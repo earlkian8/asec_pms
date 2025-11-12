@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\ActivityLogsController;
+use App\Http\Controllers\Admin\ClientsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -16,6 +17,14 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     
+    Route::prefix('client-management')->name('client-management.')->group(function(){
+        Route::get('/', [ClientsController::class, 'index'])->name('index');
+        Route::post('/store', [ClientsController::class, 'store'])->name('store');
+        Route::put('/update/{client}', [ClientsController::class, 'update'])->name('update');
+        Route::delete('/delete/{client}', [ClientsController::class, 'destroy'])->name('destroy');
+        Route::put('/update-status/{client}', [ClientsController::class, 'handleStatus'])->name('update-status');
+    });
+    // User Management
     Route::prefix('user-management')->name('user-management.')->group(function () {
 
         // Roles & Permissions

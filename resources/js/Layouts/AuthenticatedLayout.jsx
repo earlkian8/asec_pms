@@ -76,7 +76,8 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'Client Management',
-            routeName: 'clients.index',
+            href: route('client-management.index'),
+            routeName: 'client-management.*',
             icon: Users,
             type: 'single'
         },

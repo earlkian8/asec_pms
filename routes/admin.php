@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ActivityLogsController;
 use App\Http\Controllers\Admin\ClientsController;
+use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -17,6 +18,15 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     
+    // Employee Management
+    Route::prefix('employee-management')->name('employee-management.')->group(function(){
+        Route::get('/', [EmployeesController::class, 'index'])->name('index');
+        Route::post('/store', [EmployeesController::class, 'store'])->name('store');
+        Route::put('/update/{employee}', [EmployeesController::class, 'update'])->name('update');
+        Route::delete('/delete/{employee}', [EmployeesController::class, 'destroy'])->name('destroy');
+        Route::put('/update-status/{employee}', [EmployeesController::class, 'handleStatus'])->name('update-status');
+    });
+    // Client Management
     Route::prefix('client-management')->name('client-management.')->group(function(){
         Route::get('/', [ClientsController::class, 'index'])->name('index');
         Route::post('/store', [ClientsController::class, 'store'])->name('store');

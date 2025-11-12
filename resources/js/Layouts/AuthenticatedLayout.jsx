@@ -83,7 +83,8 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'Employee Management',
-            routeName: 'employees.index',
+            href: route('employee-management.index'),
+            routeName: 'employee-management.*',
             icon: UserCheck,
             type: 'single'
         },

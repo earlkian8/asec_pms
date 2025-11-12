@@ -113,12 +113,14 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             items: [
                 {
                     title: 'Roles & Permissions',
-                    routeName: 'roles.index',
+                    href: route('user-management.roles-and-permissions.index'),
+                    routeName: 'user-management.roles-and-permissions.*',
                     icon: BadgeDollarSign
                 },
                 {
                     title: 'Users',
-                    routeName: 'users.index',
+                    href: route('user-management.users.index'),
+                    routeName: 'user-management.users.*',
                     icon: User
                 },
                 {

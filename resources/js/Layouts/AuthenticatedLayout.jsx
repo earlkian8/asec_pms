@@ -123,6 +123,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 },
                 {
                     title: 'Activity Logs',
+                    href: route('user-management.activity-logs.index'),
                     routeName: 'activity-logs.index',
                     icon: FileText
                 }

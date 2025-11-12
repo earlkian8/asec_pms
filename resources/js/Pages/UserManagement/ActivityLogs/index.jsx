@@ -94,7 +94,7 @@ export default function ActivityLogsIndex() {
         <div className="w-full sm:px-6 lg:px-8">
           <div className="overflow-hidden bg-white shadow sm:rounded-lg p-2 mt-2">
             {/* Search Row */}
-            <div className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            {/* <div className="py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="w-full sm:w-auto flex-1">
                 <Input 
                   placeholder="Search" 
@@ -103,7 +103,7 @@ export default function ActivityLogsIndex() {
                   className="focus:border-gray-800 focus:ring-2 focus:ring-gray-800 focus-visible:ring-gray-800 focus-within:ring-gray-800 w-full"
                 />
               </div>
-            </div>
+            </div> */}
 
             {/* Table Content */}
             <div className="overflow-x-auto rounded-lg">

@@ -70,7 +70,8 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'Project Management',
-            routeName: 'projects.index',
+            href: route('project-management.index'),
+            routeName: 'project-management.*',
             icon: FolderOpen,
             type: 'single'
         },

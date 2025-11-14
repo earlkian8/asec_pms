@@ -15,18 +15,18 @@ class ProjectTeamsController extends Controller
     public function store(Request $request, Project $project)
     {
         $validated = $request->validate([
-            'employees'            => ['required', 'array', 'min:1'],
-            'employees.*.id'       => ['required', 'exists:employees,id'],
-            'employees.*.role'     => ['required', 'string', 'max:50'],
-            'employees.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'employees.*.start_date'  => ['nullable', 'date'],
-            'employees.*.end_date'    => ['nullable', 'date', 'after_or_equal:employees.*.start_date'],
+            'users'            => ['required', 'array', 'min:1'],
+            'users.*.id'       => ['required', 'exists:users,id'],
+            'users.*.role'     => ['required', 'string', 'max:50'],
+            'users.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
+            'users.*.start_date'  => ['nullable', 'date'],
+            'users.*.end_date'    => ['nullable', 'date', 'after_or_equal:users.*.start_date'],
         ]);
 
         $added = 0;
-        foreach ($validated['employees'] as $emp) {
+        foreach ($validated['users'] as $user) {
             $exists = ProjectTeam::where('project_id', $project->id)
-                ->where('employee_id', $emp['id'])
+                ->where('user_id', $user['id'])
                 ->exists();
 
             if ($exists) {
@@ -35,11 +35,11 @@ class ProjectTeamsController extends Controller
 
             ProjectTeam::create([
                 'project_id'   => $project->id,
-                'employee_id'  => $emp['id'],
-                'role'         => $emp['role'],
-                'hourly_rate'  => $emp['hourly_rate'],
-                'start_date'   => $emp['start_date'],
-                'end_date'     => $emp['end_date'],
+                'user_id'      => $user['id'],
+                'role'         => $user['role'],
+                'hourly_rate'  => $user['hourly_rate'],
+                'start_date'   => $user['start_date'],
+                'end_date'     => $user['end_date'],
                 'is_active'    => true,
             ]);
 
@@ -58,19 +58,19 @@ class ProjectTeamsController extends Controller
                 'ids.*' => 'integer|exists:project_teams,id',
             ]);
 
-            $teams = ProjectTeam::with('employee')
+            $teams = ProjectTeam::with('user')
                 ->where('project_id', $project->id)
                 ->whereIn('id', $validated['ids'])
                 ->get();
 
             foreach ($teams as $team) {
-                $employeeName = $team->employee->first_name . ' ' . $team->employee->last_name;
-                $role         = $team->role;
+                $userName = $team->user->name;
+                $role     = $team->role;
 
                 $this->adminActivityLogs(
                     'Project Team',
                     'Delete',
-                    "Removed {$employeeName} ({$role}) from Project {$project->project_name}"
+                    "Removed {$userName} ({$role}) from Project {$project->project_name}"
                 );
 
                 $team->delete();
@@ -84,15 +84,15 @@ class ProjectTeamsController extends Controller
             abort(404);
         }
 
-        $employeeName = $projectTeam->employee->first_name . ' ' . $projectTeam->employee->last_name;
-        $role         = $projectTeam->role;
+        $userName = $projectTeam->user->name;
+        $role     = $projectTeam->role;
 
         $projectTeam->delete();
 
         $this->adminActivityLogs(
             'Project Team',
             'Delete',
-            "Removed {$employeeName} ({$role}) from Project {$project->project_name}"
+            "Removed {$userName} ({$role}) from Project {$project->project_name}"
         );
 
         return redirect()->back()->with('success', 'Team member removed successfully.');
@@ -115,16 +115,17 @@ class ProjectTeamsController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
-        $employeeName = $projectTeam->employee->first_name . ' ' . $projectTeam->employee->last_name;
+        $userName = $projectTeam->user->name;
 
         $this->adminActivityLogs(
             'Project Team',
             'Update Status',
-            'Updated ' . $employeeName . ' status to ' . $status . ' in Project ' . $project->project_name
+            'Updated ' . $userName . ' status to ' . $status . ' in Project ' . $project->project_name
         );
 
         return redirect()->back()->with('success', 'Team member status updated successfully.');
     }
+
     public function update(Request $request, Project $project, ProjectTeam $projectTeam)
     {
         if ($projectTeam->project_id !== $project->id) {
@@ -140,15 +141,15 @@ class ProjectTeamsController extends Controller
         ]);
 
         // Save old values for logging
-        $oldEmployee = $projectTeam->employee?->first_name . ' ' . $projectTeam->employee?->last_name;
-        $oldRole     = $projectTeam->role;
-        $oldRate     = $projectTeam->hourly_rate;
-        $oldDates    = ($projectTeam->start_date ?? '---') . ' - ' . ($projectTeam->end_date ?? '---');
-        $oldStatus   = $projectTeam->is_active ? 'Active' : 'Inactive';
+        $oldUser   = $projectTeam->user?->name;
+        $oldRole   = $projectTeam->role;
+        $oldRate   = $projectTeam->hourly_rate;
+        $oldDates  = ($projectTeam->start_date ?? '---') . ' - ' . ($projectTeam->end_date ?? '---');
+        $oldStatus = $projectTeam->is_active ? 'Active' : 'Inactive';
 
         $projectTeam->update($validated);
 
-        $employee = $projectTeam->employee; // stays the same
+        $user = $projectTeam->user;
 
         $newRole   = $validated['role'];
         $newRate   = $validated['hourly_rate'] ?? '---';
@@ -158,7 +159,7 @@ class ProjectTeamsController extends Controller
         $this->adminActivityLogs(
             'Project Team',
             'Update',
-            "Updated team member {$oldEmployee} in Project {$project->project_name}: " .
+            "Updated team member {$oldUser} in Project {$project->project_name}: " .
             "Role: {$oldRole} → {$newRole}, " .
             "Rate: {$oldRate} → {$newRate}, " .
             "Dates: {$oldDates} → {$newDates}, " .

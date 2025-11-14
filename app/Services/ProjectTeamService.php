@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectTeam;
+use App\Models\User;
 
 class ProjectTeamService
 {
@@ -12,7 +13,7 @@ class ProjectTeamService
     {
         $search = request('search');
 
-        $projectTeams = ProjectTeam::with('employee')
+        $projectTeams = ProjectTeam::with('user')
             ->where('project_id', $project->id)
             ->when($search, function ($query, $search) {
                 $query->whereHas('employee', function ($q) use ($search) {
@@ -24,14 +25,13 @@ class ProjectTeamService
             ->paginate(10)
             ->withQueryString();
 
-        $employees = Employee::select('id', 'first_name', 'last_name', 'email', 'position')
-            ->where('is_active', true)
+        $employees = User::select('id', 'name', 'email')
             ->whereNotIn('id', function ($query) use ($project) {
-                $query->select('employee_id')
+                $query->select('user_id')
                     ->from('project_teams')
                     ->where('project_id', $project->id);
             })
-            ->orderBy('first_name')
+            ->orderBy('name')
             ->get();
 
         return [

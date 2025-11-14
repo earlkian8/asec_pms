@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('project_teams', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained('projects', 'id')->onDelete('cascade');
-            $table->foreignId('employee_id')->constrained('employees', 'id')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users', 'id')->onDelete('cascade');
             $table->string('role', 50);
             $table->decimal('hourly_rate', 10, 2)->nullable();
             $table->date('start_date')->nullable();
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->timestamps();
 
             // Unique constraint for project, user, and role combination
-            $table->unique(['project_id', 'employee_id', 'role'], 'project_user_role_unique');
+            $table->unique(['project_id', 'user_id', 'role'], 'project_user_role_unique');
         });
     }
 

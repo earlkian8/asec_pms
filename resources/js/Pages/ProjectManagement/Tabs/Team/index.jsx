@@ -21,25 +21,38 @@ export default function TeamTab({ project, teamData }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editProjectTeam, setEditProjectTeam] = useState(null);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const projectTeams = teamData.projectTeams.data || [];
-
+  console.log(teamData);
   // Frontend filtering
   const filteredTeam = useMemo(() => {
     if (!search) return projectTeams;
     return projectTeams.filter(team => {
-      const fullName = `${team.employee?.first_name} ${team.employee?.last_name}`.toLowerCase();
-      const email = (team.employee?.email || '').toLowerCase();
+      const fullName = `${team.user?.name || ''}`.toLowerCase();
+      const email = (team.user?.email || '').toLowerCase();
       const role = (team.role || '').toLowerCase();
       const query = search.toLowerCase();
       return fullName.includes(query) || email.includes(query) || role.includes(query);
     });
   }, [search, projectTeams]);
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredTeam.length / itemsPerPage);
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const paginatedTeam = filteredTeam.slice(startIdx, endIdx);
+
+  const goToPage = (page) => {
+    const pageNum = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(pageNum);
+  };
+
   // Selection
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredTeam.length) setSelectedIds([]);
-    else setSelectedIds(filteredTeam.map(member => member.id));
+    if (selectedIds.length === paginatedTeam.length) setSelectedIds([]);
+    else setSelectedIds(paginatedTeam.map(member => member.id));
   };
   const toggleSelect = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -67,7 +80,7 @@ export default function TeamTab({ project, teamData }) {
       { is_active: !team.is_active },
       {
         preserveScroll: true,
-        onSuccess: () => toast.success(`${team.employee?.first_name} ${team.employee?.last_name} status updated.`),
+        onSuccess: () => toast.success(`${team.user?.name} status updated.`),
         onError: () => toast.error("Failed to update status.")
       }
     );
@@ -84,7 +97,10 @@ export default function TeamTab({ project, teamData }) {
         <Input
           placeholder="Search team members..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setCurrentPage(1);
+          }}
           className="focus:border-gray-800 focus:ring-2 focus:ring-gray-800 w-full sm:max-w-md"
         />
         <div className="flex gap-2">
@@ -113,17 +129,17 @@ export default function TeamTab({ project, teamData }) {
                 <div
                   onClick={toggleSelectAll}
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
-                    selectedIds.length === filteredTeam.length && filteredTeam.length > 0
+                    selectedIds.length === paginatedTeam.length && paginatedTeam.length > 0
                       ? 'border-gray-800 bg-gray-800'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  {selectedIds.length === filteredTeam.length && filteredTeam.length > 0 && (
+                  {selectedIds.length === paginatedTeam.length && paginatedTeam.length > 0 && (
                     <Check className="h-3 w-3 text-white" />
                   )}
                 </div>
               </TableHead>
-              <TableHead>Employee</TableHead>
+              <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Hourly Rate</TableHead>
@@ -134,7 +150,7 @@ export default function TeamTab({ project, teamData }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTeam.length > 0 ? filteredTeam.map(team => {
+            {paginatedTeam.length > 0 ? paginatedTeam.map(team => {
               const isSelected = selectedIds.includes(team.id);
               return (
                 <TableRow key={team.id} className={`cursor-pointer transition ${isSelected ? "bg-gray-100" : "hover:bg-gray-50"}`}>
@@ -148,8 +164,8 @@ export default function TeamTab({ project, teamData }) {
                       {isSelected && <Check className="h-3 w-3 text-white" />}
                     </div>
                   </TableCell>
-                  <TableCell>{team.employee?.first_name} {team.employee?.last_name}</TableCell>
-                  <TableCell>{team.employee?.email}</TableCell>
+                  <TableCell>{team.user?.name}</TableCell>
+                  <TableCell>{team.user?.email}</TableCell>
                   <TableCell className="capitalize">{team.role}</TableCell>
                   <TableCell>{formatCurrency(team.hourly_rate)}</TableCell>
                   <TableCell>{formatDate(team.start_date)}</TableCell>
@@ -182,11 +198,55 @@ export default function TeamTab({ project, teamData }) {
         </Table>
       </div>
 
+      {/* Pagination Controls */}
+      {filteredTeam.length > 0 && (
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-gray-600">
+            Showing {startIdx + 1} to {Math.min(endIdx, filteredTeam.length)} of {filteredTeam.length} team members
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 h-auto"
+            >
+              Previous
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`px-3 py-1 rounded text-sm font-medium transition ${
+                    currentPage === page
+                      ? 'bg-zinc-700 text-white'
+                      : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 h-auto"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Add Modal */}
       {showAddModal && (
         <AddProjectTeam
           setShowAddModal={setShowAddModal}
-          employees={teamData.employees || []}
+          users={teamData.employees || []}
           project={project}
         />
       )}

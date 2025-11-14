@@ -24,8 +24,8 @@ class ProjectMilestone extends Model
     }
 
     // Optional: relationship to tasks (for future)
-    // public function tasks()
-    // {
-    //     return $this->hasMany(Task::class);
-    // }
+    public function tasks()
+    {
+        return $this->hasMany(ProjectTask::class);
+    }
 }

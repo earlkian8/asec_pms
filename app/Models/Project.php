@@ -32,4 +32,21 @@ class Project extends Model
     {
         return $this->hasMany(ProjectMilestone::class);
     }
+
+    public function team()
+    {
+        return $this->hasMany(ProjectTeam::class, 'project_id');
+    }
+
+    /**
+     * Get all active team users (for task assignment dropdown)
+     */
+    public function teamUsers()
+    {
+        return $this->team()
+            ->active()      // only active members
+            ->current()     // current members
+            ->with('user'); // eager load employee/user info
+    }
+    
 }

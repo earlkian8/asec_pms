@@ -9,7 +9,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import { router } from "@inertiajs/react"
 import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
@@ -28,13 +27,6 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }))
-  }
-
-  const handleCheckbox = (checked) => {
-    setFormData((prev) => ({
-      ...prev,
-      is_active: checked,
     }))
   }
 
@@ -63,8 +55,7 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            Edit Team Member – {projectTeam.employee?.first_name}{" "}
-            {projectTeam.employee?.last_name}
+            Edit Team Member – {projectTeam.user?.name}
           </DialogTitle>
         </DialogHeader>
 
@@ -113,14 +104,14 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
 
           <div className="flex items-center gap-2">
             <Switch
-                checked={formData.is_active}
-                onCheckedChange={(checked) =>
+              checked={formData.is_active}
+              onCheckedChange={(checked) =>
                 setFormData((prev) => ({ ...prev, is_active: checked }))
-                }
-                className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+              }
+              className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
             />
             <Label>Status ({formData.is_active ? "Active" : "Inactive"})</Label>
-            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditModal(false)}>

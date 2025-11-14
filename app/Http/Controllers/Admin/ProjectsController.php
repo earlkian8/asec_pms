@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Project;
+use App\Models\ProjectTask;
 use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Services\ProjectTeamService;
 use App\Services\ProjectFilesService;
 use App\Services\ProjectMilestonesService;
+use App\Services\TaskService;
 
 class ProjectsController extends Controller
 {
@@ -19,11 +21,13 @@ class ProjectsController extends Controller
     protected $projectTeamService;
     protected $projectFilesService;
     protected $projectMilestonesService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService)
+    protected $projectTasksService;
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
         $this->projectMilestonesService = $projectMilestonesService;
+        $this->projectTasksService = $projectTasksService;
     }
     public function index(Request $request)
     {
@@ -122,20 +126,30 @@ class ProjectsController extends Controller
     }
 
     public function show(Project $project, Request $request)
-    {
-        // Load needed relationships (add more depending on future tabs)
-        $project->load(['client']);
+{
+    // Load project relationships
+    $project->load(['client']);
 
-        $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
-        $fileData = $this->projectFilesService->getProjectFilesData($project);
-        $milestoneData = $this->projectMilestonesService->getProjectMilestonesData($project);
-        return Inertia::render('ProjectManagement/project-detail', [
-            'project' => $project,
-            'teamData' => $teamData,
-            'fileData'  => $fileData,
-            'milestoneData' => $milestoneData,
-        ]);
-    }
+    // Get project team data
+    $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
+
+    // Get project files data
+    $fileData = $this->projectFilesService->getProjectFilesData($project);
+
+    // Get project milestones data
+    $milestoneData = $this->projectMilestonesService->getProjectMilestonesData($project);
+
+    // Get all tasks, users, and milestones using the new TaskService
+    $taskData = $this->projectTasksService->getTaskData($project);
+
+    return Inertia::render('ProjectManagement/project-detail', [
+        'project' => $project,
+        'teamData' => $teamData,
+        'fileData' => $fileData,
+        'milestoneData' => $milestoneData,
+        'taskData' => $taskData,
+    ]);
+}
 
     
 

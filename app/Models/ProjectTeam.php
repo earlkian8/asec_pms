@@ -11,7 +11,7 @@ class ProjectTeam extends Model
 
     protected $fillable = [
         'project_id',
-        'employee_id',
+        'user_id',
         'role',
         'hourly_rate',
         'start_date',
@@ -38,9 +38,9 @@ class ProjectTeam extends Model
     /**
      * Get the employee assigned to the project team.
      */
-    public function employee()
+    public function user()
     {
-        return $this->belongsTo(Employee::class, 'employee_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**

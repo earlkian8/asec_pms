@@ -22,6 +22,8 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [editMilestone, setEditMilestone] = useState(null);
   const [deleteMilestone, setDeleteMilestone] = useState(null);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const milestones = milestoneData.milestones.data || [];
 
@@ -37,7 +39,21 @@ export default function MilestonesTab({ project, milestoneData }) {
     });
   }, [search, milestones]);
 
-  const handleSearch = (e) => setSearch(e.target.value);
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredMilestones.length / itemsPerPage);
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const paginatedMilestones = filteredMilestones.slice(startIdx, endIdx);
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
+  const goToPage = (page) => {
+    const pageNum = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(pageNum);
+  };
 
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
@@ -64,22 +80,22 @@ export default function MilestonesTab({ project, milestoneData }) {
         <Table className="min-w-[600px] w-full">
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Action</TableHead>
+              <TableHead className="w-[15%]">Name</TableHead>
+              <TableHead className="w-[40%]">Description</TableHead>
+              <TableHead className="w-[20%]">Due Date</TableHead>
+              <TableHead className="w-[15%]">Status</TableHead>
+              <TableHead className="w-[10%] text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMilestones.length > 0 ? filteredMilestones.map(milestone => (
+            {paginatedMilestones.length > 0 ? paginatedMilestones.map(milestone => (
               <TableRow key={milestone.id} className="hover:bg-gray-50 transition">
                 <TableCell>{milestone.name}</TableCell>
                 <TableCell>{milestone.description || '---'}</TableCell>
                 <TableCell>{formatDate(milestone.due_date)}</TableCell>
                 <TableCell className="capitalize">{milestone.status}</TableCell>
                 <TableCell>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 justify-end">
                     <button
                       onClick={() => { setEditMilestone(milestone); setShowEditModal(true); }}
                       className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
@@ -110,6 +126,50 @@ export default function MilestonesTab({ project, milestoneData }) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination Controls */}
+      {filteredMilestones.length > 0 && (
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-gray-600">
+            Showing {startIdx + 1} to {Math.min(endIdx, filteredMilestones.length)} of {filteredMilestones.length} milestones
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 h-auto"
+            >
+              Previous
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`px-3 py-1 rounded text-sm font-medium transition ${
+                    currentPage === page
+                      ? 'bg-zinc-700 text-white'
+                      : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 h-auto"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       {showAddModal && (

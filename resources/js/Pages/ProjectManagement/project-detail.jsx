@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 // Future Tab Imports
 // import OverviewTab from './Tabs/Overview';
 import MilestonesTab from './Tabs/Milestones';
-// import TasksTab from './Tabs/Tasks';
+import TasksTab from './Tabs/Tasks';
 import TeamTab from './Tabs/Team/index';
 import FilesTab from './Tabs/Files/index';
 // import ProgressUpdatesTab from './Tabs/ProgressUpdates';
@@ -16,7 +16,7 @@ import FilesTab from './Tabs/Files/index';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData, fileData, milestoneData } = usePage().props;
+    const { project, teamData, fileData, milestoneData, taskData } = usePage().props;
 
     const breadcrumbs = [
         { title: "Home", href: route("dashboard") },
@@ -28,7 +28,7 @@ export default function ProjectDetail() {
     const tabs = [
         // { key: "overview", label: "Overview", component: <OverviewTab project={project} /> },
         { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
-        // { key: "tasks", label: "Tasks", component: <TasksTab project={project} /> },
+        { key: "tasks", label: "Tasks", component: <TasksTab project={project} taskData={taskData} /> },
         { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
         { key: "files", label: "Files", component: <FilesTab project={project} fileData={fileData} /> },
         // { key: "progress-update", label: "Progress Update", component: <ProgressUpdatesTab project={project} /> },

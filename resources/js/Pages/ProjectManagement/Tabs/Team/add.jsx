@@ -19,34 +19,35 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { router } from "@inertiajs/react"
 import { toast } from "sonner"
-import AddEmployee from "@/Pages/EmployeeManagement/add"
-export default function AddProjectTeam({ setShowAddModal, employees = [], project }) {
-  const [search, setSearch] = useState("")
-  const [selectedEmployees, setSelectedEmployees] = useState([])
-  const [formData, setFormData] = useState({})
-  const [showNewModal, setShowNewModal] = useState(false) // ✅ new modal state
+import AddUser from "@/Pages/UserManagement/Users/add"
 
-  const filteredEmployees = employees.filter((e) => {
-    const fullName = `${e.first_name} ${e.last_name}`.toLowerCase()
+export default function AddProjectTeam({ setShowAddModal, users = [], project }) {
+  const [search, setSearch] = useState("")
+  const [selectedUsers, setSelectedUsers] = useState([])
+  const [formData, setFormData] = useState({})
+  const [showNewModal, setShowNewModal] = useState(false)
+
+  const filteredUsers = users.filter((u) => {
+    const fullName = `${u.name || ''}`.toLowerCase()
     return (
       fullName.includes(search.toLowerCase()) ||
-      e.email.toLowerCase().includes(search.toLowerCase())
+      u.email.toLowerCase().includes(search.toLowerCase())
     )
   })
 
   const toggleSelectAll = (checked) => {
     if (checked) {
-      setSelectedEmployees(filteredEmployees.map((e) => e.id))
+      setSelectedUsers(filteredUsers.map((u) => u.id))
     } else {
-      setSelectedEmployees([])
+      setSelectedUsers([])
     }
   }
 
-  const toggleEmployee = (id) => {
-    if (selectedEmployees.includes(id)) {
-      setSelectedEmployees(selectedEmployees.filter((eid) => eid !== id))
+  const toggleUser = (id) => {
+    if (selectedUsers.includes(id)) {
+      setSelectedUsers(selectedUsers.filter((uid) => uid !== id))
     } else {
-      setSelectedEmployees([...selectedEmployees, id])
+      setSelectedUsers([...selectedUsers, id])
     }
   }
 
@@ -61,37 +62,36 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
   }
 
   const handleSubmit = (e) => {
-  e.preventDefault()
+    e.preventDefault()
 
-  if (selectedEmployees.length === 0) {
-    toast.error("Please select at least one employee.")
-    return
-  }
-
-  const employeesPayload = selectedEmployees.map((employeeId) => ({
-    id: employeeId,
-    role: formData[employeeId]?.role || "Member",
-    hourly_rate: formData[employeeId]?.hourly_rate || null,
-    start_date: formData[employeeId]?.start_date || null,
-    end_date: formData[employeeId]?.end_date || null,
-  }))
-
-  router.post(
-    route("project-management.project-teams.store", project.id),
-    { employees: employeesPayload },
-    {
-      preserveScroll: true,
-      onSuccess: () => {
-        toast.success("Team members assigned successfully")
-        setShowAddModal(false)
-      },
-      onError: (errors) => {
-        toast.error("Failed to assign some team members.")
-      },
+    if (selectedUsers.length === 0) {
+      toast.error("Please select at least one user.")
+      return
     }
-  )
-}
 
+    const usersPayload = selectedUsers.map((userId) => ({
+      id: userId,
+      role: formData[userId]?.role || "Member",
+      hourly_rate: formData[userId]?.hourly_rate || null,
+      start_date: formData[userId]?.start_date || null,
+      end_date: formData[userId]?.end_date || null,
+    }))
+
+    router.post(
+      route("project-management.project-teams.store", project.id),
+      { users: usersPayload },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          toast.success("Team members assigned successfully")
+          setShowAddModal(false)
+        },
+        onError: (errors) => {
+          toast.error("Failed to assign some team members.")
+        },
+      }
+    )
+  }
 
   return (
     <Dialog open={true} onOpenChange={() => setShowAddModal(false)}>
@@ -103,7 +103,7 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
         {/* Search + New Button */}
         <div className="mb-3 flex items-center justify-between gap-2">
           <Input
-            placeholder="Search employees by name or email..."
+            placeholder="Search users by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -124,12 +124,12 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
                 <TableHead className="w-12">
                   <Checkbox
                     checked={
-                      filteredEmployees.length > 0 &&
-                      selectedEmployees.length === filteredEmployees.length
+                      filteredUsers.length > 0 &&
+                      selectedUsers.length === filteredUsers.length
                     }
                     indeterminate={
-                      selectedEmployees.length > 0 &&
-                      selectedEmployees.length < filteredEmployees.length
+                      selectedUsers.length > 0 &&
+                      selectedUsers.length < filteredUsers.length
                     }
                     onCheckedChange={(checked) => toggleSelectAll(checked)}
                   />
@@ -143,16 +143,15 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEmployees.map((emp) => {
-                const isSelected = selectedEmployees.includes(emp.id);
+              {filteredUsers.map((user) => {
+                const isSelected = selectedUsers.includes(user.id);
 
                 return (
                   <TableRow
-                    key={emp.id}
+                    key={user.id}
                     onClick={(e) => {
-                      // Prevent toggling when clicking inside inputs/checkbox
                       if (e.target.closest("input")) return;
-                      toggleEmployee(emp.id);
+                      toggleUser(user.id);
                     }}
                     className={`cursor-pointer transition ${
                       isSelected ? "bg-gray-100" : "hover:bg-gray-50"
@@ -161,19 +160,17 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
                     <TableCell>
                       <Checkbox
                         checked={isSelected}
-                        onCheckedChange={(checked) => {
-                          toggleEmployee(emp.id);
-                        }}
-                        onClick={(e) => e.stopPropagation()} // prevent row toggle duplication
+                        onCheckedChange={() => toggleUser(user.id)}
+                        onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
-                    <TableCell>{emp.first_name} {emp.last_name}</TableCell>
-                    <TableCell>{emp.email}</TableCell>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
                     <TableCell>
                       <Input
                         placeholder="Role"
-                        value={formData[emp.id]?.role || ""}
-                        onChange={(e) => handleChange(emp.id, "role", e.target.value)}
+                        value={formData[user.id]?.role || ""}
+                        onChange={(e) => handleChange(user.id, "role", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
@@ -181,39 +178,38 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
                       <Input
                         type="number"
                         placeholder="0.00"
-                        value={formData[emp.id]?.hourly_rate || ""}
-                        onChange={(e) => handleChange(emp.id, "hourly_rate", e.target.value)}
+                        value={formData[user.id]?.hourly_rate || ""}
+                        onChange={(e) => handleChange(user.id, "hourly_rate", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
                     <TableCell>
                       <Input
                         type="date"
-                        value={formData[emp.id]?.start_date || ""}
-                        onChange={(e) => handleChange(emp.id, "start_date", e.target.value)}
+                        value={formData[user.id]?.start_date || ""}
+                        onChange={(e) => handleChange(user.id, "start_date", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
                     <TableCell>
                       <Input
                         type="date"
-                        value={formData[emp.id]?.end_date || ""}
-                        onChange={(e) => handleChange(emp.id, "end_date", e.target.value)}
+                        value={formData[user.id]?.end_date || ""}
+                        onChange={(e) => handleChange(user.id, "end_date", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
                   </TableRow>
                 );
               })}
-              {filteredEmployees.length === 0 && (
+              {filteredUsers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-sm text-gray-500">
-                    No employees found
+                    No users found
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
-
           </Table>
         </div>
 
@@ -221,15 +217,13 @@ export default function AddProjectTeam({ setShowAddModal, employees = [], projec
           <Button variant="outline" onClick={() => setShowAddModal(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={selectedEmployees.length === 0}>
+          <Button onClick={handleSubmit} disabled={selectedUsers.length === 0}>
             Add Selected
           </Button>
         </DialogFooter>
       </DialogContent>
 
-      {showNewModal && (
-        <AddEmployee setShowAddModal={setShowNewModal}/>
-      )}
+      {showNewModal && <AddUser setShowAddModal={setShowNewModal} />}
     </Dialog>
   )
 }

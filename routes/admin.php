@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
 use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
+use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
@@ -55,6 +56,13 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'update'])->name('update');
             Route::delete('/destroy/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'destroy'])->name('destroy');
         });
+
+        // Project Tasks
+        Route::prefix('project-tasks')->name('project-tasks.')->group(function(){
+            Route::post('/store', [ProjectTasksController::class, 'store'])->name('store');
+            Route::put('/update/{milestone}/task/{task}', [ProjectTasksController::class, 'update'])->name('update');
+            Route::delete('/destroy/{milestone}/task/{task}', [ProjectTasksController::class, 'destroy'])->name('destroy');
+        }); 
     });
 
     // Employee Management

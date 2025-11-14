@@ -8,11 +8,19 @@ use App\Models\Project;
 use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Services\ProjectTeamService;
+
 
 class ProjectsController extends Controller
 {
     use ActivityLogsTrait;
 
+    protected $projectTeamService;
+
+    public function __construct(ProjectTeamService $projectTeamService)
+    {
+        $this->projectTeamService = $projectTeamService;
+    }
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -107,6 +115,96 @@ class ProjectsController extends Controller
         $this->adminActivityLogs('Project', 'Delete', 'Deleted Project ' . $projectName);
 
         return redirect()->back()->with('success', 'Project deleted successfully.');
+    }
+
+    public function show(Project $project, Request $request)
+    {
+        // Load needed relationships (add more depending on future tabs)
+        $project->load(['client']);
+
+        $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
+
+        return Inertia::render('ProjectManagement/project-detail', [
+            'project' => $project,
+            'teamData' => $teamData,
+        ]);
+    }
+
+    public function destroyTeam(Request $request, Project $project, ProjectTeam $projectTeam = null)
+    {
+        // If request has "ids", then it's a bulk destroy
+        if ($request->has('ids') && is_array($request->ids)) {
+            $validated = $request->validate([
+                'ids'   => 'required|array|min:1',
+                'ids.*' => 'integer|exists:project_teams,id',
+            ]);
+
+            $teams = ProjectTeam::with('employee')
+                ->where('project_id', $project->id)
+                ->whereIn('id', $validated['ids'])
+                ->get();
+
+            foreach ($teams as $team) {
+                $employeeName = $team->employee->first_name . ' ' . $team->employee->last_name;
+                $role         = $team->role;
+
+                $this->adminActivityLogs(
+                    'Project Team',
+                    'Delete',
+                    "Removed {$employeeName} ({$role}) from Project {$project->project_name}"
+                );
+
+                $team->delete();
+            }
+
+            return redirect()->back()->with('success', 'Selected team members removed successfully.');
+        }
+
+        // Otherwise, it's a single destroy
+        if (!$projectTeam || $projectTeam->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $employeeName = $projectTeam->employee->first_name . ' ' . $projectTeam->employee->last_name;
+        $role         = $projectTeam->role;
+
+        $projectTeam->delete();
+
+        $this->adminActivityLogs(
+            'Project Team',
+            'Delete',
+            "Removed {$employeeName} ({$role}) from Project {$project->project_name}"
+        );
+
+        return redirect()->back()->with('success', 'Team member removed successfully.');
+    }
+
+
+    public function handleStatus(Request $request, Projects $project, ProjectTeam $projectTeam)
+    {
+        if ($projectTeam->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $status = $request->boolean('is_active') ? 'active' : 'inactive';
+
+        $projectTeam->update([
+            'is_active' => $request->boolean('is_active'),
+        ]);
+
+        $employeeName = $projectTeam->employee->first_name . ' ' . $projectTeam->employee->last_name;
+
+        $this->adminActivityLogs(
+            'Project Team',
+            'Update Status',
+            'Updated ' . $employeeName . ' status to ' . $status . ' in Project ' . $project->project_name
+        );
+
+        return redirect()->back()->with('success', 'Team member status updated successfully.');
     }
 
 }

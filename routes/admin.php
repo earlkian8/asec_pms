@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ActivityLogsController;
 use App\Http\Controllers\Admin\ClientsController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectsController;
+use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -28,6 +29,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/store', [ProjectsController::class, 'store'])->name('store');
         Route::put('/update/{project}', [ProjectsController::class, 'update'])->name('update');
         Route::delete('/delete/{project}', [ProjectsController::class, 'destroy'])->name('destroy');
+        Route::get('/view/{project}', [ProjectsController::class, 'show'])->name('view');
+
+        Route::prefix('project-teams')->name('project-teams.')->group(function(){
+            Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])->name('store');
+            Route::post('/delete/{project}/{projectTeam?}', [ProjectTeamsController::class, 'destroy'])->name('destroy');
+            Route::put('/update-status/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'handleStatus'])->name('update-status');
+            Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])->name('update');
+        });
     });
     // Employee Management
     Route::prefix('employee-management')->name('employee-management.')->group(function(){

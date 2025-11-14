@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, usePage, router } from '@inertiajs/react';
+import { Head, usePage, router, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { 
   Table,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
-import { Trash2, SquarePen } from 'lucide-react';
+import { Trash2, SquarePen, Eye } from 'lucide-react';
 
 import AddProject from './add';
 import EditProject from './edit';
@@ -28,7 +28,6 @@ export default function ProjectsIndex() {
     { header: 'Code', width: '10%' },
     { header: 'Name', width: '20%' },
     { header: 'Client', width: '15%' },
-    { header: 'Category', width: '15%' },
     { header: 'Type', width: '10%' },
     { header: 'Status', width: '10%' },
     { header: 'Priority', width: '10%' },
@@ -186,7 +185,6 @@ export default function ProjectsIndex() {
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">{project.project_code || '---'}</TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">{project.project_name}</TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">{project.client?.client_name || '---'}</TableCell>
-                        <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">{project.category?.category_name || '---'}</TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">
                           <span className={`p-2 rounded-sm ${typeColors[project.project_type] || 'bg-gray-100 text-gray-800'}`}>
                             {project.project_type}
@@ -204,6 +202,15 @@ export default function ProjectsIndex() {
                         </TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">
                           <div className="flex gap-2">
+                            <Link href={route('project-management.view', project.id)}>
+                              <button
+                                  className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                  title="View Transactions"
+                                  aria-label="View Transactions"
+                              >
+                                  <Eye size={18} />
+                              </button>
+                            </Link>
                             <button
                               onClick={() => {
                                 setEditProject(project);

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ActivityLogsController;
 use App\Http\Controllers\Admin\ClientsController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
+use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\RolesController;
@@ -40,11 +41,19 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])->name('update');
         });
 
+        // Project Files
         Route::prefix('project-files')->name('project-files.')->group(function(){
             Route::post('/store/{project}', [ProjectFilesController::class, 'store'])->name('store');
             Route::put('/update/{project}/files/{file}', [ProjectFilesController::class, 'update'])->name('update');
             Route::delete('/destroy/{project}/files/{file?}', [ProjectFilesController::class, 'destroy'])->name('destroy');
             Route::get('/download/{project}/files/{file}', [ProjectFilesController::class, 'download'])->name('download');
+        });
+
+        // Project Milestones
+        Route::prefix('project-milestones')->name('project-milestones.')->group(function(){
+            Route::post('/store/{project}', [ProjectMilestonesController::class, 'store'])->name('store');
+            Route::put('/update/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'update'])->name('update');
+            Route::delete('/destroy/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'destroy'])->name('destroy');
         });
     });
 

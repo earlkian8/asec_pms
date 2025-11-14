@@ -1,0 +1,140 @@
+import { useForm } from "@inertiajs/react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/Components/ui/dialog";
+import { Input } from "@/Components/ui/input";
+import InputError from "@/Components/InputError";
+import { Label } from "@/Components/ui/label";
+import { Button } from "@/Components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
+import { Textarea } from "@/Components/ui/textarea";
+
+const EditMilestone = ({ setShowEditModal, milestone, project }) => {
+  const { data, setData, put, errors, processing } = useForm({
+    name: milestone.name || "",
+    description: milestone.description || "",
+    due_date: milestone.due_date || "",
+    status: milestone.status || "pending",
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    put(route("project-management.project-milestones.update", [project.id, milestone.id]), {
+      preserveScroll: true,
+      onSuccess: (page) => {
+        setShowEditModal(false);
+        const flash = page.props.flash;
+        if (flash && flash.error) {
+          toast.error(flash.error);
+        } else {
+          toast.success("Milestone updated successfully!");
+        }
+      },
+      onError: () => toast.error("Please check the form for errors"),
+    });
+  };
+
+  const inputClass = (error) =>
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    (error
+      ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
+      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
+
+  return (
+    <Dialog open onOpenChange={setShowEditModal}>
+      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-zinc-800">Edit Milestone</DialogTitle>
+          <DialogDescription className="text-zinc-600">
+            Update the milestone details below.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+          {/* Name */}
+          <div>
+            <Label className="text-zinc-800">Milestone Name</Label>
+            <Input
+              type="text"
+              value={data.name}
+              onChange={(e) => setData("name", e.target.value)}
+              placeholder="Enter milestone name"
+              className={inputClass(errors.name)}
+            />
+            <InputError message={errors.name} />
+          </div>
+
+          {/* Description */}
+          <div>
+            <Label className="text-zinc-800">Description</Label>
+            <Textarea
+              value={data.description}
+              onChange={(e) => setData("description", e.target.value)}
+              placeholder="Enter milestone description"
+              className={inputClass(errors.description)}
+            />
+            <InputError message={errors.description} />
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <Label className="text-zinc-800">Due Date</Label>
+            <Input
+              type="date"
+              value={data.due_date}
+              onChange={(e) => setData("due_date", e.target.value)}
+              className={inputClass(errors.due_date)}
+            />
+            <InputError message={errors.due_date} />
+          </div>
+
+          {/* Status */}
+          <div>
+            <Label className="text-zinc-800">Status</Label>
+            <Select
+              value={data.status}
+              onValueChange={(value) => setData("status", value)}
+            >
+              <SelectTrigger className={inputClass(errors.status)}>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+            <InputError message={errors.status} />
+          </div>
+
+          {/* Footer Buttons */}
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEditModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-zinc-800 text-white hover:bg-zinc-900 transition"
+              disabled={processing}
+            >
+              Update Milestone
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default EditMilestone;

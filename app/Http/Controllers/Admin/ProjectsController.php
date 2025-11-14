@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Services\ProjectTeamService;
 use App\Services\ProjectFilesService;
+use App\Services\ProjectMilestonesService;
 
 class ProjectsController extends Controller
 {
@@ -17,10 +18,12 @@ class ProjectsController extends Controller
 
     protected $projectTeamService;
     protected $projectFilesService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService)
+    protected $projectMilestonesService;
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
+        $this->projectMilestonesService = $projectMilestonesService;
     }
     public function index(Request $request)
     {
@@ -125,11 +128,12 @@ class ProjectsController extends Controller
 
         $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
         $fileData = $this->projectFilesService->getProjectFilesData($project);
-
+        $milestoneData = $this->projectMilestonesService->getProjectMilestonesData($project);
         return Inertia::render('ProjectManagement/project-detail', [
             'project' => $project,
             'teamData' => $teamData,
             'fileData'  => $fileData,
+            'milestoneData' => $milestoneData,
         ]);
     }
 

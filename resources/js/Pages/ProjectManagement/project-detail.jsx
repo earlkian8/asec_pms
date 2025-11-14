@@ -8,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 // import MilestonesTab from './Tabs/Milestones';
 // import TasksTab from './Tabs/Tasks';
 import TeamTab from './Tabs/Team/index';
-// import FilesTab from './Tabs/Files';
+import FilesTab from './Tabs/Files/index';
 // import ProgressUpdatesTab from './Tabs/ProgressUpdates';
 // import BudgetTab from './Tabs/Budget';
 // import MaterialAllocationTab from './Tabs/MaterialAllocation';
@@ -16,7 +16,7 @@ import TeamTab from './Tabs/Team/index';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData } = usePage().props;
+    const { project, teamData, fileData } = usePage().props;
 
     const breadcrumbs = [
         { title: "Home", href: route("dashboard") },
@@ -30,7 +30,7 @@ export default function ProjectDetail() {
         // { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} /> },
         // { key: "tasks", label: "Tasks", component: <TasksTab project={project} /> },
         { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
-        // { key: "files", label: "Files", component: <FilesTab project={project} /> },
+        { key: "files", label: "Files", component: <FilesTab project={project} fileData={fileData} /> },
         // { key: "progress-update", label: "Progress Update", component: <ProgressUpdatesTab project={project} /> },
         // { key: "budget", label: "Budget", component: <BudgetTab project={project} /> },
         // { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} /> },

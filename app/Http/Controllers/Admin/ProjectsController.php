@@ -9,17 +9,18 @@ use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Services\ProjectTeamService;
-
+use App\Services\ProjectFilesService;
 
 class ProjectsController extends Controller
 {
     use ActivityLogsTrait;
 
     protected $projectTeamService;
-
-    public function __construct(ProjectTeamService $projectTeamService)
+    protected $projectFilesService;
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService)
     {
         $this->projectTeamService = $projectTeamService;
+        $this->projectFilesService = $projectFilesService;
     }
     public function index(Request $request)
     {
@@ -123,10 +124,12 @@ class ProjectsController extends Controller
         $project->load(['client']);
 
         $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
+        $fileData = $this->projectFilesService->getProjectFilesData($project);
 
         return Inertia::render('ProjectManagement/project-detail', [
             'project' => $project,
             'teamData' => $teamData,
+            'fileData'  => $fileData,
         ]);
     }
 

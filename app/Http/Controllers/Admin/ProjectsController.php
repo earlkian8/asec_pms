@@ -13,6 +13,7 @@ use App\Services\ProjectTeamService;
 use App\Services\ProjectFilesService;
 use App\Services\ProjectMilestonesService;
 use App\Services\TaskService;
+use App\Services\ProgressUpdateService;
 
 class ProjectsController extends Controller
 {
@@ -22,12 +23,14 @@ class ProjectsController extends Controller
     protected $projectFilesService;
     protected $projectMilestonesService;
     protected $projectTasksService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService)
+    protected $progressUpdateService;
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
         $this->projectMilestonesService = $projectMilestonesService;
         $this->projectTasksService = $projectTasksService;
+        $this->progressUpdateService = $progressUpdateService;
     }
     public function index(Request $request)
     {
@@ -142,12 +145,16 @@ class ProjectsController extends Controller
     // Get all tasks, users, and milestones using the new TaskService
     $taskData = $this->projectTasksService->getTaskData($project);
 
+    // Get progress updates data
+    $progressUpdateData = $this->progressUpdateService->getProgressUpdateData($project);
+
     return Inertia::render('ProjectManagement/project-detail', [
         'project' => $project,
         'teamData' => $teamData,
         'fileData' => $fileData,
         'milestoneData' => $milestoneData,
         'taskData' => $taskData,
+        'progressUpdateData' => $progressUpdateData,
     ]);
 }
 

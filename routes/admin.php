@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
+use App\Http\Controllers\Admin\ProgressUpdatesController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -63,6 +64,13 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{milestone}/task/{task}', [ProjectTasksController::class, 'update'])->name('update');
             Route::put('/update-status/{milestone}/task/{task}', [ProjectTasksController::class, 'updateStatus'])->name('update-status');
             Route::delete('/destroy/{milestone}/task/{task}', [ProjectTasksController::class, 'destroy'])->name('destroy');
+        });
+
+        // Progress Updates
+        Route::prefix('progress-updates')->name('progress-updates.')->group(function(){
+            Route::post('/store', [ProgressUpdatesController::class, 'store'])->name('store');
+            Route::put('/update/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'update'])->name('update');
+            Route::delete('/destroy/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'destroy'])->name('destroy');
         }); 
     });
 

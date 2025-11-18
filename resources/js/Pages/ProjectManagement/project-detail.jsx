@@ -9,14 +9,14 @@ import MilestonesTab from './Tabs/Milestones';
 import TasksTab from './Tabs/Tasks';
 import TeamTab from './Tabs/Team/index';
 import FilesTab from './Tabs/Files/index';
-// import ProgressUpdatesTab from './Tabs/ProgressUpdates';
+import ProgressUpdateTab from './Tabs/ProgressUpdate';
 // import BudgetTab from './Tabs/Budget';
 // import MaterialAllocationTab from './Tabs/MaterialAllocation';
 // import LaborCostTab from './Tabs/LaborCost';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData, fileData, milestoneData, taskData } = usePage().props;
+    const { project, teamData, fileData, milestoneData, taskData, progressUpdateData } = usePage().props;
 
     const breadcrumbs = [
         { title: "Home", href: route("dashboard") },
@@ -31,8 +31,7 @@ export default function ProjectDetail() {
         { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
         { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
         { key: "tasks", label: "Tasks", component: <TasksTab project={project} taskData={taskData} /> },
-        // { key: "progress-update", label: "Progress Update", component: <ProgressUpdatesTab project={project} /> },
-        { key: "progress-update", label: "Progress Update" },
+        { key: "progress-update", label: "Progress Update", component: <ProgressUpdateTab project={project} progressUpdateData={progressUpdateData} /> },
         { key: "files", label: "Files", component: <FilesTab project={project} fileData={fileData} /> },
         
         // { key: "budget", label: "Budget", component: <BudgetTab project={project} /> },

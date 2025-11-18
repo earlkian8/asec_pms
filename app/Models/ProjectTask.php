@@ -27,4 +27,9 @@ class ProjectTask extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to');
     }
+
+    public function progressUpdates()
+    {
+        return $this->hasMany(ProgressUpdate::class, 'project_task_id');
+    }
 }

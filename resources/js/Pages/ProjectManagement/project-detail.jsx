@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 // Future Tab Imports
-// import OverviewTab from './Tabs/Overview';
+import OverviewTab from './Tabs/Overview';
 import MilestonesTab from './Tabs/Milestones';
 import TeamTab from './Tabs/Team/index';
 import MaterialAllocationTab from './Tabs/MaterialAllocation';
@@ -13,7 +13,7 @@ import LaborCostTab from './Tabs/LaborCost';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData, milestoneData, materialAllocationData, laborCostData } = usePage().props;
+    const { project, teamData, milestoneData, materialAllocationData, laborCostData, overviewData } = usePage().props;
 
     const breadcrumbs = [
         { title: "Home", href: route("dashboard") },
@@ -23,8 +23,7 @@ export default function ProjectDetail() {
 
     // Flexible Tab List
     const tabs = [
-        // { key: "overview", label: "Overview", component: <OverviewTab project={project} /> },
-        { key: "overview", label: "Overview" },
+        { key: "overview", label: "Overview", component: <OverviewTab project={project} overviewData={overviewData} /> },
         { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
         { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
         { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} /> },

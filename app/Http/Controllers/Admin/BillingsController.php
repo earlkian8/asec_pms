@@ -32,7 +32,7 @@ class BillingsController extends Controller
         $projects = Project::where('is_billable', true)
             ->with('milestones:id,project_id,name')
             ->orderBy('project_name', 'asc')
-            ->get(['id', 'project_code', 'project_name', 'billing_type']);
+            ->get(['id', 'project_code', 'project_name', 'billing_type', 'contract_amount']);
 
         $data['projects'] = $projects;
 
@@ -70,6 +70,24 @@ class BillingsController extends Controller
             
             if (!$milestone) {
                 return back()->with('error', 'Milestone does not belong to this project.');
+            }
+        }
+
+        // Validate billing amount against contract amount
+        if ($validated['billing_type'] === 'fixed_price') {
+            // For fixed price, check if billing amount exceeds contract amount
+            if ($validated['billing_amount'] > $project->contract_amount) {
+                return back()->with('error', 'Billing amount cannot exceed contract amount (' . number_format($project->contract_amount, 2) . ').');
+            }
+
+            // Check total existing billings + new billing doesn't exceed contract amount
+            $totalBilled = Billing::where('project_id', $project->id)
+                ->where('billing_type', 'fixed_price')
+                ->sum('billing_amount');
+            
+            if (($totalBilled + $validated['billing_amount']) > $project->contract_amount) {
+                $remaining = $project->contract_amount - $totalBilled;
+                return back()->with('error', 'Total billings would exceed contract amount. Remaining billable amount: ' . number_format($remaining, 2) . '.');
             }
         }
 

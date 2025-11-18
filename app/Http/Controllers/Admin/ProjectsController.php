@@ -16,6 +16,7 @@ use App\Services\TaskService;
 use App\Services\ProgressUpdateService;
 use App\Services\MaterialAllocationService;
 use App\Services\LaborCostService;
+use App\Services\ProjectOverviewService;
 
 class ProjectsController extends Controller
 {
@@ -28,7 +29,8 @@ class ProjectsController extends Controller
     protected $progressUpdateService;
     protected $materialAllocationService;
     protected $laborCostService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService)
+    protected $projectOverviewService;
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService, ProjectOverviewService $projectOverviewService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
@@ -37,6 +39,7 @@ class ProjectsController extends Controller
         $this->progressUpdateService = $progressUpdateService;
         $this->materialAllocationService = $materialAllocationService;
         $this->laborCostService = $laborCostService;
+        $this->projectOverviewService = $projectOverviewService;
     }
     public function index(Request $request)
     {
@@ -154,6 +157,9 @@ class ProjectsController extends Controller
     // Get labor cost data
     $laborCostData = $this->laborCostService->getProjectLaborCostsData($project);
 
+    // Get project overview data
+    $overviewData = $this->projectOverviewService->getProjectOverviewData($project);
+
     return Inertia::render('ProjectManagement/project-detail', [
         'project' => $project,
         'teamData' => $teamData,
@@ -161,6 +167,7 @@ class ProjectsController extends Controller
         'milestoneData' => $milestoneData,
         'materialAllocationData' => $materialAllocationData,
         'laborCostData' => $laborCostData,
+        'overviewData' => $overviewData,
     ]);
 }
 

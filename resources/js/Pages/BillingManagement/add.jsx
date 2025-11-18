@@ -47,12 +47,19 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
         if (project.billing_type !== 'milestone') {
           setData('milestone_id', '');
         }
+        // For fixed_price billing, auto-fill billing amount with contract amount
+        if (project.billing_type === 'fixed_price' && project.contract_amount) {
+          setData('billing_amount', parseFloat(project.contract_amount).toFixed(2));
+        } else {
+          setData('billing_amount', '');
+        }
       }
     } else {
       setSelectedProject(null);
       setMilestones([]);
       setData('billing_type', '');
       setData('milestone_id', '');
+      setData('billing_amount', '');
     }
   }, [data.project_id]);
 
@@ -147,6 +154,23 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             </div>
           )}
 
+          {/* Contract Amount Info (read-only) */}
+          {selectedProject && selectedProject.contract_amount && (
+            <div>
+              <Label>Contract Amount</Label>
+              <Input
+                value={`₱${parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                readOnly
+                className="bg-gray-50 border-gray-300 text-gray-600"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {data.billing_type === 'fixed_price' 
+                  ? 'Billing amount should not exceed contract amount'
+                  : 'For milestone billing, enter the milestone billing amount'}
+              </p>
+            </div>
+          )}
+
           {/* Billing Amount */}
           <div>
             <Label>Billing Amount *</Label>
@@ -154,11 +178,19 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
               type="number"
               step="0.01"
               min="0.01"
+              max={selectedProject && data.billing_type === 'fixed_price' ? selectedProject.contract_amount : undefined}
               value={data.billing_amount}
               onChange={(e) => setData("billing_amount", e.target.value)}
-              placeholder="0.00"
+              placeholder={selectedProject && data.billing_type === 'fixed_price' 
+                ? `Max: ₱${parseFloat(selectedProject.contract_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : "0.00"}
               className={inputClass(errors.billing_amount)}
             />
+            {selectedProject && data.billing_type === 'fixed_price' && selectedProject.contract_amount && (
+              <p className="text-xs text-gray-500 mt-1">
+                Maximum: ₱{parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            )}
             <InputError message={errors.billing_amount} />
           </div>
 

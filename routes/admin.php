@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/store', [ProgressUpdatesController::class, 'store'])->name('store');
             Route::put('/update/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'update'])->name('update');
             Route::delete('/destroy/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'destroy'])->name('destroy');
+            Route::get('/download/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'download'])->name('download');
         }); 
     });
 

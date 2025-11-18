@@ -127,4 +127,32 @@ class ProgressUpdatesController extends Controller
 
         return back()->with('success', 'Progress update deleted successfully');
     }
+
+    // Download progress update file
+    public function download(ProjectMilestone $milestone, ProjectTask $task, ProgressUpdate $progressUpdate)
+    {
+        if ($progressUpdate->project_task_id !== $task->id || $task->project_milestone_id !== $milestone->id) {
+            abort(404);
+        }
+
+        if (!$progressUpdate->file_path) {
+            return redirect()->back()->with('error', 'No file attached to this progress update.');
+        }
+
+        $disk = env('FILESYSTEM_DISK', 'public');
+
+        if (!Storage::disk($disk)->exists($progressUpdate->file_path)) {
+            return redirect()->back()->with('error', 'File not found on server.');
+        }
+
+        // Log the download
+        $this->adminActivityLogs(
+            'Progress Update',
+            'Download',
+            'Downloaded file "' . $progressUpdate->original_name . '" from progress update for task "' . $task->title . '"'
+        );
+
+        // Return the file as a download with original name
+        return Storage::disk($disk)->download($progressUpdate->file_path, $progressUpdate->original_name);
+    }
 }

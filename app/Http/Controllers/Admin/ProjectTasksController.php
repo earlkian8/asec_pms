@@ -66,6 +66,29 @@ class ProjectTasksController extends Controller
         return back()->with('success', 'Task updated successfully');
     }
 
+    // Update task status
+    public function updateStatus(ProjectMilestone $milestone, ProjectTask $task, Request $request)
+    {
+        if ($task->project_milestone_id !== $milestone->id) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['pending','in_progress','completed'])],
+        ]);
+
+        $oldStatus = $task->status;
+        $task->update($data);
+
+        $this->adminActivityLogs(
+            'Task',
+            'Updated Status',
+            'Updated task "' . $task->title . '" status from "' . $oldStatus . '" to "' . $data['status'] . '" for milestone "' . $milestone->name . '"'
+        );
+
+        return back()->with('success', 'Task status updated successfully');
+    }
+
     // Delete task
     public function destroy(ProjectMilestone $milestone, ProjectTask $task)
     {

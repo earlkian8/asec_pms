@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { router } from '@inertiajs/react';
 import {
   Table,
   TableBody,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
 import { Trash2, SquarePen } from 'lucide-react';
 import AddTask from './add';
@@ -58,6 +60,30 @@ console.log('taskData:', taskData);
 
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
+  const handleStatusChange = (task, newStatus) => {
+    // Find the milestone ID for this task
+    const milestoneId = task.project_milestone_id || 
+      task.milestone?.id ||
+      Object.values(taskData.tasks || {}).find(t => 
+        t.data?.data?.some(d => d.id === task.id)
+      )?.milestone?.id;
+
+    if (!milestoneId) {
+      toast.error('Unable to find milestone for this task');
+      return;
+    }
+
+    router.put(
+      route('project-management.project-tasks.update-status', [milestoneId, task.id]),
+      { status: newStatus },
+      {
+        preserveScroll: true,
+        onSuccess: () => toast.success('Task status updated successfully'),
+        onError: () => toast.error('Failed to update task status')
+      }
+    );
+  };
+
   return (
     <div className="w-full">
       {/* Search + Add */}
@@ -99,7 +125,21 @@ console.log('taskData:', taskData);
                   <TableCell>{task.milestone_name || task.milestone?.name || '---'}</TableCell>
                   <TableCell>{task.assigned_user?.name || '---'}</TableCell>
                   <TableCell>{formatDate(task.due_date)}</TableCell>
-                  <TableCell className="capitalize">{task.status}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={task.status}
+                      onValueChange={(value) => handleStatusChange(task, value)}
+                    >
+                      <SelectTrigger className="w-[140px] h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <button

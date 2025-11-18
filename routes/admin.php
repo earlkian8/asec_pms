@@ -61,6 +61,7 @@ Route::middleware('auth')->group(function () {
         Route::prefix('project-tasks')->name('project-tasks.')->group(function(){
             Route::post('/store', [ProjectTasksController::class, 'store'])->name('store');
             Route::put('/update/{milestone}/task/{task}', [ProjectTasksController::class, 'update'])->name('update');
+            Route::put('/update-status/{milestone}/task/{task}', [ProjectTasksController::class, 'updateStatus'])->name('update-status');
             Route::delete('/destroy/{milestone}/task/{task}', [ProjectTasksController::class, 'destroy'])->name('destroy');
         }); 
     });

@@ -57,6 +57,16 @@ export default function MilestonesTab({ project, milestoneData }) {
 
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
+  const formatStatus = (status) => {
+    if (!status) return '---';
+    const statusMap = {
+      'pending': 'Pending',
+      'in_progress': 'In Progress',
+      'completed': 'Completed'
+    };
+    return statusMap[status] || status;
+  };
+
   return (
     <div className="w-full">
       {/* Search + Add */}
@@ -84,18 +94,18 @@ export default function MilestonesTab({ project, milestoneData }) {
               <TableHead className="w-[40%]">Description</TableHead>
               <TableHead className="w-[20%]">Due Date</TableHead>
               <TableHead className="w-[15%]">Status</TableHead>
-              <TableHead className="w-[10%] text-right">Action</TableHead>
+              <TableHead className="w-[10%]">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedMilestones.length > 0 ? paginatedMilestones.map(milestone => (
               <TableRow key={milestone.id} className="hover:bg-gray-50 transition">
-                <TableCell>{milestone.name}</TableCell>
-                <TableCell>{milestone.description || '---'}</TableCell>
-                <TableCell>{formatDate(milestone.due_date)}</TableCell>
-                <TableCell className="capitalize">{milestone.status}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2 justify-end">
+                <TableCell className="w-[15%]">{milestone.name}</TableCell>
+                <TableCell className="w-[40%]">{milestone.description || '---'}</TableCell>
+                <TableCell className="w-[20%]">{formatDate(milestone.due_date)}</TableCell>
+                <TableCell className="w-[15%]">{formatStatus(milestone.status)}</TableCell>
+                <TableCell className="w-[10%]">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => { setEditMilestone(milestone); setShowEditModal(true); }}
                       className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"

@@ -82,13 +82,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             icon: Users,
             type: 'single'
         },
-        {
-            title: 'Employee Management',
-            href: route('employee-management.index'),
-            routeName: 'employee-management.*',
-            icon: UserCheck,
-            type: 'single'
-        },
+        // {
+        //     title: 'Employee Management',
+        //     href: route('employee-management.index'),
+        //     routeName: 'employee-management.*',
+        //     icon: UserCheck,
+        //     type: 'single'
+        // },
         {
             title: 'Inventory Management',
             routeName: 'inventory.index',

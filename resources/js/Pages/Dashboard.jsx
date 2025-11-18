@@ -187,14 +187,13 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         </div>
 
         {/* Alerts Section */}
-        {(alerts.overdue_projects.length > 0 || alerts.overdue_billings.length > 0 || alerts.upcoming_due_dates.length > 0) && (
+        {/* {(alerts.overdue_projects.length > 0 || alerts.overdue_billings.length > 0 || alerts.upcoming_due_dates.length > 0) && (
           <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <AlertCircle className="text-red-600" size={20} />
               Alerts & Notifications
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Overdue Projects */}
               {alerts.overdue_projects.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -215,7 +214,6 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 </div>
               )}
 
-              {/* Upcoming Due Dates */}
               {alerts.upcoming_due_dates.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -236,7 +234,6 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 </div>
               )}
 
-              {/* Overdue Billings */}
               {alerts.overdue_billings.length > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -258,7 +255,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               )}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Charts Row 1: Revenue & Expenses */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

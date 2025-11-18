@@ -1,325 +1,193 @@
-import { useForm } from "@inertiajs/react";
 import { useState } from "react";
+import { router } from "@inertiajs/react";
 import { toast } from "sonner";
+import { Button } from "@/Components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter
 } from "@/Components/ui/dialog";
-import { Input } from "@/Components/ui/input";
-import InputError from "@/Components/InputError";
-import { Label } from "@/Components/ui/label";
-import { Button } from "@/Components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
-import { Textarea } from "@/Components/ui/textarea";
-import { Checkbox } from "@/Components/ui/checkbox";
-import AddClient from "../ClientManagement/add";
-const AddProject = ({ setShowAddModal, clients }) => {
-  const { data, setData, post, errors, processing } = useForm({
-    project_name: "",
-    client_id: "",
-    project_type: "",
-    status: "planning",
-    priority: "medium",
-    contract_amount: "",
-    start_date: "",
-    planned_end_date: "",
-    actual_end_date: "",
-    completion_percentage: 0,
-    location: "",
-    description: "",
-    is_billable: true,
-    billing_type: "fixed_price",
-  });
-  const [showAddClient, setShowAddClient] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+import { ProjectWizardProvider, useProjectWizard } from "@/Contexts/ProjectWizardContext";
+import Step1ProjectInfo from "./wizard-steps/Step1ProjectInfo";
+import Step2TeamMembers from "./wizard-steps/Step2TeamMembers";
+import Step3Milestones from "./wizard-steps/Step3Milestones";
+import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
+import Step5LaborCost from "./wizard-steps/Step5LaborCost";
+import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
-    post(route("project-management.store"), {
+const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) => {
+  const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep } = useProjectWizard();
+  const [processing, setProcessing] = useState(false);
+
+  const stepTitles = [
+    "Project Information",
+    "Team Members",
+    "Milestones",
+    "Material Allocation",
+    "Labor Cost"
+  ];
+
+  const handleSubmit = () => {
+    const allData = getAllData();
+    setProcessing(true);
+    
+    router.post(route("project-management.store"), {
+      ...allData.project,
+      team_members: allData.teamMembers,
+      milestones: allData.milestones,
+      material_allocations: allData.materialAllocations,
+      labor_costs: allData.laborCosts,
+    }, {
       preserveScroll: true,
       onSuccess: (page) => {
+        resetWizard();
         setShowAddModal(false);
+        setProcessing(false);
         const flash = page.props.flash;
         if (flash && flash.error) {
           toast.error(flash.error);
         } else {
-          toast.success("Project created successfully!");
+          toast.success("Project created successfully with all related data!");
         }
       },
       onError: (errors) => {
+        setProcessing(false);
         toast.error("Please check the form for errors");
       },
     });
   };
 
-  const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
-    (error
-      ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
-      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return <Step1ProjectInfo clients={clients} />;
+      case 2:
+        return <Step2TeamMembers users={users} />;
+      case 3:
+        return <Step3Milestones />;
+      case 4:
+        return <Step4MaterialAllocation inventoryItems={inventoryItems} />;
+      case 5:
+        return <Step5LaborCost users={users} />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <>
-    {showAddClient && (
-        <AddClient setShowAddModal={setShowAddClient} />
-    )}
     <Dialog open onOpenChange={setShowAddModal}>
-      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-zinc-800">Add Project</DialogTitle>
-          <DialogDescription className="text-zinc-600">
-            Fill in the project details below.
-          </DialogDescription>
+          <DialogTitle className="text-zinc-800">Add New Project</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Project Name */}
-          <div className="col-span-2">
-            <Label className="text-zinc-800">Project Name</Label>
-            <Input
-              type="text"
-              value={data.project_name}
-              onChange={(e) => setData("project_name", e.target.value)}
-              placeholder="Enter project name"
-              className={inputClass(errors.project_name)}
-            />
-            <InputError message={errors.project_name} />
-          </div>
-
-          {/* Client */}
-          <div>
-            <Label className="text-zinc-800">Client</Label>
-            <div className="flex gap-2 items-center">
-                <Select
-                value={data.client_id}
-                onValueChange={(value) => setData("client_id", value)}
+        {/* Progress Steps */}
+        <div className="flex items-center justify-between mb-6 px-2">
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
+            <div key={step} className="flex items-center flex-1">
+              <div className="flex flex-col items-center flex-1">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
+                    step < currentStep
+                      ? "bg-green-500 text-white"
+                      : step === currentStep
+                      ? "bg-zinc-700 text-white"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
                 >
-                <SelectTrigger className={inputClass(errors.client_id)}>
-                    <SelectValue placeholder="Select client" />
-                </SelectTrigger>
-                <SelectContent>
-                    {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
-                        {client.client_name}
-                    </SelectItem>
-                    ))}
-                </SelectContent>
-                </Select>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="whitespace-nowrap"
-                    onClick={() => {
-                        setShowAddClient(true);
-                    }}
+                  {step < currentStep ? <Check size={20} /> : step}
+                </div>
+                <span
+                  className={`text-xs mt-2 text-center ${
+                    step <= currentStep ? "text-zinc-700 font-medium" : "text-gray-400"
+                  }`}
                 >
-                    New
-                </Button>
+                  {stepTitles[step - 1]}
+                </span>
+              </div>
+              {step < totalSteps && (
+                <div
+                  className={`h-1 flex-1 mx-2 transition-all ${
+                    step < currentStep ? "bg-green-500" : "bg-gray-200"
+                  }`}
+                />
+              )}
             </div>
-            <InputError message={errors.client_id} />
-          </div>
+          ))}
+        </div>
 
-          {/* Project Type */}
-          <div>
-            <Label className="text-zinc-800">Project Type</Label>
-            <Select
-              value={data.project_type}
-              onValueChange={(value) => setData("project_type", value)}
-            >
-              <SelectTrigger className={inputClass(errors.project_type)}>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="design">Design</SelectItem>
-                <SelectItem value="construction">Construction</SelectItem>
-                <SelectItem value="consultancy">Consultancy</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.project_type} />
-          </div>
+        {/* Step Content */}
+        <div className="flex-1 overflow-y-auto px-1">
+          {renderStep()}
+        </div>
 
-          {/* Status */}
-          <div>
-            <Label className="text-zinc-800">Status</Label>
-            <Select
-              value={data.status}
-              onValueChange={(value) => setData("status", value)}
-            >
-              <SelectTrigger className={inputClass(errors.status)}>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="planning">Planning</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.status} />
-          </div>
+        {/* Navigation Buttons */}
+        <div className="flex justify-between items-center pt-4 border-t mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              resetWizard();
+              setShowAddModal(false);
+            }}
+            disabled={processing}
+          >
+            Cancel
+          </Button>
 
-          {/* Priority */}
-          <div>
-            <Label className="text-zinc-800">Priority</Label>
-            <Select
-              value={data.priority}
-              onValueChange={(value) => setData("priority", value)}
-            >
-              <SelectTrigger className={inputClass(errors.priority)}>
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.priority} />
-          </div>
+          <div className="flex gap-2">
+            {currentStep > 1 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={prevStep}
+                disabled={processing}
+                className="flex items-center gap-2"
+              >
+                <ChevronLeft size={18} />
+                Previous
+              </Button>
+            )}
 
-          {/* Contract Amount */}
-          <div>
-            <Label className="text-zinc-800">Contract Amount</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={data.contract_amount}
-              onChange={(e) => setData("contract_amount", e.target.value)}
-              placeholder="Enter amount"
-              className={inputClass(errors.contract_amount)}
-            />
-            <InputError message={errors.contract_amount} />
+            {currentStep < totalSteps ? (
+              <Button
+                type="button"
+                onClick={nextStep}
+                disabled={processing}
+                className="bg-zinc-700 hover:bg-zinc-900 text-white flex items-center gap-2"
+              >
+                Next
+                <ChevronRight size={18} />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={processing}
+                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+              >
+                {processing ? "Creating..." : "Create Project"}
+              </Button>
+            )}
           </div>
-
-          {/* Start Date */}
-          <div>
-            <Label className="text-zinc-800">Start Date</Label>
-            <Input
-              type="date"
-              value={data.start_date}
-              onChange={(e) => setData("start_date", e.target.value)}
-              className={inputClass(errors.start_date)}
-            />
-            <InputError message={errors.start_date} />
-          </div>
-
-          {/* Planned End Date */}
-          <div>
-            <Label className="text-zinc-800">Planned End Date</Label>
-            <Input
-              type="date"
-              value={data.planned_end_date}
-              onChange={(e) => setData("planned_end_date", e.target.value)}
-              className={inputClass(errors.planned_end_date)}
-            />
-            <InputError message={errors.planned_end_date} />
-          </div>
-
-          {/* Actual End Date */}
-          <div>
-            <Label className="text-zinc-800">Actual End Date</Label>
-            <Input
-              type="date"
-              value={data.actual_end_date}
-              onChange={(e) => setData("actual_end_date", e.target.value)}
-              className={inputClass(errors.actual_end_date)}
-            />
-            <InputError message={errors.actual_end_date} />
-          </div>
-
-          {/* Completion Percentage */}
-          <div>
-            <Label className="text-zinc-800">Completion (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={data.completion_percentage}
-              onChange={(e) => setData("completion_percentage", e.target.value)}
-              placeholder="0.00"
-              className={inputClass(errors.completion_percentage)}
-            />
-            <InputError message={errors.completion_percentage} />
-          </div>
-
-          {/* Billing Type */}
-          <div>
-            <Label className="text-zinc-800">Billing Type</Label>
-            <Select
-              value={data.billing_type}
-              onValueChange={(value) => setData("billing_type", value)}
-            >
-              <SelectTrigger className={inputClass(errors.billing_type)}>
-                <SelectValue placeholder="Select billing type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fixed_price">Fixed Price</SelectItem>
-                <SelectItem value="milestone">Milestone</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.billing_type} />
-          </div>
-
-          {/* Billable Checkbox */}
-          <div className="flex items-center space-x-2 mt-2">
-            <Checkbox
-              checked={data.is_billable}
-              onCheckedChange={(value) => setData("is_billable", value)}
-            />
-            <Label className="text-zinc-800">Billable</Label>
-          </div>
-
-          {/* Location */}
-          <div className="col-span-2">
-            <Label className="text-zinc-800">Location</Label>
-            <Textarea
-              value={data.location}
-              onChange={(e) => setData("location", e.target.value)}
-              placeholder="Enter project location"
-              className={inputClass(errors.location)}
-            />
-            <InputError message={errors.location} />
-          </div>
-
-          {/* Description */}
-          <div className="col-span-2">
-            <Label className="text-zinc-800">Description</Label>
-            <Textarea
-              value={data.description}
-              onChange={(e) => setData("description", e.target.value)}
-              placeholder="Enter project description"
-              className={inputClass(errors.description)}
-            />
-            <InputError message={errors.description} />
-          </div>
-
-          {/* Footer Buttons */}
-          <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowAddModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="bg-zinc-800 text-white hover:bg-zinc-900 transition"
-              disabled={processing}
-            >
-              Add Project
-            </Button>
-          </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
-    </>
+  );
+};
+
+const AddProject = ({ setShowAddModal, clients, users, inventoryItems }) => {
+  return (
+    <ProjectWizardProvider>
+      <AddProjectWizard
+        setShowAddModal={setShowAddModal}
+        clients={clients}
+        users={users}
+        inventoryItems={inventoryItems}
+      />
+    </ProjectWizardProvider>
   );
 };
 

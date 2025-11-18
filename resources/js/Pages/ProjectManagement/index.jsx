@@ -39,6 +39,8 @@ export default function ProjectsIndex() {
   const projects = pagination?.data || [];
   const paginationLinks = pagination?.links || [];
   const clients = usePage().props.clients;
+  const users = usePage().props.users || [];
+  const inventoryItems = usePage().props.inventoryItems || [];
 //   const categories = usePage().props.categories;
   const initialSearch = usePage().props.search || '';
 
@@ -127,7 +129,12 @@ export default function ProjectsIndex() {
   return (
     <>
       {showAddModal && (
-        <AddProject setShowAddModal={setShowAddModal} clients={clients} />
+        <AddProject 
+          setShowAddModal={setShowAddModal} 
+          clients={clients}
+          users={users}
+          inventoryItems={inventoryItems}
+        />
       )}
       {showEditModal && (
         <EditProject setShowEditModal={setShowEditModal} project={editProject} clients={clients} />

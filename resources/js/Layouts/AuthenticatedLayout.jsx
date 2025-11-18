@@ -98,7 +98,8 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'Billing Management',
-            routeName: 'billing.index',
+            href: route('billing-management.index'),
+            routeName: 'billing-management.*',
             icon: BadgeDollarSign,
             type: 'single'
         },

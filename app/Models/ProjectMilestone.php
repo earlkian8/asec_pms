@@ -28,4 +28,9 @@ class ProjectMilestone extends Model
     {
         return $this->hasMany(ProjectTask::class);
     }
+
+    public function billings()
+    {
+        return $this->hasMany(Billing::class, 'milestone_id');
+    }
 }

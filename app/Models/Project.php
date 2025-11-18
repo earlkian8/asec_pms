@@ -48,5 +48,10 @@ class Project extends Model
             ->current()     // current members
             ->with('user'); // eager load employee/user info
     }
+
+    public function billings()
+    {
+        return $this->hasMany(Billing::class);
+    }
     
 }

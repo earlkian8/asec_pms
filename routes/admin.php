@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\ProgressUpdatesController;
 use App\Http\Controllers\Admin\InventoryItemsController;
+use App\Http\Controllers\Admin\BillingsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -124,5 +125,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/destroy/{inventoryItem}', [InventoryItemsController::class, 'destroy'])->name('destroy');
         Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->name('stock-in');
         Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->name('stock-out');
+    });
+
+    // Billing Management
+    Route::prefix('billing-management')->name('billing-management.')->group(function(){
+        Route::get('/', [BillingsController::class, 'index'])->name('index');
+        Route::post('/store', [BillingsController::class, 'store'])->name('store');
+        Route::put('/update/{billing}', [BillingsController::class, 'update'])->name('update');
+        Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->name('destroy');
+        Route::get('/view/{billing}', [BillingsController::class, 'show'])->name('show');
+        Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->name('add-payment');
     });
 });

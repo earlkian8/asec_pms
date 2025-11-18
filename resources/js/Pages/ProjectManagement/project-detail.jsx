@@ -27,15 +27,24 @@ export default function ProjectDetail() {
     // Flexible Tab List
     const tabs = [
         // { key: "overview", label: "Overview", component: <OverviewTab project={project} /> },
+        { key: "overview", label: "Overview" },
+        { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
         { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
         { key: "tasks", label: "Tasks", component: <TasksTab project={project} taskData={taskData} /> },
-        { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
-        { key: "files", label: "Files", component: <FilesTab project={project} fileData={fileData} /> },
         // { key: "progress-update", label: "Progress Update", component: <ProgressUpdatesTab project={project} /> },
+        { key: "progress-update", label: "Progress Update" },
+        { key: "files", label: "Files", component: <FilesTab project={project} fileData={fileData} /> },
+        
         // { key: "budget", label: "Budget", component: <BudgetTab project={project} /> },
         // { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} /> },
         // { key: "labor-cost", label: "Labor Cost", component: <LaborCostTab project={project} /> },
         // { key: "issues", label: "Issues", component: <IssuesTab project={project} /> },
+
+
+        { key: "budget", label: "Budget" },
+        { key: "material-allocation", label: "Material Allocation" },
+        { key: "labor-cost", label: "Labor Cost" },
+        { key: "issues", label: "Issues" },
     ];
 
     const [activeTab, setActiveTab] = useState("overview");

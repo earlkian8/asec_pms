@@ -136,25 +136,17 @@ class ProjectsController extends Controller
     // Get project team data
     $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
 
-    // Get project files data
+    // Get project files data (kept for potential future use)
     $fileData = $this->projectFilesService->getProjectFilesData($project);
 
-    // Get project milestones data
+    // Get project milestones data (now includes tasks and progress updates)
     $milestoneData = $this->projectMilestonesService->getProjectMilestonesData($project);
-
-    // Get all tasks, users, and milestones using the new TaskService
-    $taskData = $this->projectTasksService->getTaskData($project);
-
-    // Get progress updates data
-    $progressUpdateData = $this->progressUpdateService->getProgressUpdateData($project);
 
     return Inertia::render('ProjectManagement/project-detail', [
         'project' => $project,
         'teamData' => $teamData,
         'fileData' => $fileData,
         'milestoneData' => $milestoneData,
-        'taskData' => $taskData,
-        'progressUpdateData' => $progressUpdateData,
     ]);
 }
 

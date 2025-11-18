@@ -15,9 +15,13 @@ import { Button } from "@/Components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 
-const AddProgressUpdate = ({ setShowAddModal, tasks = [] }) => {
+const AddProgressUpdate = ({ setShowAddModal, tasks = [], preselectedTask = null, project = null }) => {
+  const initialTaskId = preselectedTask?.id 
+    ? (typeof preselectedTask.id === 'string' ? parseInt(preselectedTask.id) : preselectedTask.id)
+    : (tasks[0]?.id ? (typeof tasks[0].id === 'string' ? parseInt(tasks[0].id) : tasks[0].id) : "");
+    
   const { data, setData, post, errors, processing } = useForm({
-    project_task_id: tasks[0]?.id || "",
+    project_task_id: initialTaskId,
     description: "",
     file: null,
   });
@@ -47,7 +51,24 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [] }) => {
       return;
     }
 
+    // Ensure project_task_id is a number
+    const taskId = typeof data.project_task_id === 'string' 
+      ? parseInt(data.project_task_id) 
+      : data.project_task_id;
+
+    if (isNaN(taskId)) {
+      toast.error("Invalid task selected");
+      return;
+    }
+
+    // Update form data with correct type
+    const submitData = {
+      ...data,
+      project_task_id: taskId
+    };
+
     post(route("project-management.progress-updates.store"), {
+      data: submitData,
       preserveScroll: true,
       forceFormData: true,
       onSuccess: () => {
@@ -55,7 +76,16 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [] }) => {
         toast.success("Progress update created successfully!");
         setPreviewName("");
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: (errors) => {
+        console.error('Progress update errors:', errors);
+        if (errors.project_task_id) {
+          toast.error(errors.project_task_id);
+        } else if (errors.file) {
+          toast.error(errors.file);
+        } else {
+          toast.error("Please check the form for errors");
+        }
+      },
     });
   };
 
@@ -72,7 +102,7 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [] }) => {
             <Label>Task</Label>
             <Select
               value={data.project_task_id ? data.project_task_id.toString() : ""}
-              onValueChange={(value) => setData("project_task_id", value)}
+              onValueChange={(value) => setData("project_task_id", parseInt(value))}
             >
               <SelectTrigger className={inputClass(errors.project_task_id)}>
                 <SelectValue placeholder="Select task" />

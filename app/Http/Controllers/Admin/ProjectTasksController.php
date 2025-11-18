@@ -30,7 +30,7 @@ class ProjectTasksController extends Controller
             'project_milestone_id' => $data['project_milestone_id'],
             'title'                => $data['title'],
             'description'          => $data['description'] ?? null,
-            'assigned_to'          => $data['assigned_to'] ?? null,
+            'assigned_to'          => !empty($data['assigned_to']) ? $data['assigned_to'] : null,
             'due_date'             => $data['due_date'] ?? null,
             'status'               => $data['status'],
         ]);
@@ -54,6 +54,11 @@ class ProjectTasksController extends Controller
             'due_date'     => 'nullable|date',
             'status'       => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
+
+        // Ensure assigned_to is null if empty
+        if (isset($data['assigned_to']) && empty($data['assigned_to'])) {
+            $data['assigned_to'] = null;
+        }
 
         $task->update($data);
 

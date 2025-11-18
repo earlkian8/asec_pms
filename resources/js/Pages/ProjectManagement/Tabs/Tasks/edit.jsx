@@ -43,13 +43,28 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
       return;
     }
 
-    put(route("project-management.project-tasks.update", [data.project_milestone_id, task.id]), {
+    // Ensure assigned_to is null if empty string, otherwise convert to integer
+    const submitData = {
+      ...data,
+      project_milestone_id: typeof data.project_milestone_id === 'string' 
+        ? parseInt(data.project_milestone_id) 
+        : data.project_milestone_id,
+      assigned_to: data.assigned_to && data.assigned_to !== "" 
+        ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
+        : null,
+    };
+
+    put(route("project-management.project-tasks.update", [submitData.project_milestone_id, task.id]), {
+      data: submitData,
       preserveScroll: true,
       onSuccess: () => {
         setShowEditModal(false);
         toast.success("Task updated successfully!");
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: (errors) => {
+        console.error('Task update errors:', errors);
+        toast.error("Please check the form for errors");
+      },
     });
   };
 
@@ -117,6 +132,7 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">None (Unassigned)</SelectItem>
                 {users.length > 0 ? (
                   users.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>

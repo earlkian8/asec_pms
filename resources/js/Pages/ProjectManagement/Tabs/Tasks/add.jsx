@@ -15,11 +15,11 @@ import { Button } from "@/Components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 
-const AddTask = ({ setShowAddModal, milestones = [], users = [] }) => {
+const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMilestone = null, project = null }) => {
   const { data, setData, post, errors, processing } = useForm({
     title: "",
     description: "",
-    project_milestone_id: milestones[0]?.id || "",
+    project_milestone_id: preselectedMilestone?.id || milestones[0]?.id || "",
     assigned_to: "",
     due_date: "",
     status: "pending",
@@ -39,14 +39,28 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [] }) => {
       return;
     }
 
+    // Ensure assigned_to is null if empty string, otherwise convert to integer
+    const submitData = {
+      ...data,
+      project_milestone_id: typeof data.project_milestone_id === 'string' 
+        ? parseInt(data.project_milestone_id) 
+        : data.project_milestone_id,
+      assigned_to: data.assigned_to && data.assigned_to !== "" 
+        ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
+        : null,
+    };
+
     post(route("project-management.project-tasks.store"), {
-      data,
+      data: submitData,
       preserveScroll: true,
       onSuccess: () => {
         setShowAddModal(false);
         toast.success("Task created successfully!");
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: (errors) => {
+        console.error('Task creation errors:', errors);
+        toast.error("Please check the form for errors");
+      },
     });
   };
 
@@ -114,6 +128,7 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [] }) => {
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">None (Unassigned)</SelectItem>
                 {users.length > 0 ? (
                   users.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>

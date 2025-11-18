@@ -13,9 +13,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 import { Check, Trash2, SquarePen } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
+import { usePermission } from '@/utils/permissions';
 import AddProjectTeam from './add'; // import the Add modal
 import EditProjectTeam from './edit';
 export default function TeamTab({ project, teamData }) {
+  const { has } = usePermission();
   const [selectedIds, setSelectedIds] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -104,19 +106,23 @@ export default function TeamTab({ project, teamData }) {
           className="focus:border-gray-800 focus:ring-2 focus:ring-gray-800 w-full sm:max-w-md"
         />
         <div className="flex gap-2">
-          <Button
-            className="bg-red-600 hover:bg-red-700 text-white"
-            disabled={selectedIds.length === 0}
-            onClick={handleBulkUnassign}
-          >
-            <Trash2 className="w-4 h-4 mr-2" /> Unassign Selected
-          </Button>
-          <Button
-            className="bg-zinc-700 hover:bg-zinc-900 text-white"
-            onClick={() => setShowAddModal(true)}
-          >
-            + Add Team Member
-          </Button>
+          {has('project-teams.delete') && (
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={selectedIds.length === 0}
+              onClick={handleBulkUnassign}
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Unassign Selected
+            </Button>
+          )}
+          {has('project-teams.create') && (
+            <Button
+              className="bg-zinc-700 hover:bg-zinc-900 text-white"
+              onClick={() => setShowAddModal(true)}
+            >
+              + Add Team Member
+            </Button>
+          )}
         </div>
       </div>
 
@@ -125,20 +131,22 @@ export default function TeamTab({ project, teamData }) {
         <Table className="min-w-[600px] w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[30px]">
-                <div
-                  onClick={toggleSelectAll}
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
-                    selectedIds.length === paginatedTeam.length && paginatedTeam.length > 0
-                      ? 'border-gray-800 bg-gray-800'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  {selectedIds.length === paginatedTeam.length && paginatedTeam.length > 0 && (
-                    <Check className="h-3 w-3 text-white" />
-                  )}
-                </div>
-              </TableHead>
+              {has('project-teams.delete') && (
+                <TableHead className="w-[30px]">
+                  <div
+                    onClick={toggleSelectAll}
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
+                      selectedIds.length === paginatedTeam.length && paginatedTeam.length > 0
+                        ? 'border-gray-800 bg-gray-800'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    {selectedIds.length === paginatedTeam.length && paginatedTeam.length > 0 && (
+                      <Check className="h-3 w-3 text-white" />
+                    )}
+                  </div>
+                </TableHead>
+              )}
               <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
@@ -154,16 +162,18 @@ export default function TeamTab({ project, teamData }) {
               const isSelected = selectedIds.includes(team.id);
               return (
                 <TableRow key={team.id} className={`cursor-pointer transition ${isSelected ? "bg-gray-100" : "hover:bg-gray-50"}`}>
-                  <TableCell>
-                    <div
-                      onClick={() => toggleSelect(team.id)}
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
-                        isSelected ? 'border-gray-800 bg-gray-800' : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      {isSelected && <Check className="h-3 w-3 text-white" />}
-                    </div>
-                  </TableCell>
+                  {has('project-teams.delete') && (
+                    <TableCell>
+                      <div
+                        onClick={() => toggleSelect(team.id)}
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
+                          isSelected ? 'border-gray-800 bg-gray-800' : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3 text-white" />}
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell>{team.user?.name}</TableCell>
                   <TableCell>{team.user?.email}</TableCell>
                   <TableCell className="capitalize">{team.role}</TableCell>
@@ -171,25 +181,33 @@ export default function TeamTab({ project, teamData }) {
                   <TableCell>{formatDate(team.start_date)}</TableCell>
                   <TableCell>{formatDate(team.end_date)}</TableCell>
                   <TableCell>
-                    <Switch
-                      checked={team.is_active}
-                      onCheckedChange={() => handleToggleStatus(team)}
-                      className="switch data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
-                    />
+                    {has('project-teams.update') ? (
+                      <Switch
+                        checked={team.is_active}
+                        onCheckedChange={() => handleToggleStatus(team)}
+                        className="switch data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+                      />
+                    ) : (
+                      <span className={`px-2 py-1 rounded text-xs ${team.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {team.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <button
-                      onClick={() => { setEditProjectTeam(team); setShowEditModal(true); }}
-                      className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                    >
-                      <SquarePen size={18} />
-                    </button>
+                    {has('project-teams.update') && (
+                      <button
+                        onClick={() => { setEditProjectTeam(team); setShowEditModal(true); }}
+                        className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                      >
+                        <SquarePen size={18} />
+                      </button>
+                    )}
                   </TableCell>
                 </TableRow>
               );
             }) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-4 text-gray-500">
+                <TableCell colSpan={has('project-teams.delete') ? 9 : 8} className="text-center py-4 text-gray-500">
                   No team members found.
                 </TableCell>
               </TableRow>

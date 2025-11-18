@@ -2,7 +2,8 @@ import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { usePermission } from '@/utils/permissions';
 import { 
     Menu,
     LayoutDashboard,
@@ -34,6 +35,7 @@ import {
 import { Toaster } from '@/Components/ui/sonner';
 export default function AuthenticatedLayout({ header, children, breadcrumbs = [] }) {
     const user = usePage().props.auth.user;
+    const { has, hasAny } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     
@@ -60,7 +62,12 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
     // Get current route for active state
     const currentRoute = route().current();
 
-    const navigationModules = [
+    // Helper function to check if user has any permission for a module
+    const hasModuleAccess = (permissionPrefixes) => {
+        return hasAny(permissionPrefixes);
+    };
+
+    const allNavigationModules = [
         {
             title: 'Dashboard',
             href: route('dashboard'),
@@ -138,6 +145,71 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             ]
         }
     ];
+
+    // Filter navigation modules based on permissions
+    const navigationModules = useMemo(() => {
+        return allNavigationModules.map(module => {
+            if (module.title === 'Dashboard') {
+                return has('dashboard.view') ? module : null;
+            }
+            if (module.title === 'Project Management') {
+                return hasModuleAccess([
+                    'projects.view', 'projects.create', 'projects.update', 'projects.delete',
+                    'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
+                    'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
+                    'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+                    'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
+                    'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
+                    'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
+                    'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
+                    'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
+                ]) ? module : null;
+            }
+            if (module.title === 'Client Management') {
+                return hasModuleAccess([
+                    'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
+                ]) ? module : null;
+            }
+            if (module.title === 'Inventory Management') {
+                return hasModuleAccess([
+                    'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
+                ]) ? module : null;
+            }
+            if (module.title === 'Billing Management') {
+                return hasModuleAccess([
+                    'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments'
+                ]) ? module : null;
+            }
+            if (module.title === 'Reports & Analytics') {
+                return hasModuleAccess([
+                    'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget'
+                ]) ? module : null;
+            }
+            if (module.title === 'User Management') {
+                // For collapsible items, check if user has access to any sub-item
+                const filteredItems = module.items.filter(item => {
+                    if (item.title === 'Roles & Permissions') {
+                        return hasModuleAccess(['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign']);
+                    }
+                    if (item.title === 'Users') {
+                        return hasModuleAccess(['users.view', 'users.create', 'users.update', 'users.delete', 'users.reset-password']);
+                    }
+                    if (item.title === 'Activity Logs') {
+                        return hasModuleAccess(['activity-logs.view', 'activity-logs.export']);
+                    }
+                    return false;
+                });
+                
+                // If user has access to any sub-item, return module with filtered items
+                if (filteredItems.length > 0) {
+                    return { ...module, items: filteredItems };
+                }
+                
+                return null;
+            }
+            return module; // Default to showing if no permission check is defined
+        }).filter(module => module !== null);
+    }, [has, hasAny]);
 
     const renderNavigationItem = (item) => {
     if (item.type === 'single') {

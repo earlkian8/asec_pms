@@ -29,6 +29,7 @@ import {
   Search,
   AlertCircle,
 } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import AddMilestone from './add';
 import EditMilestone from './edit';
 import DeleteMilestone from './delete';
@@ -43,6 +44,7 @@ import EditIssue from '../Issues/edit';
 import DeleteIssue from '../Issues/delete';
 
 export default function MilestonesTab({ project, milestoneData }) {
+  const { has } = usePermission();
   const [expandedMilestones, setExpandedMilestones] = useState(new Set());
   const [expandedTasks, setExpandedTasks] = useState(new Set());
   const [expandedProgressUpdates, setExpandedProgressUpdates] = useState(new Set());
@@ -387,21 +389,25 @@ export default function MilestonesTab({ project, milestoneData }) {
           <p className="text-sm text-gray-500 mt-1">Manage milestones, tasks, and progress updates</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="border-orange-300 text-orange-700 hover:bg-orange-50 shadow-sm"
-            onClick={() => setShowAddIssueModal(true)}
-          >
-            <AlertCircle size={18} className="mr-2" />
-            Add Issue ({issues.length})
-          </Button>
-          <Button
-            className="bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus size={18} className="mr-2" />
-            Add Milestone
-          </Button>
+          {has('project-issues.create') && (
+            <Button
+              variant="outline"
+              className="border-orange-300 text-orange-700 hover:bg-orange-50 shadow-sm"
+              onClick={() => setShowAddIssueModal(true)}
+            >
+              <AlertCircle size={18} className="mr-2" />
+              Add Issue ({issues.length})
+            </Button>
+          )}
+          {has('project-milestones.create') && (
+            <Button
+              className="bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
+              onClick={() => setShowAddModal(true)}
+            >
+              <Plus size={18} className="mr-2" />
+              Add Milestone
+            </Button>
+          )}
         </div>
       </div>
 
@@ -540,36 +546,42 @@ export default function MilestonesTab({ project, milestoneData }) {
                         <TableCell className="relative z-10 text-sm text-gray-600">{tasks.length}</TableCell>
                         <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
-                            <button
-                              onClick={() => {
-                                setSelectedMilestoneForTask(milestone);
-                                setShowAddTaskModal(true);
-                              }}
-                              className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                              title="Add Task"
-                            >
-                              <Plus size={14} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditMilestone(milestone);
-                                setShowEditModal(true);
-                              }}
-                              className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                              title="Edit Milestone"
-                            >
-                              <SquarePen size={14} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteMilestone(milestone);
-                                setShowDeleteModal(true);
-                              }}
-                              className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                              title="Delete Milestone"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {has('project-tasks.create') && (
+                              <button
+                                onClick={() => {
+                                  setSelectedMilestoneForTask(milestone);
+                                  setShowAddTaskModal(true);
+                                }}
+                                className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                title="Add Task"
+                              >
+                                <Plus size={14} />
+                              </button>
+                            )}
+                            {has('project-milestones.update') && (
+                              <button
+                                onClick={() => {
+                                  setEditMilestone(milestone);
+                                  setShowEditModal(true);
+                                }}
+                                className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                title="Edit Milestone"
+                              >
+                                <SquarePen size={14} />
+                              </button>
+                            )}
+                            {has('project-milestones.delete') && (
+                              <button
+                                onClick={() => {
+                                  setDeleteMilestone(milestone);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                title="Delete Milestone"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -679,36 +691,40 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 </div>
                               </TableCell>
                               <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
-                                <Select
-                                  value={taskWithMilestone.status}
-                                  onValueChange={(value) => handleTaskStatusChange(taskWithMilestone, value)}
-                                >
-                                  <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent p-0 hover:bg-gray-100 rounded">
-                                    <SelectValue>
-                                      {getStatusBadge(taskWithMilestone.status)}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="pending" className="focus:bg-yellow-50">
-                                      <span className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                                        Pending
-                                      </span>
-                                    </SelectItem>
-                                    <SelectItem value="in_progress" className="focus:bg-blue-50">
-                                      <span className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                        In Progress
-                                      </span>
-                                    </SelectItem>
-                                    <SelectItem value="completed" className="focus:bg-green-50">
-                                      <span className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                        Completed
-                                      </span>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                {has('project-tasks.update-status') ? (
+                                  <Select
+                                    value={taskWithMilestone.status}
+                                    onValueChange={(value) => handleTaskStatusChange(taskWithMilestone, value)}
+                                  >
+                                    <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent p-0 hover:bg-gray-100 rounded">
+                                      <SelectValue>
+                                        {getStatusBadge(taskWithMilestone.status)}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending" className="focus:bg-yellow-50">
+                                        <span className="flex items-center gap-2">
+                                          <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                          Pending
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="in_progress" className="focus:bg-blue-50">
+                                        <span className="flex items-center gap-2">
+                                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                          In Progress
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="completed" className="focus:bg-green-50">
+                                        <span className="flex items-center gap-2">
+                                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                          Completed
+                                        </span>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <div>{getStatusBadge(taskWithMilestone.status)}</div>
+                                )}
                               </TableCell>
                               <TableCell className="relative z-10 text-sm text-gray-600">{formatDate(taskWithMilestone.due_date)}</TableCell>
                               <TableCell className="relative z-10">
@@ -732,36 +748,42 @@ export default function MilestonesTab({ project, milestoneData }) {
                               </TableCell>
                               <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-end gap-1">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedTaskForProgress(taskWithMilestone);
-                                      setShowAddProgressModal(true);
-                                    }}
-                                    className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                    title="Add Progress Update"
-                                  >
-                                    <Plus size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditTask(taskWithMilestone);
-                                      setShowEditTaskModal(true);
-                                    }}
-                                    className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                    title="Edit Task"
-                                  >
-                                    <SquarePen size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setDeleteTask(taskWithMilestone);
-                                      setShowDeleteTaskModal(true);
-                                    }}
-                                    className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                                    title="Delete Task"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
+                                  {has('progress-updates.create') && (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedTaskForProgress(taskWithMilestone);
+                                        setShowAddProgressModal(true);
+                                      }}
+                                      className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                      title="Add Progress Update"
+                                    >
+                                      <Plus size={14} />
+                                    </button>
+                                  )}
+                                  {has('project-tasks.update') && (
+                                    <button
+                                      onClick={() => {
+                                        setEditTask(taskWithMilestone);
+                                        setShowEditTaskModal(true);
+                                      }}
+                                      className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                      title="Edit Task"
+                                    >
+                                      <SquarePen size={14} />
+                                    </button>
+                                  )}
+                                  {has('project-tasks.delete') && (
+                                    <button
+                                      onClick={() => {
+                                        setDeleteTask(taskWithMilestone);
+                                        setShowDeleteTaskModal(true);
+                                      }}
+                                      className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                      title="Delete Task"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -821,7 +843,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                         </div>
                                       </div>
                                       <div className="flex gap-1">
-                                        {update.file_path && getDownloadUrl(update, taskWithMilestone) && (
+                                        {update.file_path && getDownloadUrl(update, taskWithMilestone) && has('progress-updates.view') && (
                                           <a
                                             href={getDownloadUrl(update, taskWithMilestone)}
                                             target="_blank"
@@ -835,32 +857,36 @@ export default function MilestonesTab({ project, milestoneData }) {
                                             </button>
                                           </a>
                                         )}
-                                        <button
-                                          onClick={() => {
-                                            setEditProgressUpdate({
-                                              ...update,
-                                              task: update.task || taskWithMilestone
-                                            });
-                                            setShowEditProgressModal(true);
-                                          }}
-                                          className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
-                                          title="Edit Update"
-                                        >
-                                          <SquarePen size={14} />
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setDeleteProgressUpdate({
-                                              ...update,
-                                              task: update.task || taskWithMilestone
-                                            });
-                                            setShowDeleteProgressModal(true);
-                                          }}
-                                          className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
-                                          title="Delete Update"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
+                                        {has('progress-updates.update') && (
+                                          <button
+                                            onClick={() => {
+                                              setEditProgressUpdate({
+                                                ...update,
+                                                task: update.task || taskWithMilestone
+                                              });
+                                              setShowEditProgressModal(true);
+                                            }}
+                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
+                                            title="Edit Update"
+                                          >
+                                            <SquarePen size={14} />
+                                          </button>
+                                        )}
+                                        {has('progress-updates.delete') && (
+                                          <button
+                                            onClick={() => {
+                                              setDeleteProgressUpdate({
+                                                ...update,
+                                                task: update.task || taskWithMilestone
+                                              });
+                                              setShowDeleteProgressModal(true);
+                                            }}
+                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
+                                            title="Delete Update"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -933,26 +959,30 @@ export default function MilestonesTab({ project, milestoneData }) {
                                             </div>
                                           </div>
                                           <div className="flex gap-1">
-                                            <button
-                                              onClick={() => {
-                                                setEditIssue(issue);
-                                                setShowEditIssueModal(true);
-                                              }}
-                                              className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
-                                              title="Edit Issue"
-                                            >
-                                              <SquarePen size={14} />
-                                            </button>
-                                            <button
-                                              onClick={() => {
-                                                setDeleteIssue(issue);
-                                                setShowDeleteIssueModal(true);
-                                              }}
-                                              className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
-                                              title="Delete Issue"
-                                            >
-                                              <Trash2 size={14} />
-                                            </button>
+                                            {has('project-issues.update') && (
+                                              <button
+                                                onClick={() => {
+                                                  setEditIssue(issue);
+                                                  setShowEditIssueModal(true);
+                                                }}
+                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
+                                                title="Edit Issue"
+                                              >
+                                                <SquarePen size={14} />
+                                              </button>
+                                            )}
+                                            {has('project-issues.delete') && (
+                                              <button
+                                                onClick={() => {
+                                                  setDeleteIssue(issue);
+                                                  setShowDeleteIssueModal(true);
+                                                }}
+                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
+                                                title="Delete Issue"
+                                              >
+                                                <Trash2 size={14} />
+                                              </button>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -1014,26 +1044,30 @@ export default function MilestonesTab({ project, milestoneData }) {
                                       </div>
                                     </div>
                                     <div className="flex gap-1">
-                                      <button
-                                        onClick={() => {
-                                          setEditIssue(issue);
-                                          setShowEditIssueModal(true);
-                                        }}
-                                        className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
-                                        title="Edit Issue"
-                                      >
-                                        <SquarePen size={14} />
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setDeleteIssue(issue);
-                                          setShowDeleteIssueModal(true);
-                                        }}
-                                        className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
-                                        title="Delete Issue"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
+                                      {has('project-issues.update') && (
+                                        <button
+                                          onClick={() => {
+                                            setEditIssue(issue);
+                                            setShowEditIssueModal(true);
+                                          }}
+                                          className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
+                                          title="Edit Issue"
+                                        >
+                                          <SquarePen size={14} />
+                                        </button>
+                                      )}
+                                      {has('project-issues.delete') && (
+                                        <button
+                                          onClick={() => {
+                                            setDeleteIssue(issue);
+                                            setShowDeleteIssueModal(true);
+                                          }}
+                                          className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
+                                          title="Delete Issue"
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 </div>

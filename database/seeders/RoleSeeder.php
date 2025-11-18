@@ -96,6 +96,7 @@ class RoleSeeder extends Seeder
             'dashboard.view',
             'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate',
             'projects.view', // View only for context
+            'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
             'reports.view', 'reports.inventory',
         ]);
 

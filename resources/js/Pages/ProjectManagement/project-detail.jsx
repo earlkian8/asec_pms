@@ -1,7 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, usePage, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 
 // Future Tab Imports
 import OverviewTab from './Tabs/Overview';
@@ -14,6 +15,7 @@ import LaborCostTab from './Tabs/LaborCost';
 
 export default function ProjectDetail() {
     const { project, teamData, milestoneData, materialAllocationData, laborCostData, overviewData } = usePage().props;
+    const { has } = usePermission();
 
     const breadcrumbs = [
         { title: "Home", href: route("dashboard") },
@@ -21,16 +23,60 @@ export default function ProjectDetail() {
         { title: "Project Details" },
     ];
 
-    // Flexible Tab List
-    const tabs = [
-        { key: "overview", label: "Overview", component: <OverviewTab project={project} overviewData={overviewData} /> },
-        { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
-        { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
-        { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} /> },
-        { key: "labor-cost", label: "Labor Cost", component: <LaborCostTab project={project} laborCostData={laborCostData} /> },
+    // All possible tabs with their required permissions
+    const allTabs = [
+        { 
+            key: "overview", 
+            label: "Overview", 
+            component: <OverviewTab project={project} overviewData={overviewData} />,
+            permission: 'projects.view'
+        },
+        { 
+            key: "team", 
+            label: "Team", 
+            component: <TeamTab project={project} teamData={teamData} />,
+            permission: 'project-teams.view'
+        },
+        { 
+            key: "milestones", 
+            label: "Milestones", 
+            component: <MilestonesTab project={project} milestoneData={milestoneData}/>,
+            permission: 'project-milestones.view'
+        },
+        { 
+            key: "material-allocation", 
+            label: "Material Allocation", 
+            component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} />,
+            permission: 'material-allocations.view'
+        },
+        { 
+            key: "labor-cost", 
+            label: "Labor Cost", 
+            component: <LaborCostTab project={project} laborCostData={laborCostData} />,
+            permission: 'labor-costs.view'
+        },
     ];
 
-    const [activeTab, setActiveTab] = useState("overview");
+    // Filter tabs based on user permissions
+    const tabs = useMemo(() => {
+        return allTabs.filter(tab => has(tab.permission));
+    }, [has]);
+
+    // Set active tab to first available tab
+    const [activeTab, setActiveTab] = useState(null);
+
+    // Update active tab when tabs change or on initial load
+    useEffect(() => {
+        if (tabs.length > 0) {
+            // If no active tab or current tab is not in available tabs, set to first available
+            if (!activeTab || !tabs.some(tab => tab.key === activeTab)) {
+                setActiveTab(tabs[0].key);
+            }
+        } else {
+            setActiveTab(null);
+        }
+    }, [tabs, activeTab]);
+
     const currentTab = tabs.find(t => t.key === activeTab);
 
     return (
@@ -64,23 +110,29 @@ export default function ProjectDetail() {
                     {/* ----------------------------- */}
                     {/* TAB HEADERS */}
                     {/* ----------------------------- */}
-                    <div className="border-b border-gray-200 mb-4 overflow-x-auto no-scrollbar">
-                        <div className="flex gap-4 w-max">
-                            {tabs.map(tab => (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => setActiveTab(tab.key)}
-                                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition
-                                        ${activeTab === tab.key
-                                            ? "border-zinc-700 text-zinc-700 font-semibold"
-                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                        }`}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
+                    {tabs.length > 0 ? (
+                        <div className="border-b border-gray-200 mb-4 overflow-x-auto no-scrollbar">
+                            <div className="flex gap-4 w-max">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition
+                                            ${activeTab === tab.key
+                                                ? "border-zinc-700 text-zinc-700 font-semibold"
+                                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                            }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="border-b border-gray-200 mb-4">
+                            <p className="text-sm text-gray-500 py-2">You don't have permission to view any tabs for this project.</p>
+                        </div>
+                    )}
 
                     {/* ----------------------------- */}
                     {/* TAB CONTENT AREA */}

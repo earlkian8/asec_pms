@@ -11,15 +11,17 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
-import { Trash2, SquarePen } from 'lucide-react';
+import { Trash2, SquarePen, AlertCircle } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import { toast } from 'sonner';
+import { usePermission } from '@/utils/permissions';
 
 import AddClient from './add';
 import EditClient from './edit';
 import DeleteClient from './delete';
 
 export default function ClientsIndex() {
+  const { has } = usePermission();
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
     { title: "Client Management", href: route('client-management.index') },
@@ -109,6 +111,21 @@ export default function ClientsIndex() {
     });
   };
 
+  // Check if user has permission to view clients
+  if (!has('clients.view')) {
+    return (
+      <AuthenticatedLayout breadcrumbs={breadcrumbs}>
+        <Head title="Clients" />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">You don't have permission to view clients.</p>
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
   return (
     <>
       {/* 🔹 Modals */}
@@ -134,12 +151,14 @@ export default function ClientsIndex() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-zinc-700 hover:bg-zinc-900 text-white"
-                  >
-                    Add Client
-                  </Button>
+                  {has('clients.create') && (
+                    <Button
+                      onClick={() => setShowAddModal(true)}
+                      className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                    >
+                      Add Client
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -175,40 +194,57 @@ export default function ClientsIndex() {
                           </TableCell>
                           <TableCell className="text-xs sm:text-sm">
                             <div className="flex items-center gap-2">
-                              <Switch
-                                checked={client.is_active}
-                                onCheckedChange={(checked) => handleStatusChange(client, checked)}
-                                className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
-                              />
-                              <span
-                                className={`text-xs font-medium ${client.is_active ? 'text-green-600' : 'text-red-600'}`}
-                              >
-                                {client.is_active ? 'Active' : 'Inactive'}
-                              </span>
+                              {has('clients.update-status') ? (
+                                <>
+                                  <Switch
+                                    checked={client.is_active}
+                                    onCheckedChange={(checked) => handleStatusChange(client, checked)}
+                                    className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+                                  />
+                                  <span
+                                    className={`text-xs font-medium ${client.is_active ? 'text-green-600' : 'text-red-600'}`}
+                                  >
+                                    {client.is_active ? 'Active' : 'Inactive'}
+                                  </span>
+                                </>
+                              ) : (
+                                <span
+                                  className={`text-xs font-medium px-2 py-1 rounded ${client.is_active ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}
+                                >
+                                  {client.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="text-xs sm:text-sm">
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditClient(client);
-                                  setShowEditModal(true);
-                                }}
-                                className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                title="Edit"
-                              >
-                                <SquarePen size={18} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setDeleteClient(client);
-                                  setShowDeleteModal(true);
-                                }}
-                                className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                                title="Delete"
-                              >
-                                <Trash2 size={18} />
-                              </button>
+                              {has('clients.update') && (
+                                <button
+                                  onClick={() => {
+                                    setEditClient(client);
+                                    setShowEditModal(true);
+                                  }}
+                                  className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                  title="Edit"
+                                >
+                                  <SquarePen size={18} />
+                                </button>
+                              )}
+                              {has('clients.delete') && (
+                                <button
+                                  onClick={() => {
+                                    setDeleteClient(client);
+                                    setShowDeleteModal(true);
+                                  }}
+                                  className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
+                              {!has('clients.update') && !has('clients.delete') && (
+                                <span className="text-xs text-gray-400">No actions available</span>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

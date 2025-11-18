@@ -18,8 +18,22 @@ import {
   Percent,
   Activity
 } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 
 export default function OverviewTab({ project, overviewData }) {
+  const { has } = usePermission();
+  
+  // If user doesn't have permission to view projects, show message
+  if (!has('projects.view')) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <p className="text-gray-500">You don't have permission to view this project.</p>
+        </div>
+      </div>
+    );
+  }
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return '₱0.00';
     return new Intl.NumberFormat('en-PH', {

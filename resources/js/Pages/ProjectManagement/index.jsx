@@ -12,12 +12,15 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Trash2, SquarePen, Eye } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 
 import AddProject from './add';
 import EditProject from './edit';
 import DeleteProject from './delete';
 
 export default function ProjectsIndex() {
+  const { has } = usePermission();
+  
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
     { title: "Project Management", href: route('project-management.index') },
@@ -160,12 +163,14 @@ export default function ProjectsIndex() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button
-                  onClick={() => setShowAddModal(true)}
-                  className="bg-zinc-700 hover:bg-zinc-900 text-white"
-                >
-                  Add Project
-                </Button>
+                {has('projects.create') && (
+                  <Button
+                    onClick={() => setShowAddModal(true)}
+                    className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                  >
+                    Add Project
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -209,35 +214,41 @@ export default function ProjectsIndex() {
                         </TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">
                           <div className="flex gap-2">
-                            <Link href={route('project-management.view', project.id)}>
+                            {has('projects.view') && (
+                              <Link href={route('project-management.view', project.id)}>
+                                <button
+                                    className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                    title="View Project"
+                                    aria-label="View Project"
+                                >
+                                    <Eye size={18} />
+                                </button>
+                              </Link>
+                            )}
+                            {has('projects.update') && (
                               <button
-                                  className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                  title="View Transactions"
-                                  aria-label="View Transactions"
+                                onClick={() => {
+                                  setEditProject(project);
+                                  setShowEditModal(true);
+                                }}
+                                className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                title="Edit"
                               >
-                                  <Eye size={18} />
+                                <SquarePen size={18} />
                               </button>
-                            </Link>
-                            <button
-                              onClick={() => {
-                                setEditProject(project);
-                                setShowEditModal(true);
-                              }}
-                              className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                              title="Edit"
-                            >
-                              <SquarePen size={18} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteProject(project);
-                                setShowDeleteModal(true);
-                              }}
-                              className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                              title="Delete"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                            )}
+                            {has('projects.delete') && (
+                              <button
+                                onClick={() => {
+                                  setDeleteProject(project);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                title="Delete"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

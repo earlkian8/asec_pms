@@ -23,12 +23,14 @@ import {
   Clock,
   TrendingUp
 } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import AddLaborCost from './add';
 import EditLaborCost from './edit';
 import DeleteLaborCost from './delete';
 import ViewLaborCost from './view';
 
 export default function LaborCostTab({ project, laborCostData }) {
+  const { has } = usePermission();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -150,13 +152,15 @@ export default function LaborCostTab({ project, laborCostData }) {
           <h2 className="text-2xl font-bold text-gray-900">Labor Cost</h2>
           <p className="text-sm text-gray-500 mt-1">Track labor hours and costs for this project</p>
         </div>
-        <Button
-          className="bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
-          onClick={() => setShowAddModal(true)}
-        >
-          <Plus size={18} className="mr-2" />
-          Add Labor Cost
-        </Button>
+        {has('labor-costs.create') && (
+          <Button
+            className="bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
+            onClick={() => setShowAddModal(true)}
+          >
+            <Plus size={18} className="mr-2" />
+            Add Labor Cost
+          </Button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -266,36 +270,42 @@ export default function LaborCostTab({ project, laborCostData }) {
                     </TableCell>
                     <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setViewLaborCost(cost);
-                            setShowViewModal(true);
-                          }}
-                          className="p-2 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-700 transition"
-                          title="View Details"
-                        >
-                          <Eye size={18} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditLaborCost(cost);
-                            setShowEditModal(true);
-                          }}
-                          className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                          title="Edit"
-                        >
-                          <SquarePen size={18} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeleteLaborCost(cost);
-                            setShowDeleteModal(true);
-                          }}
-                          className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {has('labor-costs.view') && (
+                          <button
+                            onClick={() => {
+                              setViewLaborCost(cost);
+                              setShowViewModal(true);
+                            }}
+                            className="p-2 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-700 transition"
+                            title="View Details"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        )}
+                        {has('labor-costs.update') && (
+                          <button
+                            onClick={() => {
+                              setEditLaborCost(cost);
+                              setShowEditModal(true);
+                            }}
+                            className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                            title="Edit"
+                          >
+                            <SquarePen size={18} />
+                          </button>
+                        )}
+                        {has('labor-costs.delete') && (
+                          <button
+                            onClick={() => {
+                              setDeleteLaborCost(cost);
+                              setShowDeleteModal(true);
+                            }}
+                            className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -307,13 +317,15 @@ export default function LaborCostTab({ project, laborCostData }) {
                   <TrendingUp className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                   <p className="text-sm font-medium">No labor cost entries found</p>
                   {searchInput && <p className="text-xs text-gray-400 mt-1">Try adjusting your search or filters</p>}
-                  <Button
-                    className="mt-4 bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
-                    onClick={() => setShowAddModal(true)}
-                  >
-                    <Plus size={18} className="mr-2" />
-                    Add First Labor Cost Entry
-                  </Button>
+                  {has('labor-costs.create') && (
+                    <Button
+                      className="mt-4 bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
+                      onClick={() => setShowAddModal(true)}
+                    >
+                      <Plus size={18} className="mr-2" />
+                      Add First Labor Cost Entry
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             )}

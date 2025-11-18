@@ -26,6 +26,7 @@ import {
   Calendar,
   Eye
 } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import AddReceivingReport from './add';
 import EditReceivingReport from './edit';
 import DeleteReceivingReport from './delete';
@@ -33,6 +34,7 @@ import DeleteMaterialAllocation from './delete-allocation';
 import ViewMaterialAllocation from './view';
 
 export default function MaterialAllocationTab({ project, materialAllocationData }) {
+  const { has } = usePermission();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -262,7 +264,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                       </TableCell>
                       <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
                         <div className="flex gap-2">
-                          {remaining > 0 && (
+                          {remaining > 0 && has('material-allocations.receiving-report') && (
                             <button
                               onClick={() => {
                                 setSelectedAllocation(allocation);
@@ -274,26 +276,30 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                               <Plus size={18} />
                             </button>
                           )}
-                          <button
-                            onClick={() => {
-                              setViewAllocation(allocation);
-                              setShowViewModal(true);
-                            }}
-                            className="p-2 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-700 transition"
-                            title="View Details"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeleteAllocation(allocation);
-                              setShowDeleteAllocationModal(true);
-                            }}
-                            className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                            title="Delete Allocation"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          {has('material-allocations.view') && (
+                            <button
+                              onClick={() => {
+                                setViewAllocation(allocation);
+                                setShowViewModal(true);
+                              }}
+                              className="p-2 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-700 transition"
+                              title="View Details"
+                            >
+                              <Eye size={18} />
+                            </button>
+                          )}
+                          {has('material-allocations.delete') && (
+                            <button
+                              onClick={() => {
+                                setDeleteAllocation(allocation);
+                                setShowDeleteAllocationModal(true);
+                              }}
+                              className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                              title="Delete Allocation"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

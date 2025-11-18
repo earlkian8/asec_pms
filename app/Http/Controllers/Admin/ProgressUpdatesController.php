@@ -19,11 +19,11 @@ class ProgressUpdatesController extends Controller
     {
         $data = $request->validate([
             'project_task_id' => 'required|exists:project_tasks,id',
-            'description'    => 'nullable|string',
+            'description'    => 'required|string',
             'file'            => 'nullable|file|max:20480', // 20MB max
         ]);
 
-        $task = ProjectTask::findOrFail($data['project_task_id']);
+        $task = ProjectTask::with('milestone.project')->findOrFail($data['project_task_id']);
         $milestone = $task->milestone;
 
         $filePath = null;
@@ -68,9 +68,12 @@ class ProgressUpdatesController extends Controller
         if ($progressUpdate->project_task_id !== $task->id || $task->project_milestone_id !== $milestone->id) {
             abort(404);
         }
+        
+        // Load project relationship
+        $milestone->load('project');
 
         $data = $request->validate([
-            'description' => 'nullable|string',
+            'description' => 'required|string',
             'file'       => 'nullable|file|max:20480',
         ]);
 

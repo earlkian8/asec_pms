@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
+use App\Models\ProjectIssue;
 
 class ProjectMilestonesService
 {
@@ -13,7 +14,7 @@ class ProjectMilestonesService
     {
         $search = request('search');
 
-        // Load milestones with all related tasks and progress updates efficiently
+        // Load milestones with all related tasks, progress updates, and issues efficiently
         $milestones = ProjectMilestone::where('project_id', $project->id)
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -25,15 +26,44 @@ class ProjectMilestonesService
             ->with([
                 'tasks' => function ($query) {
                     $query->with([
-                        'assignedUser',
+                        'assignedUser', // Load without field restrictions to ensure it works
+                        'milestone',
                         'progressUpdates' => function ($q) {
                             $q->with('createdBy')->orderBy('created_at', 'desc');
+                        },
+                        'issues' => function ($q) {
+                            $q->with(['reportedBy', 'assignedTo'])->orderBy('created_at', 'desc');
                         }
                     ])->orderBy('due_date', 'asc');
+                },
+                'issues' => function ($q) {
+                    $q->with(['reportedBy', 'assignedTo', 'task'])->orderBy('created_at', 'desc');
                 }
             ])
             ->orderBy('due_date', 'asc')
             ->get();
+        
+        // Ensure all relationships are properly loaded and accessible
+        $milestones->each(function ($milestone) {
+            $milestone->tasks->each(function ($task) {
+                // Ensure progressUpdates is loaded
+                if (!$task->relationLoaded('progressUpdates')) {
+                    $task->load(['progressUpdates' => function ($q) {
+                        $q->with('createdBy')->orderBy('created_at', 'desc');
+                    }]);
+                }
+                // Ensure issues is loaded
+                if (!$task->relationLoaded('issues')) {
+                    $task->load(['issues' => function ($q) {
+                        $q->with(['reportedBy', 'assignedTo'])->orderBy('created_at', 'desc');
+                    }]);
+                }
+                // Ensure assignedUser is loaded
+                if (!$task->relationLoaded('assignedUser')) {
+                    $task->load('assignedUser');
+                }
+            });
+        });
 
         // Fetch all active/current users in the project team for task assignment
         $users = $project->team()
@@ -44,10 +74,17 @@ class ProjectMilestonesService
             ->pluck('user')
             ->filter();
 
+        // Fetch all issues for this project
+        $issues = ProjectIssue::where('project_id', $project->id)
+            ->with(['milestone', 'task', 'reportedBy', 'assignedTo'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return [
             'project' => $project->load('client'),
             'milestones' => $milestones,
             'users' => $users,
+            'issues' => $issues,
             'search' => $search,
         ];
     }

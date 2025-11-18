@@ -19,8 +19,8 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
   const { data, setData, post, errors, processing } = useForm({
     title: "",
     description: "",
-    project_milestone_id: preselectedMilestone?.id || milestones[0]?.id || "",
-    assigned_to: "",
+    project_milestone_id: preselectedMilestone?.id || milestones[0]?.id || null,
+    assigned_to: "none",
     due_date: "",
     status: "pending",
   });
@@ -34,7 +34,7 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!data.project_milestone_id) {
+    if (!data.project_milestone_id || data.project_milestone_id === null) {
       toast.error("Please select a milestone");
       return;
     }
@@ -45,7 +45,7 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
       project_milestone_id: typeof data.project_milestone_id === 'string' 
         ? parseInt(data.project_milestone_id) 
         : data.project_milestone_id,
-      assigned_to: data.assigned_to && data.assigned_to !== "" 
+      assigned_to: data.assigned_to && data.assigned_to !== "none" 
         ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
         : null,
     };
@@ -100,18 +100,24 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
           <div>
             <Label>Milestone</Label>
             <Select
-              value={data.project_milestone_id.toString()}
-              onValueChange={(value) => setData("project_milestone_id", value)}
+              value={data.project_milestone_id ? data.project_milestone_id.toString() : undefined}
+              onValueChange={(value) => setData("project_milestone_id", parseInt(value))}
             >
               <SelectTrigger className={inputClass(errors.project_milestone_id)}>
                 <SelectValue placeholder="Select milestone" />
               </SelectTrigger>
               <SelectContent>
-                {milestones.map((m) => (
-                  <SelectItem key={m.id} value={m.id.toString()}>
-                    {m.name}
-                  </SelectItem>
-                ))}
+                {milestones.length > 0 ? (
+                  milestones.map((m) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>
+                      {m.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-sm text-gray-500">
+                    No milestones available
+                  </div>
+                )}
               </SelectContent>
             </Select>
             <InputError message={errors.project_milestone_id} />
@@ -128,7 +134,7 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Unassigned)</SelectItem>
+                <SelectItem value="none">None (Unassigned)</SelectItem>
                 {users.length > 0 ? (
                   users.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>

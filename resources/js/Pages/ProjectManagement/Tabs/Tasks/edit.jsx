@@ -18,8 +18,8 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
   const { data, setData, put, errors, processing } = useForm({
     title: task.title || "",
     description: task.description || "",
-    project_milestone_id: task.project_milestone_id || "",
-    assigned_to: task.assigned_to || "",
+    project_milestone_id: task.project_milestone_id || null,
+    assigned_to: task.assigned_to ? task.assigned_to.toString() : "none",
     due_date: task.due_date || "",
     status: task.status || "pending",
   });
@@ -49,7 +49,7 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
       project_milestone_id: typeof data.project_milestone_id === 'string' 
         ? parseInt(data.project_milestone_id) 
         : data.project_milestone_id,
-      assigned_to: data.assigned_to && data.assigned_to !== "" 
+      assigned_to: data.assigned_to && data.assigned_to !== "none" 
         ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
         : null,
     };
@@ -104,18 +104,24 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
           <div>
             <Label>Milestone</Label>
             <Select
-              value={data.project_milestone_id.toString()}
-              onValueChange={(value) => setData("project_milestone_id", value)}
+              value={data.project_milestone_id ? data.project_milestone_id.toString() : undefined}
+              onValueChange={(value) => setData("project_milestone_id", parseInt(value))}
             >
               <SelectTrigger className={inputClass(errors.project_milestone_id)}>
                 <SelectValue placeholder="Select milestone" />
               </SelectTrigger>
               <SelectContent>
-                {milestones.map((m) => (
-                  <SelectItem key={m.id} value={m.id.toString()}>
-                    {m.name}
-                  </SelectItem>
-                ))}
+                {milestones.length > 0 ? (
+                  milestones.map((m) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>
+                      {m.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-sm text-gray-500">
+                    No milestones available
+                  </div>
+                )}
               </SelectContent>
             </Select>
             <InputError message={errors.project_milestone_id} />
@@ -125,14 +131,14 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
           <div>
             <Label>Assign To</Label>
             <Select
-              value={data.assigned_to ? data.assigned_to.toString() : ""}
+              value={data.assigned_to}
               onValueChange={(value) => setData("assigned_to", value)}
             >
               <SelectTrigger className={inputClass(errors.assigned_to)}>
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Unassigned)</SelectItem>
+                <SelectItem value="none">None (Unassigned)</SelectItem>
                 {users.length > 0 ? (
                   users.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>

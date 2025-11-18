@@ -63,5 +63,9 @@ class Project extends Model
     {
         return $this->hasMany(ProjectLaborCost::class);
     }
-    
+
+    public function issues()
+    {
+        return $this->hasMany(ProjectIssue::class);
+    }
 }

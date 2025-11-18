@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
 import {
@@ -71,10 +71,14 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [], preselectedTask = null
       data: submitData,
       preserveScroll: true,
       forceFormData: true,
-      onSuccess: () => {
+      onSuccess: (page) => {
         setShowAddModal(false);
         toast.success("Progress update created successfully!");
         setPreviewName("");
+        // Reload the entire page to get fresh data
+        setTimeout(() => {
+          router.reload({ only: ['milestoneData'] });
+        }, 100);
       },
       onError: (errors) => {
         console.error('Progress update errors:', errors);
@@ -126,12 +130,13 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [], preselectedTask = null
 
           {/* Description */}
           <div>
-            <Label>Description</Label>
+            <Label>Description <span className="text-red-500">*</span></Label>
             <Textarea
               value={data.description}
               onChange={(e) => setData("description", e.target.value)}
               placeholder="Enter progress update description"
               className={inputClass(errors.description)}
+              required
             />
             <InputError message={errors.description} />
           </div>

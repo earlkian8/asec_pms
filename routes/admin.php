@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\ProgressUpdatesController;
+use App\Http\Controllers\Admin\ProjectIssuesController;
 use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
 use App\Http\Controllers\Admin\ProjectLaborCostsController;
 use App\Http\Controllers\Admin\InventoryItemsController;
@@ -76,6 +77,13 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'update'])->name('update');
             Route::delete('/destroy/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'destroy'])->name('destroy');
             Route::get('/download/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'download'])->name('download');
+        });
+
+        // Project Issues
+        Route::prefix('project-issues')->name('project-issues.')->group(function(){
+            Route::post('/store', [ProjectIssuesController::class, 'store'])->name('store');
+            Route::put('/update/{project}/issue/{issue}', [ProjectIssuesController::class, 'update'])->name('update');
+            Route::delete('/destroy/{project}/issue/{issue}', [ProjectIssuesController::class, 'destroy'])->name('destroy');
         });
 
         // Material Allocations

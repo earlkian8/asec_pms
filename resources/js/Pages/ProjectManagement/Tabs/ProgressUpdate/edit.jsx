@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
 import {
@@ -59,14 +59,31 @@ const EditProgressUpdate = ({ setShowEditModal, progressUpdate, tasks = [] }) =>
         setShowEditModal(false);
         toast.success("Progress update updated successfully!");
         setPreviewName("");
+        // Reload the entire page to get fresh data
+        setTimeout(() => {
+          router.reload({ only: ['milestoneData'] });
+        }, 100);
       },
       onError: () => toast.error("Please check the form for errors"),
     });
   };
 
-  const getFileUrl = (filePath) => {
-    if (!filePath) return null;
-    return `${import.meta.env.VITE_APP_URL || ''}/storage/${filePath}`;
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '---';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getFileUrl = () => {
+    if (!progressUpdate?.file_path) return null;
+    const task = progressUpdate.task || tasks.find(t => t.id === progressUpdate.project_task_id);
+    if (!task || !task.milestone) return null;
+    return route('project-management.progress-updates.download', [
+      task.milestone.id,
+      task.id,
+      progressUpdate.id
+    ]);
   };
 
   return (
@@ -89,29 +106,35 @@ const EditProgressUpdate = ({ setShowEditModal, progressUpdate, tasks = [] }) =>
 
           {/* Description */}
           <div>
-            <Label>Description</Label>
+            <Label>Description <span className="text-red-500">*</span></Label>
             <Textarea
               value={data.description}
               onChange={(e) => setData("description", e.target.value)}
               placeholder="Enter progress update description"
               className={inputClass(errors.description)}
+              required
             />
             <InputError message={errors.description} />
           </div>
 
           {/* Current File */}
-          {progressUpdate.file_path && (
+          {progressUpdate.file_path && getFileUrl() && (
             <div>
               <Label>Current File</Label>
               <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                 <a
-                  href={getFileUrl(progressUpdate.file_path)}
+                  href={getFileUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 text-sm"
+                  className="text-blue-600 hover:text-blue-800 text-sm underline"
                 >
                   {progressUpdate.original_name || 'View File'}
                 </a>
+                {progressUpdate.file_size && (
+                  <span className="text-xs text-gray-500">
+                    ({formatFileSize(progressUpdate.file_size)})
+                  </span>
+                )}
               </div>
             </div>
           )}

@@ -29,9 +29,6 @@ export default function ProjectDetail() {
         { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
         { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} /> },
         { key: "labor-cost", label: "Labor Cost", component: <LaborCostTab project={project} laborCostData={laborCostData} /> },
-        // { key: "budget", label: "Budget", component: <BudgetTab project={project} /> },
-        // { key: "issues", label: "Issues", component: <IssuesTab project={project} /> },
-        { key: "issues", label: "Issues" },
     ];
 
     const [activeTab, setActiveTab] = useState("overview");

@@ -32,4 +32,9 @@ class ProjectTask extends Model
     {
         return $this->hasMany(ProgressUpdate::class, 'project_task_id');
     }
+
+    public function issues()
+    {
+        return $this->hasMany(ProjectIssue::class, 'project_task_id');
+    }
 }

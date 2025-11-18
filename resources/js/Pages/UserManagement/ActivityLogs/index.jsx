@@ -11,8 +11,11 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/Components/ui/input"
 import { Button } from "@/Components/ui/button"
+import { AlertCircle } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 
 export default function ActivityLogsIndex() {
+  const { has } = usePermission();
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
     { title: "User Management", href: route('user-management.activity-logs.index') },
@@ -85,6 +88,21 @@ export default function ActivityLogsIndex() {
   };
 
   const showPagination = pageLinks.length > 0 || prevLink?.url || nextLink?.url;
+
+  // Check if user has permission to view activity logs
+  if (!has('activity-logs.view')) {
+    return (
+      <AuthenticatedLayout breadcrumbs={breadcrumbs}>
+        <Head title="Activity Logs" />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">You don't have permission to view activity logs.</p>
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
 
   return (
     <AuthenticatedLayout breadcrumbs={breadcrumbs}>

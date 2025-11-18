@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/Components/ui/input"
 import { Button } from "@/Components/ui/button"
-import { Trash2, Users, SquarePen } from 'lucide-react';
+import { Trash2, Users, SquarePen, AlertCircle } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import AddRole from './add';
 import DeleteRole from './delete';
 
 export default function RolesIndex() {
+  const { has } = usePermission();
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
     { title: "User Management", href: route('user-management.roles-and-permissions.index') },
@@ -90,6 +92,21 @@ export default function RolesIndex() {
 
   const showPagination = pageLinks.length > 0 || prevLink?.url || nextLink?.url;
 
+  // Check if user has permission to view roles
+  if (!has('roles.view')) {
+    return (
+      <AuthenticatedLayout breadcrumbs={breadcrumbs}>
+        <Head title="Roles" />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">You don't have permission to view roles.</p>
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
   return (
     <>
     {showAddModal && (
@@ -117,14 +134,16 @@ export default function RolesIndex() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button 
-                  onClick={() => {
-                    setShowAddModal(true);
-                  }}
-                  className="bg-zinc-700 hover:bg-zinc-900 text-white"
-                >
-                  Add Role
-                </Button>
+                {has('roles.create') && (
+                  <Button 
+                    onClick={() => {
+                      setShowAddModal(true);
+                    }}
+                    className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                  >
+                    Add Role
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -172,29 +191,36 @@ export default function RolesIndex() {
                         </TableCell>   
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                router.visit(route('user-management.roles-and-permissions.edit', role.id));
-                              }}
-                              className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                              title="Edit Permissions"
-                              aria-label="Edit Permissions"
-                              type="button"
-                            >
-                              <SquarePen size={18} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeleteRole(role);
-                                setShowDeleteModal(true);
-                              }}
-                              className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                              title="Delete"
-                              aria-label="Delete"
-                              type="button"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                            {has('roles.update') && (
+                              <button
+                                onClick={() => {
+                                  router.visit(route('user-management.roles-and-permissions.edit', role.id));
+                                }}
+                                className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                title="Edit Permissions"
+                                aria-label="Edit Permissions"
+                                type="button"
+                              >
+                                <SquarePen size={18} />
+                              </button>
+                            )}
+                            {has('roles.delete') && (
+                              <button
+                                onClick={() => {
+                                  setDeleteRole(role);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                title="Delete"
+                                aria-label="Delete"
+                                type="button"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
+                            {!has('roles.update') && !has('roles.delete') && (
+                              <span className="text-xs text-gray-400">No actions available</span>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

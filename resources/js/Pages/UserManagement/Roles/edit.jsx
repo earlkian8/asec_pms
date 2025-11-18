@@ -139,10 +139,10 @@ export default function EditRolePermissions() {
     <AuthenticatedLayout breadcrumbs={breadcrumbs}>
       <Head title={`Edit Permissions - ${role.name}`} />
 
-      <div className="w-full sm:px-6 lg:px-8">
-        <div className="overflow-hidden bg-white shadow sm:rounded-lg p-4 mt-2">
+      <div className="w-full">
+        <div className="bg-white shadow sm:rounded-lg">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
@@ -166,9 +166,11 @@ export default function EditRolePermissions() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            {/* Global Select All */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          {/* Content Area */}
+          <div className="p-4">
+            <form onSubmit={handleSubmit}>
+              {/* Global Select All */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Checkbox
@@ -265,36 +267,37 @@ export default function EditRolePermissions() {
                 })}
             </div>
 
-            {/* Form Actions */}
-            <div className="mt-8 flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  router.visit(
-                    route('user-management.roles-and-permissions.index')
-                  )
-                }
-                disabled={processing}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={processing}
-                className="bg-zinc-700 hover:bg-zinc-900 text-white"
-              >
-                {processing ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save size={16} className="mr-2" />
-                    Save Permissions
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
+              {/* Form Actions */}
+              <div className="mt-8 flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    router.visit(
+                      route('user-management.roles-and-permissions.index')
+                    )
+                  }
+                  disabled={processing}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={processing}
+                  className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                >
+                  {processing ? (
+                    'Saving...'
+                  ) : (
+                    <>
+                      <Save size={16} className="mr-2" />
+                      Save Permissions
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </AuthenticatedLayout>

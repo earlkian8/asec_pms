@@ -11,7 +11,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
-import { Trash2, SquarePen, Package, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Trash2, SquarePen, Package, ArrowDownToLine, ArrowUpFromLine, AlertCircle } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import AddInventoryItem from './add';
 import EditInventoryItem from './edit';
 import DeleteInventoryItem from './delete';
@@ -21,6 +22,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
 export default function InventoryManagement({ items, search: initialSearch, projects, transactions, transactionsSearch: initialTransactionsSearch }) {
+  const { has } = usePermission();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -134,6 +136,21 @@ export default function InventoryManagement({ items, search: initialSearch, proj
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
+  // Check if user has permission to view inventory
+  if (!has('inventory.view')) {
+    return (
+      <AuthenticatedLayout breadcrumbs={breadcrumbs}>
+        <Head title="Inventory Management" />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">You don't have permission to view inventory.</p>
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
   return (
     <AuthenticatedLayout breadcrumbs={breadcrumbs}>
       <Head title="Inventory Management" />
@@ -171,13 +188,15 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                     onChange={handleSearch}
                     className="focus:border-gray-800 focus:ring-2 focus:ring-gray-800 w-full sm:max-w-md"
                   />
-                  <Button
-                    className="bg-zinc-700 hover:bg-zinc-900 text-white"
-                    onClick={() => setShowAddModal(true)}
-                  >
-                    <Package size={16} className="mr-2" />
-                    + Add Item
-                  </Button>
+                  {has('inventory.create') && (
+                    <Button
+                      className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                      onClick={() => setShowAddModal(true)}
+                    >
+                      <Package size={16} className="mr-2" />
+                      + Add Item
+                    </Button>
+                  )}
                 </div>
 
                 {/* Inventory Items Table */}
@@ -231,35 +250,46 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
-                                <button
-                                  onClick={() => { setStockInItem(item); setShowStockInModal(true); }}
-                                  className="p-2 rounded hover:bg-green-100 text-green-600 hover:text-green-700 transition"
-                                  title="Stock In"
-                                >
-                                  <ArrowDownToLine size={18} />
-                                </button>
-                                <button
-                                  onClick={() => { setStockOutItem(item); setShowStockOutModal(true); }}
-                                  className="p-2 rounded hover:bg-orange-100 text-orange-600 hover:text-orange-700 transition"
-                                  title="Stock Out"
-                                  disabled={item.current_stock <= 0}
-                                >
-                                  <ArrowUpFromLine size={18} />
-                                </button>
-                                <button
-                                  onClick={() => { setEditItem(item); setShowEditModal(true); }}
-                                  className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                  title="Edit"
-                                >
-                                  <SquarePen size={18} />
-                                </button>
-                                <button
-                                  onClick={() => { setDeleteItem(item); setShowDeleteModal(true); }}
-                                  className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                                  title="Delete"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
+                                {has('inventory.stock-in') && (
+                                  <button
+                                    onClick={() => { setStockInItem(item); setShowStockInModal(true); }}
+                                    className="p-2 rounded hover:bg-green-100 text-green-600 hover:text-green-700 transition"
+                                    title="Stock In"
+                                  >
+                                    <ArrowDownToLine size={18} />
+                                  </button>
+                                )}
+                                {has('inventory.stock-out') && (
+                                  <button
+                                    onClick={() => { setStockOutItem(item); setShowStockOutModal(true); }}
+                                    className="p-2 rounded hover:bg-orange-100 text-orange-600 hover:text-orange-700 transition"
+                                    title="Stock Out"
+                                    disabled={item.current_stock <= 0}
+                                  >
+                                    <ArrowUpFromLine size={18} />
+                                  </button>
+                                )}
+                                {has('inventory.update') && (
+                                  <button
+                                    onClick={() => { setEditItem(item); setShowEditModal(true); }}
+                                    className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                    title="Edit"
+                                  >
+                                    <SquarePen size={18} />
+                                  </button>
+                                )}
+                                {has('inventory.delete') && (
+                                  <button
+                                    onClick={() => { setDeleteItem(item); setShowDeleteModal(true); }}
+                                    className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                                {!has('inventory.stock-in') && !has('inventory.stock-out') && !has('inventory.update') && !has('inventory.delete') && (
+                                  <span className="text-xs text-gray-400">No actions available</span>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>

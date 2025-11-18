@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/Components/ui/input"
 import { Button } from "@/Components/ui/button"
-import { Trash2, SquarePen, UnlockIcon } from 'lucide-react';
+import { Trash2, SquarePen, UnlockIcon, AlertCircle } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import AddUser from './add';
 import EditUser from './edit';
 import ResetPassword from './reset';
 import DeleteUser from './delete';
 export default function UsersIndex() {
+  const { has } = usePermission();
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
     { title: "User Management", href: route('user-management.users.index') },
@@ -97,6 +99,21 @@ export default function UsersIndex() {
 
   const showPagination = pageLinks.length > 0 || prevLink?.url || nextLink?.url;
 
+  // Check if user has permission to view users
+  if (!has('users.view')) {
+    return (
+      <AuthenticatedLayout breadcrumbs={breadcrumbs}>
+        <Head title="Users" />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">You don't have permission to view users.</p>
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
   return (
     <>
     {showAddModal && (
@@ -132,14 +149,16 @@ export default function UsersIndex() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button 
-                  onClick={() => {
-                    setShowAddModal(true);
-                  }}
-                  className="bg-zinc-700 hover:bg-zinc-900 text-white"
-                >
-                  Add User
-                </Button>
+                {has('users.create') && (
+                  <Button 
+                    onClick={() => {
+                      setShowAddModal(true);
+                    }}
+                    className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                  >
+                    Add User
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -184,43 +203,52 @@ export default function UsersIndex() {
                         </TableCell>   
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
                           <div className="flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        setEditUser(user);
-                                        setShowEditModal(true);
-                                    }}
-                                    className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                    title="Edit"
-                                    aria-label="Edit"
-                                    type="button"
-                                >
-                                    <SquarePen size={18} />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setResetUser(user);
-                                        setShowResetModal(true);
-                                    }}
-                                    className="p-2 rounded hover:bg-yellow-100 text-yellow-600 hover:text-yellow-700 transition"
-                                    title="Reset Password"
-                                    aria-label="Reset Password"
-                                    type="button"
-                                >
-                                    <UnlockIcon size={18} />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setDeleteUser(user);
-                                        setShowDeleteModal(true);
-                                    }}
-                                    className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
-                                    title="Delete"
-                                    aria-label="Delete"
-                                    type="button"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
+                                {has('users.update') && (
+                                  <button
+                                      onClick={() => {
+                                          setEditUser(user);
+                                          setShowEditModal(true);
+                                      }}
+                                      className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                                      title="Edit"
+                                      aria-label="Edit"
+                                      type="button"
+                                  >
+                                      <SquarePen size={18} />
+                                  </button>
+                                )}
+                                {has('users.reset-password') && (
+                                  <button
+                                      onClick={() => {
+                                          setResetUser(user);
+                                          setShowResetModal(true);
+                                      }}
+                                      className="p-2 rounded hover:bg-yellow-100 text-yellow-600 hover:text-yellow-700 transition"
+                                      title="Reset Password"
+                                      aria-label="Reset Password"
+                                      type="button"
+                                  >
+                                      <UnlockIcon size={18} />
+                                  </button>
+                                )}
+                                {has('users.delete') && (
+                                  <button
+                                      onClick={() => {
+                                          setDeleteUser(user);
+                                          setShowDeleteModal(true);
+                                      }}
+                                      className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                                      title="Delete"
+                                      aria-label="Delete"
+                                      type="button"
+                                  >
+                                      <Trash2 size={18} />
+                                  </button>
+                                )}
+                                {!has('users.update') && !has('users.reset-password') && !has('users.delete') && (
+                                  <span className="text-xs text-gray-400">No actions available</span>
+                                )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

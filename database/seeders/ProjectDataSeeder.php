@@ -13,6 +13,7 @@ use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
 use App\Models\Billing;
 use App\Models\BillingPayment;
+use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -27,32 +28,93 @@ class ProjectDataSeeder extends Seeder
     {
         $this->command->info('Starting data seeding...');
 
-        // Create Users for team members
-        $this->command->info('Creating users...');
-        $users = User::factory(30)->create();
-        $this->command->info("Created {$users->count()} users");
+        // Create Users with different roles (9 users, test user already created)
+        $this->command->info('Creating users with roles...');
+        $users = $this->createUsersWithRoles(9);
+        $this->command->info("Created {$users->count()} users with roles");
 
-        // Create Clients
+        // Get all users including test user
+        $allUsers = User::all();
+
+        // Create Clients (reduced to 10)
         $this->command->info('Creating clients...');
-        $clients = $this->createClients(25);
+        $clients = $this->createClients(10);
         $this->command->info("Created {$clients->count()} clients");
 
-        // Create Inventory Items
+        // Create Inventory Items (reduced to 20)
         $this->command->info('Creating inventory items...');
-        $inventoryItems = $this->createInventoryItems(50);
+        $inventoryItems = $this->createInventoryItems(20);
         $this->command->info("Created {$inventoryItems->count()} inventory items");
 
-        // Create Projects with all submodules
+        // Create Projects with all submodules (reduced to 5)
         $this->command->info('Creating projects with all submodules...');
-        $projects = $this->createProjects($clients, $users, $inventoryItems, 20);
+        $projects = $this->createProjects($clients, $allUsers, $inventoryItems, 5);
         $this->command->info("Created {$projects->count()} projects with all related data");
 
-        // Create Billings for billable projects
+        // Create Billings for billable projects (reduced)
         $this->command->info('Creating billings...');
-        $billings = $this->createBillings($projects, $users);
+        $billings = $this->createBillings($projects, $allUsers);
         $this->command->info("Created {$billings->count()} billings with payments");
 
         $this->command->info('Data seeding completed successfully!');
+    }
+
+    private function createUsersWithRoles($count)
+    {
+        $roles = [
+            'Admin',
+            'Project Manager',
+            'Finance Manager',
+            'Inventory Manager',
+            'Team Member',
+            'HR Manager',
+            'Sales Manager',
+            'Viewer',
+            'Admin', // Second admin for variety
+        ];
+
+        $users = collect();
+        $names = [
+            'John Doe',
+            'Jane Smith',
+            'Mike Johnson',
+            'Sarah Williams',
+            'David Brown',
+            'Emily Davis',
+            'Chris Wilson',
+            'Lisa Anderson',
+            'Tom Martinez',
+        ];
+
+        for ($i = 0; $i < $count; $i++) {
+            $roleName = $roles[$i] ?? 'Team Member';
+            $name = $names[$i] ?? fake()->name();
+            
+            // Generate unique email
+            $baseEmail = strtolower(str_replace(' ', '.', $name));
+            $email = $baseEmail . '@example.com';
+            $counter = 1;
+            while (User::where('email', $email)->exists()) {
+                $email = $baseEmail . $counter . '@example.com';
+                $counter++;
+            }
+            
+            $user = User::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]);
+
+            $role = Role::where('name', $roleName)->first();
+            if ($role) {
+                $user->assignRole($role);
+            }
+
+            $users->push($user);
+        }
+
+        return $users;
     }
 
     private function createClients($count)
@@ -274,8 +336,8 @@ class ProjectDataSeeder extends Seeder
                 'billing_type' => $billingType,
             ]);
 
-            // Create Team Members (2-8 members per project)
-            $teamCount = fake()->numberBetween(2, 8);
+            // Create Team Members (2-5 members per project, reduced)
+            $teamCount = fake()->numberBetween(2, 5);
             $selectedUsers = $users->random($teamCount);
             $teamStartDate = $startDate;
 
@@ -304,8 +366,8 @@ class ProjectDataSeeder extends Seeder
                 ]);
             }
 
-            // Create Milestones (3-8 milestones per project)
-            $milestoneCount = fake()->numberBetween(3, 8);
+            // Create Milestones (2-4 milestones per project, reduced)
+            $milestoneCount = fake()->numberBetween(2, 4);
             $milestoneDates = $this->generateMilestoneDates($startDate, $plannedEndDate, $milestoneCount);
             $milestones = collect();
 
@@ -325,8 +387,8 @@ class ProjectDataSeeder extends Seeder
 
                 $milestones->push($milestone);
 
-                // Create Tasks for each milestone (2-6 tasks per milestone)
-                $taskCount = fake()->numberBetween(2, 6);
+                // Create Tasks for each milestone (2-4 tasks per milestone, reduced)
+                $taskCount = fake()->numberBetween(2, 4);
                 $taskUsers = $selectedUsers->random(min(3, $selectedUsers->count()));
 
                 for ($t = 0; $t < $taskCount; $t++) {
@@ -355,8 +417,8 @@ class ProjectDataSeeder extends Seeder
                 }
             }
 
-            // Create Material Allocations (3-10 items per project)
-            $allocationCount = fake()->numberBetween(3, 10);
+            // Create Material Allocations (2-5 items per project, reduced)
+            $allocationCount = fake()->numberBetween(2, 5);
             $selectedItems = $inventoryItems->where('is_active', true)->random($allocationCount);
 
             foreach ($selectedItems as $item) {
@@ -386,8 +448,8 @@ class ProjectDataSeeder extends Seeder
                 ]);
             }
 
-            // Create Labor Costs (10-50 entries per project)
-            $laborCostCount = fake()->numberBetween(10, 50);
+            // Create Labor Costs (5-15 entries per project, reduced)
+            $laborCostCount = fake()->numberBetween(5, 15);
             $projectUsers = $selectedUsers;
 
             for ($l = 0; $l < $laborCostCount; $l++) {

@@ -11,7 +11,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
-import { Trash2, SquarePen, DollarSign, CreditCard } from 'lucide-react';
+import { Trash2, SquarePen, DollarSign, CreditCard, AlertCircle } from 'lucide-react';
+import { usePermission } from '@/utils/permissions';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
 export default function BillingManagement({ billings, search: initialSearch, projects, status: initialStatus, project_id: initialProjectId, billing_type: initialBillingType }) {
+  const { has } = usePermission();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -99,6 +101,21 @@ export default function BillingManagement({ billings, search: initialSearch, pro
     return 'bg-red-500';
   };
 
+  // Check if user has permission to view billing
+  if (!has('billing.view')) {
+    return (
+      <AuthenticatedLayout breadcrumbs={breadcrumbs}>
+        <Head title="Billing Management" />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">You don't have permission to view billing.</p>
+          </div>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
   return (
     <AuthenticatedLayout breadcrumbs={breadcrumbs}>
       <Head title="Billing Management" />
@@ -114,13 +131,15 @@ export default function BillingManagement({ billings, search: initialSearch, pro
                 onChange={handleSearch}
                 className="focus:border-gray-800 focus:ring-2 focus:ring-gray-800 w-full sm:max-w-md"
               />
-              <Button
-                className="bg-zinc-700 hover:bg-zinc-900 text-white"
-                onClick={() => setShowAddModal(true)}
-              >
-                <DollarSign size={16} className="mr-2" />
-                + Add Billing
-              </Button>
+              {has('billing.create') && (
+                <Button
+                  className="bg-zinc-700 hover:bg-zinc-900 text-white"
+                  onClick={() => setShowAddModal(true)}
+                >
+                  <DollarSign size={16} className="mr-2" />
+                  + Add Billing
+                </Button>
+              )}
             </div>
 
             {/* Filters */}
@@ -247,7 +266,7 @@ export default function BillingManagement({ billings, search: initialSearch, pro
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {billing.status !== 'paid' && (
+                            {billing.status !== 'paid' && has('billing.add-payment') && (
                               <button
                                 onClick={() => { setPaymentBilling(billing); setShowPaymentModal(true); }}
                                 className="p-2 rounded hover:bg-green-100 text-green-600 hover:text-green-700 transition"
@@ -256,7 +275,7 @@ export default function BillingManagement({ billings, search: initialSearch, pro
                                 <CreditCard size={18} />
                               </button>
                             )}
-                            {billing.status !== 'paid' && (
+                            {billing.status !== 'paid' && has('billing.update') && (
                               <button
                                 onClick={() => { setEditBilling(billing); setShowEditModal(true); }}
                                 className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
@@ -265,7 +284,7 @@ export default function BillingManagement({ billings, search: initialSearch, pro
                                 <SquarePen size={18} />
                               </button>
                             )}
-                            {billing.payments_count === 0 && (
+                            {billing.payments_count === 0 && has('billing.delete') && (
                               <button
                                 onClick={() => { setDeleteBilling(billing); setShowDeleteModal(true); }}
                                 className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
@@ -273,6 +292,9 @@ export default function BillingManagement({ billings, search: initialSearch, pro
                               >
                                 <Trash2 size={18} />
                               </button>
+                            )}
+                            {(!has('billing.add-payment') && !has('billing.update') && !has('billing.delete')) && (
+                              <span className="text-xs text-gray-400">No actions available</span>
                             )}
                           </div>
                         </TableCell>

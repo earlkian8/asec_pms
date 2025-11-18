@@ -28,7 +28,7 @@ Route::get('/', function(){
     return redirect()->route('login');
 });
 
-Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified', 'permission:dashboard.view'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     
@@ -128,44 +128,44 @@ Route::middleware('auth')->group(function () {
 
         // Roles & Permissions
         Route::prefix('roles-and-permissions')->name('roles-and-permissions.')->group(function(){
-            Route::get('/', [RolesController::class, 'index'])->name('index');
-            Route::post('/store', [RolesController::class, 'store'])->name('store');
-            Route::get('/edit/{role}', [RolesController::class, 'edit'])->name('edit');
-            Route::put('/update/{role}', [RolesController::class, 'update'])->name('update');
-            Route::delete('/destroy/{role}', [RolesController::class, 'destroy'])->name('destroy');
+            Route::get('/', [RolesController::class, 'index'])->middleware('permission:roles.view')->name('index');
+            Route::post('/store', [RolesController::class, 'store'])->middleware('permission:roles.create')->name('store');
+            Route::get('/edit/{role}', [RolesController::class, 'edit'])->middleware('permission:roles.update')->name('edit');
+            Route::put('/update/{role}', [RolesController::class, 'update'])->middleware('permission:roles.update')->name('update');
+            Route::delete('/destroy/{role}', [RolesController::class, 'destroy'])->middleware('permission:roles.delete')->name('destroy');
         });
         // Users
         Route::prefix('users')->name('users.')->group(function(){
-            Route::get('/', [UsersController::class, 'index'])->name('index');
-            Route::post('/store', [UsersController::class, 'store'])->name('store');
-            Route::put('/update/{user}', [UsersController::class, 'update'])->name('update');
-            Route::patch('/reset-password/{user}', [UsersController::class, 'resetPassword'])->name('reset-password');
-            Route::delete('/destroy/{user}', [UsersController::class, 'destroy'])->name('destroy');
+            Route::get('/', [UsersController::class, 'index'])->middleware('permission:users.view')->name('index');
+            Route::post('/store', [UsersController::class, 'store'])->middleware('permission:users.create')->name('store');
+            Route::put('/update/{user}', [UsersController::class, 'update'])->middleware('permission:users.update')->name('update');
+            Route::patch('/reset-password/{user}', [UsersController::class, 'resetPassword'])->middleware('permission:users.reset-password')->name('reset-password');
+            Route::delete('/destroy/{user}', [UsersController::class, 'destroy'])->middleware('permission:users.delete')->name('destroy');
         });
         // Activity Logs
         Route::prefix('activity-logs')->name('activity-logs.')->group(function(){
-            Route::get('/', [ActivityLogsController::class, 'index'])->name('index');
+            Route::get('/', [ActivityLogsController::class, 'index'])->middleware('permission:activity-logs.view')->name('index');
         });
     });
 
     // Inventory Management
     Route::prefix('inventory-management')->name('inventory-management.')->group(function(){
-        Route::get('/', [InventoryItemsController::class, 'index'])->name('index');
-        Route::get('/transactions', [InventoryItemsController::class, 'transactions'])->name('transactions');
-        Route::post('/store', [InventoryItemsController::class, 'store'])->name('store');
-        Route::put('/update/{inventoryItem}', [InventoryItemsController::class, 'update'])->name('update');
-        Route::delete('/destroy/{inventoryItem}', [InventoryItemsController::class, 'destroy'])->name('destroy');
-        Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->name('stock-in');
-        Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->name('stock-out');
+        Route::get('/', [InventoryItemsController::class, 'index'])->middleware('permission:inventory.view')->name('index');
+        Route::get('/transactions', [InventoryItemsController::class, 'transactions'])->middleware('permission:inventory.view')->name('transactions');
+        Route::post('/store', [InventoryItemsController::class, 'store'])->middleware('permission:inventory.create')->name('store');
+        Route::put('/update/{inventoryItem}', [InventoryItemsController::class, 'update'])->middleware('permission:inventory.update')->name('update');
+        Route::delete('/destroy/{inventoryItem}', [InventoryItemsController::class, 'destroy'])->middleware('permission:inventory.delete')->name('destroy');
+        Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->middleware('permission:inventory.stock-in')->name('stock-in');
+        Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->middleware('permission:inventory.stock-out')->name('stock-out');
     });
 
     // Billing Management
     Route::prefix('billing-management')->name('billing-management.')->group(function(){
-        Route::get('/', [BillingsController::class, 'index'])->name('index');
-        Route::post('/store', [BillingsController::class, 'store'])->name('store');
-        Route::put('/update/{billing}', [BillingsController::class, 'update'])->name('update');
-        Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->name('destroy');
-        Route::get('/view/{billing}', [BillingsController::class, 'show'])->name('show');
-        Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->name('add-payment');
+        Route::get('/', [BillingsController::class, 'index'])->middleware('permission:billing.view')->name('index');
+        Route::post('/store', [BillingsController::class, 'store'])->middleware('permission:billing.create')->name('store');
+        Route::put('/update/{billing}', [BillingsController::class, 'update'])->middleware('permission:billing.update')->name('update');
+        Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->middleware('permission:billing.delete')->name('destroy');
+        Route::get('/view/{billing}', [BillingsController::class, 'show'])->middleware('permission:billing.view')->name('show');
+        Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->middleware('permission:billing.add-payment')->name('add-payment');
     });
 });

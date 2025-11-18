@@ -16,20 +16,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create default admin user
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'dev@unisync.com',
-            'password' => Hash::make('password')
-        ]);
-
         // Seed permissions and roles first
         $this->call([
             PermissionSeeder::class,
             RoleSeeder::class,
         ]);
 
-        // Seed project data (clients, inventory, projects with all submodules)
+        // Create test user with Super Admin role
+        $testUser = User::create([
+            'name' => 'Test User',
+            'email' => 'dev@unisync.com',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $testUser->assignRole('Super Admin');
+
+        // Seed project data (clients, inventory, projects with all submodules, and additional users)
         $this->call([
             ProjectDataSeeder::class,
         ]);

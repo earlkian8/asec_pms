@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\ProgressUpdatesController;
+use App\Http\Controllers\Admin\InventoryItemsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -112,5 +113,16 @@ Route::middleware('auth')->group(function () {
         Route::prefix('activity-logs')->name('activity-logs.')->group(function(){
             Route::get('/', [ActivityLogsController::class, 'index'])->name('index');
         });
+    });
+
+    // Inventory Management
+    Route::prefix('inventory-management')->name('inventory-management.')->group(function(){
+        Route::get('/', [InventoryItemsController::class, 'index'])->name('index');
+        Route::get('/transactions', [InventoryItemsController::class, 'transactions'])->name('transactions');
+        Route::post('/store', [InventoryItemsController::class, 'store'])->name('store');
+        Route::put('/update/{inventoryItem}', [InventoryItemsController::class, 'update'])->name('update');
+        Route::delete('/destroy/{inventoryItem}', [InventoryItemsController::class, 'destroy'])->name('destroy');
+        Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->name('stock-in');
+        Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->name('stock-out');
     });
 });

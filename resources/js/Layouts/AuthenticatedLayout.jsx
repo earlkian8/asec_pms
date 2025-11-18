@@ -91,7 +91,8 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         // },
         {
             title: 'Inventory Management',
-            routeName: 'inventory.index',
+            href: route('inventory-management.index'),
+            routeName: 'inventory-management.*',
             icon: Boxes,
             type: 'single'
         },

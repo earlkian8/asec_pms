@@ -179,7 +179,7 @@ class InventoryItemsController extends Controller
             'created_by' => auth()->id(),
         ];
 
-        // If project_use, create material allocation
+        // If project_use, create material allocation but DON'T remove stock yet
         if ($data['stock_out_type'] === 'project_use' && isset($data['project_id'])) {
             $project = Project::findOrFail($data['project_id']);
             
@@ -206,12 +206,16 @@ class InventoryItemsController extends Controller
 
             $transactionData['project_id'] = $project->id;
             $transactionData['project_material_allocation_id'] = $allocation->id;
+            
+            // Create transaction for tracking but DON'T update stock
+            // Stock will be removed when receiving report is created
+            $transaction = InventoryTransaction::create($transactionData);
+        } else {
+            // For non-project_use stock outs, create transaction and update stock immediately
+            $transaction = InventoryTransaction::create($transactionData);
+            // Update current stock
+            $this->inventoryService->updateItemStock($inventoryItem);
         }
-
-        $transaction = InventoryTransaction::create($transactionData);
-
-        // Update current stock
-        $this->inventoryService->updateItemStock($inventoryItem);
 
         $this->adminActivityLogs(
             'Inventory Transaction',

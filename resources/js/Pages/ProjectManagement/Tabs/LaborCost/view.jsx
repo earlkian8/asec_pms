@@ -1,0 +1,123 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/Components/ui/dialog";
+import { Button } from "@/Components/ui/button";
+import { User, Calendar, Clock, DollarSign, FileText } from "lucide-react";
+
+const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
+  const user = laborCost.user || laborCost.user_id || {};
+  const createdBy = laborCost.created_by || laborCost.createdBy || {};
+  const totalCost = (laborCost.hours_worked || 0) * (laborCost.hourly_rate || 0);
+
+  const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  }) : '---';
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  return (
+    <Dialog open onOpenChange={setShowViewModal}>
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-zinc-800 text-xl">Labor Cost Details</DialogTitle>
+          <DialogDescription className="text-zinc-600">
+            View details for labor cost entry
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Labor Cost Information */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Clock size={20} />
+              Labor Cost Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm font-medium text-gray-700">Employee:</span>
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-900">
+                  <User size={14} className="text-gray-400" />
+                  <span>{user.name || 'Unknown'}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-700">Work Date:</span>
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-900">
+                  <Calendar size={14} className="text-gray-400" />
+                  <span>{formatDate(laborCost.work_date)}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-700">Hours Worked:</span>
+                <p className="text-sm text-gray-900 mt-1">{laborCost.hours_worked} hours</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-700">Hourly Rate:</span>
+                <p className="text-sm text-gray-900 mt-1">{formatCurrency(laborCost.hourly_rate)}</p>
+              </div>
+              <div className="md:col-span-2">
+                <span className="text-sm font-medium text-gray-700">Total Cost:</span>
+                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(totalCost)}</p>
+              </div>
+              {laborCost.description && (
+                <div className="md:col-span-2">
+                  <span className="text-sm font-medium text-gray-700">Description:</span>
+                  <p className="text-sm text-gray-900 mt-1">{laborCost.description}</p>
+                </div>
+              )}
+              {laborCost.notes && (
+                <div className="md:col-span-2">
+                  <span className="text-sm font-medium text-gray-700">Notes:</span>
+                  <p className="text-sm text-gray-900 mt-1">{laborCost.notes}</p>
+                </div>
+              )}
+              {createdBy && (
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Created By:</span>
+                  <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-900">
+                    <User size={14} className="text-gray-400" />
+                    <span>{createdBy.name || 'Unknown'}</span>
+                  </div>
+                </div>
+              )}
+              {laborCost.created_at && (
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Created At:</span>
+                  <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-900">
+                    <Calendar size={14} className="text-gray-400" />
+                    <span>{formatDate(laborCost.created_at)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowViewModal(false)}
+          >
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default ViewLaborCost;
+

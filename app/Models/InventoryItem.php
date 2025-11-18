@@ -51,8 +51,18 @@ class InventoryItem extends Model
             ->where('transaction_type', 'stock_in')
             ->sum('quantity');
         
+        // For stock_out, exclude project_use transactions that don't have receiving reports yet
+        // (these are the initial allocation transactions that haven't been received)
         $stockOut = $this->transactions()
             ->where('transaction_type', 'stock_out')
+            ->where(function ($query) {
+                $query->where('stock_out_type', '!=', 'project_use')
+                    ->orWhere(function ($q) {
+                        // Include project_use transactions only if they have a receiving report ID in notes
+                        $q->where('stock_out_type', 'project_use')
+                          ->where('notes', 'like', '%[RECEIVING_REPORT_ID:%');
+                    });
+            })
             ->sum('quantity');
         
         return $stockIn - $stockOut;

@@ -7,13 +7,13 @@ import { ArrowLeft } from 'lucide-react';
 // import OverviewTab from './Tabs/Overview';
 import MilestonesTab from './Tabs/Milestones';
 import TeamTab from './Tabs/Team/index';
+import MaterialAllocationTab from './Tabs/MaterialAllocation';
+import LaborCostTab from './Tabs/LaborCost';
 // import BudgetTab from './Tabs/Budget';
-// import MaterialAllocationTab from './Tabs/MaterialAllocation';
-// import LaborCostTab from './Tabs/LaborCost';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData, milestoneData } = usePage().props;
+    const { project, teamData, milestoneData, materialAllocationData, laborCostData } = usePage().props;
 
     const breadcrumbs = [
         { title: "Home", href: route("dashboard") },
@@ -27,16 +27,10 @@ export default function ProjectDetail() {
         { key: "overview", label: "Overview" },
         { key: "team", label: "Team", component: <TeamTab project={project} teamData={teamData} /> },
         { key: "milestones", label: "Milestones", component: <MilestonesTab project={project} milestoneData={milestoneData}/> },
-        
+        { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} /> },
+        { key: "labor-cost", label: "Labor Cost", component: <LaborCostTab project={project} laborCostData={laborCostData} /> },
         // { key: "budget", label: "Budget", component: <BudgetTab project={project} /> },
-        // { key: "material-allocation", label: "Material Allocation", component: <MaterialAllocationTab project={project} /> },
-        // { key: "labor-cost", label: "Labor Cost", component: <LaborCostTab project={project} /> },
         // { key: "issues", label: "Issues", component: <IssuesTab project={project} /> },
-
-
-        { key: "budget", label: "Budget" },
-        { key: "material-allocation", label: "Material Allocation" },
-        { key: "labor-cost", label: "Labor Cost" },
         { key: "issues", label: "Issues" },
     ];
 

@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
 use App\Http\Controllers\Admin\ProgressUpdatesController;
+use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
+use App\Http\Controllers\Admin\ProjectLaborCostsController;
 use App\Http\Controllers\Admin\InventoryItemsController;
 use App\Http\Controllers\Admin\BillingsController;
 use App\Http\Controllers\Admin\RolesController;
@@ -74,6 +76,21 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'update'])->name('update');
             Route::delete('/destroy/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'destroy'])->name('destroy');
             Route::get('/download/{milestone}/task/{task}/update/{progressUpdate}', [ProgressUpdatesController::class, 'download'])->name('download');
+        });
+
+        // Material Allocations
+        Route::prefix('material-allocations')->name('material-allocations.')->group(function(){
+            Route::post('/receiving-report/{project}/allocation/{allocation}', [ProjectMaterialAllocationsController::class, 'storeReceivingReport'])->name('store-receiving-report');
+            Route::put('/receiving-report/{project}/allocation/{allocation}/report/{receivingReport}', [ProjectMaterialAllocationsController::class, 'updateReceivingReport'])->name('update-receiving-report');
+            Route::delete('/receiving-report/{project}/allocation/{allocation}/report/{receivingReport}', [ProjectMaterialAllocationsController::class, 'destroyReceivingReport'])->name('destroy-receiving-report');
+            Route::delete('/{project}/allocation/{allocation}', [ProjectMaterialAllocationsController::class, 'destroy'])->name('destroy');
+        });
+
+        // Labor Costs
+        Route::prefix('labor-costs')->name('labor-costs.')->group(function(){
+            Route::post('/store/{project}', [ProjectLaborCostsController::class, 'store'])->name('store');
+            Route::put('/update/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'update'])->name('update');
+            Route::delete('/destroy/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'destroy'])->name('destroy');
         }); 
     });
 

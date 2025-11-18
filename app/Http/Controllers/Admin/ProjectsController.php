@@ -14,6 +14,8 @@ use App\Services\ProjectFilesService;
 use App\Services\ProjectMilestonesService;
 use App\Services\TaskService;
 use App\Services\ProgressUpdateService;
+use App\Services\MaterialAllocationService;
+use App\Services\LaborCostService;
 
 class ProjectsController extends Controller
 {
@@ -24,13 +26,17 @@ class ProjectsController extends Controller
     protected $projectMilestonesService;
     protected $projectTasksService;
     protected $progressUpdateService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService)
+    protected $materialAllocationService;
+    protected $laborCostService;
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
         $this->projectMilestonesService = $projectMilestonesService;
         $this->projectTasksService = $projectTasksService;
         $this->progressUpdateService = $progressUpdateService;
+        $this->materialAllocationService = $materialAllocationService;
+        $this->laborCostService = $laborCostService;
     }
     public function index(Request $request)
     {
@@ -142,11 +148,19 @@ class ProjectsController extends Controller
     // Get project milestones data (now includes tasks and progress updates)
     $milestoneData = $this->projectMilestonesService->getProjectMilestonesData($project);
 
+    // Get material allocation data
+    $materialAllocationData = $this->materialAllocationService->getProjectMaterialAllocationsData($project);
+
+    // Get labor cost data
+    $laborCostData = $this->laborCostService->getProjectLaborCostsData($project);
+
     return Inertia::render('ProjectManagement/project-detail', [
         'project' => $project,
         'teamData' => $teamData,
         'fileData' => $fileData,
         'milestoneData' => $milestoneData,
+        'materialAllocationData' => $materialAllocationData,
+        'laborCostData' => $laborCostData,
     ]);
 }
 

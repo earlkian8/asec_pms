@@ -53,5 +53,15 @@ class Project extends Model
     {
         return $this->hasMany(Billing::class);
     }
+
+    public function materialAllocations()
+    {
+        return $this->hasMany(ProjectMaterialAllocation::class);
+    }
+
+    public function laborCosts()
+    {
+        return $this->hasMany(ProjectLaborCost::class);
+    }
     
 }

@@ -59,3 +59,4 @@ const DeleteIssue = ({ setShowDeleteModal, issue, project }) => {
 export default DeleteIssue;
 
 
+

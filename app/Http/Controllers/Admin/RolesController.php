@@ -61,6 +61,67 @@ class RolesController extends Controller
     }
 
     /**
+     * Show the form for editing the specified role's permissions.
+     */
+    public function edit(Role $role)
+    {
+        // Get all permissions grouped by module
+        $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
+        
+        // Get role's current permissions
+        $rolePermissions = $role->permissions->pluck('name')->toArray();
+
+        // Group permissions by module
+        $groupedPermissions = [];
+        foreach ($allPermissions as $permission) {
+            $parts = explode('.', $permission->name);
+            $module = $parts[0];
+            
+            if (!isset($groupedPermissions[$module])) {
+                $groupedPermissions[$module] = [];
+            }
+            
+            $groupedPermissions[$module][] = [
+                'id' => $permission->id,
+                'name' => $permission->name,
+                'checked' => in_array($permission->name, $rolePermissions),
+            ];
+        }
+
+        return Inertia::render('UserManagement/Roles/edit', [
+            'role' => $role,
+            'groupedPermissions' => $groupedPermissions,
+            'rolePermissions' => $rolePermissions,
+        ]);
+    }
+
+    /**
+     * Update the specified role's permissions.
+     */
+    public function update(Request $request, Role $role)
+    {
+        $validated = $request->validate([
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'string|exists:permissions,name',
+        ]);
+
+        $permissions = $validated['permissions'] ?? [];
+        
+        // Sync permissions to role
+        $role->syncPermissions($permissions);
+
+        $this->adminActivityLogs(
+            'Role',
+            'Update Permissions',
+            'Updated permissions for Role ' . $role->name
+        );
+
+        return redirect()
+            ->route('user-management.roles-and-permissions.index')
+            ->with('success', 'Role permissions updated successfully.');
+    }
+
+    /**
      * Remove the specified role from storage.
      */
     public function destroy(Role $role)

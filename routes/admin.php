@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
 use App\Http\Controllers\Admin\ProjectLaborCostsController;
 use App\Http\Controllers\Admin\InventoryItemsController;
 use App\Http\Controllers\Admin\BillingsController;
+use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\ProfileController;
@@ -117,6 +118,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/delete/{client}', [ClientsController::class, 'destroy'])->name('destroy');
         Route::put('/update-status/{client}', [ClientsController::class, 'handleStatus'])->name('update-status');
     });
+    // Reports & Analytics
+    Route::prefix('reports')->name('reports.')->group(function(){
+        Route::get('/', [ReportsController::class, 'index'])->name('index');
+    });
+
     // User Management
     Route::prefix('user-management')->name('user-management.')->group(function () {
 
@@ -124,6 +130,8 @@ Route::middleware('auth')->group(function () {
         Route::prefix('roles-and-permissions')->name('roles-and-permissions.')->group(function(){
             Route::get('/', [RolesController::class, 'index'])->name('index');
             Route::post('/store', [RolesController::class, 'store'])->name('store');
+            Route::get('/edit/{role}', [RolesController::class, 'edit'])->name('edit');
+            Route::put('/update/{role}', [RolesController::class, 'update'])->name('update');
             Route::delete('/destroy/{role}', [RolesController::class, 'destroy'])->name('destroy');
         });
         // Users

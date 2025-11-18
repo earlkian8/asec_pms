@@ -28,4 +28,9 @@ class Client extends Model
         'is_active',
         'notes',
     ];
+
+    public function projects()
+    {
+        return $this->hasMany(Project::class, 'client_id');
+    }
 }

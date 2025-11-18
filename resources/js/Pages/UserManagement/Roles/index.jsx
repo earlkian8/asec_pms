@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/Components/ui/input"
 import { Button } from "@/Components/ui/button"
-import { Trash2, Users } from 'lucide-react';
+import { Trash2, Users, SquarePen } from 'lucide-react';
 import AddRole from './add';
 import DeleteRole from './delete';
 
@@ -172,6 +172,17 @@ export default function RolesIndex() {
                         </TableCell>   
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
                           <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                router.visit(route('user-management.roles-and-permissions.edit', role.id));
+                              }}
+                              className="p-2 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
+                              title="Edit Permissions"
+                              aria-label="Edit Permissions"
+                              type="button"
+                            >
+                              <SquarePen size={18} />
+                            </button>
                             <button
                               onClick={() => {
                                 setDeleteRole(role);

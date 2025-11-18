@@ -105,7 +105,8 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'Reports & Analytics',
-            routeName: 'reports.index',
+            href: route('reports.index'),
+            routeName: 'reports.*',
             icon: TrendingUp,
             type: 'single'
         },

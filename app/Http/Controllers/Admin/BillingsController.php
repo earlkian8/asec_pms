@@ -26,15 +26,24 @@ class BillingsController extends Controller
 
     public function index(Request $request)
     {
+        $tab = $request->get('tab', 'billings');
+        
         $data = $this->billingService->getBillingsData();
+        
+        // Get transactions data if on transactions tab
+        if ($tab === 'transactions') {
+            $transactionsData = $this->billingService->getTransactionsData();
+            $data = array_merge($data, $transactionsData);
+        }
         
         // Get all billable projects for filter dropdown
         $projects = Project::where('is_billable', true)
-            ->with('milestones:id,project_id,name')
+            ->with('milestones:id,project_id,name,billing_percentage')
             ->orderBy('project_name', 'asc')
             ->get(['id', 'project_code', 'project_name', 'billing_type', 'contract_amount']);
 
         $data['projects'] = $projects;
+        $data['tab'] = $tab;
 
         return Inertia::render('BillingManagement/index', $data);
     }
@@ -62,7 +71,7 @@ class BillingsController extends Controller
             return back()->with('error', 'Billing type does not match project billing type.');
         }
 
-        // For milestone-based, verify milestone belongs to project
+        // For milestone-based, verify milestone belongs to project and calculate amount
         if ($validated['billing_type'] === 'milestone' && $validated['milestone_id']) {
             $milestone = ProjectMilestone::where('id', $validated['milestone_id'])
                 ->where('project_id', $validated['project_id'])
@@ -70,6 +79,15 @@ class BillingsController extends Controller
             
             if (!$milestone) {
                 return back()->with('error', 'Milestone does not belong to this project.');
+            }
+
+            // Calculate billing amount based on milestone percentage if not provided or if it should be recalculated
+            if ($milestone->billing_percentage && $project->contract_amount) {
+                $calculatedAmount = ($project->contract_amount * $milestone->billing_percentage) / 100;
+                // Use calculated amount if user didn't provide a different amount, or validate it's close to calculated
+                if (empty($validated['billing_amount']) || abs($validated['billing_amount'] - $calculatedAmount) < 0.01) {
+                    $validated['billing_amount'] = $calculatedAmount;
+                }
             }
         }
 
@@ -120,6 +138,11 @@ class BillingsController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
+        // For fixed_price, billing amount should not be changed
+        if ($billing->billing_type === 'fixed_price') {
+            $validated['billing_amount'] = $billing->billing_amount;
+        }
+
         // Ensure new billing amount is not less than total paid
         $totalPaid = $billing->total_paid;
         if ($validated['billing_amount'] < $totalPaid) {
@@ -142,21 +165,27 @@ class BillingsController extends Controller
 
     public function destroy(Billing $billing)
     {
-        // Cannot delete if has payments
-        if ($billing->payments()->count() > 0) {
-            return back()->with('error', 'Cannot delete billing with existing payments. Please delete payments first.');
-        }
-
+        // Allow deletion even if paid, but preserve transaction records
         $billingCode = $billing->billing_code;
+        $paymentCount = $billing->payments()->count();
+        
+        // IMPORTANT: Manually set billing_id to null for all payments BEFORE deleting the billing
+        // This ensures transactions are preserved even if foreign key constraint fails
+        if ($paymentCount > 0) {
+            BillingPayment::where('billing_id', $billing->id)
+                ->update(['billing_id' => null]);
+        }
+        
+        // Now delete the billing
         $billing->delete();
 
         $this->adminActivityLogs(
             'Billing',
             'Deleted',
-            'Deleted billing "' . $billingCode . '"'
+            'Deleted billing "' . $billingCode . '"' . ($paymentCount > 0 ? ' (preserved ' . $paymentCount . ' transaction record(s))' : '')
         );
 
-        return back()->with('success', 'Billing deleted successfully.');
+        return back()->with('success', 'Billing deleted successfully.' . ($paymentCount > 0 ? ' Transaction records have been preserved.' : ''));
     }
 
     public function show(Billing $billing)
@@ -201,7 +230,7 @@ class BillingsController extends Controller
         $this->adminActivityLogs(
             'Billing Payment',
             'Created',
-            'Recorded payment "' . $payment->payment_code . '" of ' . number_format($payment->payment_amount, 2) . ' for billing "' . $billing->billing_code . '"'
+            'Recorded payment "' . $payment->payment_code . '" of ' . number_format((float)$payment->payment_amount, 2) . ' for billing "' . $billing->billing_code . '"'
         );
 
         return back()->with('success', 'Payment recorded successfully.');

@@ -36,13 +36,33 @@ class DashboardController extends Controller
             ->pluck('count', 'project_type');
 
         $totalContractAmount = Project::sum('contract_amount');
-        $averageCompletion = Project::avg('completion_percentage') ?? 0;
+        
+        // Calculate average completion based on milestones
+        $allProjects = Project::with('milestones')->get();
+        $completionPercentages = $allProjects->map(function ($project) {
+            $milestones = $project->milestones;
+            $totalMilestones = $milestones->count();
+            $completedMilestones = $milestones->where('status', 'completed')->count();
+            return $totalMilestones > 0 
+                ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                : 0;
+        });
+        $averageCompletion = $completionPercentages->avg() ?? 0;
 
         // Recent Projects (last 5)
-        $recentProjects = Project::with('client:id,client_name')
+        $recentProjects = Project::with(['client:id,client_name', 'milestones'])
             ->orderBy('created_at', 'desc')
             ->take(5)
-            ->get(['id', 'project_code', 'project_name', 'status', 'completion_percentage', 'client_id', 'created_at']);
+            ->get()
+            ->map(function ($project) {
+                $milestones = $project->milestones;
+                $totalMilestones = $milestones->count();
+                $completedMilestones = $milestones->where('status', 'completed')->count();
+                $project->milestones_completion_percentage = $totalMilestones > 0 
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                    : 0;
+                return $project->only(['id', 'project_code', 'project_name', 'status', 'milestones_completion_percentage', 'client_id', 'created_at']);
+            });
 
         // Client Statistics
         $totalClients = Client::count();

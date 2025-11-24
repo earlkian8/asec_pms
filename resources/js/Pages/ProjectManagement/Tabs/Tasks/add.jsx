@@ -34,7 +34,10 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!data.project_milestone_id || data.project_milestone_id === null) {
+    // If preselectedMilestone is provided, use it; otherwise require selection
+    const milestoneId = preselectedMilestone?.id || data.project_milestone_id;
+    
+    if (!milestoneId || milestoneId === null) {
       toast.error("Please select a milestone");
       return;
     }
@@ -42,9 +45,9 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
     // Ensure assigned_to is null if empty string, otherwise convert to integer
     const submitData = {
       ...data,
-      project_milestone_id: typeof data.project_milestone_id === 'string' 
-        ? parseInt(data.project_milestone_id) 
-        : data.project_milestone_id,
+      project_milestone_id: typeof milestoneId === 'string' 
+        ? parseInt(milestoneId) 
+        : milestoneId,
       assigned_to: data.assigned_to && data.assigned_to !== "none" 
         ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
         : null,
@@ -96,32 +99,34 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
             <InputError message={errors.description} />
           </div>
 
-          {/* Milestone */}
-          <div>
-            <Label>Milestone</Label>
-            <Select
-              value={data.project_milestone_id ? data.project_milestone_id.toString() : undefined}
-              onValueChange={(value) => setData("project_milestone_id", parseInt(value))}
-            >
-              <SelectTrigger className={inputClass(errors.project_milestone_id)}>
-                <SelectValue placeholder="Select milestone" />
-              </SelectTrigger>
-              <SelectContent>
-                {milestones.length > 0 ? (
-                  milestones.map((m) => (
-                    <SelectItem key={m.id} value={m.id.toString()}>
-                      {m.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-1.5 text-sm text-gray-500">
-                    No milestones available
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.project_milestone_id} />
-          </div>
+          {/* Milestone - Only show if not preselected */}
+          {!preselectedMilestone && (
+            <div>
+              <Label>Milestone</Label>
+              <Select
+                value={data.project_milestone_id ? data.project_milestone_id.toString() : undefined}
+                onValueChange={(value) => setData("project_milestone_id", parseInt(value))}
+              >
+                <SelectTrigger className={inputClass(errors.project_milestone_id)}>
+                  <SelectValue placeholder="Select milestone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {milestones.length > 0 ? (
+                    milestones.map((m) => (
+                      <SelectItem key={m.id} value={m.id.toString()}>
+                        {m.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                      No milestones available
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+              <InputError message={errors.project_milestone_id} />
+            </div>
+          )}
 
           {/* Assigned To */}
           <div>

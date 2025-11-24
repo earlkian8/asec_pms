@@ -111,5 +111,49 @@ class BillingService
 
         return $billing;
     }
+
+    public function getTransactionsData()
+    {
+        $search = request('search');
+        $projectId = request('transaction_project_id');
+        $paymentMethod = request('transaction_payment_method');
+
+        $transactions = BillingPayment::with([
+            'billing:id,billing_code,project_id',
+            'billing.project:id,project_code,project_name',
+            'createdBy:id,name'
+        ])
+            // Include all transactions, including those with null billing_id (orphaned transactions)
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('payment_code', 'ilike', "%{$search}%")
+                      ->orWhere('reference_number', 'ilike', "%{$search}%")
+                      ->orWhereHas('billing', function ($billingQuery) use ($search) {
+                          $billingQuery->where('billing_code', 'ilike', "%{$search}%");
+                      });
+                });
+            })
+            ->when($projectId, function ($query, $projectId) {
+                // When filtering by project, only show transactions with billing matching project_id
+                // (exclude orphaned transactions since we can't determine their project)
+                $query->whereHas('billing', function ($billingQuery) use ($projectId) {
+                    $billingQuery->where('project_id', $projectId);
+                });
+            })
+            ->when($paymentMethod, function ($query, $paymentMethod) {
+                $query->where('payment_method', $paymentMethod);
+            })
+            ->orderBy('payment_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->paginate(15)
+            ->withQueryString();
+
+        return [
+            'transactions' => $transactions,
+            'search' => $search,
+            'project_id' => $projectId,
+            'payment_method' => $paymentMethod,
+        ];
+    }
 }
 

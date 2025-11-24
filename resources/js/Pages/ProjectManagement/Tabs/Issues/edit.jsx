@@ -66,10 +66,7 @@ const EditIssue = ({ setShowEditModal, issue, project, milestones = [], tasks = 
     });
   };
 
-  // Filter tasks based on selected milestone
-  const filteredTasks = data.project_milestone_id && data.project_milestone_id !== "none"
-    ? tasks.filter(t => t.project_milestone_id === parseInt(data.project_milestone_id))
-    : [];
+  // No need to filter tasks - they're all available for selection
 
   return (
     <Dialog open onOpenChange={setShowEditModal}>
@@ -110,7 +107,7 @@ const EditIssue = ({ setShowEditModal, issue, project, milestones = [], tasks = 
               value={data.project_milestone_id}
               onValueChange={(value) => {
                 setData("project_milestone_id", value);
-                setData("project_task_id", "none"); // Reset task when milestone changes
+                // Don't reset task when milestone changes - allow independent selection
               }}
             >
               <SelectTrigger className={inputClass(errors.project_milestone_id)}>
@@ -128,22 +125,31 @@ const EditIssue = ({ setShowEditModal, issue, project, milestones = [], tasks = 
             <InputError message={errors.project_milestone_id} />
           </div>
 
-          {/* Task (Optional, depends on milestone) */}
+          {/* Task (Optional) */}
           <div>
             <Label>Task (Optional)</Label>
             <Select
               value={data.project_task_id}
-              onValueChange={(value) => setData("project_task_id", value)}
-              disabled={!data.project_milestone_id || data.project_milestone_id === "none"}
+              onValueChange={(value) => {
+                setData("project_task_id", value);
+                // Auto-select milestone if task is selected
+                if (value && value !== "none") {
+                  const selectedTask = tasks.find(t => t.id === parseInt(value));
+                  if (selectedTask && (selectedTask.project_milestone_id || selectedTask.milestone?.id)) {
+                    const milestoneId = selectedTask.project_milestone_id || selectedTask.milestone?.id;
+                    setData("project_milestone_id", milestoneId.toString());
+                  }
+                }
+              }}
             >
               <SelectTrigger className={inputClass(errors.project_task_id)}>
-                <SelectValue placeholder={data.project_milestone_id && data.project_milestone_id !== "none" ? "Select task (optional)" : "Select milestone first"} />
+                <SelectValue placeholder="Select task (optional)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
-                {filteredTasks.map((t) => (
+                {tasks.map((t) => (
                   <SelectItem key={t.id} value={t.id.toString()}>
-                    {t.title}
+                    {t.title} {t.milestone ? `(${t.milestone.name})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

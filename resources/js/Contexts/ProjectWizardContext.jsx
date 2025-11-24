@@ -12,7 +12,7 @@ export const useProjectWizard = () => {
 
 export const ProjectWizardProvider = ({ children }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   // Step 1: Project Basic Info
   const [projectData, setProjectData] = useState({
@@ -25,10 +25,8 @@ export const ProjectWizardProvider = ({ children }) => {
     start_date: '',
     planned_end_date: '',
     actual_end_date: '',
-    completion_percentage: 0,
     location: '',
     description: '',
-    is_billable: true,
     billing_type: 'fixed_price',
   });
 
@@ -126,10 +124,8 @@ export const ProjectWizardProvider = ({ children }) => {
       start_date: '',
       planned_end_date: '',
       actual_end_date: '',
-      completion_percentage: 0,
       location: '',
       description: '',
-      is_billable: true,
       billing_type: 'fixed_price',
     });
     setTeamMembers([]);

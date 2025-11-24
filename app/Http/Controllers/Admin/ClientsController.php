@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -44,6 +45,7 @@ class ClientsController extends Controller
             'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
             'contact_person'  => ['nullable', 'max:255'],
             'email'           => ['nullable', 'email', 'max:100'],
+            'password'        => ['nullable', 'string', 'min:8'],
             'phone_number'    => ['nullable', 'max:20'],
             'address'         => ['nullable', 'max:255'],
             'city'            => ['nullable', 'max:100'],
@@ -64,6 +66,13 @@ class ClientsController extends Controller
         }
         if (is_null($validated['payment_terms'] ?? null)) {
             unset($validated['payment_terms']);
+        }
+
+        // Hash password if provided
+        if (!empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
         }
 
         // Generate unique client code
@@ -89,6 +98,7 @@ class ClientsController extends Controller
             'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
             'contact_person'  => ['nullable', 'max:255'],
             'email'           => ['nullable', 'email', 'max:100'],
+            'password'        => ['nullable', 'string', 'min:8'],
             'phone_number'    => ['nullable', 'max:20'],
             'address'         => ['nullable', 'max:255'],
             'city'            => ['nullable', 'max:100'],
@@ -108,6 +118,13 @@ class ClientsController extends Controller
         }
         if (is_null($validated['payment_terms'] ?? null)) {
             unset($validated['payment_terms']);
+        }
+
+        // Hash password if provided
+        if (!empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
         }
 
         $oldName = $client->client_name;
@@ -149,5 +166,22 @@ class ClientsController extends Controller
             'Update Status',
             'Updated Client ' . $client->client_name . ' status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
+    }
+
+    public function resetPassword(Client $client)
+    {
+        $defaultPassword = 'clientpassword';
+        
+        $client->update([
+            'password' => Hash::make($defaultPassword),
+        ]);
+
+        $this->adminActivityLogs(
+            'Client',
+            'Reset Password',
+            'Reset password for Client ' . $client->client_name . ' (' . $client->client_code . ')'
+        );
+
+        return redirect()->back()->with('success', 'Client password reset successfully.');
     }
 }

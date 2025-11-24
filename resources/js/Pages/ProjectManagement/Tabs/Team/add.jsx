@@ -61,6 +61,15 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
     }))
   }
 
+  // Auto-populate role when user is selected
+  const handleUserToggle = (userId) => {
+    toggleUser(userId);
+    const user = users.find(u => u.id === userId);
+    if (user && user.role && !formData[userId]?.role) {
+      handleChange(userId, 'role', user.role);
+    }
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
 
@@ -69,11 +78,27 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
       return
     }
 
+    // Validate required fields
+    for (const userId of selectedUsers) {
+      if (!formData[userId]?.role) {
+        toast.error(`Please enter a role for ${users.find(u => u.id === userId)?.name}`);
+        return;
+      }
+      if (!formData[userId]?.hourly_rate || parseFloat(formData[userId]?.hourly_rate) <= 0) {
+        toast.error(`Please enter a valid hourly rate for ${users.find(u => u.id === userId)?.name}`);
+        return;
+      }
+      if (!formData[userId]?.start_date) {
+        toast.error(`Please enter a start date for ${users.find(u => u.id === userId)?.name}`);
+        return;
+      }
+    }
+
     const usersPayload = selectedUsers.map((userId) => ({
       id: userId,
-      role: formData[userId]?.role || "Member",
-      hourly_rate: formData[userId]?.hourly_rate || null,
-      start_date: formData[userId]?.start_date || null,
+      role: formData[userId]?.role,
+      hourly_rate: formData[userId]?.hourly_rate,
+      start_date: formData[userId]?.start_date,
       end_date: formData[userId]?.end_date || null,
     }))
 
@@ -136,9 +161,9 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                 </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Hourly Rate</TableHead>
-                <TableHead>Start Date</TableHead>
+                <TableHead>Role <span class="text-red-500">*</span></TableHead>
+                <TableHead>Hourly Rate <span class="text-red-500">*</span></TableHead>
+                <TableHead>Start Date <span class="text-red-500">*</span></TableHead>
                 <TableHead>End Date</TableHead>
               </TableRow>
             </TableHeader>
@@ -151,7 +176,7 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                     key={user.id}
                     onClick={(e) => {
                       if (e.target.closest("input")) return;
-                      toggleUser(user.id);
+                      handleUserToggle(user.id);
                     }}
                     className={`cursor-pointer transition ${
                       isSelected ? "bg-gray-100" : "hover:bg-gray-50"
@@ -168,19 +193,23 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
                       <Input
-                        placeholder="Role"
-                        value={formData[user.id]?.role || ""}
+                        placeholder={user.role || "Role"}
+                        value={formData[user.id]?.role || user.role || ""}
                         onChange={(e) => handleChange(user.id, "role", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        required
                       />
                     </TableCell>
                     <TableCell>
                       <Input
                         type="number"
+                        step="0.01"
+                        min="0"
                         placeholder="0.00"
                         value={formData[user.id]?.hourly_rate || ""}
                         onChange={(e) => handleChange(user.id, "hourly_rate", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        required
                       />
                     </TableCell>
                     <TableCell>
@@ -189,6 +218,9 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                         value={formData[user.id]?.start_date || ""}
                         onChange={(e) => handleChange(user.id, "start_date", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        min={project?.start_date || undefined}
+                        max={project?.planned_end_date || undefined}
+                        required
                       />
                     </TableCell>
                     <TableCell>
@@ -197,6 +229,8 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                         value={formData[user.id]?.end_date || ""}
                         onChange={(e) => handleChange(user.id, "end_date", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        min={formData[user.id]?.start_date || project?.start_date || undefined}
+                        max={project?.planned_end_date || undefined}
                       />
                     </TableCell>
                   </TableRow>

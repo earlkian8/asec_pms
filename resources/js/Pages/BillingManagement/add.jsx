@@ -47,7 +47,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
         if (project.billing_type !== 'milestone') {
           setData('milestone_id', '');
         }
-        // For fixed_price billing, auto-fill billing amount with contract amount
+        // For fixed_price billing, auto-fill billing amount with contract amount (fixed)
         if (project.billing_type === 'fixed_price' && project.contract_amount) {
           setData('billing_amount', parseFloat(project.contract_amount).toFixed(2));
         } else {
@@ -88,9 +88,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
     });
   };
 
-  // Filter only billable projects
-  const billableProjects = projects.filter(p => p.is_billable !== false);
-
   return (
     <Dialog open onOpenChange={setShowAddModal}>
       <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -101,7 +98,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Project */}
           <div>
-            <Label>Project *</Label>
+            <Label>Project <span class="text-red-500">*</span></Label>
             <Select
               value={data.project_id}
               onValueChange={(value) => setData("project_id", value)}
@@ -110,7 +107,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
-                {billableProjects.map((project) => (
+                {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id.toString()}>
                     {project.project_code} - {project.project_name}
                   </SelectItem>
@@ -120,24 +117,34 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.project_id} />
           </div>
 
-          {/* Billing Type (auto-filled from project) */}
-          <div>
-            <Label>Billing Type *</Label>
-            <Input
-              value={data.billing_type === 'fixed_price' ? 'Fixed Price' : data.billing_type === 'milestone' ? 'Milestone' : ''}
-              readOnly
-              className={inputClass(errors.billing_type, true)}
-            />
-            <InputError message={errors.billing_type} />
-          </div>
+          {/* Billing Type (auto-filled from project) - Moved after Project */}
+          {selectedProject && (
+            <div>
+              <Label>Billing Type <span class="text-red-500">*</span></Label>
+              <Input
+                value={data.billing_type === 'fixed_price' ? 'Fixed Price' : data.billing_type === 'milestone' ? 'Milestone' : ''}
+                readOnly
+                className="bg-gray-50 border-gray-300 text-gray-600"
+              />
+              <InputError message={errors.billing_type} />
+            </div>
+          )}
 
           {/* Milestone (only for milestone-based billing) */}
           {data.billing_type === 'milestone' && (
             <div>
-              <Label>Milestone *</Label>
+              <Label>Milestone <span class="text-red-500">*</span></Label>
               <Select
                 value={data.milestone_id}
-                onValueChange={(value) => setData("milestone_id", value)}
+                onValueChange={(value) => {
+                  setData("milestone_id", value);
+                  // Calculate billing amount based on milestone percentage
+                  const selectedMilestone = milestones.find(m => m.id.toString() === value);
+                  if (selectedMilestone && selectedProject && selectedMilestone.billing_percentage) {
+                    const calculatedAmount = (parseFloat(selectedProject.contract_amount || 0) * parseFloat(selectedMilestone.billing_percentage)) / 100;
+                    setData("billing_amount", calculatedAmount.toFixed(2));
+                  }
+                }}
               >
                 <SelectTrigger className={inputClass(errors.milestone_id)}>
                   <SelectValue placeholder="Select milestone" />
@@ -145,7 +152,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
                 <SelectContent>
                   {milestones.map((milestone) => (
                     <SelectItem key={milestone.id} value={milestone.id.toString()}>
-                      {milestone.name}
+                      {milestone.name} {milestone.billing_percentage ? `(${milestone.billing_percentage}%)` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -173,22 +180,35 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
           {/* Billing Amount */}
           <div>
-            <Label>Billing Amount *</Label>
+            <Label>Billing Amount <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
               min="0.01"
               max={selectedProject && data.billing_type === 'fixed_price' ? selectedProject.contract_amount : undefined}
               value={data.billing_amount}
-              onChange={(e) => setData("billing_amount", e.target.value)}
+              onChange={(e) => {
+                // Only allow changes for milestone type
+                if (data.billing_type === 'milestone') {
+                  setData("billing_amount", e.target.value);
+                }
+              }}
+              readOnly={data.billing_type === 'fixed_price'}
               placeholder={selectedProject && data.billing_type === 'fixed_price' 
                 ? `Max: ₱${parseFloat(selectedProject.contract_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : "0.00"}
-              className={inputClass(errors.billing_amount)}
+              className={data.billing_type === 'fixed_price' 
+                ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed" 
+                : inputClass(errors.billing_amount)}
             />
             {selectedProject && data.billing_type === 'fixed_price' && selectedProject.contract_amount && (
               <p className="text-xs text-gray-500 mt-1">
-                Maximum: ₱{parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Fixed amount: ₱{parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            )}
+            {data.billing_type === 'milestone' && selectedProject && (
+              <p className="text-xs text-gray-500 mt-1">
+                Amount calculated from milestone percentage. You can adjust if needed.
               </p>
             )}
             <InputError message={errors.billing_amount} />
@@ -196,7 +216,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
           {/* Billing Date */}
           <div>
-            <Label>Billing Date *</Label>
+            <Label>Billing Date <span class="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.billing_date}

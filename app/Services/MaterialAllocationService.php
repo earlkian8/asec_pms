@@ -17,10 +17,10 @@ class MaterialAllocationService
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('inventoryItem', function ($itemQuery) use ($search) {
-                        $itemQuery->where('item_name', 'ilike', "%{$search}%")
-                            ->orWhere('item_code', 'ilike', "%{$search}%");
+                        $itemQuery->where('item_name', 'like', "%{$search}%")
+                            ->orWhere('item_code', 'like', "%{$search}%");
                     })
-                    ->orWhere('notes', 'ilike', "%{$search}%");
+                    ->orWhere('notes', 'like', "%{$search}%");
                 });
             })
             ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {

@@ -9,30 +9,42 @@ use App\Models\User;
 
 class ProjectTeamService
 {
-    public function getProjectTeamData(Project $project)
+    public function getProjectTeamData(Project $project, $request = null)
     {
         $search = request('search');
 
         $projectTeams = ProjectTeam::with('user')
             ->where('project_id', $project->id)
             ->when($search, function ($query, $search) {
-                $query->whereHas('employee', function ($q) use ($search) {
-                    $q->whereRaw("CONCAT(first_name, ' ', last_name) ILIKE ?", ["%{$search}%"])
-                        ->orWhere('email', 'ilike', "%{$search}%");
-                })->orWhere('role', 'ilike', "%{$search}%");
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'ilike', "%{$search}%")
+                            ->orWhere('email', 'ilike', "%{$search}%");
+                    })->orWhere('role', 'ilike', "%{$search}%");
+                });
             })
             ->orderBy('created_at', 'desc')
             ->paginate(10)
             ->withQueryString();
 
-        $employees = User::select('id', 'name', 'email')
-            ->whereNotIn('id', function ($query) use ($project) {
-                $query->select('user_id')
-                    ->from('project_teams')
-                    ->where('project_id', $project->id);
-            })
+        // Get user IDs already in the project team
+        $existingUserIds = ProjectTeam::where('project_id', $project->id)
+            ->pluck('user_id')
+            ->filter()
+            ->toArray();
+        
+        $employees = User::with('roles')
+            ->whereNotIn('id', $existingUserIds)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->roles->first()?->name ?? 'No Role',
+                ];
+            });
 
         return [
             'projectTeams' => $projectTeams,

@@ -108,12 +108,21 @@ class ReportsController extends Controller
             $query->where('client_id', $clientId);
         }
 
-        $projects = $query->with('client:id,client_name')
+        $projects = $query->with(['client:id,client_name', 'milestones'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->whereBetween('start_date', [$startDate, $endDate])
                   ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
             })
-            ->get();
+            ->get()
+            ->map(function ($project) {
+                $milestones = $project->milestones;
+                $totalMilestones = $milestones->count();
+                $completedMilestones = $milestones->where('status', 'completed')->count();
+                $project->completion_percentage = $totalMilestones > 0 
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                    : 0;
+                return $project;
+            });
 
         $totalProjects = $projects->count();
         $completedProjects = $projects->where('status', 'completed')->count();
@@ -267,9 +276,22 @@ class ReportsController extends Controller
                 $query->whereBetween('start_date', [$startDate, $endDate])
                       ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
             })
-            ->select('id', 'client_id', 'project_name', 'contract_amount', 'status', 'completion_percentage');
+            ->with('milestones')
+            ->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
         }])
         ->get();
+        
+        // Calculate completion_percentage for each project
+        $clients->each(function ($client) {
+            $client->projects->each(function ($project) {
+                $milestones = $project->milestones;
+                $totalMilestones = $milestones->count();
+                $completedMilestones = $milestones->where('status', 'completed')->count();
+                $project->completion_percentage = $totalMilestones > 0 
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                    : 0;
+            });
+        });
 
         $topClients = $clients->map(function ($client) {
             $totalContractValue = $client->projects->sum('contract_amount');

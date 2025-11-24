@@ -21,7 +21,9 @@ export default function Step3Milestones() {
   const [newMilestone, setNewMilestone] = useState({
     name: "",
     description: "",
+    start_date: "",
     due_date: "",
+    billing_percentage: "",
     status: "pending",
   });
 
@@ -40,7 +42,9 @@ export default function Step3Milestones() {
     setNewMilestone({
       name: "",
       description: "",
+      start_date: "",
       due_date: "",
+      billing_percentage: "",
       status: "pending",
     });
   };
@@ -53,7 +57,7 @@ export default function Step3Milestones() {
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="md:col-span-2">
-            <Label>Milestone Name *</Label>
+            <Label>Milestone Name <span class="text-red-500">*</span></Label>
             <Input
               placeholder="e.g. Phase 1: Design"
               value={newMilestone.name}
@@ -72,11 +76,34 @@ export default function Step3Milestones() {
           </div>
 
           <div>
+            <Label>Start Date</Label>
+            <Input
+              type="date"
+              value={newMilestone.start_date}
+              onChange={(e) => setNewMilestone({ ...newMilestone, start_date: e.target.value })}
+            />
+          </div>
+
+          <div>
             <Label>Due Date</Label>
             <Input
               type="date"
               value={newMilestone.due_date}
               onChange={(e) => setNewMilestone({ ...newMilestone, due_date: e.target.value })}
+              min={newMilestone.start_date || undefined}
+            />
+          </div>
+
+          <div>
+            <Label>Billing Percentage (%)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="0.00"
+              value={newMilestone.billing_percentage}
+              onChange={(e) => setNewMilestone({ ...newMilestone, billing_percentage: e.target.value })}
             />
           </div>
 
@@ -118,7 +145,9 @@ export default function Step3Milestones() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Start Date</TableHead>
                 <TableHead>Due Date</TableHead>
+                <TableHead>Billing %</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
@@ -128,7 +157,9 @@ export default function Step3Milestones() {
                 <TableRow key={index}>
                   <TableCell className="font-medium">{milestone.name}</TableCell>
                   <TableCell>{milestone.description || "---"}</TableCell>
+                  <TableCell>{milestone.start_date || "---"}</TableCell>
                   <TableCell>{milestone.due_date || "---"}</TableCell>
+                  <TableCell>{milestone.billing_percentage ? `${milestone.billing_percentage}%` : "---"}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded text-xs capitalize ${
                       milestone.status === 'completed' ? 'bg-green-100 text-green-700' :

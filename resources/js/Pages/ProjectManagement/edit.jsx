@@ -29,10 +29,8 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
     start_date: project.start_date || "",
     planned_end_date: project.planned_end_date || "",
     actual_end_date: project.actual_end_date || "",
-    completion_percentage: project.completion_percentage || 0,
     location: project.location || "",
     description: project.description || "",
-    is_billable: project.is_billable ?? true,
     billing_type: project.billing_type || "fixed_price",
   });
 
@@ -137,6 +135,13 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                   <SelectItem value="construction">Construction</SelectItem>
                   <SelectItem value="consultancy">Consultancy</SelectItem>
                   <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="commissioning">Commissioning</SelectItem>
+                  <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="renovation">Renovation</SelectItem>
+                  <SelectItem value="site_layout">Site Layout</SelectItem>
+                  <SelectItem value="relocation">Relocation</SelectItem>
+                  <SelectItem value="excavation">Excavation</SelectItem>
+                  <SelectItem value="surveying">Surveying</SelectItem>
                 </SelectContent>
               </Select>
               <InputError message={errors.project_type} />
@@ -177,7 +182,6 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
               <InputError message={errors.priority} />
@@ -231,20 +235,6 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
               <InputError message={errors.actual_end_date} />
             </div>
 
-            {/* Completion Percentage */}
-            <div>
-              <Label className="text-zinc-800">Completion (%)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={data.completion_percentage}
-                onChange={(e) => setData("completion_percentage", e.target.value)}
-                placeholder="0.00"
-                className={inputClass(errors.completion_percentage)}
-              />
-              <InputError message={errors.completion_percentage} />
-            </div>
-
             {/* Billing Type */}
             <div>
               <Label className="text-zinc-800">Billing Type</Label>
@@ -261,15 +251,6 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                 </SelectContent>
               </Select>
               <InputError message={errors.billing_type} />
-            </div>
-
-            {/* Billable Checkbox */}
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                checked={data.is_billable}
-                onCheckedChange={(value) => setData("is_billable", value)}
-              />
-              <Label className="text-zinc-800">Billable</Label>
             </div>
 
             {/* Location */}

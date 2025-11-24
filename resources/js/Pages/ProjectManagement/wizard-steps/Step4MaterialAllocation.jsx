@@ -72,7 +72,7 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <Label>Inventory Item *</Label>
+            <Label>Inventory Item <span class="text-red-500">*</span></Label>
             <Select value={selectedItemId} onValueChange={setSelectedItemId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select item" />
@@ -88,7 +88,7 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
           </div>
 
           <div>
-            <Label>Quantity Allocated *</Label>
+            <Label>Quantity Allocated <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"

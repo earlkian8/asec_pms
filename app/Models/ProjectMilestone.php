@@ -13,7 +13,9 @@ class ProjectMilestone extends Model
         'project_id',
         'name',
         'description',
+        'start_date',
         'due_date',
+        'billing_percentage',
         'status',
     ];
 

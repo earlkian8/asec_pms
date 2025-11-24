@@ -29,6 +29,7 @@ const EditClient = ({ client, setShowEditModal }) => {
     client_type: client.client_type || '',
     contact_person: client.contact_person || '',
     email: client.email || '',
+    password: '',
     phone_number: client.phone_number || '',
     address: client.address || '',
     city: client.city || '',
@@ -139,6 +140,19 @@ const EditClient = ({ client, setShowEditModal }) => {
               className={inputClass(errors.email)}
             />
             <InputError message={errors.email} />
+          </div>
+
+          {/* Password */}
+          <div>
+            <Label className="text-zinc-800">Password</Label>
+            <Input
+              type="password"
+              value={data.password}
+              onChange={e => setData('password', e.target.value)}
+              placeholder="Leave blank to keep current password"
+              className={inputClass(errors.password)}
+            />
+            <InputError message={errors.password} />
           </div>
 
           {/* Phone */}

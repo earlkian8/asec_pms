@@ -18,7 +18,7 @@ return new class extends Migration
             $table->date('work_date');
             $table->decimal('hours_worked', 8, 2);
             $table->decimal('hourly_rate', 10, 2);
-            $table->decimal('total_cost', 12, 2)->virtualAs('hours_worked * hourly_rate');
+            $table->decimal('total_cost', 12, 2)->nullable();
             $table->text('description')->nullable();
             $table->text('notes')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');

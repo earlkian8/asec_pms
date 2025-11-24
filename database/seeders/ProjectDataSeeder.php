@@ -262,9 +262,9 @@ class ProjectDataSeeder extends Seeder
 
     private function createProjects($clients, $users, $inventoryItems, $count)
     {
-        $projectTypes = ['design', 'construction', 'consultancy', 'maintenance'];
+        $projectTypes = ['design', 'construction', 'consultancy', 'maintenance', 'structural', 'civil', 'mechanical', 'electrical', 'environmental', 'geotechnical', 'surveying'];
         $statuses = ['planning', 'active', 'on_hold', 'completed', 'cancelled'];
-        $priorities = ['low', 'medium', 'high', 'critical'];
+        $priorities = ['low', 'medium', 'high'];
         $billingTypes = ['fixed_price', 'milestone'];
         $locations = [
             'Manila, Metro Manila',
@@ -314,9 +314,6 @@ class ProjectDataSeeder extends Seeder
             }
             
             $contractAmount = fake()->randomFloat(2, 50000, 5000000);
-            $completionPercentage = $status === 'completed' ? 100 : 
-                                   ($status === 'active' ? fake()->randomFloat(2, 10, 95) : 
-                                   ($status === 'on_hold' ? fake()->randomFloat(2, 0, 50) : 0));
 
             $project = Project::create([
                 'project_code' => $projectCode,
@@ -329,10 +326,8 @@ class ProjectDataSeeder extends Seeder
                 'start_date' => $startDate->toDateString(),
                 'planned_end_date' => $plannedEndDate->toDateString(),
                 'actual_end_date' => $actualEndDate?->toDateString(),
-                'completion_percentage' => $completionPercentage,
                 'location' => fake()->randomElement($locations),
                 'description' => fake()->optional(0.8)->paragraph(),
-                'is_billable' => fake()->boolean(80),
                 'billing_type' => $billingType,
             ]);
 
@@ -595,10 +590,8 @@ class ProjectDataSeeder extends Seeder
         $billings = collect();
         $paymentMethods = ['cash', 'check', 'bank_transfer', 'credit_card', 'other'];
         
-        // Only create billings for billable projects
-        $billableProjects = $projects->where('is_billable', true);
-        
-        foreach ($billableProjects as $project) {
+        // Create billings for all projects
+        foreach ($projects as $project) {
             $milestones = ProjectMilestone::where('project_id', $project->id)->get();
             
             // Determine how many billings to create based on project type

@@ -14,11 +14,11 @@ import { Button } from "@/Components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 
-const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users = [] }) => {
+const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users = [], preselectedTask = null }) => {
   const { data, setData, post, errors, processing } = useForm({
     project_id: project?.id || "",
-    project_milestone_id: "none",
-    project_task_id: "none",
+    project_milestone_id: preselectedTask?.milestone?.id || preselectedTask?.milestone_id || "none",
+    project_task_id: preselectedTask?.id || "none",
     title: "",
     description: "",
     priority: "medium",
@@ -63,10 +63,7 @@ const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users
     });
   };
 
-  // Filter tasks based on selected milestone
-  const filteredTasks = data.project_milestone_id && data.project_milestone_id !== "none"
-    ? tasks.filter(t => t.project_milestone_id === parseInt(data.project_milestone_id))
-    : [];
+  // No need to filter tasks - they're all available for selection
 
   return (
     <Dialog open onOpenChange={setShowAddModal}>
@@ -100,53 +97,66 @@ const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users
             <InputError message={errors.description} />
           </div>
 
-          {/* Milestone (Optional) */}
-          <div>
-            <Label>Milestone (Optional)</Label>
-            <Select
-              value={data.project_milestone_id}
-              onValueChange={(value) => {
-                setData("project_milestone_id", value);
-                setData("project_task_id", "none"); // Reset task when milestone changes
-              }}
-            >
-              <SelectTrigger className={inputClass(errors.project_milestone_id)}>
-                <SelectValue placeholder="Select milestone (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {milestones.map((m) => (
-                  <SelectItem key={m.id} value={m.id.toString()}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.project_milestone_id} />
-          </div>
+          {/* Milestone (Optional) - Hide if task is preselected */}
+          {!preselectedTask && (
+            <div>
+              <Label>Milestone (Optional)</Label>
+              <Select
+                value={data.project_milestone_id}
+                onValueChange={(value) => {
+                  setData("project_milestone_id", value);
+                  // Don't reset task when milestone changes - allow independent selection
+                }}
+              >
+                <SelectTrigger className={inputClass(errors.project_milestone_id)}>
+                  <SelectValue placeholder="Select milestone (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {milestones.map((m) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <InputError message={errors.project_milestone_id} />
+            </div>
+          )}
 
-          {/* Task (Optional, depends on milestone) */}
-          <div>
-            <Label>Task (Optional)</Label>
-            <Select
-              value={data.project_task_id}
-              onValueChange={(value) => setData("project_task_id", value)}
-              disabled={!data.project_milestone_id || data.project_milestone_id === "none"}
-            >
-              <SelectTrigger className={inputClass(errors.project_task_id)}>
-                <SelectValue placeholder={data.project_milestone_id ? "Select task (optional)" : "Select milestone first"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {filteredTasks.map((t) => (
-                  <SelectItem key={t.id} value={t.id.toString()}>
-                    {t.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.project_task_id} />
-          </div>
+          {/* Task (Optional) - Hide if task is preselected */}
+          {!preselectedTask && (
+            <div>
+              <Label>Task (Optional)</Label>
+              <Select
+                value={data.project_task_id}
+                onValueChange={(value) => {
+                  setData("project_task_id", value);
+                  // Auto-select milestone if task is selected
+                  if (value && value !== "none") {
+                    const selectedTask = tasks.find(t => t.id === parseInt(value));
+                    if (selectedTask && (selectedTask.project_milestone_id || selectedTask.milestone?.id)) {
+                      const milestoneId = selectedTask.project_milestone_id || selectedTask.milestone?.id;
+                      setData("project_milestone_id", milestoneId.toString());
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className={inputClass(errors.project_task_id)}>
+                  <SelectValue placeholder="Select task (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {tasks.map((t) => (
+                    <SelectItem key={t.id} value={t.id.toString()}>
+                      {t.title} {t.milestone ? `(${t.milestone.name})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <InputError message={errors.project_task_id} />
+            </div>
+          )}
 
           {/* Priority */}
           <div>

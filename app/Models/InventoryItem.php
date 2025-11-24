@@ -31,7 +31,7 @@ class InventoryItem extends Model
 
     public function transactions()
     {
-        return $this->hasMany(InventoryTransaction::class);
+        return $this->hasMany(InventoryTransaction::class, 'inventory_item_id');
     }
 
     public function materialAllocations()
@@ -47,25 +47,30 @@ class InventoryItem extends Model
     // Calculate current stock from transactions
     public function calculateCurrentStock()
     {
-        $stockIn = $this->transactions()
-            ->where('transaction_type', 'stock_in')
-            ->sum('quantity');
-        
-        // For stock_out, exclude project_use transactions that don't have receiving reports yet
-        // (these are the initial allocation transactions that haven't been received)
-        $stockOut = $this->transactions()
-            ->where('transaction_type', 'stock_out')
-            ->where(function ($query) {
-                $query->where('stock_out_type', '!=', 'project_use')
-                    ->orWhere(function ($q) {
-                        // Include project_use transactions only if they have a receiving report ID in notes
-                        $q->where('stock_out_type', 'project_use')
-                          ->where('notes', 'like', '%[RECEIVING_REPORT_ID:%');
-                    });
-            })
-            ->sum('quantity');
-        
-        return $stockIn - $stockOut;
+        try {
+            $stockIn = $this->transactions()
+                ->where('transaction_type', 'stock_in')
+                ->sum('quantity');
+            
+            // For stock_out, exclude project_use transactions that don't have receiving reports yet
+            // (these are the initial allocation transactions that haven't been received)
+            $stockOut = $this->transactions()
+                ->where('transaction_type', 'stock_out')
+                ->where(function ($query) {
+                    $query->where('stock_out_type', '!=', 'project_use')
+                        ->orWhere(function ($q) {
+                            // Include project_use transactions only if they have a receiving report ID in notes
+                            $q->where('stock_out_type', 'project_use')
+                              ->where('notes', 'like', '%[RECEIVING_REPORT_ID:%');
+                        });
+                })
+                ->sum('quantity');
+            
+            return $stockIn - $stockOut;
+        } catch (\Exception $e) {
+            // Table doesn't exist, return current_stock value
+            return $this->current_stock ?? 0;
+        }
     }
 
     // Check if stock is low

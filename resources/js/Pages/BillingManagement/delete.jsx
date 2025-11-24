@@ -41,8 +41,8 @@ const DeleteBilling = ({ setShowDeleteModal, billing }) => {
             Are you sure you want to delete the billing "{billing.billing_code}"? 
             This action cannot be undone.
             {billing.payments_count > 0 && (
-              <span className="block mt-2 text-red-600 font-medium">
-                Note: This billing has {billing.payments_count} payment(s). You must delete all payments first.
+              <span className="block mt-2 text-amber-600 font-medium">
+                Note: This billing has {billing.payments_count} transaction(s). The billing will be deleted but transaction records will be preserved.
               </span>
             )}
           </DialogDescription>

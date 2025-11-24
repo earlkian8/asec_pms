@@ -28,13 +28,15 @@ export default function ProjectsIndex() {
   ];
 
   const columns = [
-    { header: 'Code', width: '10%' },
-    { header: 'Name', width: '20%' },
-    { header: 'Client', width: '15%' },
+    { header: 'Code', width: '8%' },
+    { header: 'Name', width: '18%' },
+    { header: 'Client', width: '12%' },
     { header: 'Type', width: '10%' },
-    { header: 'Status', width: '10%' },
-    { header: 'Priority', width: '10%' },
-    { header: 'Action', width: '10%' },
+    { header: 'Contract Amount', width: '12%' },
+    { header: 'Progress', width: '15%' },
+    { header: 'Status', width: '8%' },
+    { header: 'Priority', width: '8%' },
+    { header: 'Action', width: '9%' },
   ];
 
   // Data from backend
@@ -76,7 +78,6 @@ export default function ProjectsIndex() {
     low: 'bg-green-100 text-green-800',
     medium: 'bg-blue-100 text-blue-800',
     high: 'bg-yellow-100 text-yellow-800',
-    critical: 'bg-red-100 text-red-800',
   };
 
   // Handle search input
@@ -176,7 +177,7 @@ export default function ProjectsIndex() {
 
             {/* Table */}
             <div className="overflow-x-auto rounded-lg">
-              <Table className="min-w-[900px] w-full">
+              <Table className="min-w-[1200px] w-full">
                 <TableHeader>
                   <TableRow>
                     {columns.map((col, i) => (
@@ -192,23 +193,51 @@ export default function ProjectsIndex() {
                 </TableHeader>
                 <TableBody>
                   {projects.length > 0 ? (
-                    projects.map((project) => (
+                    projects.map((project) => {
+                      const progress = project.progress_percentage || 0;
+                      return (
                       <TableRow key={project.id}>
-                        <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">{project.project_code || '---'}</TableCell>
+                        <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm font-medium">{project.project_code || '---'}</TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">{project.project_name}</TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">{project.client?.client_name || '---'}</TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">
-                          <span className={`p-2 rounded-sm ${typeColors[project.project_type] || 'bg-gray-100 text-gray-800'}`}>
+                          <span className={`px-2 py-1 rounded text-xs ${typeColors[project.project_type] || 'bg-gray-100 text-gray-800'}`}>
                             {project.project_type}
                           </span>
                         </TableCell>
+                        <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
+                          <span className="font-semibold text-gray-900">
+                            ₱{parseFloat(project.contract_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-gray-200 rounded-full h-2.5 max-w-[120px] shadow-inner">
+                              <div 
+                                className={`h-2.5 rounded-full transition-all duration-500 ${
+                                  progress === 100 ? 'bg-green-500' :
+                                  progress >= 50 ? 'bg-blue-500' :
+                                  progress > 0 ? 'bg-yellow-500' :
+                                  'bg-gray-300'
+                                }`}
+                                style={{ width: `${Math.min(progress, 100)}%` }}
+                              />
+                            </div>
+                            <span className={`text-xs font-semibold w-10 ${
+                              progress === 100 ? 'text-green-600' :
+                              progress >= 50 ? 'text-blue-600' :
+                              progress > 0 ? 'text-yellow-600' :
+                              'text-gray-500'
+                            }`}>{progress}%</span>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">
-                          <span className={`p-2 rounded-sm ${statusColors[project.status] || 'bg-gray-100 text-gray-800'}`}>
-                            {project.status}
+                          <span className={`px-2 py-1 rounded text-xs ${statusColors[project.status] || 'bg-gray-100 text-gray-800'}`}>
+                            {project.status?.replace('_', ' ')}
                           </span>
                         </TableCell>
                         <TableCell className="text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm capitalize">
-                          <span className={`p-2 rounded-sm ${priorityColors[project.priority] || 'bg-gray-100 text-gray-800'}`}>
+                          <span className={`px-2 py-1 rounded text-xs ${priorityColors[project.priority] || 'bg-gray-100 text-gray-800'}`}>
                             {project.priority}
                           </span>
                         </TableCell>
@@ -252,7 +281,8 @@ export default function ProjectsIndex() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))
+                      );
+                    })
                   ) : (
                     <TableRow>
                       <TableCell colSpan={columns.length} className="text-center py-4 text-gray-500">

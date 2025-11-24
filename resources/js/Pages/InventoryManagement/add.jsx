@@ -12,7 +12,7 @@ import InputError from "@/Components/InputError";
 import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
-import { Checkbox } from "@/Components/ui/checkbox";
+import { Switch } from "@/Components/ui/switch";
 
 const AddInventoryItem = ({ setShowAddModal }) => {
   const { data, setData, post, errors, processing } = useForm({
@@ -22,6 +22,8 @@ const AddInventoryItem = ({ setShowAddModal }) => {
     unit_of_measure: "pieces",
     min_stock_level: "",
     unit_price: "",
+    initial_stock: "",
+    initial_stock_unit_price: "",
     is_active: true,
   });
 
@@ -54,7 +56,7 @@ const AddInventoryItem = ({ setShowAddModal }) => {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Item Name */}
           <div>
-            <Label>Item Name *</Label>
+            <Label>Item Name <span class="text-red-500">*</span></Label>
             <Input
               value={data.item_name}
               onChange={(e) => setData("item_name", e.target.value)}
@@ -90,7 +92,7 @@ const AddInventoryItem = ({ setShowAddModal }) => {
 
           {/* Unit of Measure */}
           <div>
-            <Label>Unit of Measure *</Label>
+            <Label>Unit of Measure <span class="text-red-500">*</span></Label>
             <Input
               value={data.unit_of_measure}
               onChange={(e) => setData("unit_of_measure", e.target.value)}
@@ -130,15 +132,52 @@ const AddInventoryItem = ({ setShowAddModal }) => {
             <InputError message={errors.unit_price} />
           </div>
 
+          {/* Initial Stock */}
+          <div>
+            <Label>Initial Stock (Optional)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={data.initial_stock}
+              onChange={(e) => setData("initial_stock", e.target.value)}
+              placeholder="0.00"
+              className={inputClass(errors.initial_stock)}
+            />
+            <InputError message={errors.initial_stock} />
+            <p className="text-xs text-gray-500 mt-1">Add initial stock when creating this item</p>
+          </div>
+
+          {/* Initial Stock Unit Price */}
+          {data.initial_stock && (
+            <div>
+              <Label>Initial Stock Unit Price (Optional)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={data.initial_stock_unit_price}
+                onChange={(e) => setData("initial_stock_unit_price", e.target.value)}
+                placeholder="0.00"
+                className={inputClass(errors.initial_stock_unit_price)}
+              />
+              <InputError message={errors.initial_stock_unit_price} />
+            </div>
+          )}
+
           {/* Is Active */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
+          <div className="flex items-center gap-3">
+            <Switch
               id="is_active"
               checked={data.is_active}
               onCheckedChange={(checked) => setData("is_active", checked)}
+              className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
             />
             <Label htmlFor="is_active" className="cursor-pointer">
-              Active
+              {data.is_active ? 'Active' : 'Inactive'}
+              <span className={`ml-2 text-xs ${data.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                ({data.is_active ? 'Enabled' : 'Disabled'})
+              </span>
             </Label>
           </div>
 

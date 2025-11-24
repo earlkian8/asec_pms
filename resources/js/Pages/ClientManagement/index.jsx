@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
-import { Trash2, SquarePen, AlertCircle } from 'lucide-react';
+import { Trash2, SquarePen, AlertCircle, KeyRound } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import { toast } from 'sonner';
 import { usePermission } from '@/utils/permissions';
@@ -19,6 +19,7 @@ import { usePermission } from '@/utils/permissions';
 import AddClient from './add';
 import EditClient from './edit';
 import DeleteClient from './delete';
+import ResetPassword from './reset';
 
 export default function ClientsIndex() {
   const { has } = usePermission();
@@ -51,6 +52,8 @@ export default function ClientsIndex() {
   const [editClient, setEditClient] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteClient, setDeleteClient] = useState(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetClient, setResetClient] = useState(null);
   const debounceTimer = useRef(null);
 
   // 🔍 Debounced Search
@@ -111,6 +114,12 @@ export default function ClientsIndex() {
     });
   };
 
+  // ✅ Handle Reset Password
+  const handleResetPassword = (client) => {
+    setResetClient(client);
+    setShowResetModal(true);
+  };
+
   // Check if user has permission to view clients
   if (!has('clients.view')) {
     return (
@@ -132,6 +141,7 @@ export default function ClientsIndex() {
       {showAddModal && <AddClient setShowAddModal={setShowAddModal} />}
       {showEditModal && <EditClient setShowEditModal={setShowEditModal} client={editClient} />}
       {showDeleteModal && <DeleteClient setShowDeleteModal={setShowDeleteModal} client={deleteClient} />}
+      {showResetModal && <ResetPassword setShowResetModal={setShowResetModal} client={resetClient} />}
 
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
         <Head title="Clients" />
@@ -228,6 +238,15 @@ export default function ClientsIndex() {
                                   title="Edit"
                                 >
                                   <SquarePen size={18} />
+                                </button>
+                              )}
+                              {has('clients.update') && (
+                                <button
+                                  onClick={() => handleResetPassword(client)}
+                                  className="p-2 rounded hover:bg-yellow-100 text-yellow-600 hover:text-yellow-700 transition"
+                                  title="Reset Password"
+                                >
+                                  <KeyRound size={18} />
                                 </button>
                               )}
                               {has('clients.delete') && (

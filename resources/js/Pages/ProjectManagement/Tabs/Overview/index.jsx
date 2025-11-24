@@ -73,7 +73,6 @@ export default function OverviewTab({ project, overviewData }) {
       low: 'bg-gray-100 text-gray-700',
       medium: 'bg-blue-100 text-blue-700',
       high: 'bg-orange-100 text-orange-700',
-      critical: 'bg-red-100 text-red-700',
     };
     return colors[priority] || colors.medium;
   };
@@ -146,13 +145,6 @@ export default function OverviewTab({ project, overviewData }) {
             <div>
               <p className="text-xs text-gray-500">Location</p>
               <p className="text-sm font-semibold text-gray-900">{project.location || '---'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Percent className="text-gray-400" size={20} />
-            <div>
-              <p className="text-xs text-gray-500">Completion</p>
-              <p className="text-sm font-semibold text-gray-900">{formatPercentage(project.completion_percentage)}</p>
             </div>
           </div>
         </div>

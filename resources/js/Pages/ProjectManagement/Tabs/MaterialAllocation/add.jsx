@@ -85,7 +85,7 @@ const AddReceivingReport = ({ setShowAddModal, project, allocation }) => {
 
           {/* Quantity Received */}
           <div>
-            <Label className="text-zinc-800">Quantity Received *</Label>
+            <Label className="text-zinc-800">Quantity Received <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"

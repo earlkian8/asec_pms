@@ -22,7 +22,7 @@ class MaterialReceivingReport extends Model
 
     public function materialAllocation()
     {
-        return $this->belongsTo(ProjectMaterialAllocation::class);
+        return $this->belongsTo(ProjectMaterialAllocation::class, 'project_material_allocation_id');
     }
 
     public function receivedBy()

@@ -39,13 +39,20 @@ class LaborCostService
             ->paginate(10)
             ->withQueryString();
 
-        // Get project team members for dropdown
+        // Get project team members for dropdown with hourly rates
         $teamMembers = $project->team()
             ->active()
             ->current()
             ->with('user')
             ->get()
-            ->pluck('user')
+            ->map(function ($teamMember) {
+                return [
+                    'id' => $teamMember->user->id,
+                    'name' => $teamMember->user->name,
+                    'email' => $teamMember->user->email,
+                    'hourly_rate' => $teamMember->hourly_rate,
+                ];
+            })
             ->filter();
 
         // Calculate totals

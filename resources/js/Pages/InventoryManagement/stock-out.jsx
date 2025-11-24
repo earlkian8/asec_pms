@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
 import { toast } from "sonner";
 import { useState } from "react";
 import {
@@ -48,10 +48,11 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
     }
 
     post(route("inventory-management.stock-out", item.id), {
-      preserveScroll: true,
+      preserveScroll: false,
       onSuccess: () => {
         setShowStockOutModal(false);
         toast.success("Stock removed successfully!");
+        router.reload({ only: ['items'] });
       },
       onError: (errors) => {
         if (errors.error) {

@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -31,10 +31,11 @@ const StockIn = ({ setShowStockInModal, item }) => {
     e.preventDefault();
 
     post(route("inventory-management.stock-in", item.id), {
-      preserveScroll: true,
+      preserveScroll: false,
       onSuccess: () => {
         setShowStockInModal(false);
         toast.success("Stock added successfully!");
+        router.reload({ only: ['items'] });
       },
       onError: () => toast.error("Please check the form for errors"),
     });

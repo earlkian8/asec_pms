@@ -13,15 +13,19 @@ class ProjectMilestonesService
     public function getProjectMilestonesData(Project $project)
     {
         $search = request('search');
+        $statusFilter = request('status_filter', 'all');
 
         // Load milestones with all related tasks, progress updates, and issues efficiently
         $milestones = ProjectMilestone::where('project_id', $project->id)
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'ilike', "%{$search}%")
-                      ->orWhere('description', 'ilike', "%{$search}%")
-                      ->orWhere('status', 'ilike', "%{$search}%");
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('status', 'like', "%{$search}%");
                 });
+            })
+            ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
+                $query->where('status', $statusFilter);
             })
             ->with([
                 'tasks' => function ($query) {
@@ -41,10 +45,11 @@ class ProjectMilestonesService
                 }
             ])
             ->orderBy('due_date', 'asc')
-            ->get();
+            ->paginate(10)
+            ->withQueryString();
         
         // Ensure all relationships are properly loaded and accessible
-        $milestones->each(function ($milestone) {
+        $milestones->getCollection()->each(function ($milestone) {
             $milestone->tasks->each(function ($task) {
                 // Ensure progressUpdates is loaded
                 if (!$task->relationLoaded('progressUpdates')) {
@@ -86,6 +91,7 @@ class ProjectMilestonesService
             'users' => $users,
             'issues' => $issues,
             'search' => $search,
+            'statusFilter' => $statusFilter,
         ];
     }
 }

@@ -112,7 +112,8 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
           {/* Payment Amount */}
           <div>
-            <Label>Payment Amount *</Label>
+            <Label>Payment Amount <span class="text-red-500">*</span>
+</Label>
             <Input
               type="number"
               step="0.01"
@@ -131,7 +132,7 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
           {/* Payment Date */}
           <div>
-            <Label>Payment Date *</Label>
+            <Label>Payment Date <span class="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.payment_date}
@@ -143,7 +144,7 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
           {/* Payment Method */}
           <div>
-            <Label>Payment Method *</Label>
+            <Label>Payment Method <span class="text-red-500">*</span></Label>
             <Select
               value={data.payment_method}
               onValueChange={(value) => setData("payment_method", value)}

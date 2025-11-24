@@ -20,7 +20,9 @@ const AddMilestone = ({ setShowAddModal, project }) => {
   const { data, setData, post, errors, processing } = useForm({
     name: "",
     description: "",
+    start_date: "",
     due_date: "",
+    billing_percentage: "",
     status: "pending",
   });
 
@@ -84,6 +86,18 @@ const AddMilestone = ({ setShowAddModal, project }) => {
             <InputError message={errors.description} />
           </div>
 
+          {/* Start Date */}
+          <div>
+            <Label className="text-zinc-800">Start Date</Label>
+            <Input
+              type="date"
+              value={data.start_date}
+              onChange={(e) => setData("start_date", e.target.value)}
+              className={inputClass(errors.start_date)}
+            />
+            <InputError message={errors.start_date} />
+          </div>
+
           {/* Due Date */}
           <div>
             <Label className="text-zinc-800">Due Date</Label>
@@ -91,9 +105,26 @@ const AddMilestone = ({ setShowAddModal, project }) => {
               type="date"
               value={data.due_date}
               onChange={(e) => setData("due_date", e.target.value)}
+              min={data.start_date || undefined}
               className={inputClass(errors.due_date)}
             />
             <InputError message={errors.due_date} />
+          </div>
+
+          {/* Billing Percentage */}
+          <div>
+            <Label className="text-zinc-800">Billing Percentage (%)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={data.billing_percentage}
+              onChange={(e) => setData("billing_percentage", e.target.value)}
+              placeholder="0.00"
+              className={inputClass(errors.billing_percentage)}
+            />
+            <InputError message={errors.billing_percentage} />
           </div>
 
           {/* Status */}

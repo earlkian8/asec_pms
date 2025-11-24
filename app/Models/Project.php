@@ -17,11 +17,14 @@ class Project extends Model
         'start_date',
         'planned_end_date',
         'actual_end_date',
-        'completion_percentage',
         'location',
         'description',
-        'is_billable',
         'billing_type',
+        'is_billable',
+    ];
+
+    protected $casts = [
+        'is_billable' => 'boolean',
     ];
 
     public function client(){

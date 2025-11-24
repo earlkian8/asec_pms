@@ -24,11 +24,24 @@ import AddBilling from './add';
 import EditBilling from './edit';
 import DeleteBilling from './delete';
 import AddPayment from './add-payment';
+import Transactions from './Transactions';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
-export default function BillingManagement({ billings, search: initialSearch, projects, status: initialStatus, project_id: initialProjectId, billing_type: initialBillingType }) {
+export default function BillingManagement({ 
+  billings, 
+  transactions: transactionsData,
+  search: initialSearch, 
+  projects, 
+  status: initialStatus, 
+  project_id: initialProjectId, 
+  billing_type: initialBillingType,
+  tab: initialTab,
+  transaction_project_id: initialTransactionProjectId,
+  transaction_payment_method: initialTransactionPaymentMethod
+}) {
   const { has } = usePermission();
+  const { url } = usePage();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -40,6 +53,7 @@ export default function BillingManagement({ billings, search: initialSearch, pro
   const [statusFilter, setStatusFilter] = useState(initialStatus || '');
   const [projectFilter, setProjectFilter] = useState(initialProjectId || '');
   const [billingTypeFilter, setBillingTypeFilter] = useState(initialBillingType || '');
+  const [activeTab, setActiveTab] = useState(initialTab || 'billings');
   const debounceTimer = useRef(null);
 
   const breadcrumbs = [
@@ -122,6 +136,55 @@ export default function BillingManagement({ billings, search: initialSearch, pro
       
       <div className="w-full sm:px-6 lg:px-8">
         <div className="overflow-hidden bg-white shadow sm:rounded-lg p-4 mt-2">
+          {/* TAB HEADERS */}
+          <div className="border-b border-gray-200 mb-4 overflow-x-auto no-scrollbar">
+            <div className="flex gap-4 w-max">
+              <button
+                onClick={() => {
+                  setActiveTab('billings');
+                  router.get(route('billing-management.index'), 
+                    { tab: 'billings' },
+                    { preserveState: true, replace: true }
+                  );
+                }}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition
+                  ${activeTab === 'billings' || !activeTab
+                    ? "border-zinc-700 text-zinc-700 font-semibold"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+              >
+                Billings
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('transactions');
+                  router.get(route('billing-management.index'), 
+                    { tab: 'transactions' },
+                    { preserveState: true, replace: true }
+                  );
+                }}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition
+                  ${activeTab === 'transactions'
+                    ? "border-zinc-700 text-zinc-700 font-semibold"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+              >
+                Transactions
+              </button>
+            </div>
+          </div>
+
+          {/* TAB CONTENT */}
+          {activeTab === 'transactions' ? (
+            <Transactions 
+              transactions={transactionsData}
+              search={initialSearch}
+              projects={projects}
+              project_id={initialTransactionProjectId}
+              payment_method={initialTransactionPaymentMethod}
+            />
+          ) : (
+            <>
           {/* Header with Search and Filters */}
           <div className="py-2 mb-4 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -284,7 +347,7 @@ export default function BillingManagement({ billings, search: initialSearch, pro
                                 <SquarePen size={18} />
                               </button>
                             )}
-                            {billing.payments_count === 0 && has('billing.delete') && (
+                            {has('billing.delete') && (
                               <button
                                 onClick={() => { setDeleteBilling(billing); setShowDeleteModal(true); }}
                                 className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
@@ -360,6 +423,8 @@ export default function BillingManagement({ billings, search: initialSearch, pro
               setShowPaymentModal={setShowPaymentModal}
               billing={paymentBilling}
             />
+          )}
+            </>
           )}
         </div>
       </div>

@@ -52,7 +52,7 @@ class ProjectsController extends Controller
     {
         $search = $request->input('search');
 
-        $projects = Project::with(['client'])
+        $projects = Project::with(['client', 'milestones.tasks'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('project_code', 'like', "%{$search}%")
@@ -65,15 +65,33 @@ class ProjectsController extends Controller
             ->paginate(10)
             ->withQueryString(); // keep search when paginating
 
+        // Calculate progress for each project based on milestones
+        $projects->getCollection()->transform(function ($project) {
+            $milestones = $project->milestones;
+            $totalMilestones = $milestones->count();
+            $completedMilestones = $milestones->where('status', 'completed')->count();
+            $project->progress_percentage = $totalMilestones > 0 
+                ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                : 0;
+            return $project;
+        });
+
         $clients = Client::orderBy('client_name')->where('is_active', true)->get();
         
-        // Get users for team assignment
-        $users = User::orderBy('name')->get(['id', 'name', 'email']);
+        // Get users for team assignment with roles
+        $users = User::with('roles')->orderBy('name')->get(['id', 'name', 'email'])->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->roles->first()?->name ?? 'No Role',
+            ];
+        });
         
         // Get inventory items for material allocation
         $inventoryItems = InventoryItem::where('is_active', true)
             ->orderBy('item_name')
-            ->get(['id', 'item_code', 'item_name', 'unit_of_measure', 'unit_price', 'current_stock']);
+            ->get(['id', 'item_code', 'item_name']); // 'unit_of_measure', 'unit_price', 'current_stock'
 
         return Inertia::render('ProjectManagement/index', [
             'projects'   => $projects,
@@ -90,32 +108,32 @@ class ProjectsController extends Controller
             // Project data
             'project_name'          => ['required', 'max:255'],
             'client_id'             => ['required', 'exists:clients,id'],
-            'project_type'          => ['required', 'in:design,construction,consultancy,maintenance'],
+            'project_type'          => ['required', 'in:design,construction,consultancy,maintenance,structural,civil,mechanical,electrical,environmental,geotechnical,surveying'],
             'status'                => ['nullable', 'in:planning,active,on_hold,completed,cancelled'],
-            'priority'              => ['nullable', 'in:low,medium,high,critical'],
+            'priority'              => ['nullable', 'in:low,medium,high'],
             'contract_amount'       => ['required', 'numeric'],
             'start_date'            => ['nullable', 'date'],
             'planned_end_date'      => ['nullable', 'date'],
             'actual_end_date'       => ['nullable', 'date'],
-            'completion_percentage' => ['nullable', 'numeric'],
             'location'              => ['nullable', 'string'],
             'description'           => ['nullable', 'string'],
-            'is_billable'           => ['nullable', 'boolean'],
             'billing_type'          => ['nullable', 'in:fixed_price,milestone'],
             
             // Team members (optional)
             'team_members'          => ['nullable', 'array'],
             'team_members.*.id'     => ['required', 'exists:users,id'],
             'team_members.*.role'   => ['required', 'string', 'max:50'],
-            'team_members.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'team_members.*.start_date'  => ['nullable', 'date'],
+            'team_members.*.hourly_rate' => ['required', 'numeric', 'min:0'],
+            'team_members.*.start_date'  => ['required', 'date'],
             'team_members.*.end_date'    => ['nullable', 'date', 'after_or_equal:team_members.*.start_date'],
             
             // Milestones (optional)
             'milestones'            => ['nullable', 'array'],
             'milestones.*.name'     => ['required', 'string', 'max:255'],
             'milestones.*.description' => ['nullable', 'string'],
-            'milestones.*.due_date' => ['nullable', 'date'],
+            'milestones.*.start_date' => ['nullable', 'date'],
+            'milestones.*.due_date' => ['nullable', 'date', 'after_or_equal:milestones.*.start_date'],
+            'milestones.*.billing_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'milestones.*.status'   => ['nullable', 'in:pending,in_progress,completed'],
             
             // Material allocations (optional)
@@ -124,14 +142,6 @@ class ProjectsController extends Controller
             'material_allocations.*.quantity_allocated' => ['required', 'numeric', 'min:0.01'],
             'material_allocations.*.notes' => ['nullable', 'string'],
             
-            // Labor costs (optional)
-            'labor_costs'           => ['nullable', 'array'],
-            'labor_costs.*.user_id' => ['required', 'exists:users,id'],
-            'labor_costs.*.work_date' => ['required', 'date'],
-            'labor_costs.*.hours_worked' => ['required', 'numeric', 'min:0.01'],
-            'labor_costs.*.hourly_rate' => ['required', 'numeric', 'min:0'],
-            'labor_costs.*.description' => ['nullable', 'string'],
-            'labor_costs.*.notes' => ['nullable', 'string'],
         ]);
 
         DB::beginTransaction();
@@ -154,8 +164,8 @@ class ProjectsController extends Controller
                         'project_id'   => $project->id,
                         'user_id'      => $member['id'],
                         'role'         => $member['role'],
-                        'hourly_rate'  => $member['hourly_rate'] ?? null,
-                        'start_date'   => $member['start_date'] ?? null,
+                        'hourly_rate'  => $member['hourly_rate'],
+                        'start_date'   => $member['start_date'],
                         'end_date'     => $member['end_date'] ?? null,
                         'is_active'    => true,
                     ]);
@@ -169,7 +179,9 @@ class ProjectsController extends Controller
                         'project_id'   => $project->id,
                         'name'         => $milestone['name'],
                         'description'  => $milestone['description'] ?? null,
+                        'start_date'   => $milestone['start_date'] ?? null,
                         'due_date'     => $milestone['due_date'] ?? null,
+                        'billing_percentage' => $milestone['billing_percentage'] ?? null,
                         'status'       => $milestone['status'] ?? 'pending',
                     ]);
                 }
@@ -191,22 +203,6 @@ class ProjectsController extends Controller
                 }
             }
 
-            // Create labor costs
-            if (!empty($validated['labor_costs'])) {
-                foreach ($validated['labor_costs'] as $laborCost) {
-                    ProjectLaborCost::create([
-                        'project_id'    => $project->id,
-                        'user_id'       => $laborCost['user_id'],
-                        'work_date'     => $laborCost['work_date'],
-                        'hours_worked'  => $laborCost['hours_worked'],
-                        'hourly_rate'   => $laborCost['hourly_rate'],
-                        'description'   => $laborCost['description'] ?? null,
-                        'notes'         => $laborCost['notes'] ?? null,
-                        'created_by'    => auth()->id(),
-                    ]);
-                }
-            }
-
             DB::commit();
 
             $this->adminActivityLogs('Project', 'Add', 'Added Project ' . $project->project_name . ' with team, milestones, materials, and labor costs');
@@ -222,17 +218,15 @@ class ProjectsController extends Controller
         $validated = $request->validate([
             'project_name'          => ['required', 'max:255'],
             'client_id'             => ['required', 'exists:clients,id'],
-            'project_type'          => ['required', 'in:design,construction,consultancy,maintenance'],
+            'project_type'          => ['required', 'in:design,construction,consultancy,maintenance,commissioning,inspection,renovation,site_layout,surveying,relocation,excavation'],
             'status'                => ['nullable', 'in:planning,active,on_hold,completed,cancelled'],
-            'priority'              => ['nullable', 'in:low,medium,high,critical'],
+            'priority'              => ['nullable', 'in:low,medium,high'],
             'contract_amount'       => ['required', 'numeric'],
             'start_date'            => ['nullable', 'date'],
             'planned_end_date'      => ['nullable', 'date'],
             'actual_end_date'       => ['nullable', 'date'],
-            'completion_percentage' => ['nullable', 'numeric'],
             'location'              => ['nullable', 'string'],
             'description'           => ['nullable', 'string'],
-            'is_billable'           => ['nullable', 'boolean'],
             'billing_type'          => ['nullable', 'in:fixed_price,milestone'],
         ]);
 
@@ -261,7 +255,7 @@ class ProjectsController extends Controller
     $project->load(['client']);
 
     // Get project team data
-    $teamData = $this->projectTeamService->getProjectTeamData($project, $request);
+    $teamData = $this->projectTeamService->getProjectTeamData($project);
 
     // Get project files data (kept for potential future use)
     $fileData = $this->projectFilesService->getProjectFilesData($project);

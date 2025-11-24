@@ -46,18 +46,13 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [], preselectedTask = null
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!data.project_task_id) {
+    // If preselectedTask is provided, use it; otherwise use form data
+    const taskId = preselectedTask?.id 
+      ? (typeof preselectedTask.id === 'string' ? parseInt(preselectedTask.id) : preselectedTask.id)
+      : (typeof data.project_task_id === 'string' ? parseInt(data.project_task_id) : data.project_task_id);
+
+    if (!taskId || isNaN(taskId)) {
       toast.error("Please select a task");
-      return;
-    }
-
-    // Ensure project_task_id is a number
-    const taskId = typeof data.project_task_id === 'string' 
-      ? parseInt(data.project_task_id) 
-      : data.project_task_id;
-
-    if (isNaN(taskId)) {
-      toast.error("Invalid task selected");
       return;
     }
 
@@ -101,32 +96,34 @@ const AddProgressUpdate = ({ setShowAddModal, tasks = [], preselectedTask = null
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
-          {/* Task */}
-          <div>
-            <Label>Task</Label>
-            <Select
-              value={data.project_task_id ? data.project_task_id.toString() : ""}
-              onValueChange={(value) => setData("project_task_id", parseInt(value))}
-            >
-              <SelectTrigger className={inputClass(errors.project_task_id)}>
-                <SelectValue placeholder="Select task" />
-              </SelectTrigger>
-              <SelectContent>
-                {tasks.length > 0 ? (
-                  tasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id.toString()}>
-                      {task.title} - {task.milestone?.name || 'No Milestone'}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-1.5 text-sm text-gray-500">
-                    No tasks available
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.project_task_id} />
-          </div>
+          {/* Task - Only show if not preselected */}
+          {!preselectedTask && (
+            <div>
+              <Label>Task</Label>
+              <Select
+                value={data.project_task_id ? data.project_task_id.toString() : ""}
+                onValueChange={(value) => setData("project_task_id", parseInt(value))}
+              >
+                <SelectTrigger className={inputClass(errors.project_task_id)}>
+                  <SelectValue placeholder="Select task" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tasks.length > 0 ? (
+                    tasks.map((task) => (
+                      <SelectItem key={task.id} value={task.id.toString()}>
+                        {task.title} - {task.milestone?.name || 'No Milestone'}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                      No tasks available
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+              <InputError message={errors.project_task_id} />
+            </div>
+          )}
 
           {/* Description */}
           <div>

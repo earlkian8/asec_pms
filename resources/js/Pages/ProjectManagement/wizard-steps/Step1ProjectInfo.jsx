@@ -30,7 +30,7 @@ export default function Step1ProjectInfo({ clients }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Project Name */}
           <div className="md:col-span-2">
-            <Label className="text-zinc-800">Project Name *</Label>
+            <Label className="text-zinc-800">Project Name <span class="text-red-500">*</span></Label>
             <Input
               type="text"
               value={projectData.project_name}
@@ -42,7 +42,7 @@ export default function Step1ProjectInfo({ clients }) {
 
           {/* Client */}
           <div>
-            <Label className="text-zinc-800">Client *</Label>
+            <Label className="text-zinc-800">Client <span class="text-red-500">*</span></Label>
             <div className="flex gap-2 items-center">
               <Select
                 value={projectData.client_id}
@@ -72,7 +72,7 @@ export default function Step1ProjectInfo({ clients }) {
 
           {/* Project Type */}
           <div>
-            <Label className="text-zinc-800">Project Type *</Label>
+            <Label className="text-zinc-800">Project Type <span class="text-red-500">*</span></Label>
             <Select
               value={projectData.project_type}
               onValueChange={(value) => updateProjectData({ project_type: value })}
@@ -85,6 +85,13 @@ export default function Step1ProjectInfo({ clients }) {
                 <SelectItem value="construction">Construction</SelectItem>
                 <SelectItem value="consultancy">Consultancy</SelectItem>
                 <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="commissioning">Commissioning</SelectItem>
+                <SelectItem value="inspection">Inspection</SelectItem>
+                <SelectItem value="renovation">Renovation</SelectItem>
+                <SelectItem value="site_layout">Site Layout</SelectItem>
+                <SelectItem value="relocation">Relocation</SelectItem>
+                <SelectItem value="excavation">Excavation</SelectItem>
+                <SelectItem value="surveying">Surveying</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -123,14 +130,13 @@ export default function Step1ProjectInfo({ clients }) {
                 <SelectItem value="low">Low</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Contract Amount */}
           <div>
-            <Label className="text-zinc-800">Contract Amount *</Label>
+            <Label className="text-zinc-800">Contract Amount <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -174,21 +180,6 @@ export default function Step1ProjectInfo({ clients }) {
             />
           </div>
 
-          {/* Completion Percentage */}
-          <div>
-            <Label className="text-zinc-800">Completion (%)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={projectData.completion_percentage}
-              onChange={(e) => updateProjectData({ completion_percentage: e.target.value })}
-              placeholder="0.00"
-              className={inputClass(false)}
-            />
-          </div>
-
           {/* Billing Type */}
           <div>
             <Label className="text-zinc-800">Billing Type</Label>
@@ -204,15 +195,6 @@ export default function Step1ProjectInfo({ clients }) {
                 <SelectItem value="milestone">Milestone</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Billable Checkbox */}
-          <div className="flex items-center space-x-2 mt-6">
-            <Checkbox
-              checked={projectData.is_billable}
-              onCheckedChange={(value) => updateProjectData({ is_billable: value })}
-            />
-            <Label className="text-zinc-800">Billable</Label>
           </div>
 
           {/* Location */}

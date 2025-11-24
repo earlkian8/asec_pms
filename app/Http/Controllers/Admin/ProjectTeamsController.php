@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectTeam;
+use App\Models\ProjectTask;
 use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
 
@@ -18,10 +19,40 @@ class ProjectTeamsController extends Controller
             'users'            => ['required', 'array', 'min:1'],
             'users.*.id'       => ['required', 'exists:users,id'],
             'users.*.role'     => ['required', 'string', 'max:50'],
-            'users.*.hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'users.*.start_date'  => ['nullable', 'date'],
+            'users.*.hourly_rate' => ['required', 'numeric', 'min:0'],
+            'users.*.start_date'  => ['required', 'date'],
             'users.*.end_date'    => ['nullable', 'date', 'after_or_equal:users.*.start_date'],
         ]);
+
+        // Validate dates against project dates
+        if ($project->start_date || $project->planned_end_date) {
+            foreach ($validated['users'] as $index => $user) {
+                if ($user['start_date']) {
+                    if ($project->start_date && $user['start_date'] < $project->start_date) {
+                        return redirect()->back()->withErrors([
+                            "users.{$index}.start_date" => "Start date cannot be before project start date ({$project->start_date})"
+                        ])->withInput();
+                    }
+                    if ($project->planned_end_date && $user['start_date'] > $project->planned_end_date) {
+                        return redirect()->back()->withErrors([
+                            "users.{$index}.start_date" => "Start date cannot be after project end date ({$project->planned_end_date})"
+                        ])->withInput();
+                    }
+                }
+                if ($user['end_date']) {
+                    if ($project->start_date && $user['end_date'] < $project->start_date) {
+                        return redirect()->back()->withErrors([
+                            "users.{$index}.end_date" => "End date cannot be before project start date ({$project->start_date})"
+                        ])->withInput();
+                    }
+                    if ($project->planned_end_date && $user['end_date'] > $project->planned_end_date) {
+                        return redirect()->back()->withErrors([
+                            "users.{$index}.end_date" => "End date cannot be after project end date ({$project->planned_end_date})"
+                        ])->withInput();
+                    }
+                }
+            }
+        }
 
         $added = 0;
         foreach ($validated['users'] as $user) {
@@ -35,7 +66,7 @@ class ProjectTeamsController extends Controller
 
             ProjectTeam::create([
                 'project_id'   => $project->id,
-                'user_id'      => $user['id'],
+                'user_id'     => $user['id'],
                 'role'         => $user['role'],
                 'hourly_rate'  => $user['hourly_rate'],
                 'start_date'   => $user['start_date'],
@@ -63,7 +94,20 @@ class ProjectTeamsController extends Controller
                 ->whereIn('id', $validated['ids'])
                 ->get();
 
+            $cannotDelete = [];
             foreach ($teams as $team) {
+                // Check if team member has tasks
+                $hasTasks = ProjectTask::where('assigned_to', $team->user_id)
+                    ->whereHas('milestone', function ($query) use ($project) {
+                        $query->where('project_id', $project->id);
+                    })
+                    ->exists();
+
+                if ($hasTasks) {
+                    $cannotDelete[] = $team->user->name;
+                    continue;
+                }
+
                 $userName = $team->user->name;
                 $role     = $team->role;
 
@@ -76,12 +120,27 @@ class ProjectTeamsController extends Controller
                 $team->delete();
             }
 
+            if (!empty($cannotDelete)) {
+                return redirect()->back()->with('error', 'Cannot remove team members with assigned tasks: ' . implode(', ', $cannotDelete));
+            }
+
             return redirect()->back()->with('success', 'Selected team members removed successfully.');
         }
 
         // Otherwise, it's a single destroy
         if (!$projectTeam || $projectTeam->project_id !== $project->id) {
             abort(404);
+        }
+
+        // Check if team member has tasks
+        $hasTasks = ProjectTask::where('assigned_to', $projectTeam->user_id)
+            ->whereHas('milestone', function ($query) use ($project) {
+                $query->where('project_id', $project->id);
+            })
+            ->exists();
+
+        if ($hasTasks) {
+            return redirect()->back()->with('error', 'Cannot remove team member with assigned tasks.');
         }
 
         $userName = $projectTeam->user->name;
@@ -134,11 +193,39 @@ class ProjectTeamsController extends Controller
 
         $validated = $request->validate([
             'role'        => ['required', 'string', 'max:50'],
-            'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'start_date'  => ['nullable', 'date'],
+            'hourly_rate' => ['required', 'numeric', 'min:0'],
+            'start_date'  => ['required', 'date'],
             'end_date'    => ['nullable', 'date', 'after_or_equal:start_date'],
             'is_active'   => ['required', 'boolean'],
         ]);
+
+        // Validate dates against project dates
+        if ($project->start_date || $project->planned_end_date) {
+            if ($validated['start_date']) {
+                if ($project->start_date && $validated['start_date'] < $project->start_date) {
+                    return redirect()->back()->withErrors([
+                        'start_date' => "Start date cannot be before project start date ({$project->start_date})"
+                    ])->withInput();
+                }
+                if ($project->planned_end_date && $validated['start_date'] > $project->planned_end_date) {
+                    return redirect()->back()->withErrors([
+                        'start_date' => "Start date cannot be after project end date ({$project->planned_end_date})"
+                    ])->withInput();
+                }
+            }
+            if ($validated['end_date']) {
+                if ($project->start_date && $validated['end_date'] < $project->start_date) {
+                    return redirect()->back()->withErrors([
+                        'end_date' => "End date cannot be before project start date ({$project->start_date})"
+                    ])->withInput();
+                }
+                if ($project->planned_end_date && $validated['end_date'] > $project->planned_end_date) {
+                    return redirect()->back()->withErrors([
+                        'end_date' => "End date cannot be after project end date ({$project->planned_end_date})"
+                    ])->withInput();
+                }
+            }
+        }
 
         // Save old values for logging
         $oldUser   = $projectTeam->user?->name;

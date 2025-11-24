@@ -22,14 +22,23 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
         ]);
 
-        // Create test user with Super Admin role
-        $testUser = User::create([
-            'name' => 'Test User',
-            'email' => 'dev@unisync.com',
-            'password' => Hash::make('password'),
-            'email_verified_at' => now(),
-        ]);
-        $testUser->assignRole('Super Admin');
+        // Create or update admin user with Super Admin role
+        // Update this email to match your account email
+        $adminEmail = 'dev@unisync.com'; // Change this to your email
+        
+        $adminUser = User::firstOrCreate(
+            ['email' => $adminEmail],
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
+        
+        // Ensure Super Admin role is assigned (remove other roles first)
+        $adminUser->syncRoles(['Super Admin']);
+        
+        $this->command->info("Super Admin role assigned to: {$adminEmail}");
 
         // Seed project data (clients, inventory, projects with all submodules, and additional users)
         $this->call([

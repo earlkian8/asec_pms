@@ -28,7 +28,7 @@ Route::get('/', function(){
     return redirect()->route('login');
 });
 
-Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified', 'permission:dashboard.view'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     
@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/update/{client}', [ClientsController::class, 'update'])->middleware('permission:clients.update')->name('update');
         Route::delete('/delete/{client}', [ClientsController::class, 'destroy'])->middleware('permission:clients.delete')->name('destroy');
         Route::put('/update-status/{client}', [ClientsController::class, 'handleStatus'])->middleware('permission:clients.update-status')->name('update-status');
+        Route::patch('/reset-password/{client}', [ClientsController::class, 'resetPassword'])->middleware('permission:clients.update')->name('reset-password');
     });
     // Reports & Analytics
     Route::prefix('reports')->name('reports.')->group(function(){
@@ -157,6 +158,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/destroy/{inventoryItem}', [InventoryItemsController::class, 'destroy'])->middleware('permission:inventory.delete')->name('destroy');
         Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->middleware('permission:inventory.stock-in')->name('stock-in');
         Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->middleware('permission:inventory.stock-out')->name('stock-out');
+        Route::put('/update-status/{inventoryItem}', [InventoryItemsController::class, 'updateStatus'])->middleware('permission:inventory.update')->name('update-status');
     });
 
     // Billing Management

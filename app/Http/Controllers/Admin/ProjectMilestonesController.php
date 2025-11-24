@@ -19,7 +19,9 @@ class ProjectMilestonesController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'due_date' => 'nullable|date',
+            'start_date' => 'nullable|date',
+            'due_date' => 'nullable|date|after_or_equal:start_date',
+            'billing_percentage' => 'nullable|numeric|min:0|max:100',
             'status' => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 
@@ -39,7 +41,9 @@ class ProjectMilestonesController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'due_date' => 'nullable|date',
+            'start_date' => 'nullable|date',
+            'due_date' => 'nullable|date|after_or_equal:start_date',
+            'billing_percentage' => 'nullable|numeric|min:0|max:100',
             'status' => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 

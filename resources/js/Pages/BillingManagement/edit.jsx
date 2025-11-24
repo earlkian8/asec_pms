@@ -76,19 +76,59 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             />
           </div>
 
+          {/* Billing Type (read-only) */}
+          <div>
+            <Label>Billing Type</Label>
+            <Input
+              value={billing.billing_type === 'fixed_price' ? 'Fixed Price' : billing.billing_type === 'milestone' ? 'Milestone' : ''}
+              readOnly
+              className="bg-gray-50 border-gray-300 text-gray-600"
+            />
+          </div>
+
+          {/* Milestone (if milestone-based) */}
+          {billing.billing_type === 'milestone' && billing.milestone && (
+            <div>
+              <Label>Milestone</Label>
+              <Input
+                value={billing.milestone.name + (billing.milestone.billing_percentage ? ` (${billing.milestone.billing_percentage}%)` : '')}
+                readOnly
+                className="bg-gray-50 border-gray-300 text-gray-600"
+              />
+            </div>
+          )}
+
           {/* Billing Amount */}
           <div>
-            <Label>Billing Amount *</Label>
+            <Label>Billing Amount <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
               min="0.01"
               value={data.billing_amount}
-              onChange={(e) => setData("billing_amount", e.target.value)}
+              onChange={(e) => {
+                // Only allow changes for milestone type
+                if (billing.billing_type === 'milestone') {
+                  setData("billing_amount", e.target.value);
+                }
+              }}
+              readOnly={billing.billing_type === 'fixed_price'}
               placeholder="0.00"
-              className={inputClass(errors.billing_amount)}
+              className={billing.billing_type === 'fixed_price' 
+                ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed" 
+                : inputClass(errors.billing_amount)}
             />
             <InputError message={errors.billing_amount} />
+            {billing.billing_type === 'fixed_price' && (
+              <p className="text-xs text-gray-500 mt-1">
+                Fixed amount cannot be changed.
+              </p>
+            )}
+            {billing.billing_type === 'milestone' && (
+              <p className="text-xs text-gray-500 mt-1">
+                Amount can be adjusted for milestone billing.
+              </p>
+            )}
             {billing.total_paid > 0 && (
               <p className="text-xs text-gray-500 mt-1">
                 Total paid: ₱{parseFloat(billing.total_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -98,7 +138,7 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 
           {/* Billing Date */}
           <div>
-            <Label>Billing Date *</Label>
+            <Label>Billing Date <span class="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.billing_date}

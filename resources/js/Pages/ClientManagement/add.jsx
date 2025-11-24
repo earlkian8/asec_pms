@@ -29,6 +29,7 @@ const AddClient = ({ setShowAddModal }) => {
     client_type: '',
     contact_person: '',
     email: '',
+    password: '',
     phone_number: '',
     address: '',
     city: '',
@@ -131,6 +132,19 @@ const AddClient = ({ setShowAddModal }) => {
               className={inputClass(errors.email)}
             />
             <InputError message={errors.email} />
+          </div>
+
+          {/* Password */}
+          <div>
+            <Label className="text-zinc-800">Password</Label>
+            <Input
+              type="password"
+              value={data.password}
+              onChange={e => setData('password', e.target.value)}
+              placeholder="Enter password (min 8 characters)"
+              className={inputClass(errors.password)}
+            />
+            <InputError message={errors.password} />
           </div>
 
           {/* Phone */}

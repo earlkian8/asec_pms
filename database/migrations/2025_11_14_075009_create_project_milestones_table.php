@@ -16,7 +16,9 @@ return new class extends Migration
             $table->foreignId('project_id')->constrained()->onDelete('cascade'); // Link to projects
             $table->string('name');
             $table->text('description')->nullable();
+            $table->date('start_date')->nullable()->after('description');
             $table->date('due_date')->nullable();
+            $table->decimal('billing_percentage', 5, 2)->nullable()->after('due_date');
             $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
             $table->timestamps();
         });

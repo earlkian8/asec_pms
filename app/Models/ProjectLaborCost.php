@@ -12,6 +12,7 @@ class ProjectLaborCost extends Model
         'work_date',
         'hours_worked',
         'hourly_rate',
+        'total_cost',
         'description',
         'notes',
         'created_by',
@@ -38,9 +39,24 @@ class ProjectLaborCost extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // Calculate total cost
-    public function getTotalCostAttribute()
+    // Auto-calculate total_cost before saving
+    protected static function boot()
     {
+        parent::boot();
+
+        static::saving(function ($model) {
+            if ($model->hours_worked && $model->hourly_rate) {
+                $model->total_cost = $model->hours_worked * $model->hourly_rate;
+            }
+        });
+    }
+
+    // Calculate total cost (fallback if not saved)
+    public function getTotalCostAttribute($value)
+    {
+        if ($value !== null) {
+            return $value;
+        }
         return $this->hours_worked * $this->hourly_rate;
     }
 }

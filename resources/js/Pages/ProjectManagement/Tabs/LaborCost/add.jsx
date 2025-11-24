@@ -33,12 +33,9 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
     const user = teamMembers.find(m => m.id === parseInt(userId));
     setSelectedUser(user);
     
-    // Auto-fill hourly rate from project team if available
-    if (user) {
-      const teamMember = project.team?.find(t => t.user_id === user.id);
-      if (teamMember?.hourly_rate) {
-        setData("hourly_rate", teamMember.hourly_rate);
-      }
+    // Auto-fill hourly rate from team member if available
+    if (user && user.hourly_rate) {
+      setData("hourly_rate", user.hourly_rate);
     }
   };
 
@@ -83,7 +80,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Employee */}
           <div>
-            <Label className="text-zinc-800">Employee *</Label>
+            <Label className="text-zinc-800">Employee <span class="text-red-500">*</span></Label>
             <Select
               value={data.user_id}
               onValueChange={handleUserChange}
@@ -110,7 +107,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
 
           {/* Work Date */}
           <div>
-            <Label className="text-zinc-800">Work Date *</Label>
+            <Label className="text-zinc-800">Work Date <span class="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.work_date}
@@ -122,7 +119,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
 
           {/* Hours Worked */}
           <div>
-            <Label className="text-zinc-800">Hours Worked *</Label>
+            <Label className="text-zinc-800">Hours Worked <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -139,7 +136,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
 
           {/* Hourly Rate */}
           <div>
-            <Label className="text-zinc-800">Hourly Rate *</Label>
+            <Label className="text-zinc-800">Hourly Rate <span class="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"

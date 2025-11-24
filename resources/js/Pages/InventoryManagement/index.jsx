@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 import { Trash2, SquarePen, Package, ArrowDownToLine, ArrowUpFromLine, AlertCircle } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 import { usePermission } from '@/utils/permissions';
 import AddInventoryItem from './add';
 import EditInventoryItem from './edit';
@@ -21,7 +22,7 @@ import StockOut from './stock-out';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
-export default function InventoryManagement({ items, search: initialSearch, projects, transactions, transactionsSearch: initialTransactionsSearch }) {
+export default function InventoryManagement({ items, search: initialSearch, projects, transactions, transactionsSearch: initialTransactionsSearch, receivingReports, receivingReportsSearch: initialReceivingReportsSearch }) {
   const { has } = usePermission();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -34,11 +35,14 @@ export default function InventoryManagement({ items, search: initialSearch, proj
   const [stockOutItem, setStockOutItem] = useState(null);
   const [search, setSearch] = useState(initialSearch || '');
   const [transactionsSearch, setTransactionsSearch] = useState(initialTransactionsSearch || '');
+  const [receivingReportsSearch, setReceivingReportsSearch] = useState(initialReceivingReportsSearch || '');
   const [activeTab, setActiveTab] = useState('items');
   const [currentPage, setCurrentPage] = useState(1);
   const [transactionsPage, setTransactionsPage] = useState(1);
+  const [receivingReportsPage, setReceivingReportsPage] = useState(1);
   const itemsPerPage = 15;
   const transactionsPerPage = 20;
+  const receivingReportsPerPage = 20;
 
   const breadcrumbs = [
     { title: "Home", href: route("dashboard") },
@@ -47,6 +51,7 @@ export default function InventoryManagement({ items, search: initialSearch, proj
 
   const inventoryItems = items?.data || [];
   const transactionList = transactions?.data || [];
+  const receivingReportsList = receivingReports?.data || [];
 
   // Frontend filtering for items
   const filteredItems = useMemo(() => {
@@ -73,6 +78,20 @@ export default function InventoryManagement({ items, search: initialSearch, proj
     });
   }, [transactionsSearch, transactionList]);
 
+  // Frontend filtering for receiving reports
+  const filteredReceivingReports = useMemo(() => {
+    if (!receivingReportsSearch) return receivingReportsList;
+    const query = receivingReportsSearch.toLowerCase();
+    return receivingReportsList.filter(report => {
+      const itemName = (report.material_allocation?.inventory_item?.item_name || '').toLowerCase();
+      const itemCode = (report.material_allocation?.inventory_item?.item_code || '').toLowerCase();
+      const projectName = (report.material_allocation?.project?.project_name || '').toLowerCase();
+      const projectCode = (report.material_allocation?.project?.project_code || '').toLowerCase();
+      const notes = (report.notes || '').toLowerCase();
+      return itemName.includes(query) || itemCode.includes(query) || projectName.includes(query) || projectCode.includes(query) || notes.includes(query);
+    });
+  }, [receivingReportsSearch, receivingReportsList]);
+
   // Pagination calculations for items
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIdx = (currentPage - 1) * itemsPerPage;
@@ -84,6 +103,12 @@ export default function InventoryManagement({ items, search: initialSearch, proj
   const transactionsStartIdx = (transactionsPage - 1) * transactionsPerPage;
   const transactionsEndIdx = transactionsStartIdx + transactionsPerPage;
   const paginatedTransactions = filteredTransactions.slice(transactionsStartIdx, transactionsEndIdx);
+
+  // Pagination calculations for receiving reports
+  const totalReceivingReportsPages = Math.ceil(filteredReceivingReports.length / receivingReportsPerPage);
+  const receivingReportsStartIdx = (receivingReportsPage - 1) * receivingReportsPerPage;
+  const receivingReportsEndIdx = receivingReportsStartIdx + receivingReportsPerPage;
+  const paginatedReceivingReports = filteredReceivingReports.slice(receivingReportsStartIdx, receivingReportsEndIdx);
 
   const handleSearch = (e) => {
     setSearch(e.target.value);
@@ -103,6 +128,15 @@ export default function InventoryManagement({ items, search: initialSearch, proj
     );
   };
 
+  const handleReceivingReportsSearch = (e) => {
+    setReceivingReportsSearch(e.target.value);
+    setReceivingReportsPage(1);
+    router.get(route('inventory-management.index'), 
+      { receiving_reports_search: e.target.value },
+      { preserveState: true, replace: true }
+    );
+  };
+
   const goToPage = (page) => {
     const pageNum = Math.max(1, Math.min(page, totalPages));
     setCurrentPage(pageNum);
@@ -111,6 +145,11 @@ export default function InventoryManagement({ items, search: initialSearch, proj
   const goToTransactionsPage = (page) => {
     const pageNum = Math.max(1, Math.min(page, totalTransactionsPages));
     setTransactionsPage(pageNum);
+  };
+
+  const goToReceivingReportsPage = (page) => {
+    const pageNum = Math.max(1, Math.min(page, totalReceivingReportsPages));
+    setReceivingReportsPage(pageNum);
   };
 
   const formatNumber = (num) => {
@@ -129,9 +168,21 @@ export default function InventoryManagement({ items, search: initialSearch, proj
     return types[type] || type;
   };
 
+  // Handle Status Toggle
+  const handleStatusChange = (item, newStatus) => {
+    router.put(route('inventory-management.update-status', item.id), {
+      is_active: newStatus,
+    }, {
+      preserveScroll: true,
+      onSuccess: () => toast.success('Item status updated successfully!'),
+      onError: () => toast.error('Failed to update status.'),
+    });
+  };
+
   const tabs = [
     { key: 'items', label: 'Items' },
     { key: 'transactions', label: 'Transactions' },
+    { key: 'receiving-reports', label: 'Receiving Reports' },
   ];
 
   const currentTab = tabs.find(t => t.key === activeTab);
@@ -240,13 +291,30 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                               {item.unit_price ? `₱${formatNumber(item.unit_price)}` : '---'}
                             </TableCell>
                             <TableCell>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                item.is_active 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {item.is_active ? 'Active' : 'Inactive'}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                {has('inventory.update') ? (
+                                  <>
+                                    <Switch
+                                      checked={item.is_active}
+                                      onCheckedChange={(checked) => handleStatusChange(item, checked)}
+                                      className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+                                    />
+                                    <span
+                                      className={`text-xs font-medium ${item.is_active ? 'text-green-600' : 'text-red-600'}`}
+                                    >
+                                      {item.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    item.is_active 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {item.is_active ? 'Active' : 'Inactive'}
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
@@ -261,9 +329,16 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                                 )}
                                 {has('inventory.stock-out') && (
                                   <button
-                                    onClick={() => { setStockOutItem(item); setShowStockOutModal(true); }}
-                                    className="p-2 rounded hover:bg-orange-100 text-orange-600 hover:text-orange-700 transition"
-                                    title="Stock Out"
+                                    onClick={() => {
+                                      if (item.current_stock <= 0) {
+                                        toast.error(`Cannot pull out stock. Item "${item.item_name}" has no available stock.`);
+                                        return;
+                                      }
+                                      setStockOutItem(item);
+                                      setShowStockOutModal(true);
+                                    }}
+                                    className="p-2 rounded hover:bg-orange-100 text-orange-600 hover:text-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={item.current_stock <= 0 ? "No stock available" : "Stock Out"}
                                     disabled={item.current_stock <= 0}
                                   >
                                     <ArrowUpFromLine size={18} />
@@ -349,7 +424,7 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                   </div>
                 )}
               </>
-            ) : (
+            ) : activeTab === 'transactions' ? (
               <>
                 {/* Transactions Tab */}
                 <div className="py-2 mb-4">
@@ -473,6 +548,142 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                         variant="outline"
                         onClick={() => goToTransactionsPage(transactionsPage + 1)}
                         disabled={transactionsPage === totalTransactionsPages}
+                        className="px-3 py-1 h-auto"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Receiving Reports Tab */}
+                <div className="py-2 mb-4">
+                  <Input
+                    placeholder="Search receiving reports by item name, code, project, or notes..."
+                    value={receivingReportsSearch}
+                    onChange={handleReceivingReportsSearch}
+                    className="focus:border-gray-800 focus:ring-2 focus:ring-gray-800 w-full sm:max-w-md"
+                  />
+                </div>
+
+                {/* Receiving Reports Table */}
+                <div className="overflow-x-auto rounded-lg">
+                  <Table className="min-w-[1200px] w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Condition</TableHead>
+                        <TableHead>Received By</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedReceivingReports.length > 0 ? (
+                        paginatedReceivingReports.map(report => {
+                          // Handle both snake_case (Inertia default) and camelCase
+                          const allocation = report.material_allocation || report.materialAllocation || {};
+                          const item = allocation?.inventory_item || allocation?.inventoryItem || {};
+                          const project = allocation?.project || {};
+                          const receivedBy = report.received_by || report.receivedBy || {};
+                          
+                          return (
+                            <TableRow key={report.id} className="hover:bg-gray-50 transition">
+                              <TableCell>{formatDate(report.received_at)}</TableCell>
+                              <TableCell>
+                                {item && (item.item_name || item.item_code) ? (
+                                  <div>
+                                    <div className="font-medium">{item.item_name || '---'}</div>
+                                    <div className="text-xs text-gray-500">{item.item_code || ''}</div>
+                                  </div>
+                                ) : (
+                                  '---'
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {project && project.project_code ? (
+                                  <div>
+                                    <div className="font-medium">{project.project_code}</div>
+                                    <div className="text-xs text-gray-500">{project.project_name || ''}</div>
+                                  </div>
+                                ) : (
+                                  '---'
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {formatNumber(report.quantity_received)} {item.unit_of_measure || 'units'}
+                              </TableCell>
+                              <TableCell>
+                                {report.condition ? (
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    report.condition.toLowerCase() === 'good' 
+                                      ? 'bg-green-100 text-green-800'
+                                      : report.condition.toLowerCase() === 'damaged'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-green-100 text-gray-800'
+                                  }`}>
+                                    {report.condition}
+                                  </span>
+                                ) : (
+                                  '---'
+                                )}
+                              </TableCell>
+                              <TableCell>{receivedBy.name || '---'}</TableCell>
+                              <TableCell className="max-w-xs truncate">{report.notes || '---'}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-4 text-gray-500">
+                            No receiving reports found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Receiving Reports Pagination */}
+                {filteredReceivingReports.length > 0 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-gray-600">
+                      Showing {receivingReportsStartIdx + 1} to {Math.min(receivingReportsEndIdx, filteredReceivingReports.length)} of {filteredReceivingReports.length} receiving reports
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => goToReceivingReportsPage(receivingReportsPage - 1)}
+                        disabled={receivingReportsPage === 1}
+                        className="px-3 py-1 h-auto"
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalReceivingReportsPages }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => goToReceivingReportsPage(page)}
+                            className={`px-3 py-1 rounded text-sm font-medium transition ${
+                              receivingReportsPage === page
+                                ? 'bg-zinc-700 text-white'
+                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        onClick={() => goToReceivingReportsPage(receivingReportsPage + 1)}
+                        disabled={receivingReportsPage === totalReceivingReportsPages}
                         className="px-3 py-1 h-auto"
                       >
                         Next

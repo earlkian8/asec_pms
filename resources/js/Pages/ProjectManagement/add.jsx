@@ -14,7 +14,6 @@ import Step1ProjectInfo from "./wizard-steps/Step1ProjectInfo";
 import Step2TeamMembers from "./wizard-steps/Step2TeamMembers";
 import Step3Milestones from "./wizard-steps/Step3Milestones";
 import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
-import Step5LaborCost from "./wizard-steps/Step5LaborCost";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) => {
@@ -25,8 +24,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
     "Project Information",
     "Team Members",
     "Milestones",
-    "Material Allocation",
-    "Labor Cost"
+    "Material Allocation"
   ];
 
   const handleSubmit = () => {
@@ -38,7 +36,6 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
       team_members: allData.teamMembers,
       milestones: allData.milestones,
       material_allocations: allData.materialAllocations,
-      labor_costs: allData.laborCosts,
     }, {
       preserveScroll: true,
       onSuccess: (page) => {
@@ -69,8 +66,6 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
         return <Step3Milestones />;
       case 4:
         return <Step4MaterialAllocation inventoryItems={inventoryItems} />;
-      case 5:
-        return <Step5LaborCost users={users} />;
       default:
         return null;
     }

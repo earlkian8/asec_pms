@@ -15,6 +15,7 @@ class Client extends Model
         'client_type',
         'contact_person',
         'email',
+        'password',
         'phone_number',
         'address',
         'city',
@@ -27,6 +28,10 @@ class Client extends Model
         'payment_terms',
         'is_active',
         'notes',
+    ];
+
+    protected $hidden = [
+        'password',
     ];
 
     public function projects()

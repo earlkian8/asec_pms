@@ -11,6 +11,7 @@ class ProjectMaterialAllocation extends Model
         'inventory_item_id',
         'quantity_allocated',
         'quantity_received',
+        'quantity_remaining',
         'status',
         'allocated_by',
         'allocated_at',
@@ -46,6 +47,27 @@ class ProjectMaterialAllocation extends Model
     public function transactions()
     {
         return $this->hasMany(InventoryTransaction::class);
+    }
+
+    // Auto-calculate quantity_remaining before saving
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($model) {
+            if ($model->quantity_allocated !== null && $model->quantity_received !== null) {
+                $model->quantity_remaining = $model->quantity_allocated - $model->quantity_received;
+            }
+        });
+    }
+
+    // Calculate quantity remaining (fallback if not saved)
+    public function getQuantityRemainingAttribute($value)
+    {
+        if ($value !== null) {
+            return $value;
+        }
+        return $this->quantity_allocated - $this->quantity_received;
     }
 
     // Update status based on received quantity

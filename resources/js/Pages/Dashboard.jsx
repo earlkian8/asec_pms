@@ -39,19 +39,19 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
   const { has } = usePermission();
 
   // Check if user has permission to view dashboard
-  if (!has('dashboard.view')) {
-    return (
-      <AuthenticatedLayout>
-        <Head title="Dashboard" />
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">You don't have permission to view the dashboard.</p>
-          </div>
-        </div>
-      </AuthenticatedLayout>
-    );
-  }
+  // if (!has('dashboard.view')) {
+  //   return (
+  //     <AuthenticatedLayout>
+  //       <Head title="Dashboard" />
+  //       <div className="flex items-center justify-center py-12">
+  //         <div className="text-center">
+  //           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+  //           <p className="text-gray-500">You don't have permission to view the dashboard.</p>
+  //         </div>
+  //       </div>
+  //     </AuthenticatedLayout>
+  //   );
+  // }
 
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return '₱0.00';
@@ -531,7 +531,6 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                         <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${getStatusColor(project.status)}`}>
                           {project.status?.replace('_', ' ')}
                         </span>
-                        <p className="text-xs text-gray-500 mt-1">{formatPercentage(project.completion_percentage)}</p>
                       </div>
                     </div>
                   </div>

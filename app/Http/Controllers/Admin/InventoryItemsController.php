@@ -35,9 +35,14 @@ class InventoryItemsController extends Controller
         // Get transactions data for the transactions tab
         $transactionsData = $this->inventoryService->getTransactions();
 
+        // Get receiving reports data for the receiving reports tab
+        $receivingReportsData = $this->inventoryService->getReceivingReports();
+
         $data['projects'] = $projects;
         $data['transactions'] = $transactionsData['transactions'];
         $data['transactionsSearch'] = $transactionsData['search'];
+        $data['receivingReports'] = $receivingReportsData['receivingReports'];
+        $data['receivingReportsSearch'] = $receivingReportsData['search'];
 
         return Inertia::render('InventoryManagement/index', $data);
     }
@@ -51,6 +56,8 @@ class InventoryItemsController extends Controller
             'unit_of_measure' => 'required|string|max:50',
             'min_stock_level' => 'nullable|numeric|min:0',
             'unit_price' => 'nullable|numeric|min:0',
+            'initial_stock' => 'nullable|numeric|min:0',
+            'initial_stock_unit_price' => 'nullable|numeric|min:0',
             'is_active' => 'boolean',
         ]);
 
@@ -62,15 +69,36 @@ class InventoryItemsController extends Controller
 
         $data['item_code'] = $itemCode;
         $data['created_by'] = auth()->id();
-        $data['current_stock'] = 0;
+        $initialStock = $data['initial_stock'] ?? 0;
+        $initialStockUnitPrice = $data['initial_stock_unit_price'] ?? null;
+        $data['current_stock'] = $initialStock;
         $data['is_active'] = $data['is_active'] ?? true;
 
+        // Remove initial stock fields from item data
+        unset($data['initial_stock'], $data['initial_stock_unit_price']);
+
         $item = InventoryItem::create($data);
+
+        // If initial stock is provided, create a stock_in transaction
+        if ($initialStock > 0) {
+            InventoryTransaction::create([
+                'inventory_item_id' => $item->id,
+                'transaction_type' => 'stock_in',
+                'quantity' => $initialStock,
+                'unit_price' => $initialStockUnitPrice,
+                'transaction_date' => now(),
+                'notes' => 'Initial stock - Item creation',
+                'created_by' => auth()->id(),
+            ]);
+
+            // Update current stock
+            $this->inventoryService->updateItemStock($item);
+        }
 
         $this->adminActivityLogs(
             'Inventory Item',
             'Created',
-            'Created inventory item "' . $item->item_name . '" with code "' . $item->item_code . '"'
+            'Created inventory item "' . $item->item_name . '" with code "' . $item->item_code . '"' . ($initialStock > 0 ? ' with initial stock of ' . $initialStock : '')
         );
 
         return back()->with('success', 'Inventory item created successfully');
@@ -105,9 +133,13 @@ class InventoryItemsController extends Controller
         $itemName = $inventoryItem->item_name;
         $itemCode = $inventoryItem->item_code;
 
-        // Check if item has transactions
-        if ($inventoryItem->transactions()->count() > 0) {
-            return back()->with('error', 'Cannot delete item with existing transactions. Please delete transactions first.');
+        // Check if item has transactions (only if table exists)
+        try {
+            if ($inventoryItem->transactions()->count() > 0) {
+                return back()->with('error', 'Cannot delete item with existing transactions. Please delete transactions first.');
+            }
+        } catch (\Exception $e) {
+            // Table doesn't exist, proceed with deletion
         }
 
         $inventoryItem->delete();
@@ -224,6 +256,25 @@ class InventoryItemsController extends Controller
         );
 
         return back()->with('success', 'Stock removed successfully');
+    }
+
+    public function updateStatus(Request $request, InventoryItem $inventoryItem)
+    {
+        $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $inventoryItem->update([
+            'is_active' => $request->input('is_active'),
+        ]);
+
+        $this->adminActivityLogs(
+            'Inventory Item',
+            'Update Status',
+            'Updated inventory item "' . $inventoryItem->item_name . '" status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
+        );
+
+        return back()->with('success', 'Inventory item status updated successfully.');
     }
 
     public function transactions(Request $request)

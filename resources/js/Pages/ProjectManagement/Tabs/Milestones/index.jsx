@@ -42,6 +42,7 @@ import DeleteProgressUpdate from '../ProgressUpdate/delete';
 import AddIssue from '../Issues/add';
 import EditIssue from '../Issues/edit';
 import DeleteIssue from '../Issues/delete';
+import TaskDetailModal from '../Tasks/TaskDetailModal';
 
 export default function MilestonesTab({ project, milestoneData }) {
   const { has } = usePermission();
@@ -76,6 +77,10 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [showDeleteIssueModal, setShowDeleteIssueModal] = useState(false);
   const [editIssue, setEditIssue] = useState(null);
   const [deleteIssue, setDeleteIssue] = useState(null);
+  
+  // Task detail modal
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -474,7 +479,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                 <TableHead className="font-semibold text-gray-700">Due Date</TableHead>
                 <TableHead className="font-semibold text-gray-700">Progress</TableHead>
                 <TableHead className="font-semibold text-gray-700">Tasks</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-right w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -544,8 +549,8 @@ export default function MilestonesTab({ project, milestoneData }) {
                           </div>
                         </TableCell>
                         <TableCell className="relative z-10 text-sm text-gray-600">{tasks.length}</TableCell>
-                        <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
+                        <TableCell className="relative z-10 w-[120px]" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end gap-1 items-center">
                             {has('project-tasks.create') && (
                               <button
                                 onClick={() => {
@@ -657,8 +662,11 @@ export default function MilestonesTab({ project, milestoneData }) {
                           <>
                             <TableRow 
                               key={`task-${task.id}`}
-                              className={`${taskColors.rowClasses} group`}
-                              onClick={() => toggleTask(task.id)}
+                              className={`${taskColors.rowClasses} group cursor-pointer`}
+                              onClick={() => {
+                                setSelectedTaskForDetail(taskWithMilestone);
+                                setShowTaskDetailModal(true);
+                              }}
                             >
                               {/* Colored background overlay starting from indent */}
                               <div 
@@ -667,19 +675,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                               ></div>
                               <TableCell className="relative z-10 pl-8">
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleTask(task.id);
-                                    }}
-                                    className="p-1 hover:bg-gray-200 rounded transition"
-                                  >
-                                    {isTaskExpanded ? (
-                                      <ChevronDown size={14} className="text-gray-600" />
-                                    ) : (
-                                      <ChevronRight size={14} className="text-gray-600" />
-                                    )}
-                                  </button>
+                                  <FileText size={14} className="text-gray-400" />
                                 </div>
                               </TableCell>
                               <TableCell className="relative z-10">
@@ -787,211 +783,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 </div>
                               </TableCell>
                             </TableRow>
-
-                            {/* Whitespace spacer between task and progress updates */}
-                            {isTaskExpanded && (
-                              <TableRow className="bg-white hover:bg-white border-0">
-                                <TableCell colSpan={7} className="p-0 h-1.5 bg-white"></TableCell>
-                              </TableRow>
-                            )}
-                            {/* Progress Updates under task */}
-                            {isTaskExpanded && (
-                              <>
-                                {progressUpdates.length > 0 ? (
-                                  progressUpdates.map(update => {
-                                    const updateColors = getRowColorClasses('progress_update');
-                                    return (
-                              <TableRow 
-                                key={`update-${update.id}`}
-                                className={`${updateColors.rowClasses} group`}
-                              >
-                                {/* Colored background overlay starting from indent */}
-                                <div 
-                                  className={`absolute inset-0 ${updateColors.bgClasses} border-l-4 ${updateColors.borderColor} pointer-events-none`}
-                                  style={{ left: `${updateColors.indent * 4}px` }}
-                                ></div>
-                                <TableCell className="relative z-10 pl-16">
-                                  <div className="flex items-center gap-2">
-                                  </div>
-                                </TableCell>
-                                <TableCell className="relative z-10" colSpan={6}>
-                                  <div className="pl-2 space-y-2">
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <p className="text-sm text-gray-700 font-medium mb-2">{update.description || 'No description'}</p>
-                                        <div className="flex items-center gap-3 text-xs text-gray-500">
-                                          {update.file_path && getDownloadUrl(update, taskWithMilestone) ? (
-                                            <>
-                                              {getFileIcon(update)}
-                                              <a
-                                                href={getDownloadUrl(update, taskWithMilestone)}
-                                                className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                              >
-                                                {update.original_name || 'Download File'}
-                                              </a>
-                                              {update.file_size && (
-                                                <span>• {formatFileSize(update.file_size)}</span>
-                                              )}
-                                            </>
-                                          ) : (
-                                            <span className="text-gray-400">No file attached</span>
-                                          )}
-                                          <span>• By {update.createdBy?.name || 'Unknown'}</span>
-                                          <span>• {formatDate(update.created_at)}</span>
-                                        </div>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        {update.file_path && getDownloadUrl(update, taskWithMilestone) && has('progress-updates.view') && (
-                                          <a
-                                            href={getDownloadUrl(update, taskWithMilestone)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                          >
-                                            <button
-                                              className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
-                                              title="Download File"
-                                            >
-                                              <Download size={14} />
-                                            </button>
-                                          </a>
-                                        )}
-                                        {has('progress-updates.update') && (
-                                          <button
-                                            onClick={() => {
-                                              setEditProgressUpdate({
-                                                ...update,
-                                                task: update.task || taskWithMilestone
-                                              });
-                                              setShowEditProgressModal(true);
-                                            }}
-                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
-                                            title="Edit Update"
-                                          >
-                                            <SquarePen size={14} />
-                                          </button>
-                                        )}
-                                        {has('progress-updates.delete') && (
-                                          <button
-                                            onClick={() => {
-                                              setDeleteProgressUpdate({
-                                                ...update,
-                                                task: update.task || taskWithMilestone
-                                              });
-                                              setShowDeleteProgressModal(true);
-                                            }}
-                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
-                                            title="Delete Update"
-                                          >
-                                            <Trash2 size={14} />
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                                    );
-                                  })
-                                ) : (
-                                  <TableRow className="bg-teal-50/20 hover:bg-teal-50/30 border-l-4 border-teal-200 transition">
-                                    <TableCell className="pl-16">
-                                      <div className="flex items-center gap-2">
-                                      </div>
-                                    </TableCell>
-                                    <TableCell colSpan={6}>
-                                      <div className="pl-2 py-4">
-                                        <div className="flex items-center gap-3 text-sm text-gray-500">
-                                          <FileText size={16} className="text-gray-400" />
-                                          <span>No progress updates yet. Click the + button to add one.</span>
-                                        </div>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                              </>
-                            )}
-                            
-                            {/* Whitespace spacer between task and issues */}
-                            {isTaskExpanded && taskIssues.length > 0 && (
-                              <>
-                                <TableRow className="bg-white hover:bg-white border-0">
-                                  <TableCell colSpan={7} className="p-0 h-1.5 bg-white"></TableCell>
-                                </TableRow>
-                                {taskIssues.map(issue => {
-                                  const issueColors = getRowColorClasses('issue', issue.priority);
-                                  return (
-                                  <TableRow 
-                                    key={`task-issue-${issue.id}`}
-                                    className={`${issueColors.rowClasses} group`}
-                                  >
-                                    {/* Colored background overlay starting from indent */}
-                                    <div 
-                                      className={`absolute inset-0 ${issueColors.bgClasses} border-l-4 ${issueColors.borderColor} pointer-events-none`}
-                                      style={{ left: `${issueColors.indent * 4}px` }}
-                                    ></div>
-                                    <TableCell className="relative z-10 pl-16">
-                                      <div className="flex items-center gap-2">
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="relative z-10" colSpan={6}>
-                                      <div className="pl-2 space-y-2">
-                                        <div className="flex items-start justify-between">
-                                          <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                              <AlertCircle size={14} className="text-orange-600" />
-                                              <p className="text-sm text-gray-700 font-medium">{issue.title || 'Untitled Issue'}</p>
-                                            </div>
-                                            {issue.description && (
-                                              <p className="text-xs text-gray-600 mb-2">{issue.description}</p>
-                                            )}
-                                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                                              <span>Priority: {issue.priority || 'Medium'}</span>
-                                              <span>• Status: {issue.status || 'Open'}</span>
-                                              {issue.reportedBy && (
-                                                <span>• Reported by: {issue.reportedBy.name}</span>
-                                              )}
-                                              {issue.assignedTo && (
-                                                <span>• Assigned to: {issue.assignedTo.name}</span>
-                                              )}
-                                              <span>• {formatDate(issue.created_at)}</span>
-                                            </div>
-                                          </div>
-                                          <div className="flex gap-1">
-                                            {has('project-issues.update') && (
-                                              <button
-                                                onClick={() => {
-                                                  setEditIssue(issue);
-                                                  setShowEditIssueModal(true);
-                                                }}
-                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
-                                                title="Edit Issue"
-                                              >
-                                                <SquarePen size={14} />
-                                              </button>
-                                            )}
-                                            {has('project-issues.delete') && (
-                                              <button
-                                                onClick={() => {
-                                                  setDeleteIssue(issue);
-                                                  setShowDeleteIssueModal(true);
-                                                }}
-                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
-                                                title="Delete Issue"
-                                              >
-                                                <Trash2 size={14} />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                  );
-                                })}
-                              </>
-                            )}
                           </>
                         );
                       })}
@@ -1201,6 +992,24 @@ export default function MilestonesTab({ project, milestoneData }) {
         />
       )}
 
+      {/* Task Detail Modal */}
+      {showTaskDetailModal && selectedTaskForDetail && (
+        <TaskDetailModal
+          task={selectedTaskForDetail}
+          isOpen={showTaskDetailModal}
+          onClose={() => {
+            setShowTaskDetailModal(false);
+            setSelectedTaskForDetail(null);
+          }}
+          project={project}
+          milestones={milestones}
+          users={users}
+          allTasks={allTasks}
+          onRefresh={() => {
+            router.reload({ only: ['milestoneData'] });
+          }}
+        />
+      )}
     </div>
   );
 }

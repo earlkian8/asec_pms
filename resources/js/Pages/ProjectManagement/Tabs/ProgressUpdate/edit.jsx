@@ -52,9 +52,22 @@ const EditProgressUpdate = ({ setShowEditModal, progressUpdate, tasks = [] }) =>
       return;
     }
 
+    // Ensure description is always included and not empty
+    const trimmedDescription = (data.description || "").trim();
+    if (!trimmedDescription) {
+      toast.error("Description is required");
+      return;
+    }
+
+    // Update the form data with trimmed description to ensure it's always sent
+    setData("description", trimmedDescription);
+
+    // Only use forceFormData if there's a file, otherwise use regular form submission
+    const hasFile = data.file !== null;
+    
     put(route("project-management.progress-updates.update", [task.milestone.id, task.id, progressUpdate.id]), {
       preserveScroll: true,
-      forceFormData: true,
+      forceFormData: hasFile,
       onSuccess: () => {
         setShowEditModal(false);
         toast.success("Progress update updated successfully!");
@@ -64,7 +77,14 @@ const EditProgressUpdate = ({ setShowEditModal, progressUpdate, tasks = [] }) =>
           router.reload({ only: ['milestoneData'] });
         }, 100);
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: (errors) => {
+        console.error('Progress update errors:', errors);
+        if (errors.description) {
+          toast.error(errors.description);
+        } else {
+          toast.error("Please check the form for errors");
+        }
+      },
     });
   };
 
@@ -108,10 +128,11 @@ const EditProgressUpdate = ({ setShowEditModal, progressUpdate, tasks = [] }) =>
           <div>
             <Label>Description <span className="text-red-500">*</span></Label>
             <Textarea
-              value={data.description}
+              value={data.description || ""}
               onChange={(e) => setData("description", e.target.value)}
               placeholder="Enter progress update description"
               className={inputClass(errors.description)}
+              rows={4}
               required
             />
             <InputError message={errors.description} />

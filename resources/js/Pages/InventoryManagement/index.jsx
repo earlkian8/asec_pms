@@ -632,7 +632,20 @@ export default function InventoryManagement({ items, search: initialSearch, proj
                                   '---'
                                 )}
                               </TableCell>
-                              <TableCell>{receivedBy.name || '---'}</TableCell>
+                              <TableCell>
+                                {receivedBy.name ? (
+                                  <div>
+                                    <div className="font-medium">{receivedBy.name}</div>
+                                    {receivedBy.roles && receivedBy.roles.length > 0 && (
+                                      <div className="text-xs text-gray-500">
+                                        {receivedBy.roles.map(role => role.name).join(', ')}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  '---'
+                                )}
+                              </TableCell>
                               <TableCell className="max-w-xs truncate">{report.notes || '---'}</TableCell>
                             </TableRow>
                           );

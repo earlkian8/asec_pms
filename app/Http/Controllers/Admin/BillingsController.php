@@ -36,9 +36,8 @@ class BillingsController extends Controller
             $data = array_merge($data, $transactionsData);
         }
         
-        // Get all billable projects for filter dropdown
-        $projects = Project::where('is_billable', true)
-            ->with('milestones:id,project_id,name,billing_percentage')
+        // Get all projects for filter dropdown
+        $projects = Project::with('milestones:id,project_id,name,billing_percentage')
             ->orderBy('project_name', 'asc')
             ->get(['id', 'project_code', 'project_name', 'billing_type', 'contract_amount']);
 
@@ -60,11 +59,8 @@ class BillingsController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
-        // Verify project is billable
+        // Get project
         $project = Project::findOrFail($validated['project_id']);
-        if (!$project->is_billable) {
-            return back()->with('error', 'This project is not billable.');
-        }
 
         // Verify billing type matches project billing type
         if ($project->billing_type !== $validated['billing_type']) {

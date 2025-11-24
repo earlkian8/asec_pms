@@ -124,14 +124,12 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
               type="number"
               step="0.01"
               min="0.01"
-              max="24"
               value={data.hours_worked}
               onChange={(e) => setData("hours_worked", e.target.value)}
-              placeholder="Enter hours (max: 24)"
+              placeholder="Enter hours worked"
               className={inputClass(errors.hours_worked)}
             />
             <InputError message={errors.hours_worked} />
-            <p className="text-xs text-gray-500 mt-1">Maximum: 24 hours per day</p>
           </div>
 
           {/* Hourly Rate */}

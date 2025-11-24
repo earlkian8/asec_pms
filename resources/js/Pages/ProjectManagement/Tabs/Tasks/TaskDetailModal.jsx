@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { usePage } from '@inertiajs/react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import DeleteIssue from '../Issues/delete';
 
 const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, allTasks, onRefresh }) => {
   const { has } = usePermission();
+  const { props } = usePage();
   const [showAddProgressModal, setShowAddProgressModal] = useState(false);
   const [showEditProgressModal, setShowEditProgressModal] = useState(false);
   const [showDeleteProgressModal, setShowDeleteProgressModal] = useState(false);
@@ -29,15 +31,43 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const [editIssue, setEditIssue] = useState(null);
   const [deleteIssue, setDeleteIssue] = useState(null);
 
-  if (!task) return null;
+  // Get fresh task data from milestoneData after reload
+  const getFreshTask = () => {
+    if (!task?.id) return task;
+    const milestoneData = props.milestoneData;
+    if (!milestoneData) return task;
+    
+    // Handle both paginated and non-paginated milestone data
+    const milestones = Array.isArray(milestoneData.milestones) 
+      ? milestoneData.milestones 
+      : (milestoneData.milestones?.data || []);
+    
+    if (!Array.isArray(milestones) || milestones.length === 0) return task;
+    
+    // Find the task in the fresh milestone data
+    for (const milestone of milestones) {
+      if (milestone.tasks && Array.isArray(milestone.tasks)) {
+        const freshTask = milestone.tasks.find(t => t.id === task.id);
+        if (freshTask) {
+          // Ensure the task has the milestone relationship
+          return { ...freshTask, milestone: milestone };
+        }
+      }
+    }
+    return task;
+  };
+
+  const currentTask = getFreshTask();
+
+  if (!currentTask) return null;
 
   // Get progress updates and issues for this task
-  const rawProgressUpdates = task.progressUpdates || task.progress_updates || [];
+  const rawProgressUpdates = currentTask.progressUpdates || currentTask.progress_updates || [];
   const progressUpdates = Array.isArray(rawProgressUpdates) 
     ? rawProgressUpdates 
     : (rawProgressUpdates.data || []);
 
-  const rawTaskIssues = task.issues || task.task_issues || [];
+  const rawTaskIssues = currentTask.issues || currentTask.task_issues || [];
   const taskIssues = Array.isArray(rawTaskIssues) ? rawTaskIssues : [];
 
   const formatDate = (dateString) => {
@@ -63,13 +93,14 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   };
 
   const getDownloadUrl = (update) => {
-    if (!update.file_path || !task.milestone) return null;
-    const milestoneId = task.milestone.id || task.milestone_id;
-    return route('project-management.progress-updates.download', {
-      milestone: milestoneId,
-      task: task.id,
-      update: update.id
-    });
+    if (!update.file_path || !currentTask.milestone) return null;
+    const milestoneId = currentTask.milestone.id || currentTask.milestone_id;
+    if (!milestoneId || !currentTask.id || !update.id) return null;
+    return route('project-management.progress-updates.download', [
+      milestoneId,
+      currentTask.id,
+      update.id
+    ]);
   };
 
   const getStatusBadge = (status) => {
@@ -80,7 +111,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     };
     const config = statusConfig[status] || statusConfig.pending;
     return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text}`}>
+      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     );
@@ -95,7 +126,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     };
     const config = statusConfig[status] || statusConfig.open;
     return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text}`}>
+      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     );
@@ -110,7 +141,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     };
     const config = priorityConfig[priority] || priorityConfig.medium;
     return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text}`}>
+      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     );
@@ -119,93 +150,95 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">{task.title}</DialogTitle>
-            {task.description && (
-              <p className="text-sm text-gray-600 mt-2">{task.description}</p>
+        <DialogContent className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-y-auto p-5">
+          <DialogHeader className="pb-3 border-b border-gray-200">
+            <DialogTitle className="text-lg font-semibold">{currentTask.title}</DialogTitle>
+            {currentTask.description && (
+              <p className="text-sm text-gray-600 mt-1.5">{currentTask.description}</p>
             )}
           </DialogHeader>
 
-          <div className="space-y-6 mt-4">
-            {/* Task Info */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-              <div>
-                <span className="text-sm font-medium text-gray-700">Status:</span>
-                <div className="mt-1">{getStatusBadge(task.status)}</div>
+          <div className="space-y-4 mt-3">
+            {/* Task Info - Compact Horizontal Layout */}
+            <div className="flex items-center gap-4 px-3 py-2 bg-gray-50 rounded border border-gray-200">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-gray-500">Status:</span>
+                {getStatusBadge(currentTask.status)}
               </div>
-              <div>
-                <span className="text-sm font-medium text-gray-700">Due Date:</span>
-                <div className="mt-1 text-sm text-gray-600">{formatDate(task.due_date)}</div>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={14} className="text-gray-400" />
+                <span className="text-sm text-gray-700">{formatDate(currentTask.due_date)}</span>
               </div>
-              <div>
-                <span className="text-sm font-medium text-gray-700">Assigned To:</span>
-                <div className="mt-1 text-sm text-gray-600">
-                  {task.assignedUser?.name || task.assigned_user?.name || 'Unassigned'}
-                </div>
+              <div className="flex items-center gap-1.5">
+                <User size={14} className="text-gray-400" />
+                <span className="text-sm text-gray-700">
+                  {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
+                </span>
               </div>
-              <div>
-                <span className="text-sm font-medium text-gray-700">Milestone:</span>
-                <div className="mt-1 text-sm text-gray-600">
-                  {task.milestone?.name || 'N/A'}
-                </div>
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <span className="text-xs font-medium text-gray-500">Milestone:</span>
+                <span className="text-sm text-gray-700 truncate">
+                  {currentTask.milestone?.name || 'N/A'}
+                </span>
               </div>
             </div>
 
-            {/* Progress Updates Section */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Progress Updates ({progressUpdates.length})</h3>
+            {/* Progress Updates Section - Full Width Vertical */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900">
+                  Progress Updates
+                  <span className="text-gray-500 font-normal ml-1.5">({progressUpdates.length})</span>
+                </h3>
                 {has('progress-updates.create') && (
                   <Button
                     onClick={() => setShowAddProgressModal(true)}
                     size="sm"
-                    className="flex items-center gap-2"
+                    className="h-8 px-3 text-xs"
                   >
-                    <Plus size={16} />
-                    Add Progress Update
+                    <Plus size={14} className="mr-1.5" />
+                    Add Update
                   </Button>
                 )}
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
                 {progressUpdates.length > 0 ? (
-                  progressUpdates.map((update) => (
-                    <div key={update.id} className="border rounded-lg p-4 bg-white hover:bg-gray-50 transition">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-700 mb-2">{update.description || 'No description'}</p>
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                  progressUpdates.map((update, idx) => (
+                    <div key={update.id} className="border border-gray-200 rounded-md p-3 bg-white hover:bg-gray-50 transition-colors group">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-800 mb-2 leading-relaxed">{update.description || 'No description'}</p>
+                          <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500">
                             {update.file_path && getDownloadUrl(update) ? (
                               <>
                                 {getFileIcon(update)}
                                 <a
                                   href={getDownloadUrl(update)}
-                                  className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
                                   {update.original_name || 'Download File'}
                                 </a>
                                 {update.file_size && (
-                                  <span>• {formatFileSize(update.file_size)}</span>
+                                  <span className="text-gray-400">• {formatFileSize(update.file_size)}</span>
                                 )}
                               </>
-                            ) : (
-                              <span className="text-gray-400">No file attached</span>
-                            )}
-                            <span>• By {update.createdBy?.name || 'Unknown'}</span>
-                            <span>• {formatDate(update.created_at)}</span>
+                            ) : null}
+                            <span className="text-gray-400">{update.createdBy?.name || 'Unknown'}</span>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-400">{formatDate(update.created_at)}</span>
                           </div>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           {update.file_path && getDownloadUrl(update) && has('progress-updates.view') && (
                             <a
                               href={getDownloadUrl(update)}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                                 <Download size={14} />
                               </Button>
                             </a>
@@ -214,11 +247,11 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => {
                                 setEditProgressUpdate({
                                   ...update,
-                                  task: task
+                                  task: currentTask
                                 });
                                 setShowEditProgressModal(true);
                               }}
@@ -230,11 +263,11 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
                               onClick={() => {
                                 setDeleteProgressUpdate({
                                   ...update,
-                                  task: task
+                                  task: currentTask
                                 });
                                 setShowDeleteProgressModal(true);
                               }}
@@ -247,81 +280,84 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                  <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 rounded-md border border-gray-200">
                     No progress updates yet
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Issues Section - Grid View */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Issues ({taskIssues.length})</h3>
+            {/* Issues Section - Full Width Vertical */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900">
+                  Issues
+                  <span className="text-gray-500 font-normal ml-1.5">({taskIssues.length})</span>
+                </h3>
                 {has('project-issues.create') && (
                   <Button
                     onClick={() => setShowAddIssueModal(true)}
                     size="sm"
-                    className="flex items-center gap-2"
+                    className="h-8 px-3 text-xs"
                   >
-                    <Plus size={16} />
+                    <Plus size={14} className="mr-1.5" />
                     Add Issue
                   </Button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
                 {taskIssues.length > 0 ? (
                   taskIssues.map((issue) => (
-                    <div key={issue.id} className="border rounded-lg p-4 bg-white hover:bg-gray-50 transition">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-gray-900 line-clamp-2">{issue.title}</h4>
-                        <div className="flex gap-1">
+                    <div key={issue.id} className="border border-gray-200 rounded-md p-3 bg-white hover:bg-gray-50 transition-colors group">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <h4 className="text-sm font-medium text-gray-900 flex-1">{issue.title}</h4>
+                        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           {has('project-issues.update') && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => {
                                 setEditIssue(issue);
                                 setShowEditIssueModal(true);
                               }}
                             >
-                              <SquarePen size={12} />
+                              <SquarePen size={14} />
                             </Button>
                           )}
                           {has('project-issues.delete') && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
                               onClick={() => {
                                 setDeleteIssue(issue);
                                 setShowDeleteIssueModal(true);
                               }}
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={14} />
                             </Button>
                           )}
                         </div>
                       </div>
                       {issue.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2 mb-3">{issue.description}</p>
+                        <p className="text-sm text-gray-600 mb-2 leading-relaxed">{issue.description}</p>
                       )}
-                      <div className="flex flex-wrap gap-2 mb-2">
+                      <div className="flex items-center flex-wrap gap-2 mb-2">
                         {getIssueStatusBadge(issue.status)}
                         {getPriorityBadge(issue.priority)}
                       </div>
-                      <div className="text-xs text-gray-500 space-y-1">
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
                         {issue.assignedTo && (
-                          <div className="flex items-center gap-1">
-                            <User size={12} />
+                          <div className="flex items-center gap-1.5">
+                            <User size={13} />
                             <span>{issue.assignedTo?.name || 'Unassigned'}</span>
                           </div>
                         )}
                         {issue.due_date && (
-                          <div className="flex items-center gap-1">
-                            <Calendar size={12} />
+                          <div className="flex items-center gap-1.5">
+                            <Calendar size={13} />
                             <span>{formatDate(issue.due_date)}</span>
                           </div>
                         )}
@@ -329,7 +365,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                  <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 rounded-md border border-gray-200">
                     No issues yet
                   </div>
                 )}
@@ -342,16 +378,32 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
       {/* Progress Update Modals */}
       {showAddProgressModal && (
         <AddProgressUpdate
-          setShowAddModal={setShowAddProgressModal}
+          setShowAddModal={(value) => {
+            setShowAddProgressModal(value);
+            if (!value && onRefresh) {
+              // Refresh task data after closing modal
+              setTimeout(() => {
+                onRefresh();
+              }, 100);
+            }
+          }}
           project={project}
           tasks={allTasks}
-          preselectedTask={task}
+          preselectedTask={currentTask}
         />
       )}
 
       {showEditProgressModal && editProgressUpdate && (
         <EditProgressUpdate
-          setShowEditModal={setShowEditProgressModal}
+          setShowEditModal={(value) => {
+            setShowEditProgressModal(value);
+            if (!value && onRefresh) {
+              // Refresh task data after closing modal
+              setTimeout(() => {
+                onRefresh();
+              }, 100);
+            }
+          }}
           progressUpdate={editProgressUpdate}
           project={project}
           tasks={allTasks}
@@ -360,27 +412,51 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
       {showDeleteProgressModal && deleteProgressUpdate && (
         <DeleteProgressUpdate
-          setShowDeleteModal={setShowDeleteProgressModal}
+          setShowDeleteModal={(value) => {
+            setShowDeleteProgressModal(value);
+            if (!value && onRefresh) {
+              // Refresh task data after closing modal
+              setTimeout(() => {
+                onRefresh();
+              }, 100);
+            }
+          }}
           progressUpdate={deleteProgressUpdate}
-          task={deleteProgressUpdate.task || task}
+          task={deleteProgressUpdate.task || currentTask}
         />
       )}
 
       {/* Issue Modals */}
       {showAddIssueModal && (
         <AddIssue
-          setShowAddModal={setShowAddIssueModal}
+          setShowAddModal={(value) => {
+            setShowAddIssueModal(value);
+            if (!value && onRefresh) {
+              // Refresh task data after closing modal
+              setTimeout(() => {
+                onRefresh();
+              }, 100);
+            }
+          }}
           project={project}
           milestones={milestones}
           tasks={allTasks}
           users={users}
-          preselectedTask={task}
+          preselectedTask={currentTask}
         />
       )}
 
       {showEditIssueModal && editIssue && (
         <EditIssue
-          setShowEditModal={setShowEditIssueModal}
+          setShowEditModal={(value) => {
+            setShowEditIssueModal(value);
+            if (!value && onRefresh) {
+              // Refresh task data after closing modal
+              setTimeout(() => {
+                onRefresh();
+              }, 100);
+            }
+          }}
           issue={editIssue}
           project={project}
           milestones={milestones}
@@ -391,7 +467,15 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
       {showDeleteIssueModal && deleteIssue && (
         <DeleteIssue
-          setShowDeleteModal={setShowDeleteIssueModal}
+          setShowDeleteModal={(value) => {
+            setShowDeleteIssueModal(value);
+            if (!value && onRefresh) {
+              // Refresh task data after closing modal
+              setTimeout(() => {
+                onRefresh();
+              }, 100);
+            }
+          }}
           issue={deleteIssue}
         />
       )}

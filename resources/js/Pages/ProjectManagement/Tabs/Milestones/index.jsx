@@ -84,6 +84,7 @@ export default function MilestonesTab({ project, milestoneData }) {
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
 
   // Handle both paginated and non-paginated milestone data
   const milestones = Array.isArray(milestoneData.milestones) 
@@ -148,8 +149,10 @@ export default function MilestonesTab({ project, milestoneData }) {
         newExpandedTasks.delete(task.id);
       });
       setExpandedTasks(newExpandedTasks);
+      setSelectedMilestoneId(null);
     } else {
       newExpanded.add(milestoneId);
+      setSelectedMilestoneId(milestoneId);
     }
     setExpandedMilestones(newExpanded);
   };
@@ -318,73 +321,6 @@ export default function MilestonesTab({ project, milestoneData }) {
     return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   };
 
-  // Get row color classes based on status and type (monday.com inspired)
-  // Returns both the row classes and the colored background classes
-  const getRowColorClasses = (type, status, progress = null) => {
-    const baseClasses = "transition-all duration-200 cursor-pointer shadow-sm relative";
-    let bgClasses = "";
-    let borderColor = "";
-    
-    if (type === 'milestone') {
-      if (status === 'completed') {
-        bgClasses = "bg-gradient-to-r from-green-50 to-emerald-50/80 hover:from-green-100 hover:to-emerald-100";
-        borderColor = "border-green-500";
-      } else if (status === 'in_progress') {
-        bgClasses = "bg-gradient-to-r from-blue-50 to-indigo-50/80 hover:from-blue-100 hover:to-indigo-100";
-        borderColor = "border-blue-500";
-      } else if (status === 'pending') {
-        bgClasses = "bg-gradient-to-r from-amber-50 to-yellow-50/80 hover:from-amber-100 hover:to-yellow-100";
-        borderColor = "border-amber-500";
-      } else {
-        bgClasses = "bg-gradient-to-r from-indigo-50 to-purple-50/80 hover:from-indigo-100 hover:to-purple-100";
-        borderColor = "border-indigo-400";
-      }
-      return { rowClasses: `${baseClasses} bg-white hover:shadow-md`, bgClasses, borderColor, indent: 0 };
-    }
-    
-    if (type === 'task') {
-      if (status === 'completed') {
-        bgClasses = "bg-gradient-to-r from-emerald-50/60 to-teal-50/50 hover:from-emerald-100/80 hover:to-teal-100/70";
-        borderColor = "border-emerald-500";
-      } else if (status === 'in_progress') {
-        bgClasses = "bg-gradient-to-r from-sky-50/60 to-cyan-50/50 hover:from-sky-100/80 hover:to-cyan-100/70";
-        borderColor = "border-sky-500";
-      } else if (status === 'pending') {
-        bgClasses = "bg-gradient-to-r from-yellow-50/60 to-orange-50/50 hover:from-yellow-100/80 hover:to-orange-100/70";
-        borderColor = "border-yellow-500";
-      } else {
-        bgClasses = "bg-gradient-to-r from-blue-50/50 to-indigo-50/40 hover:from-blue-100/70 hover:to-indigo-100/60";
-        borderColor = "border-blue-400";
-      }
-      return { rowClasses: `${baseClasses} bg-white hover:shadow-md`, bgClasses, borderColor, indent: 8 };
-    }
-    
-    if (type === 'progress_update') {
-      bgClasses = "bg-gradient-to-r from-teal-50/50 to-green-50/40 hover:from-teal-100/70 hover:to-green-100/60";
-      borderColor = "border-teal-500";
-      return { rowClasses: `${baseClasses} bg-white hover:shadow-md`, bgClasses, borderColor, indent: 16 };
-    }
-    
-    if (type === 'issue') {
-      const priority = status || 'medium';
-      if (priority === 'high' || priority === 'critical') {
-        bgClasses = "bg-gradient-to-r from-red-50/60 to-rose-50/50 hover:from-red-100/80 hover:to-rose-100/70";
-        borderColor = "border-red-500";
-      } else if (priority === 'medium') {
-        bgClasses = "bg-gradient-to-r from-orange-50/60 to-amber-50/50 hover:from-orange-100/80 hover:to-amber-100/70";
-        borderColor = "border-orange-500";
-      } else {
-        bgClasses = "bg-gradient-to-r from-orange-50/50 to-yellow-50/40 hover:from-orange-100/70 hover:to-yellow-100/60";
-        borderColor = "border-orange-400";
-      }
-      // Issues can be at task level (16) or milestone level (8)
-      const indent = 16; // Default to task level, will be overridden for milestone-level issues
-      return { rowClasses: `${baseClasses} bg-white hover:shadow-md`, bgClasses, borderColor, indent };
-    }
-    
-    return { rowClasses: baseClasses, bgClasses: "", borderColor: "", indent: 0 };
-  };
-
   return (
     <div className="w-full space-y-4">
       {/* Header Section */}
@@ -394,16 +330,6 @@ export default function MilestonesTab({ project, milestoneData }) {
           <p className="text-sm text-gray-500 mt-1">Manage milestones, tasks, and progress updates</p>
         </div>
         <div className="flex gap-2">
-          {has('project-issues.create') && (
-            <Button
-              variant="outline"
-              className="border-orange-300 text-orange-700 hover:bg-orange-50 shadow-sm"
-              onClick={() => setShowAddIssueModal(true)}
-            >
-              <AlertCircle size={18} className="mr-2" />
-              Add Issue ({issues.length})
-            </Button>
-          )}
           {has('project-milestones.create') && (
             <Button
               className="bg-zinc-700 hover:bg-zinc-900 text-white shadow-sm"
@@ -441,45 +367,19 @@ export default function MilestonesTab({ project, milestoneData }) {
         </Select>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg border border-gray-200 shadow-sm mb-4">
-        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Status Colors:</div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 shadow-sm"></div>
-          <span className="text-sm font-medium text-gray-700">Completed</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-500 shadow-sm"></div>
-          <span className="text-sm font-medium text-gray-700">In Progress</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-500 shadow-sm"></div>
-          <span className="text-sm font-medium text-gray-700">Pending</span>
-        </div>
-        <div className="ml-2 pl-2 border-l border-gray-300">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-gradient-to-r from-teal-50 to-green-50 border-2 border-teal-500 shadow-sm"></div>
-            <span className="text-sm font-medium text-gray-700">Progress Update</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-500 shadow-sm"></div>
-          <span className="text-sm font-medium text-gray-700">Issue</span>
-        </div>
-      </div>
 
       {/* Milestones Table */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-md bg-white">
-          <Table className="min-w-[1200px] w-full">
+          <Table className="w-full">
             <TableHeader>
-              <TableRow className="bg-gradient-to-r from-gray-100 to-slate-100 border-b-2 border-gray-300 shadow-sm">
-                <TableHead className="w-[30px] font-semibold text-gray-700"></TableHead>
-                <TableHead className="font-semibold text-gray-700">Milestone</TableHead>
-                <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                <TableHead className="font-semibold text-gray-700">Due Date</TableHead>
-                <TableHead className="font-semibold text-gray-700">Progress</TableHead>
-                <TableHead className="font-semibold text-gray-700">Tasks</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-right w-[120px]">Actions</TableHead>
+              <TableRow className="bg-gray-50 border-b border-gray-200">
+                <TableHead className="w-[30px] font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm"></TableHead>
+                <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Milestone</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Status</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Due Date</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Progress</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Tasks</TableHead>
+                <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -488,21 +388,18 @@ export default function MilestonesTab({ project, milestoneData }) {
                   const isExpanded = expandedMilestones.has(milestone.id);
                   const tasks = milestone.tasks || [];
                   const progress = getMilestoneProgress(milestone);
+                  const isSelected = selectedMilestoneId === milestone.id;
                   
-                  const milestoneColors = getRowColorClasses('milestone', milestone.status, progress);
                   return (
                     <>
                       <TableRow 
                         key={milestone.id}
-                        className={`${milestoneColors.rowClasses} group`}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                        }`}
                         onClick={() => toggleMilestone(milestone.id)}
                       >
-                        {/* Colored background overlay starting from indent */}
-                        <div 
-                          className={`absolute inset-0 ${milestoneColors.bgClasses} border-l-4 ${milestoneColors.borderColor} pointer-events-none`}
-                          style={{ left: `${milestoneColors.indent * 4}px` }}
-                        ></div>
-                        <TableCell className="relative z-10">
+                        <TableCell className="text-xs sm:text-sm">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -517,7 +414,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                             )}
                           </button>
                         </TableCell>
-                        <TableCell className="relative z-10">
+                        <TableCell className="text-xs sm:text-sm">
                           <div>
                             <div className="font-medium text-gray-900">{milestone.name}</div>
                             {milestone.description && (
@@ -525,9 +422,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="relative z-10">{getStatusBadge(milestone.status)}</TableCell>
-                        <TableCell className="relative z-10 text-sm text-gray-600">{formatDate(milestone.due_date)}</TableCell>
-                        <TableCell className="relative z-10">
+                        <TableCell className="text-xs sm:text-sm">{getStatusBadge(milestone.status)}</TableCell>
+                        <TableCell className="text-xs sm:text-sm text-gray-600">{formatDate(milestone.due_date)}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner">
                               <div 
@@ -548,9 +445,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                             }`}>{progress}%</span>
                           </div>
                         </TableCell>
-                        <TableCell className="relative z-10 text-sm text-gray-600">{tasks.length}</TableCell>
-                        <TableCell className="relative z-10 w-[120px]" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1 items-center">
+                        <TableCell className="text-xs sm:text-sm text-gray-600">{tasks.length}</TableCell>
+                        <TableCell className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-1 items-center">
                             {has('project-tasks.create') && (
                               <button
                                 onClick={() => {
@@ -602,7 +499,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                             {/* Whitespace spacer between milestone and tasks */}
                             {isExpanded && tasks.length > 0 && (
                               <TableRow className="bg-white hover:bg-white border-0">
-                                <TableCell colSpan={7} className="p-0 h-2 bg-white"></TableCell>
+                                <TableCell colSpan={7} className="p-0 h-1 bg-white"></TableCell>
                               </TableRow>
                             )}
                             {/* Tasks under milestone */}
@@ -657,28 +554,22 @@ export default function MilestonesTab({ project, milestoneData }) {
                           });
                         }
                         
-                        const taskColors = getRowColorClasses('task', taskWithMilestone.status);
                         return (
                           <>
                             <TableRow 
                               key={`task-${task.id}`}
-                              className={`${taskColors.rowClasses} group cursor-pointer`}
+                              className="bg-white hover:bg-gray-50 cursor-pointer transition-colors"
                               onClick={() => {
                                 setSelectedTaskForDetail(taskWithMilestone);
                                 setShowTaskDetailModal(true);
                               }}
                             >
-                              {/* Colored background overlay starting from indent */}
-                              <div 
-                                className={`absolute inset-0 ${taskColors.bgClasses} border-l-4 ${taskColors.borderColor} pointer-events-none`}
-                                style={{ left: `${taskColors.indent * 4}px` }}
-                              ></div>
-                              <TableCell className="relative z-10 pl-8">
+                              <TableCell className="text-xs sm:text-sm pl-8">
                                 <div className="flex items-center gap-2">
                                   <FileText size={14} className="text-gray-400" />
                                 </div>
                               </TableCell>
-                              <TableCell className="relative z-10">
+                              <TableCell className="text-xs sm:text-sm">
                                 <div className="pl-2">
                                   <div className="font-medium text-gray-800">{task.title}</div>
                                   {task.description && (
@@ -686,7 +577,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                              <TableCell className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
                                 {has('project-tasks.update-status') ? (
                                   <Select
                                     value={taskWithMilestone.status}
@@ -722,8 +613,8 @@ export default function MilestonesTab({ project, milestoneData }) {
                                   <div>{getStatusBadge(taskWithMilestone.status)}</div>
                                 )}
                               </TableCell>
-                              <TableCell className="relative z-10 text-sm text-gray-600">{formatDate(taskWithMilestone.due_date)}</TableCell>
-                              <TableCell className="relative z-10">
+                              <TableCell className="text-xs sm:text-sm text-gray-600">{formatDate(taskWithMilestone.due_date)}</TableCell>
+                              <TableCell className="text-xs sm:text-sm">
                                 <div className="flex items-center gap-1.5 text-sm text-gray-600">
                                   {taskWithMilestone.assignedUser?.name || taskWithMilestone.assigned_user?.name ? (
                                     <>
@@ -737,25 +628,13 @@ export default function MilestonesTab({ project, milestoneData }) {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="relative z-10 text-sm text-gray-600">
+                              <TableCell className="text-xs sm:text-sm text-gray-600">
                                 <span className="font-medium">
                                   {progressUpdates.length} {progressUpdates.length === 1 ? 'update' : 'updates'}
                                 </span>
                               </TableCell>
-                              <TableCell className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                              <TableCell className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-end gap-1">
-                                  {has('progress-updates.create') && (
-                                    <button
-                                      onClick={() => {
-                                        setSelectedTaskForProgress(taskWithMilestone);
-                                        setShowAddProgressModal(true);
-                                      }}
-                                      className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
-                                      title="Add Progress Update"
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                  )}
                                   {has('project-tasks.update') && (
                                     <button
                                       onClick={() => {
@@ -791,27 +670,19 @@ export default function MilestonesTab({ project, milestoneData }) {
                       {isExpanded && milestoneIssues.length > 0 && (
                         <>
                           <TableRow className="bg-white hover:bg-white border-0">
-                            <TableCell colSpan={7} className="p-0 h-2 bg-white"></TableCell>
+                            <TableCell colSpan={7} className="p-0 h-1 bg-white"></TableCell>
                           </TableRow>
                           {milestoneIssues.map(issue => {
-                            const issueColors = getRowColorClasses('issue', issue.priority, null);
-                            // Override indent for milestone-level issues
-                            issueColors.indent = 8;
                             return (
                             <TableRow 
                               key={`milestone-issue-${issue.id}`}
-                              className={`${issueColors.rowClasses} group`}
+                              className="bg-white hover:bg-gray-50 transition-colors"
                             >
-                              {/* Colored background overlay starting from indent */}
-                              <div 
-                                className={`absolute inset-0 ${issueColors.bgClasses} border-l-4 ${issueColors.borderColor} pointer-events-none`}
-                                style={{ left: `${issueColors.indent * 4}px` }}
-                              ></div>
-                              <TableCell className="relative z-10 pl-8">
+                              <TableCell className="text-xs sm:text-sm pl-8">
                                 <div className="flex items-center gap-2">
                                 </div>
                               </TableCell>
-                              <TableCell className="relative z-10" colSpan={6}>
+                              <TableCell className="text-xs sm:text-sm" colSpan={6}>
                                 <div className="pl-2 space-y-2">
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1">
@@ -1006,7 +877,20 @@ export default function MilestonesTab({ project, milestoneData }) {
           users={users}
           allTasks={allTasks}
           onRefresh={() => {
-            router.reload({ only: ['milestoneData'] });
+            router.reload({ 
+              only: ['milestoneData'],
+              onSuccess: () => {
+                // Update the selected task with fresh data after reload
+                const taskId = selectedTaskForDetail.id;
+                const updatedTask = allTasks.find(t => t.id === taskId) || 
+                                  milestones
+                                    .flatMap(m => m.tasks || [])
+                                    .find(t => t.id === taskId);
+                if (updatedTask) {
+                  setSelectedTaskForDetail(updatedTask);
+                }
+              }
+            });
           }}
         />
       )}

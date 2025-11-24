@@ -30,6 +30,7 @@ class ClientsController extends Controller
                 });
             })
             ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->paginate(10);
 
         return Inertia::render('ClientManagement/index', [
@@ -166,6 +167,8 @@ class ClientsController extends Controller
             'Update Status',
             'Updated Client ' . $client->client_name . ' status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
+
+        return back()->with('success', 'Client status updated successfully.');
     }
 
     public function resetPassword(Client $client)

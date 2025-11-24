@@ -94,22 +94,16 @@ class ProjectTeamsController extends Controller
                 ->whereIn('id', $validated['ids'])
                 ->get();
 
-            $cannotDelete = [];
             foreach ($teams as $team) {
-                // Check if team member has tasks
-                $hasTasks = ProjectTask::where('assigned_to', $team->user_id)
+                $userName = $team->user->name;
+                $role     = $team->role;
+
+                // Unassign all tasks assigned to this team member in this project
+                ProjectTask::where('assigned_to', $team->user_id)
                     ->whereHas('milestone', function ($query) use ($project) {
                         $query->where('project_id', $project->id);
                     })
-                    ->exists();
-
-                if ($hasTasks) {
-                    $cannotDelete[] = $team->user->name;
-                    continue;
-                }
-
-                $userName = $team->user->name;
-                $role     = $team->role;
+                    ->update(['assigned_to' => null]);
 
                 $this->adminActivityLogs(
                     'Project Team',
@@ -120,10 +114,6 @@ class ProjectTeamsController extends Controller
                 $team->delete();
             }
 
-            if (!empty($cannotDelete)) {
-                return redirect()->back()->with('error', 'Cannot remove team members with assigned tasks: ' . implode(', ', $cannotDelete));
-            }
-
             return redirect()->back()->with('success', 'Selected team members removed successfully.');
         }
 
@@ -132,19 +122,15 @@ class ProjectTeamsController extends Controller
             abort(404);
         }
 
-        // Check if team member has tasks
-        $hasTasks = ProjectTask::where('assigned_to', $projectTeam->user_id)
+        $userName = $projectTeam->user->name;
+        $role     = $projectTeam->role;
+
+        // Unassign all tasks assigned to this team member in this project
+        ProjectTask::where('assigned_to', $projectTeam->user_id)
             ->whereHas('milestone', function ($query) use ($project) {
                 $query->where('project_id', $project->id);
             })
-            ->exists();
-
-        if ($hasTasks) {
-            return redirect()->back()->with('error', 'Cannot remove team member with assigned tasks.');
-        }
-
-        $userName = $projectTeam->user->name;
-        $role     = $projectTeam->role;
+            ->update(['assigned_to' => null]);
 
         $projectTeam->delete();
 

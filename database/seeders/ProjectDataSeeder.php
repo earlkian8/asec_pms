@@ -502,9 +502,48 @@ class ProjectDataSeeder extends Seeder
                 fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Maintenance', 'Facility Management', 'Upkeep Project']),
                 fn() => fake()->company() . ' ' . fake()->randomElement(['Building Maintenance', 'Equipment Maintenance', 'Property Maintenance']),
             ],
+            'structural' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Structural Engineering', 'Structural Analysis', 'Structural Design']),
+                fn() => fake()->company() . ' ' . fake()->randomElement(['Structural Assessment', 'Structural Evaluation', 'Structural Project']),
+            ],
+            'civil' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Civil Engineering', 'Civil Works', 'Civil Infrastructure']),
+                fn() => fake()->city() . ' ' . fake()->randomElement(['Road Project', 'Bridge Project', 'Civil Development']),
+            ],
+            'mechanical' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Mechanical Engineering', 'Mechanical Systems', 'MEP Project']),
+                fn() => fake()->company() . ' ' . fake()->randomElement(['HVAC Installation', 'Mechanical Design', 'Mechanical Works']),
+            ],
+            'electrical' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Electrical Engineering', 'Electrical Systems', 'Electrical Installation']),
+                fn() => fake()->company() . ' ' . fake()->randomElement(['Electrical Design', 'Power Systems', 'Electrical Works']),
+            ],
+            'environmental' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Environmental Assessment', 'Environmental Study', 'Environmental Project']),
+                fn() => fake()->company() . ' ' . fake()->randomElement(['Environmental Impact', 'Environmental Consulting', 'Environmental Services']),
+            ],
+            'geotechnical' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Geotechnical Engineering', 'Soil Analysis', 'Geotechnical Study']),
+                fn() => fake()->company() . ' ' . fake()->randomElement(['Geotechnical Investigation', 'Foundation Analysis', 'Geotechnical Assessment']),
+            ],
+            'surveying' => [
+                fn() => fake()->words(2, true) . ' ' . fake()->randomElement(['Surveying Project', 'Land Survey', 'Topographic Survey']),
+                fn() => fake()->city() . ' ' . fake()->randomElement(['Site Survey', 'Boundary Survey', 'Surveying Services']),
+            ],
         ];
 
-        $generator = fake()->randomElement($patterns[$type]);
+        // Fallback pattern for any type not in the patterns array
+        $fallbackPatterns = [
+            fn() => fake()->words(2, true) . ' ' . ucfirst($type) . ' Project',
+            fn() => fake()->company() . ' ' . ucfirst($type) . ' Services',
+        ];
+
+        if (isset($patterns[$type])) {
+            $generator = fake()->randomElement($patterns[$type]);
+        } else {
+            $generator = fake()->randomElement($fallbackPatterns);
+        }
+        
         return $generator();
     }
 
@@ -556,9 +595,16 @@ class ProjectDataSeeder extends Seeder
             'construction' => ['Phase 1: Foundation', 'Phase 2: Structure', 'Phase 3: Finishing', 'Phase 4: MEP', 'Phase 5: Handover'],
             'consultancy' => ['Phase 1: Assessment', 'Phase 2: Planning', 'Phase 3: Implementation', 'Phase 4: Review', 'Phase 5: Completion'],
             'maintenance' => ['Phase 1: Inspection', 'Phase 2: Repairs', 'Phase 3: Upgrades', 'Phase 4: Testing', 'Phase 5: Documentation'],
+            'structural' => ['Phase 1: Site Investigation', 'Phase 2: Structural Design', 'Phase 3: Analysis', 'Phase 4: Review', 'Phase 5: Approval'],
+            'civil' => ['Phase 1: Planning', 'Phase 2: Site Preparation', 'Phase 3: Construction', 'Phase 4: Testing', 'Phase 5: Completion'],
+            'mechanical' => ['Phase 1: Design', 'Phase 2: Procurement', 'Phase 3: Installation', 'Phase 4: Testing', 'Phase 5: Commissioning'],
+            'electrical' => ['Phase 1: Design', 'Phase 2: Procurement', 'Phase 3: Installation', 'Phase 4: Testing', 'Phase 5: Commissioning'],
+            'environmental' => ['Phase 1: Assessment', 'Phase 2: Analysis', 'Phase 3: Reporting', 'Phase 4: Review', 'Phase 5: Approval'],
+            'geotechnical' => ['Phase 1: Site Investigation', 'Phase 2: Soil Analysis', 'Phase 3: Report', 'Phase 4: Review', 'Phase 5: Recommendations'],
+            'surveying' => ['Phase 1: Planning', 'Phase 2: Field Work', 'Phase 3: Data Processing', 'Phase 4: Mapping', 'Phase 5: Final Report'],
         ];
 
-        $baseNames = $patterns[$projectType] ?? $patterns['construction'];
+        $baseNames = $patterns[$projectType] ?? ['Phase 1: Planning', 'Phase 2: Execution', 'Phase 3: Review', 'Phase 4: Completion'];
         
         if ($index < count($baseNames)) {
             return $baseNames[$index];
@@ -574,9 +620,16 @@ class ProjectDataSeeder extends Seeder
             'construction' => ['Site preparation', 'Foundation work', 'Structural framing', 'Electrical installation', 'Plumbing installation', 'Finishing work'],
             'consultancy' => ['Client meeting', 'Data analysis', 'Report preparation', 'Presentation', 'Implementation planning'],
             'maintenance' => ['Equipment inspection', 'Routine maintenance', 'Repair work', 'Parts replacement', 'System testing'],
+            'structural' => ['Site investigation', 'Load analysis', 'Structural calculations', 'Design review', 'Documentation'],
+            'civil' => ['Site survey', 'Earthwork', 'Drainage design', 'Road construction', 'Quality control'],
+            'mechanical' => ['System design', 'Equipment selection', 'Installation planning', 'HVAC installation', 'System testing'],
+            'electrical' => ['Electrical design', 'Load calculation', 'Wiring installation', 'Panel installation', 'System testing'],
+            'environmental' => ['Environmental assessment', 'Data collection', 'Impact analysis', 'Report writing', 'Compliance review'],
+            'geotechnical' => ['Soil sampling', 'Laboratory testing', 'Data analysis', 'Report preparation', 'Recommendations'],
+            'surveying' => ['Field survey', 'Data collection', 'GPS mapping', 'Data processing', 'Report generation'],
         ];
 
-        $baseTasks = $tasks[$projectType] ?? $tasks['construction'];
+        $baseTasks = $tasks[$projectType] ?? ['Planning', 'Execution', 'Review', 'Documentation', 'Completion'];
         
         if ($index < count($baseTasks)) {
             return $baseTasks[$index];

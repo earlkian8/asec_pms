@@ -20,11 +20,6 @@ class Project extends Model
         'location',
         'description',
         'billing_type',
-        'is_billable',
-    ];
-
-    protected $casts = [
-        'is_billable' => 'boolean',
     ];
 
     public function client(){

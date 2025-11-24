@@ -98,7 +98,9 @@ class InventoryService
                         'project:id,project_code,project_name'
                     ]);
                 },
-                'receivedBy:id,name'
+                'receivedBy' => function ($query) {
+                    $query->select('id', 'name')->with('roles:id,name');
+                }
             ])
                 ->when($search, function ($query, $search) {
                     $query->where(function ($q) use ($search) {

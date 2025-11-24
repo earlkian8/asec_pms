@@ -109,8 +109,14 @@ export default function ClientsIndex() {
       is_active: newStatus,
     }, {
       preserveScroll: true,
-      onSuccess: () => toast.success('Client status updated successfully!'),
-      onError: () => toast.error('Failed to update status.'),
+      preserveState: true,
+      only: ['clients'],
+      onSuccess: () => {
+        toast.success('Client status updated successfully!');
+      },
+      onError: () => {
+        toast.error('Failed to update status.');
+      },
     });
   };
 

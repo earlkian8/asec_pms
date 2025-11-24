@@ -19,7 +19,7 @@ class ProjectLaborCostsController extends Controller
         $data = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'work_date' => ['required', 'date'],
-            'hours_worked' => ['required', 'numeric', 'min:0.01', 'max:24'],
+            'hours_worked' => ['required', 'numeric', 'min:0.01'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
             'description' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
@@ -45,7 +45,7 @@ class ProjectLaborCostsController extends Controller
         $data = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'work_date' => ['required', 'date'],
-            'hours_worked' => ['required', 'numeric', 'min:0.01', 'max:24'],
+            'hours_worked' => ['required', 'numeric', 'min:0.01'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
             'description' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],

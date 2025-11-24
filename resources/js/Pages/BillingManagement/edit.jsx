@@ -107,14 +107,14 @@ const EditBilling = ({ setShowEditModal, billing }) => {
               min="0.01"
               value={data.billing_amount}
               onChange={(e) => {
-                // Only allow changes for milestone type
-                if (billing.billing_type === 'milestone') {
+                // Only allow changes for fixed_price type (milestone is read-only)
+                if (billing.billing_type === 'fixed_price') {
                   setData("billing_amount", e.target.value);
                 }
               }}
-              readOnly={billing.billing_type === 'fixed_price'}
+              readOnly={billing.billing_type === 'fixed_price' || billing.billing_type === 'milestone'}
               placeholder="0.00"
-              className={billing.billing_type === 'fixed_price' 
+              className={billing.billing_type === 'fixed_price' || billing.billing_type === 'milestone'
                 ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed" 
                 : inputClass(errors.billing_amount)}
             />
@@ -124,11 +124,21 @@ const EditBilling = ({ setShowEditModal, billing }) => {
                 Fixed amount cannot be changed.
               </p>
             )}
-            {billing.billing_type === 'milestone' && (
-              <p className="text-xs text-gray-500 mt-1">
-                Amount can be adjusted for milestone billing.
-              </p>
-            )}
+            {billing.billing_type === 'milestone' && billing.milestone && billing.project && (() => {
+              if (billing.milestone.billing_percentage && billing.project.contract_amount) {
+                const calculatedAmount = (parseFloat(billing.project.contract_amount) * parseFloat(billing.milestone.billing_percentage)) / 100;
+                return (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Calculated from milestone percentage: ₱{parseFloat(billing.project.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {billing.milestone.billing_percentage}% = ₱{calculatedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                );
+              }
+              return (
+                <p className="text-xs text-gray-500 mt-1">
+                  Amount is calculated from milestone percentage and cannot be changed.
+                </p>
+              );
+            })()}
             {billing.total_paid > 0 && (
               <p className="text-xs text-gray-500 mt-1">
                 Total paid: ₱{parseFloat(billing.total_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

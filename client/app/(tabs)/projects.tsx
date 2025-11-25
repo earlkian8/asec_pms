@@ -11,10 +11,12 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProjects, Project } from '@/hooks/useProjects';
+import { FIRM_CONTACT } from '@/constants/contact';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Phone, Mail, ArrowUpDown } from 'lucide-react-native';
@@ -65,17 +67,59 @@ export default function ProjectsScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  const handleContact = (project: Project, method: 'call' | 'email') => {
+  const handleContact = async (project: Project, method: 'call' | 'email') => {
     if (method === 'call') {
-      Alert.alert('Contact Project Manager', `Would you like to call ${project.projectManager}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Call', onPress: () => Alert.alert('Info', 'Call functionality would open phone dialer') },
-      ]);
+      const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
+      
+      Alert.alert(
+        'Contact Project Manager',
+        `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Call',
+            onPress: async () => {
+              try {
+                const canOpen = await Linking.canOpenURL(phoneUrl);
+                if (canOpen) {
+                  await Linking.openURL(phoneUrl);
+                } else {
+                  Alert.alert('Error', 'Unable to open phone dialer');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to open phone dialer');
+                console.error('Error opening phone:', error);
+              }
+            },
+          },
+        ]
+      );
     } else {
-      Alert.alert('Contact Project Manager', `Would you like to email ${project.projectManager}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Email', onPress: () => Alert.alert('Info', 'Email functionality would open email client') },
-      ]);
+      const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
+      
+      Alert.alert(
+        'Contact Project Manager',
+        `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Email',
+            onPress: async () => {
+              try {
+                const canOpen = await Linking.canOpenURL(emailUrl);
+                if (canOpen) {
+                  await Linking.openURL(emailUrl);
+                } else {
+                  Alert.alert('Error', 'Unable to open email client');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to open email client');
+                console.error('Error opening email:', error);
+              }
+            },
+          },
+        ]
+      );
     }
   };
 

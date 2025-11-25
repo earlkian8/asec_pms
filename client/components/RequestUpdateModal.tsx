@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/contexts/AppContext';
+import { apiService } from '@/services/api';
 
 interface RequestUpdateModalProps {
   visible: boolean;
@@ -32,28 +33,42 @@ export default function RequestUpdateModal({
   const [loading, setLoading] = useState(false);
   const { addNotification } = useApp();
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!subject.trim() || !message.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      addNotification({
-        type: 'update',
-        title: 'Update Request Sent',
-        message: `Your update request for ${projectName} has been sent to ${projectManager}`,
-        date: new Date().toISOString(),
-        projectId,
+    
+    try {
+      const response = await apiService.post('/client/request-update', {
+        project_id: parseInt(projectId),
+        subject: subject.trim(),
+        message: message.trim(),
       });
-      Alert.alert('Success', 'Update request sent successfully!');
-      setSubject('');
-      setMessage('');
-      onClose();
-    }, 1000);
+
+      if (response.success) {
+        addNotification({
+          type: 'update',
+          title: 'Update Request Sent',
+          message: `Your update request for ${projectName} has been sent to ${projectManager}`,
+          date: new Date().toISOString(),
+          projectId,
+        });
+        Alert.alert('Success', 'Update request sent successfully!');
+        setSubject('');
+        setMessage('');
+        onClose();
+      } else {
+        Alert.alert('Error', response.message || 'Failed to send update request. Please try again.');
+      }
+    } catch (error) {
+      console.error('Request update error:', error);
+      Alert.alert('Error', 'Failed to send update request. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const backgroundColor = '#FFFFFF';

@@ -46,6 +46,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
     const [billingOpen, setBillingOpen] = useState(false);
     const [reportsOpen, setReportsOpen] = useState(false);
     const [userManagementOpen, setUserManagementOpen] = useState(false);
+    const [clientManagementOpen, setClientManagementOpen] = useState(false);
     
     // Close sidebar when clicking outside on mobile
     useEffect(() => {
@@ -84,10 +85,24 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'Client Management',
-            href: route('client-management.index'),
-            routeName: 'client-management.*',
+            type: 'collapsible',
             icon: Users,
-            type: 'single'
+            isOpen: clientManagementOpen,
+            setIsOpen: setClientManagementOpen,
+            items: [
+                {
+                    title: 'Clients',
+                    href: route('client-management.index'),
+                    routeName: 'client-management.index',
+                    icon: Users
+                },
+                {
+                    title: 'Request Updates',
+                    href: route('client-management.request-updates.index'),
+                    routeName: 'client-management.request-updates.*',
+                    icon: FileText
+                }
+            ]
         },
         // {
         //     title: 'Employee Management',
@@ -166,9 +181,27 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 ]) ? module : null;
             }
             if (module.title === 'Client Management') {
-                return hasModuleAccess([
-                    'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
-                ]) ? module : null;
+                // For collapsible items, check if user has access to any sub-item
+                const filteredItems = module.items.filter(item => {
+                    if (item.title === 'Clients') {
+                        return hasModuleAccess([
+                            'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
+                        ]);
+                    }
+                    if (item.title === 'Request Updates') {
+                        return hasModuleAccess([
+                            'clients.view', 'clients.delete'
+                        ]);
+                    }
+                    return false;
+                });
+                
+                // If user has access to any sub-item, return module with filtered items
+                if (filteredItems.length > 0) {
+                    return { ...module, items: filteredItems };
+                }
+                
+                return null;
             }
             if (module.title === 'Inventory Management') {
                 return hasModuleAccess([

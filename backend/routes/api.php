@@ -20,6 +20,9 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/statistics', [ClientDashboardController::class, 'statistics']);
     Route::get('/dashboard/projects', [ClientDashboardController::class, 'projects']);
     Route::get('/dashboard/projects/export', [ClientDashboardController::class, 'exportProjects']);
+    
+    // Request Update routes
+    Route::post('/request-update', [ClientDashboardController::class, 'requestUpdate']);
 });
 
 // Default user route (for admin/other users)

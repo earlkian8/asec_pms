@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ActivityLogsController;
 use App\Http\Controllers\Admin\ClientsController;
+use App\Http\Controllers\Admin\ClientUpdateRequestsController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
@@ -118,6 +119,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('/delete/{client}', [ClientsController::class, 'destroy'])->middleware('permission:clients.delete')->name('destroy');
         Route::put('/update-status/{client}', [ClientsController::class, 'handleStatus'])->middleware('permission:clients.update-status')->name('update-status');
         Route::patch('/reset-password/{client}', [ClientsController::class, 'resetPassword'])->middleware('permission:clients.update')->name('reset-password');
+        
+        // Request Updates
+        Route::prefix('request-updates')->name('request-updates.')->group(function(){
+            Route::get('/', [ClientUpdateRequestsController::class, 'index'])->middleware('permission:clients.view')->name('index');
+            Route::delete('/delete/{clientUpdateRequest}', [ClientUpdateRequestsController::class, 'destroy'])->middleware('permission:clients.delete')->name('destroy');
+        });
     });
     // Reports & Analytics
     Route::prefix('reports')->name('reports.')->group(function(){

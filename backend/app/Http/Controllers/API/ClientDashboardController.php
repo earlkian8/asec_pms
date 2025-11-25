@@ -8,8 +8,10 @@ use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMilestone;
 use App\Models\InventoryItem;
+use App\Models\ClientUpdateRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class ClientDashboardController extends Controller
 {
@@ -313,6 +315,60 @@ class ClientDashboardController extends Controller
             'success' => true,
             'data' => $exportData,
         ]);
+    }
+
+    /**
+     * Submit a request update for a project
+     */
+    public function requestUpdate(Request $request)
+    {
+        $client = $request->user();
+        
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|integer|exists:projects,id',
+            'subject' => 'required|string|max:255',
+            'message' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Verify that the project belongs to the authenticated client
+        $project = Project::where('id', $request->project_id)
+            ->where('client_id', $client->id)
+            ->first();
+
+        if (!$project) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Project not found or does not belong to you',
+            ], 404);
+        }
+
+        // Create the request update
+        $updateRequest = ClientUpdateRequest::create([
+            'client_id' => $client->id,
+            'project_id' => $request->project_id,
+            'subject' => $request->subject,
+            'message' => $request->message,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Update request submitted successfully',
+            'data' => [
+                'id' => $updateRequest->id,
+                'subject' => $updateRequest->subject,
+                'message' => $updateRequest->message,
+                'project_id' => $updateRequest->project_id,
+                'created_at' => $updateRequest->created_at,
+            ],
+        ], 201);
     }
 }
 

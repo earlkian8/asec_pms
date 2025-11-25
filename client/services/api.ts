@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.106:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -36,13 +36,14 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
+    options: RequestInit & { responseType?: 'json' | 'blob' | 'text' } = {}
+  ): Promise<ApiResponse<T> | Blob | string> {
+    const { responseType = 'json', ...fetchOptions } = options;
     const url = `${this.baseURL}${endpoint}`;
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...options.headers,
+      'Accept': responseType === 'json' ? 'application/json' : '*/*',
+      ...(responseType === 'json' && { 'Content-Type': 'application/json' }),
+      ...fetchOptions.headers,
     };
 
     if (this.token) {
@@ -51,9 +52,17 @@ class ApiService {
 
     try {
       const response = await fetch(url, {
-        ...options,
+        ...fetchOptions,
         headers,
       });
+
+      if (responseType === 'blob') {
+        return await response.blob();
+      }
+
+      if (responseType === 'text') {
+        return await response.text();
+      }
 
       const data = await response.json();
 
@@ -70,6 +79,9 @@ class ApiService {
         ...data,
       };
     } catch (error) {
+      if (responseType !== 'json') {
+        throw error;
+      }
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Network error occurred',
@@ -77,8 +89,8 @@ class ApiService {
     }
   }
 
-  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' });
+  async get<T>(endpoint: string, options?: { responseType?: 'json' | 'blob' | 'text' }): Promise<ApiResponse<T> | Blob | string> {
+    return this.request<T>(endpoint, { method: 'GET', ...options });
   }
 
   async post<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {

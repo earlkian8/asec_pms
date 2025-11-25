@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
-import { mockStatistics, mockProjects } from '@/data/mockData';
+import { useDashboard, DashboardProject } from '@/hooks/useDashboard';
 import {
   Briefcase,
   Wallet,
@@ -23,7 +23,6 @@ import {
   Clock,
   Calendar,
   Coins,
-  User,
   TrendingUp,
   Share2,
   Phone,
@@ -41,24 +40,22 @@ const { width } = Dimensions.get('window');
 export default function HomeScreen() {
   const { user } = useAuth();
   const { favorites, toggleFavorite, unreadCount } = useApp();
+  const { statistics, projects, loading, refresh } = useDashboard();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<typeof mockProjects[0] | null>(null);
+  const [selectedProject, setSelectedProject] = useState<DashboardProject | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const activeProjects = mockProjects.filter((p) => p.status === 'active');
+  const activeProjects = projects.filter((p) => p.status === 'active');
   const recentProjects = activeProjects.slice(0, 3);
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    // Simulate API refresh
-    setTimeout(() => {
-      setRefreshing(false);
-      Alert.alert('Success', 'Projects refreshed successfully');
-    }, 1500);
-  }, []);
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
@@ -86,11 +83,11 @@ export default function HomeScreen() {
     value: string | number;
     Icon: React.ComponentType<{ size: number; color: string }>;
     color: string;
-    gradient: string[];
+    gradient: readonly [string, string];
   }) => (
     <View style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}>
       <LinearGradient
-        colors={gradient}
+        colors={gradient as [string, string]}
         style={styles.statIconContainer}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}>
@@ -103,7 +100,7 @@ export default function HomeScreen() {
     </View>
   );
 
-  const handleShare = async (project: typeof mockProjects[0]) => {
+  const handleShare = async (project: DashboardProject) => {
     try {
       await Share.share({
         message: `Project: ${project.name}\nStatus: ${project.status}\nProgress: ${project.progress}%\nLocation: ${project.location}\nBudget: ${formatCurrency(project.budget)}`,
@@ -114,7 +111,7 @@ export default function HomeScreen() {
     }
   };
 
-  const handleContact = (project: typeof mockProjects[0], method: 'call' | 'email') => {
+  const handleContact = (project: DashboardProject, method: 'call' | 'email') => {
     if (method === 'call') {
       Alert.alert(
         'Contact Project Manager',
@@ -148,12 +145,12 @@ export default function HomeScreen() {
     }
   };
 
-  const handleRequestUpdate = (project: typeof mockProjects[0]) => {
+  const handleRequestUpdate = (project: DashboardProject) => {
     setSelectedProject(project);
     setShowRequestUpdate(true);
   };
 
-  const ProjectCard = ({ project }: { project: typeof mockProjects[0] }) => {
+  const ProjectCard = ({ project }: { project: DashboardProject }) => {
     const statusColors: Record<string, { bg: string; text: string }> = {
       active: { bg: '#D1FAE5', text: '#065F46' }, // green-100/green-700
       'on-hold': { bg: '#FEF3C7', text: '#92400E' }, // yellow-100/yellow-700
@@ -277,88 +274,107 @@ export default function HomeScreen() {
               {user?.name || 'Client'}
             </Text>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={[styles.notificationButton, { backgroundColor: cardBg, borderColor }]}
-              onPress={() => setShowNotifications(true)}>
-              <Bell size={20} color={textColor} />
-              {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.avatar, { backgroundColor: cardBg, borderColor }]}>
-              <User size={24} color={textColor} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.notificationButton, { backgroundColor: cardBg, borderColor }]}
+            onPress={() => setShowNotifications(true)}>
+            <Bell size={20} color={textColor} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Statistics Grid */}
-        <View style={styles.statsGrid}>
-          <StatCard
-            title="Active Projects"
-            value={mockStatistics.activeProjects}
-            Icon={Briefcase}
-            color="#3B82F6"
-            gradient={['#3B82F6', '#2563EB']}
-          />
-          <StatCard
-            title="Total Budget"
-            value={formatCurrency(mockStatistics.totalBudget)}
-            Icon={Wallet}
-            color="#10B981"
-            gradient={['#10B981', '#059669']}
-          />
-          <StatCard
-            title="Completed"
-            value={mockStatistics.completedProjects}
-            Icon={CheckCircle}
-            color="#8B5CF6"
-            gradient={['#8B5CF6', '#7C3AED']}
-          />
-          <StatCard
-            title="On Time"
-            value={mockStatistics.onTimeProjects}
-            Icon={Clock}
-            color="#F59E0B"
-            gradient={['#F59E0B', '#D97706']}
-          />
-        </View>
+        {statistics && (
+          <>
+            <View style={styles.statsGrid}>
+              {/* Row 1: Active Projects and On Time - 2 Columns */}
+              <View style={styles.twoColumnRow}>
+                <View style={styles.halfWidthCard}>
+                  <StatCard
+                    title="Active Projects"
+                    value={statistics.activeProjects}
+                    Icon={Briefcase}
+                    color="#3B82F6"
+                    gradient={['#3B82F6', '#2563EB']}
+                  />
+                </View>
+                <View style={styles.halfWidthCard}>
+                  <StatCard
+                    title="On Time"
+                    value={statistics.onTimeProjects}
+                    Icon={Clock}
+                    color="#F59E0B"
+                    gradient={['#F59E0B', '#D97706']}
+                  />
+                </View>
+              </View>
+              
+              {/* Row 2: Total Budget - Full Width */}
+              <View style={styles.fullWidthCard}>
+                <StatCard
+                  title="Total Budget"
+                  value={formatCurrency(statistics.totalBudget)}
+                  Icon={Wallet}
+                  color="#10B981"
+                  gradient={['#10B981', '#059669']}
+                />
+              </View>
+              
+              {/* Row 3: Completed - Full Width */}
+              <View style={styles.fullWidthCard}>
+                <StatCard
+                  title="Completed"
+                  value={statistics.completedProjects}
+                  Icon={CheckCircle}
+                  color="#8B5CF6"
+                  gradient={['#8B5CF6', '#7C3AED']}
+                />
+              </View>
+            </View>
 
-        {/* Budget Overview */}
-        <View style={[styles.budgetCard, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Budget Overview</Text>
-          <View style={styles.budgetInfo}>
-            <View style={styles.budgetRow}>
-              <Text style={[styles.budgetLabel, { color: textSecondary }]}>Total Spent</Text>
-              <Text style={[styles.budgetValue, { color: textColor }]}>
-                {formatCurrency(mockStatistics.totalSpent)}
+            {/* Budget Overview */}
+            <View style={[styles.budgetCard, { backgroundColor: cardBg, borderColor }]}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>Budget Overview</Text>
+              <View style={styles.budgetInfo}>
+                <View style={styles.budgetRow}>
+                  <Text style={[styles.budgetLabel, { color: textSecondary }]}>Total Spent</Text>
+                  <Text style={[styles.budgetValue, { color: textColor }]}>
+                    {formatCurrency(statistics.totalSpent)}
+                  </Text>
+                </View>
+                <View style={styles.budgetRow}>
+                  <Text style={[styles.budgetLabel, { color: textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.budgetValue, { color: '#10B981' }]}>
+                    {formatCurrency(statistics.totalBudget - statistics.totalSpent)}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.budgetBar, { backgroundColor: '#E5E7EB' }]}>
+                <View
+                  style={[
+                    styles.budgetFill,
+                    {
+                      width: `${statistics.totalBudget > 0 ? (statistics.totalSpent / statistics.totalBudget) * 100 : 0}%`,
+                      backgroundColor: '#3B82F6',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.budgetPercent, { color: textSecondary }]}>
+                {statistics.totalBudget > 0 ? Math.round((statistics.totalSpent / statistics.totalBudget) * 100) : 0}% of budget used
               </Text>
             </View>
-            <View style={styles.budgetRow}>
-              <Text style={[styles.budgetLabel, { color: textSecondary }]}>Remaining</Text>
-              <Text style={[styles.budgetValue, { color: '#10B981' }]}>
-                {formatCurrency(mockStatistics.totalBudget - mockStatistics.totalSpent)}
-              </Text>
-            </View>
+          </>
+        )}
+
+        {loading && !statistics && (
+          <View style={styles.loadingContainer}>
+            <Text style={[styles.loadingText, { color: textSecondary }]}>Loading dashboard...</Text>
           </View>
-          <View style={[styles.budgetBar, { backgroundColor: '#E5E7EB' }]}>
-            <View
-              style={[
-                styles.budgetFill,
-                {
-                  width: `${(mockStatistics.totalSpent / mockStatistics.totalBudget) * 100}%`,
-                  backgroundColor: '#3B82F6',
-                },
-              ]}
-            />
-          </View>
-          <Text style={[styles.budgetPercent, { color: textSecondary }]}>
-            {Math.round((mockStatistics.totalSpent / mockStatistics.totalBudget) * 100)}% of budget used
-          </Text>
-        </View>
+        )}
 
         {/* Recent Projects */}
         <View style={styles.section}>
@@ -368,9 +384,15 @@ export default function HomeScreen() {
               <Text style={[styles.seeAll, { color: '#3B82F6' }]}>See All</Text>
             </TouchableOpacity>
           </View>
-          {recentProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
+          {recentProjects.length > 0 ? (
+            recentProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyStateText, { color: textSecondary }]}>No active projects</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -413,11 +435,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
   notificationButton: {
     width: 48,
     height: 48,
@@ -454,22 +471,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 24,
   },
+  twoColumnRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfWidthCard: {
+    flex: 1,
+  },
+  fullWidthCard: {
+    width: '100%',
+  },
   statCard: {
-    width: (width - 52) / 2,
+    width: '100%',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
@@ -661,5 +678,21 @@ const styles = StyleSheet.create({
   actionButtonTextLabel: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

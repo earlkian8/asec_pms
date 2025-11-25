@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,16 @@ import {
   Dimensions,
   TextInput,
   RefreshControl,
-  Share,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useApp } from '@/contexts/AppContext';
-import { mockProjects } from '@/data/mockData';
+import { useProjects, Project } from '@/hooks/useProjects';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Star, Phone, Mail, Share2, Download, ArrowUpDown } from 'lucide-react-native';
+import { Phone, Mail, ArrowUpDown } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
 
 const { width } = Dimensions.get('window');
@@ -33,70 +32,40 @@ export default function ProjectsScreen() {
   const [showSortModal, setShowSortModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<typeof mockProjects[0] | null>(null);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { favorites, toggleFavorite } = useApp();
+
+  // Use API hook with debounced search
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { projects, loading, error, refresh } = useProjects({
+    status: filterStatus,
+    search: debouncedSearch,
+    sortBy,
+    sortOrder,
+  });
 
   const statusOptions = ['all', 'active', 'on-hold', 'completed', 'pending'];
 
   const filteredProjects = useMemo(() => {
-    let filtered = mockProjects.filter((project) => {
-      const matchesSearch =
-        project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        project.location.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = !filterStatus || filterStatus === 'all' || project.status === filterStatus;
-      const matchesFavorites = !showFavoritesOnly || favorites.has(project.id);
-      return matchesSearch && matchesStatus && matchesFavorites;
-    });
+    return projects;
+  }, [projects]);
 
-    // Sorting
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'progress':
-          comparison = a.progress - b.progress;
-          break;
-        case 'budget':
-          comparison = a.budget - b.budget;
-          break;
-        case 'date':
-          comparison = new Date(a.expectedCompletion).getTime() - new Date(b.expectedCompletion).getTime();
-          break;
-        case 'status':
-          comparison = a.status.localeCompare(b.status);
-          break;
-      }
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-    return filtered;
-  }, [searchQuery, filterStatus, sortBy, sortOrder, showFavoritesOnly, favorites]);
-
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      Alert.alert('Success', 'Projects refreshed successfully');
-    }, 1500);
-  }, []);
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
 
-  const handleShare = async (project: typeof mockProjects[0]) => {
-    try {
-      await Share.share({
-        message: `Project: ${project.name}\nStatus: ${project.status}\nProgress: ${project.progress}%\nLocation: ${project.location}\nBudget: ${formatCurrency(project.budget)}`,
-        title: project.name,
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
-  const handleContact = (project: typeof mockProjects[0], method: 'call' | 'email') => {
+  const handleContact = (project: Project, method: 'call' | 'email') => {
     if (method === 'call') {
       Alert.alert('Contact Project Manager', `Would you like to call ${project.projectManager}?`, [
         { text: 'Cancel', style: 'cancel' },
@@ -110,25 +79,8 @@ export default function ProjectsScreen() {
     }
   };
 
-  const handleExport = () => {
-    Alert.alert(
-      'Export Projects',
-      'Choose export format:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'PDF',
-          onPress: () => Alert.alert('Info', 'PDF export functionality would generate a PDF report'),
-        },
-        {
-          text: 'Excel',
-          onPress: () => Alert.alert('Info', 'Excel export functionality would generate an Excel file'),
-        },
-      ]
-    );
-  };
 
-  const handleRequestUpdate = (project: typeof mockProjects[0]) => {
+  const handleRequestUpdate = (project: Project) => {
     setSelectedProject(project);
     setShowRequestUpdate(true);
   };
@@ -156,10 +108,9 @@ export default function ProjectsScreen() {
     pending: { bg: '#F3F4F6', text: '#4B5563', dot: '#6B7280' }, // gray-100/gray-600
   };
 
-  const ProjectCard = ({ project }: { project: typeof mockProjects[0] }) => {
+  const ProjectCard = ({ project }: { project: Project }) => {
     const status = statusColors[project.status] || statusColors.pending;
     const budgetPercent = (project.spent / project.budget) * 100;
-    const isFavorite = favorites.has(project.id);
 
     return (
       <View style={[styles.projectCard, { backgroundColor: cardBg, borderColor }]}>
@@ -173,18 +124,6 @@ export default function ProjectsScreen() {
                 <Text style={[styles.projectCardName, { color: textColor }]} numberOfLines={2}>
                   {project.name}
                 </Text>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(project.id);
-                  }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Star
-                    size={18}
-                    color={isFavorite ? '#F59E0B' : textSecondary}
-                    fill={isFavorite ? '#F59E0B' : 'none'}
-                  />
-                </TouchableOpacity>
               </View>
               <Text style={[styles.projectCardLocation, { color: textSecondary }]} numberOfLines={1}>
                 <Ionicons name="location-outline" size={12} color={textSecondary} /> {project.location}
@@ -272,11 +211,6 @@ export default function ProjectsScreen() {
             <Mail size={16} color="#3B82F6" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => handleShare(project)}>
-            <Share2 size={16} color={textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonText]}
             onPress={() => handleRequestUpdate(project)}>
             <Text style={[styles.actionButtonTextLabel, { color: '#3B82F6' }]}>Request Update</Text>
@@ -301,19 +235,9 @@ export default function ProjectsScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.headerActionButton, { backgroundColor: showFavoritesOnly ? '#FEF3C7' : '#F3F4F6' }]}
-            onPress={() => setShowFavoritesOnly(!showFavoritesOnly)}>
-            <Star size={18} color={showFavoritesOnly ? '#F59E0B' : textSecondary} fill={showFavoritesOnly ? '#F59E0B' : 'none'} />
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.headerActionButton, { backgroundColor: '#F3F4F6' }]}
             onPress={() => setShowSortModal(true)}>
             <ArrowUpDown size={18} color={textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.headerActionButton, { backgroundColor: '#F3F4F6' }]}
-            onPress={handleExport}>
-            <Download size={18} color={textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -374,7 +298,25 @@ export default function ProjectsScreen() {
         </ScrollView>
 
         {/* Projects List */}
-        {filteredProjects.length > 0 ? (
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={[styles.loadingText, { color: textSecondary }]}>Loading projects...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="alert-circle-outline" size={64} color={textSecondary} />
+            <Text style={[styles.emptyStateText, { color: textColor }]}>Error loading projects</Text>
+            <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
+              {error}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: '#3B82F6' }]}
+              onPress={onRefresh}>
+              <Text style={[styles.retryButtonText, { color: '#FFFFFF' }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredProjects.length > 0 ? (
           <View style={styles.projectsList}>
             {filteredProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />
@@ -672,6 +614,25 @@ const styles = StyleSheet.create({
   emptyStateSubtext: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  loadingText: {
+    fontSize: 14,
+    marginTop: 12,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   projectActions: {
     flexDirection: 'row',

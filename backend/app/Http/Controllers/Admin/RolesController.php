@@ -17,7 +17,8 @@ class RolesController extends Controller
      */
     public function index(Request $request){
         $search = $request->get('search', '');
-        $page = $request->get('page', 1);
+        $sortBy = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
 
         $query = Role::query();
 
@@ -25,14 +26,25 @@ class RolesController extends Controller
             $query->where('name', 'like', "%{$search}%");
         }
 
+        // Validate sort_by to prevent SQL injection
+        $allowedSortColumns = ['name', 'created_at', 'users_count'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort_order
+        $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
+
         $roles = $query->withCount('users') // counts assigned users
-                    ->orderBy('created_at', 'desc')
+                    ->orderBy($sortBy, $sortOrder)
                     ->paginate(10)
                     ->withQueryString();
 
         return Inertia::render('UserManagement/Roles/index', [
             'roles' => $roles,
             'search' => $search,
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
         ]);
     }
 

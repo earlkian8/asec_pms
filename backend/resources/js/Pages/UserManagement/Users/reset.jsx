@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from "sonner";
-import { AlertTriangle, User, Mail, Key, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, User, Mail, Key, Eye, EyeOff, Loader2, UnlockIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ const ResetPassword = ({ setShowResetModal, user }) => {
     e.preventDefault();
     setProcessing(true);
     
-    router.patch(`/user-management/users/reset-password/${user.id}`, {}, {
+    router.patch(route('user-management.users.reset-password', user.id), {}, {
       preserveScroll: true,
       onSuccess: (page) => {
         setShowResetModal(false);
@@ -49,15 +49,17 @@ const ResetPassword = ({ setShowResetModal, user }) => {
 
   return (
     <Dialog open onOpenChange={setShowResetModal}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            Reset Password
-          </DialogTitle>
-          <DialogDescription>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-yellow-100 rounded-full p-2">
+              <AlertTriangle className="h-6 w-6 text-yellow-600" />
+            </div>
+            <DialogTitle className="text-yellow-900">Reset Password</DialogTitle>
+          </div>
+          <DialogDescription className="text-gray-600 pt-2">
             <div className="space-y-4">
-              <p className="mb-4 text-sm text-gray-600">
+              <p className="mb-4 text-sm">
                 Are you sure you want to reset the password for <span className="font-semibold text-gray-900">{user.name}</span>? This action cannot be undone.
               </p>
 
@@ -89,7 +91,7 @@ const ResetPassword = ({ setShowResetModal, user }) => {
                       <Input 
                         value={showPassword ? defaultPassword : '•'.repeat(defaultPassword.length)}
                         readOnly
-                        className="flex-1 font-mono text-sm bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500 focus-visible:ring-green-500 focus-within:ring-green-500"
+                        className="flex-1 font-mono text-sm bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-500"
                       />
                       <button
                         onClick={() => setShowPassword(!showPassword)}
@@ -124,10 +126,11 @@ const ResetPassword = ({ setShowResetModal, user }) => {
           </DialogDescription>
         </DialogHeader>
 
-        <DialogFooter className="flex flex-row justify-end gap-2">
+        <DialogFooter className="flex flex-row justify-end gap-2 mt-4">
           <Button
             type="button"
-            className="px-4 py-2 text-gray-900 transition bg-white border border-gray-300 rounded hover:bg-gray-50 hover:border-gray-400"
+            variant="outline"
+            className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
             onClick={() => setShowResetModal(false)}
             disabled={processing}
           >
@@ -135,14 +138,21 @@ const ResetPassword = ({ setShowResetModal, user }) => {
           </Button>
           <Button
             type="button"
-            className="flex items-center gap-2 px-4 py-2 text-white transition bg-red-500 rounded hover:bg-red-600 disabled:opacity-50"
+            className="bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             onClick={handleReset}
             disabled={processing}
           >
-            {processing && (
-              <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin"></div>
+            {processing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Resetting...
+              </>
+            ) : (
+              <>
+                <UnlockIcon size={16} />
+                Reset Password
+              </>
             )}
-            {processing ? 'Resetting...' : 'Reset Password'}
           </Button>
         </DialogFooter>
       </DialogContent>

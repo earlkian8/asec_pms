@@ -19,7 +19,9 @@ class UsersController extends Controller
     public function index(Request $request)
     {
         $search = $request->get('search', '');
-        $page = $request->get('page', 1);
+        $sortBy = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $roleFilter = $request->get('role', '');
 
         $query = User::query();
 
@@ -30,19 +32,46 @@ class UsersController extends Controller
             });
         }
 
+        // Filter by role
+        if ($roleFilter) {
+            $query->whereHas('roles', function ($q) use ($roleFilter) {
+                $q->where('name', $roleFilter);
+            });
+        }
+
+        // Validate sort_by to prevent SQL injection
+        $allowedSortColumns = ['name', 'email', 'created_at'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort_order
+        $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
+
         $users = $query
                       ->with('roles')
-                      ->orderBy('created_at', 'desc')
+                      ->orderBy($sortBy, $sortOrder)
                       ->paginate(10)
                       ->withQueryString();
 
         // Get all roles for the dropdowns
         $roles = Role::all(['id', 'name']);
 
+        // Get unique roles for filter options
+        $roleNames = Role::distinct()->pluck('name')->sort()->values();
+
         return Inertia::render('UserManagement/Users/index', [
             'users' => $users,
             'roles' => $roles,
             'search' => $search,
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
+            'filters' => [
+                'role' => $roleFilter,
+            ],
+            'filterOptions' => [
+                'roles' => $roleNames,
+            ],
         ]);
     }
 

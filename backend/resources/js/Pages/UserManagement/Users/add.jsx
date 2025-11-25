@@ -14,7 +14,7 @@ import InputError from '@/Components/InputError';
 import { Label } from '@/Components/ui/label';
 import { Button } from '@/Components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Save } from 'lucide-react';
 
 const AddUser = ({ setShowAddModal, roles }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -42,22 +42,14 @@ const AddUser = ({ setShowAddModal, roles }) => {
           toast.success('User created successfully!');
         }
       },
-      onError: (errors) => {
-        if (errors.email) {
-          toast.error('Email is already taken');
-        } else if (errors.password) {
-          toast.error('Password must be at least 8 characters');
-        } else if (errors.role) {
-          toast.error('Please select a valid role');
-        } else {
-          toast.error('Please check the form for errors');
-        }
-      }
+      onError: () => {
+        toast.error("Please check the form for errors");
+      },
     });
   };
 
   const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
@@ -179,15 +171,27 @@ const AddUser = ({ setShowAddModal, roles }) => {
               type="button"
               variant="outline"
               onClick={() => setShowAddModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="bg-zinc-800 text-white hover:bg-zinc-900 transition"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               disabled={processing}
             >
-              Add User
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Add User
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

@@ -9,12 +9,12 @@ import { Checkbox } from "@/Components/ui/checkbox";
 import { useState } from "react";
 import AddClient from "../../ClientManagement/add";
 
-export default function Step1ProjectInfo({ clients }) {
+export default function Step1ProjectInfo({ clients, errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
   const [showAddClient, setShowAddClient] = useState(false);
 
   const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
@@ -30,25 +30,26 @@ export default function Step1ProjectInfo({ clients }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Project Name */}
           <div className="md:col-span-2">
-            <Label className="text-zinc-800">Project Name <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Project Name <span className="text-red-500">*</span></Label>
             <Input
               type="text"
               value={projectData.project_name}
               onChange={(e) => updateProjectData({ project_name: e.target.value })}
               placeholder="Enter project name"
-              className={inputClass(false)}
+              className={inputClass(errors.project_name)}
             />
+            <InputError message={errors.project_name} />
           </div>
 
           {/* Client */}
           <div>
-            <Label className="text-zinc-800">Client <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Client <span className="text-red-500">*</span></Label>
             <div className="flex gap-2 items-center">
               <Select
                 value={projectData.client_id}
                 onValueChange={(value) => updateProjectData({ client_id: value })}
               >
-                <SelectTrigger className={inputClass(false)}>
+                <SelectTrigger className={inputClass(errors.client_id)}>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>
@@ -68,16 +69,17 @@ export default function Step1ProjectInfo({ clients }) {
                 New
               </Button>
             </div>
+            <InputError message={errors.client_id} />
           </div>
 
           {/* Project Type */}
           <div>
-            <Label className="text-zinc-800">Project Type <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Project Type <span className="text-red-500">*</span></Label>
             <Select
               value={projectData.project_type}
               onValueChange={(value) => updateProjectData({ project_type: value })}
             >
-              <SelectTrigger className={inputClass(false)}>
+              <SelectTrigger className={inputClass(errors.project_type)}>
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
@@ -94,6 +96,7 @@ export default function Step1ProjectInfo({ clients }) {
                 <SelectItem value="surveying">Surveying</SelectItem>
               </SelectContent>
             </Select>
+            <InputError message={errors.project_type} />
           </div>
 
           {/* Status */}
@@ -136,15 +139,16 @@ export default function Step1ProjectInfo({ clients }) {
 
           {/* Contract Amount */}
           <div>
-            <Label className="text-zinc-800">Contract Amount <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Contract Amount <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
               value={projectData.contract_amount}
               onChange={(e) => updateProjectData({ contract_amount: e.target.value })}
               placeholder="Enter amount"
-              className={inputClass(false)}
+              className={inputClass(errors.contract_amount)}
             />
+            <InputError message={errors.contract_amount} />
           </div>
 
           {/* Start Date */}

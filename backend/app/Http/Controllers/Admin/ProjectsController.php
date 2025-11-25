@@ -52,6 +52,23 @@ class ProjectsController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $clientId = $request->input('client_id');
+        $status = $request->input('status');
+        $priority = $request->input('priority');
+        $projectType = $request->input('project_type');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        // Validate sort column
+        $allowedSortColumns = ['created_at', 'project_name', 'project_code', 'status', 'priority', 'contract_amount', 'start_date', 'planned_end_date'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort order
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $projects = Project::with(['client', 'milestones.tasks'])
             ->when($search, function ($query, $search) {
@@ -62,7 +79,25 @@ class ProjectsController extends Controller
                     ->orWhere('priority', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('created_at', 'desc')
+            ->when($clientId, function ($query, $clientId) {
+                $query->where('client_id', $clientId);
+            })
+            ->when($status, function ($query, $status) {
+                $query->where('status', $status);
+            })
+            ->when($priority, function ($query, $priority) {
+                $query->where('priority', $priority);
+            })
+            ->when($projectType, function ($query, $projectType) {
+                $query->where('project_type', $projectType);
+            })
+            ->when($startDate, function ($query, $startDate) {
+                $query->whereDate('start_date', '>=', $startDate);
+            })
+            ->when($endDate, function ($query, $endDate) {
+                $query->whereDate('planned_end_date', '<=', $endDate);
+            })
+            ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
             ->withQueryString(); // keep search when paginating
 
@@ -94,12 +129,32 @@ class ProjectsController extends Controller
             ->orderBy('item_name')
             ->get(['id', 'item_code', 'item_name']); // 'unit_of_measure', 'unit_price', 'current_stock'
 
+        // Get unique project types and statuses for filters
+        $projectTypes = Project::distinct()->whereNotNull('project_type')->pluck('project_type')->sort()->values();
+        $statuses = Project::distinct()->whereNotNull('status')->pluck('status')->sort()->values();
+        $priorities = Project::distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
+
         return Inertia::render('ProjectManagement/index', [
             'projects'   => $projects,
             'search'     => $search,
             'clients'    => $clients,
             'users'      => $users,
             'inventoryItems' => $inventoryItems,
+            'filters' => [
+                'client_id' => $clientId,
+                'status' => $status,
+                'priority' => $priority,
+                'project_type' => $projectType,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
+            'filterOptions' => [
+                'projectTypes' => $projectTypes,
+                'statuses' => $statuses,
+                'priorities' => $priorities,
+            ],
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
         ]);
     }
 

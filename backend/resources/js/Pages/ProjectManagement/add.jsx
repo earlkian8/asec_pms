@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/Components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 import { ProjectWizardProvider, useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import Step1ProjectInfo from "./wizard-steps/Step1ProjectInfo";
@@ -17,8 +18,9 @@ import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) => {
-  const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep } = useProjectWizard();
+  const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep, goToStep } = useProjectWizard();
   const [processing, setProcessing] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   const stepTitles = [
     "Project Information",
@@ -30,6 +32,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
   const handleSubmit = () => {
     const allData = getAllData();
     setProcessing(true);
+    setFormErrors({});
     
     router.post(route("project-management.store"), {
       ...allData.project,
@@ -42,6 +45,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
         resetWizard();
         setShowAddModal(false);
         setProcessing(false);
+        setFormErrors({});
         const flash = page.props.flash;
         if (flash && flash.error) {
           toast.error(flash.error);
@@ -51,21 +55,30 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
       },
       onError: (errors) => {
         setProcessing(false);
+        setFormErrors(errors);
+        // Navigate to step 1 if there are project data errors
+        const projectFieldErrors = Object.keys(errors).filter(key => 
+          ['project_name', 'client_id', 'project_type', 'contract_amount'].includes(key)
+        );
+        if (projectFieldErrors.length > 0) {
+          goToStep(1);
+        }
         toast.error("Please check the form for errors");
       },
     });
   };
 
   const renderStep = () => {
+    const errors = formErrors;
     switch (currentStep) {
       case 1:
-        return <Step1ProjectInfo clients={clients} />;
+        return <Step1ProjectInfo clients={clients} errors={errors} />;
       case 2:
-        return <Step2TeamMembers users={users} />;
+        return <Step2TeamMembers users={users} errors={errors} />;
       case 3:
-        return <Step3Milestones />;
+        return <Step3Milestones errors={errors} />;
       case 4:
-        return <Step4MaterialAllocation inventoryItems={inventoryItems} />;
+        return <Step4MaterialAllocation inventoryItems={inventoryItems} errors={errors} />;
       default:
         return null;
     }
@@ -128,6 +141,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
               setShowAddModal(false);
             }}
             disabled={processing}
+            className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
           >
             Cancel
           </Button>
@@ -139,7 +153,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
                 variant="outline"
                 onClick={prevStep}
                 disabled={processing}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
               >
                 <ChevronLeft size={18} />
                 Previous
@@ -151,7 +165,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
                 type="button"
                 onClick={nextStep}
                 disabled={processing}
-                className="bg-zinc-700 hover:bg-zinc-900 text-white flex items-center gap-2"
+                className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white flex items-center gap-2 shadow-md transition-all duration-200"
               >
                 Next
                 <ChevronRight size={18} />
@@ -161,9 +175,19 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
                 type="button"
                 onClick={handleSubmit}
                 disabled={processing}
-                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white flex items-center gap-2 shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {processing ? "Creating..." : "Create Project"}
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check size={18} />
+                    Create Project
+                  </>
+                )}
               </Button>
             )}
           </div>

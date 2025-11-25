@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,6 +15,9 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Textarea } from "@/Components/ui/textarea";
 
 const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users = [], preselectedTask = null }) => {
+  const { auth } = usePage().props;
+  const currentUser = auth?.user;
+  
   const { data, setData, post, errors, processing } = useForm({
     project_id: project?.id || "",
     project_milestone_id: preselectedTask?.milestone?.id || preselectedTask?.milestone_id || "none",
@@ -23,7 +26,7 @@ const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users
     description: "",
     priority: "medium",
     status: "open",
-    assigned_to: "none",
+    assigned_to: currentUser?.id || null,
     due_date: "",
   });
 
@@ -45,9 +48,7 @@ const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users
       project_task_id: data.project_task_id && data.project_task_id !== "none" 
         ? (typeof data.project_task_id === 'string' ? parseInt(data.project_task_id) : data.project_task_id)
         : null,
-      assigned_to: data.assigned_to && data.assigned_to !== "none" 
-        ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
-        : null,
+      assigned_to: currentUser?.id || null,
     };
 
     post(route("project-management.project-issues.store"), {
@@ -196,34 +197,6 @@ const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users
               </SelectContent>
             </Select>
             <InputError message={errors.status} />
-          </div>
-
-          {/* Assigned To */}
-          <div>
-            <Label>Assign To</Label>
-            <Select
-              value={data.assigned_to}
-              onValueChange={(value) => setData("assigned_to", value)}
-            >
-              <SelectTrigger className={inputClass(errors.assigned_to)}>
-                <SelectValue placeholder="Select user" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None (Unassigned)</SelectItem>
-                {users.length > 0 ? (
-                  users.map((u) => (
-                    <SelectItem key={u.id} value={u.id.toString()}>
-                      {u.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-1.5 text-sm text-gray-500">
-                    No users available
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
-            <InputError message={errors.assigned_to} />
           </div>
 
           {/* Due Date */}

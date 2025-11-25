@@ -29,13 +29,49 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
   });
 
   const [selectedUser, setSelectedUser] = useState(null);
+  const [period, setPeriod] = useState("");
+
+  // Convert period to hours worked
+  const periodToHours = (selectedPeriod) => {
+    switch (selectedPeriod) {
+      case "weekly":
+        return 40; // Standard work week
+      case "bi-weekly":
+        return 80; // 2 weeks
+      case "month":
+        return 173.33; // Average month (4.33 weeks)
+      default:
+        return 0;
+    }
+  };
+
+  // Reverse calculate period from hours worked
+  const hoursToPeriod = (hours) => {
+    const hoursNum = parseFloat(hours);
+    if (Math.abs(hoursNum - 40) < 0.1) return "weekly";
+    if (Math.abs(hoursNum - 80) < 0.1) return "bi-weekly";
+    if (Math.abs(hoursNum - 173.33) < 0.1) return "month";
+    return ""; // No match, will show as empty
+  };
 
   useEffect(() => {
     if (data.user_id) {
       const user = teamMembers.find(m => m.id === parseInt(data.user_id));
       setSelectedUser(user);
     }
+    // Set initial period based on existing hours_worked
+    const initialHours = laborCost.hours_worked || data.hours_worked;
+    if (initialHours) {
+      const calculatedPeriod = hoursToPeriod(initialHours);
+      setPeriod(calculatedPeriod);
+    }
   }, []);
+
+  const handlePeriodChange = (selectedPeriod) => {
+    setPeriod(selectedPeriod);
+    const hours = periodToHours(selectedPeriod);
+    setData("hours_worked", hours);
+  };
 
   const handleUserChange = (userId) => {
     setData("user_id", userId);
@@ -126,18 +162,32 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
             <InputError message={errors.work_date} />
           </div>
 
-          {/* Hours Worked */}
+          {/* Hours Worked - Period Selection */}
           <div>
             <Label className="text-zinc-800">Hours Worked <span class="text-red-500">*</span></Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={data.hours_worked}
-              onChange={(e) => setData("hours_worked", e.target.value)}
-              placeholder="Enter hours worked"
-              className={inputClass(errors.hours_worked)}
-            />
+            <Select
+              value={period}
+              onValueChange={handlePeriodChange}
+            >
+              <SelectTrigger className={inputClass(errors.hours_worked)}>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly (40 hours)</SelectItem>
+                <SelectItem value="bi-weekly">Bi-weekly (80 hours)</SelectItem>
+                <SelectItem value="month">Month (173.33 hours)</SelectItem>
+              </SelectContent>
+            </Select>
+            {period && (
+              <p className="text-xs text-gray-500 mt-1">
+                Calculated hours: {data.hours_worked} hours
+              </p>
+            )}
+            {!period && data.hours_worked && (
+              <p className="text-xs text-gray-500 mt-1">
+                Current hours: {data.hours_worked} hours (does not match standard periods)
+              </p>
+            )}
             <InputError message={errors.hours_worked} />
           </div>
 

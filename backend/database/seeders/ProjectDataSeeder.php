@@ -126,7 +126,39 @@ class ProjectDataSeeder extends Seeder
         $paymentTerms = ['Net 30', 'Net 15', 'Net 45', 'Net 60', 'COD', '50% Down, 50% on Completion'];
 
         $clients = collect();
-        for ($i = 0; $i < $count; $i++) {
+        
+        // Create test client first
+        $testClient = Client::firstOrCreate(
+            ['email' => 'earlkian8@gmail.com'],
+            [
+                'client_code' => 'CLT-TEST',
+                'client_name' => 'Test Client Account',
+                'client_type' => 'corporation',
+                'contact_person' => 'Earl Kian',
+                'password' => Hash::make('password'),
+                'phone_number' => '+639123456789',
+                'address' => 'Tugbungan',
+                'city' => 'Zamboanga City',
+                'province' => 'Zamboanga del Sur',
+                'postal_code' => '7000',
+                'country' => 'Philippines',
+                'tax_id' => 'TIN-123-456-789-000',
+                'business_permit' => 'BP-1234567',
+                'credit_limit' => 10000000,
+                'payment_terms' => 'Net 30',
+                'is_active' => true,
+            ]
+        );
+        
+        // Always update password to ensure it's correct
+        $testClient->password = Hash::make('password');
+        $testClient->is_active = true;
+        $testClient->save();
+        
+        $clients->push($testClient);
+        
+        // Create remaining clients
+        for ($i = 0; $i < $count - 1; $i++) {
             do {
                 $random = str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
                 $clientCode = 'CLT-' . $random;
@@ -313,7 +345,10 @@ class ProjectDataSeeder extends Seeder
                 $actualEndDate = Carbon::parse(fake()->dateTimeBetween($startDate->toDateTimeString(), $plannedEndDate->toDateTimeString()));
             }
             
-            $contractAmount = fake()->randomFloat(2, 50000, 5000000);
+            // Set contract amount higher to ensure revenue > expenses
+            // Contract amount will be used as base for billing (revenue)
+            // We'll ensure expenses stay below 70% of contract amount
+            $contractAmount = fake()->randomFloat(2, 1000000, 10000000);
 
             $project = Project::create([
                 'project_code' => $projectCode,
@@ -413,12 +448,24 @@ class ProjectDataSeeder extends Seeder
             }
 
             // Create Material Allocations (2-5 items per project, reduced)
+            // Limit material costs to ensure they don't exceed contract amount
+            // Material costs should be max 30% of contract amount
+            $maxMaterialCost = $contractAmount * 0.30;
             $allocationCount = fake()->numberBetween(2, 5);
             $selectedItems = $inventoryItems->where('is_active', true)->random($allocationCount);
+            $totalMaterialCost = 0;
 
             foreach ($selectedItems as $item) {
-                $quantityAllocated = fake()->randomFloat(2, 10, 500);
+                // Calculate max quantity based on remaining budget
+                $remainingBudget = $maxMaterialCost - $totalMaterialCost;
+                $maxQuantityByBudget = $remainingBudget > 0 ? ($remainingBudget / max($item->unit_price, 1)) : 0;
+                $maxQuantity = min(500, $maxQuantityByBudget, ($maxMaterialCost / max($item->unit_price, 1)) / $allocationCount);
+                
+                $quantityAllocated = fake()->randomFloat(2, 10, max(10, $maxQuantity));
                 $quantityReceived = fake()->randomFloat(2, 0, $quantityAllocated);
+                
+                // Track material cost
+                $totalMaterialCost += $quantityAllocated * $item->unit_price;
                 
                 $allocationStatus = $quantityReceived >= $quantityAllocated ? 'received' :
                                    ($quantityReceived > 0 ? 'partial' : 'pending');
@@ -444,8 +491,12 @@ class ProjectDataSeeder extends Seeder
             }
 
             // Create Labor Costs (5-15 entries per project, reduced)
+            // Limit labor costs to ensure total expenses < contract amount
+            // Labor costs should be max 40% of contract amount
+            $maxLaborCost = $contractAmount * 0.40;
             $laborCostCount = fake()->numberBetween(5, 15);
             $projectUsers = $selectedUsers;
+            $totalLaborCost = 0;
 
             for ($l = 0; $l < $laborCostCount; $l++) {
                 // Determine max date for work date
@@ -464,12 +515,20 @@ class ProjectDataSeeder extends Seeder
                     ->where('user_id', $user->id)
                     ->first();
                 $hourlyRate = $teamMember?->hourly_rate ?? fake()->randomFloat(2, 200, 2000);
+                
+                // Calculate remaining labor budget
+                $remainingLaborBudget = $maxLaborCost - $totalLaborCost;
+                $maxHours = $remainingLaborBudget > 0 ? min(12, ($remainingLaborBudget / max($hourlyRate, 1)) / max(1, $laborCostCount - $l)) : 0;
+                $hoursWorked = fake()->randomFloat(2, 1, max(1, $maxHours));
+                
+                // Track labor cost
+                $totalLaborCost += $hoursWorked * $hourlyRate;
 
                 ProjectLaborCost::create([
                     'project_id' => $project->id,
                     'user_id' => $user->id,
                     'work_date' => $workDate->toDateString(),
-                    'hours_worked' => fake()->randomFloat(2, 1, 12),
+                    'hours_worked' => $hoursWorked,
                     'hourly_rate' => $hourlyRate,
                     'description' => fake()->optional(0.7)->sentence(),
                     'notes' => fake()->optional(0.3)->sentence(),
@@ -663,8 +722,10 @@ class ProjectDataSeeder extends Seeder
                     } while (Billing::where('billing_code', $billingCode)->exists());
                     
                     // Billing amount based on milestone (portion of contract)
+                    // Ensure billing amounts are substantial (revenue should be higher than expenses)
                     $milestonePortion = $project->contract_amount / $milestones->count();
-                    $billingAmount = fake()->randomFloat(2, $milestonePortion * 0.8, $milestonePortion * 1.2);
+                    // Set billing amount to 90-110% of milestone portion to ensure good revenue
+                    $billingAmount = fake()->randomFloat(2, $milestonePortion * 0.9, $milestonePortion * 1.1);
                     
                     // Billing date should be around milestone due date
                     $billingDateMin = Carbon::parse($project->start_date);

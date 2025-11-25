@@ -27,6 +27,27 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
   });
 
   const [selectedUser, setSelectedUser] = useState(null);
+  const [period, setPeriod] = useState("");
+
+  // Convert period to hours worked
+  const periodToHours = (selectedPeriod) => {
+    switch (selectedPeriod) {
+      case "weekly":
+        return 40; // Standard work week
+      case "bi-weekly":
+        return 80; // 2 weeks
+      case "month":
+        return 173.33; // Average month (4.33 weeks)
+      default:
+        return 0;
+    }
+  };
+
+  const handlePeriodChange = (selectedPeriod) => {
+    setPeriod(selectedPeriod);
+    const hours = periodToHours(selectedPeriod);
+    setData("hours_worked", hours);
+  };
 
   const handleUserChange = (userId) => {
     setData("user_id", userId);
@@ -117,18 +138,27 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             <InputError message={errors.work_date} />
           </div>
 
-          {/* Hours Worked */}
+          {/* Hours Worked - Period Selection */}
           <div>
             <Label className="text-zinc-800">Hours Worked <span class="text-red-500">*</span></Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={data.hours_worked}
-              onChange={(e) => setData("hours_worked", e.target.value)}
-              placeholder="Enter hours worked"
-              className={inputClass(errors.hours_worked)}
-            />
+            <Select
+              value={period}
+              onValueChange={handlePeriodChange}
+            >
+              <SelectTrigger className={inputClass(errors.hours_worked)}>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly (40 hours)</SelectItem>
+                <SelectItem value="bi-weekly">Bi-weekly (80 hours)</SelectItem>
+                <SelectItem value="month">Month (173.33 hours)</SelectItem>
+              </SelectContent>
+            </Select>
+            {period && (
+              <p className="text-xs text-gray-500 mt-1">
+                Calculated hours: {data.hours_worked} hours
+              </p>
+            )}
             <InputError message={errors.hours_worked} />
           </div>
 

@@ -170,7 +170,7 @@ export default function Step1ProjectInfo({ clients }) {
           </div>
 
           {/* Actual End Date */}
-          <div>
+          {/* <div>
             <Label className="text-zinc-800">Actual End Date</Label>
             <Input
               type="date"
@@ -178,7 +178,7 @@ export default function Step1ProjectInfo({ clients }) {
               onChange={(e) => updateProjectData({ actual_end_date: e.target.value })}
               className={inputClass(false)}
             />
-          </div>
+          </div> */}
 
           {/* Billing Type */}
           <div>

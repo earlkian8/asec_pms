@@ -1,98 +1,665 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  RefreshControl,
+  Share,
+  Linking,
+  Alert,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
+import { useApp } from '@/contexts/AppContext';
+import { mockStatistics, mockProjects } from '@/data/mockData';
+import {
+  Briefcase,
+  Wallet,
+  CheckCircle,
+  Clock,
+  Calendar,
+  Coins,
+  User,
+  TrendingUp,
+  Share2,
+  Phone,
+  Mail,
+  Bell,
+  Star,
+} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import RequestUpdateModal from '@/components/RequestUpdateModal';
+import NotificationCenter from '@/components/NotificationCenter';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const { user } = useAuth();
+  const { favorites, toggleFavorite, unreadCount } = useApp();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
+  const [showRequestUpdate, setShowRequestUpdate] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<typeof mockProjects[0] | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const activeProjects = mockProjects.filter((p) => p.status === 'active');
+  const recentProjects = activeProjects.slice(0, 3);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // Simulate API refresh
+    setTimeout(() => {
+      setRefreshing(false);
+      Alert.alert('Success', 'Projects refreshed successfully');
+    }, 1500);
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const backgroundColor = '#F3F4F6'; // gray-100
+  const cardBg = '#FFFFFF'; // white
+  const textColor = '#111827'; // gray-900
+  const textSecondary = '#4B5563'; // gray-600
+  const borderColor = '#E5E7EB'; // gray-200
+
+  const StatCard = ({
+    title,
+    value,
+    Icon,
+    color,
+    gradient,
+  }: {
+    title: string;
+    value: string | number;
+    Icon: React.ComponentType<{ size: number; color: string }>;
+    color: string;
+    gradient: string[];
+  }) => (
+    <View style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}>
+      <LinearGradient
+        colors={gradient}
+        style={styles.statIconContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}>
+        <Icon size={24} color="#FFFFFF" />
+      </LinearGradient>
+      <View style={styles.statContent}>
+        <Text style={[styles.statValue, { color: textColor }]}>{value}</Text>
+        <Text style={[styles.statTitle, { color: textSecondary }]}>{title}</Text>
+      </View>
+    </View>
+  );
+
+  const handleShare = async (project: typeof mockProjects[0]) => {
+    try {
+      await Share.share({
+        message: `Project: ${project.name}\nStatus: ${project.status}\nProgress: ${project.progress}%\nLocation: ${project.location}\nBudget: ${formatCurrency(project.budget)}`,
+        title: project.name,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleContact = (project: typeof mockProjects[0], method: 'call' | 'email') => {
+    if (method === 'call') {
+      Alert.alert(
+        'Contact Project Manager',
+        `Would you like to call ${project.projectManager}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Call',
+            onPress: () => {
+              // Linking.openURL(`tel:+1234567890`);
+              Alert.alert('Info', 'Call functionality would open phone dialer');
+            },
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Contact Project Manager',
+        `Would you like to email ${project.projectManager}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Email',
+            onPress: () => {
+              // Linking.openURL(`mailto:${project.projectManager.toLowerCase().replace(' ', '.')}@example.com`);
+              Alert.alert('Info', 'Email functionality would open email client');
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleRequestUpdate = (project: typeof mockProjects[0]) => {
+    setSelectedProject(project);
+    setShowRequestUpdate(true);
+  };
+
+  const ProjectCard = ({ project }: { project: typeof mockProjects[0] }) => {
+    const statusColors: Record<string, { bg: string; text: string }> = {
+      active: { bg: '#D1FAE5', text: '#065F46' }, // green-100/green-700
+      'on-hold': { bg: '#FEF3C7', text: '#92400E' }, // yellow-100/yellow-700
+      completed: { bg: '#DBEAFE', text: '#1E40AF' }, // blue-100/blue-700
+      pending: { bg: '#F3F4F6', text: '#4B5563' }, // gray-100/gray-600
+    };
+
+    const status = statusColors[project.status] || statusColors.pending;
+    const isFavorite = favorites.has(project.id);
+
+    return (
+      <View style={[styles.projectCard, { backgroundColor: cardBg, borderColor }]}>
+        <TouchableOpacity
+          onPress={() => router.push(`/project/${project.id}`)}
+          activeOpacity={0.7}>
+          <View style={styles.projectHeader}>
+            <View style={styles.projectTitleContainer}>
+              <View style={styles.projectTitleRow}>
+                <Text style={[styles.projectName, { color: textColor }]} numberOfLines={1}>
+                  {project.name}
+                </Text>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(project.id);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Star
+                    size={20}
+                    color={isFavorite ? '#F59E0B' : textSecondary}
+                    fill={isFavorite ? '#F59E0B' : 'none'}
+                  />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.projectLocation, { color: textSecondary }]} numberOfLines={1}>
+                {project.location}
+              </Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+              <Text style={[styles.statusText, { color: status.text }]}>
+                {project.status.replace('-', ' ').toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+        <View style={styles.progressContainer}>
+          <View style={styles.progressHeader}>
+            <Text style={[styles.progressLabel, { color: textSecondary }]}>Progress</Text>
+            <Text style={[styles.progressPercent, { color: textColor }]}>{project.progress}%</Text>
+          </View>
+          <View style={[styles.progressBar, { backgroundColor: '#E5E7EB' }]}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${project.progress}%`, backgroundColor: '#3B82F6' },
+              ]}
+            />
+          </View>
+        </View>
+
+          <View style={styles.projectFooter}>
+            <View style={styles.projectInfo}>
+              <Calendar size={14} color={textSecondary} />
+              <Text style={[styles.projectInfoText, { color: textSecondary }]}>
+                Due: {new Date(project.expectedCompletion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </Text>
+            </View>
+            <View style={styles.projectInfo}>
+              <Coins size={14} color={textSecondary} />
+              <Text style={[styles.projectInfoText, { color: textSecondary }]}>
+                {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Action Buttons */}
+        <View style={styles.projectActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonSmall]}
+            onPress={() => handleContact(project, 'call')}>
+            <Phone size={16} color="#3B82F6" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonSmall]}
+            onPress={() => handleContact(project, 'email')}>
+            <Mail size={16} color="#3B82F6" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonSmall]}
+            onPress={() => handleShare(project)}>
+            <Share2 size={16} color={textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.actionButtonText]}
+            onPress={() => handleRequestUpdate(project)}>
+            <Text style={[styles.actionButtonTextLabel, { color: '#3B82F6' }]}>Request Update</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 20 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
+        }>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.greeting, { color: textSecondary }]}>Welcome back,</Text>
+            <Text style={[styles.userName, { color: textColor }]}>
+              {user?.name || 'Client'}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.notificationButton, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => setShowNotifications(true)}>
+              <Bell size={20} color={textColor} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.avatar, { backgroundColor: cardBg, borderColor }]}>
+              <User size={24} color={textColor} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Statistics Grid */}
+        <View style={styles.statsGrid}>
+          <StatCard
+            title="Active Projects"
+            value={mockStatistics.activeProjects}
+            Icon={Briefcase}
+            color="#3B82F6"
+            gradient={['#3B82F6', '#2563EB']}
+          />
+          <StatCard
+            title="Total Budget"
+            value={formatCurrency(mockStatistics.totalBudget)}
+            Icon={Wallet}
+            color="#10B981"
+            gradient={['#10B981', '#059669']}
+          />
+          <StatCard
+            title="Completed"
+            value={mockStatistics.completedProjects}
+            Icon={CheckCircle}
+            color="#8B5CF6"
+            gradient={['#8B5CF6', '#7C3AED']}
+          />
+          <StatCard
+            title="On Time"
+            value={mockStatistics.onTimeProjects}
+            Icon={Clock}
+            color="#F59E0B"
+            gradient={['#F59E0B', '#D97706']}
+          />
+        </View>
+
+        {/* Budget Overview */}
+        <View style={[styles.budgetCard, { backgroundColor: cardBg, borderColor }]}>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Budget Overview</Text>
+          <View style={styles.budgetInfo}>
+            <View style={styles.budgetRow}>
+              <Text style={[styles.budgetLabel, { color: textSecondary }]}>Total Spent</Text>
+              <Text style={[styles.budgetValue, { color: textColor }]}>
+                {formatCurrency(mockStatistics.totalSpent)}
+              </Text>
+            </View>
+            <View style={styles.budgetRow}>
+              <Text style={[styles.budgetLabel, { color: textSecondary }]}>Remaining</Text>
+              <Text style={[styles.budgetValue, { color: '#10B981' }]}>
+                {formatCurrency(mockStatistics.totalBudget - mockStatistics.totalSpent)}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.budgetBar, { backgroundColor: '#E5E7EB' }]}>
+            <View
+              style={[
+                styles.budgetFill,
+                {
+                  width: `${(mockStatistics.totalSpent / mockStatistics.totalBudget) * 100}%`,
+                  backgroundColor: '#3B82F6',
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.budgetPercent, { color: textSecondary }]}>
+            {Math.round((mockStatistics.totalSpent / mockStatistics.totalBudget) * 100)}% of budget used
+          </Text>
+        </View>
+
+        {/* Recent Projects */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>Active Projects</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/projects')}>
+              <Text style={[styles.seeAll, { color: '#3B82F6' }]}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {recentProjects.map((project) => (
+            <ProjectCard key={project.id} project={project} />
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Modals */}
+      {selectedProject && (
+        <RequestUpdateModal
+          visible={showRequestUpdate}
+          onClose={() => {
+            setShowRequestUpdate(false);
+            setSelectedProject(null);
+          }}
+          projectId={selectedProject.id}
+          projectName={selectedProject.name}
+          projectManager={selectedProject.projectManager}
+        />
+      )}
+
+      <NotificationCenter
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  stepContainer: {
-    gap: 8,
+  notificationButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  greeting: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    width: (width - 52) / 2,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  statContent: {
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  budgetCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  budgetInfo: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  budgetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  budgetLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  budgetValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  budgetBar: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  budgetFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  budgetPercent: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  seeAll: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  projectCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  projectHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  projectTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  projectTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  projectName: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  projectLocation: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  progressContainer: {
+    marginBottom: 16,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  progressPercent: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  projectFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  projectInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  projectInfoText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  projectActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    gap: 8,
+    alignItems: 'center',
+  },
+  actionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonSmall: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#EFF6FF',
+  },
+  actionButtonText: {
+    flex: 1,
+    backgroundColor: '#EFF6FF',
+  },
+  actionButtonTextLabel: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

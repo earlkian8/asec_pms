@@ -7,136 +7,34 @@ import {
   TouchableOpacity,
   Dimensions,
   RefreshControl,
-  Share,
   Alert,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useApp } from '@/contexts/AppContext';
-import { mockProjects, Milestone } from '@/data/mockData';
 import { FIRM_CONTACT } from '@/constants/contact';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Phone, Mail, Share2, Download, Star, FileText, AlertCircle } from 'lucide-react-native';
+import { Phone, Mail } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
-import IssueReportModal from '@/components/IssueReportModal';
-import DocumentViewer from '@/components/DocumentViewer';
+import { useProjectDetail, ProjectDetail, ProgressUpdate } from '@/hooks/useProjectDetail';
 
 const { width } = Dimensions.get('window');
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { favorites, toggleFavorite } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
-  const [showIssueReport, setShowIssueReport] = useState(false);
-  const [showDocuments, setShowDocuments] = useState(false);
 
-  const project = mockProjects.find((p) => p.id === id);
-
-  if (!project) {
-    return (
-      <View style={[styles.container, { backgroundColor: '#F3F4F6' }]}>
-        <Text style={{ color: '#111827' }}>Project not found</Text>
-      </View>
-    );
-  }
-
+  const { project, loading, error, refresh } = useProjectDetail(id as string);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'milestones' | 'updates'>('overview');
-  const isFavorite = favorites.has(project.id);
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      Alert.alert('Success', 'Project data refreshed successfully');
-    }, 1500);
-  }, []);
-
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `Project: ${project.name}\nStatus: ${project.status}\nProgress: ${project.progress}%\nLocation: ${project.location}\nBudget: ${formatCurrency(project.budget)}\nDescription: ${project.description}`,
-        title: project.name,
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
-  const handleContact = async (method: 'call' | 'email') => {
-    if (method === 'call') {
-      const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
-      
-      Alert.alert(
-        'Contact Project Manager',
-        `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Call',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(phoneUrl);
-                if (canOpen) {
-                  await Linking.openURL(phoneUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open phone dialer');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open phone dialer');
-                console.error('Error opening phone:', error);
-              }
-            },
-          },
-        ]
-      );
-    } else {
-      const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-      
-      Alert.alert(
-        'Contact Project Manager',
-        `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Email',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(emailUrl);
-                if (canOpen) {
-                  await Linking.openURL(emailUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open email client');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open email client');
-                console.error('Error opening email:', error);
-              }
-            },
-          },
-        ]
-      );
-    }
-  };
-
-  const handleExport = () => {
-    Alert.alert(
-      'Export Project',
-      'Choose export format:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'PDF',
-          onPress: () => Alert.alert('Info', 'PDF export functionality would generate a PDF report for this project'),
-        },
-        {
-          text: 'Excel',
-          onPress: () => Alert.alert('Info', 'Excel export functionality would generate an Excel file'),
-        },
-      ]
-    );
-  };
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
@@ -160,8 +58,6 @@ export default function ProjectDetailScreen() {
     pending: { bg: '#F3F4F6', text: '#4B5563', dot: '#6B7280' }, // gray-100/gray-600
   };
 
-  const status = statusColors[project.status] || statusColors.pending;
-
   const StatBox = ({
     label,
     value,
@@ -182,7 +78,7 @@ export default function ProjectDetailScreen() {
     </View>
   );
 
-  const MilestoneCard = ({ milestone }: { milestone: Milestone }) => {
+  const MilestoneCard = ({ milestone }: { milestone: ProjectDetail['milestones'][0] }) => {
     const milestoneStatusColors: Record<string, { bg: string; text: string; icon: string }> = {
       completed: { bg: '#D1FAE5', text: '#065F46', icon: 'checkmark-circle' }, // green-100/green-700
       'in-progress': { bg: '#DBEAFE', text: '#1E40AF', icon: 'time' }, // blue-100/blue-700
@@ -278,7 +174,7 @@ export default function ProjectDetailScreen() {
     );
   };
 
-  const UpdateCard = ({ update }: { update: typeof project.recentUpdates[0] }) => {
+  const UpdateCard = ({ update }: { update: ProgressUpdate }) => {
     const updateTypeColors: Record<string, { bg: string; icon: string }> = {
       progress: { bg: '#3B82F6', icon: 'trending-up' },
       milestone: { bg: '#10B981', icon: 'flag' },
@@ -305,12 +201,102 @@ export default function ProjectDetailScreen() {
             </Text>
           </View>
         </View>
-        <Text style={[styles.updateDescription, { color: textSecondary }]}>
-          {update.description}
-        </Text>
+        {update.description && (
+          <Text style={[styles.updateDescription, { color: textSecondary }]}>
+            {update.description}
+          </Text>
+        )}
       </View>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={{ color: '#4B5563', marginTop: 12 }}>Loading project details...</Text>
+      </View>
+    );
+  }
+
+  if (error || !project) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+        <Text style={{ color: '#111827', fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>
+          {error || 'Project not found'}
+        </Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: '#3B82F6', marginTop: 16 }]}
+          onPress={refresh}>
+          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const handleContact = async (method: 'call' | 'email') => {
+    if (!project) return;
+    
+    if (method === 'call') {
+      const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
+      
+      Alert.alert(
+        'Contact Project Manager',
+        `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Call',
+            onPress: async () => {
+              try {
+                const canOpen = await Linking.canOpenURL(phoneUrl);
+                if (canOpen) {
+                  await Linking.openURL(phoneUrl);
+                } else {
+                  Alert.alert('Error', 'Unable to open phone dialer');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to open phone dialer');
+                console.error('Error opening phone:', error);
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
+      
+      Alert.alert(
+        'Contact Project Manager',
+        `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Email',
+            onPress: async () => {
+              try {
+                const canOpen = await Linking.canOpenURL(emailUrl);
+                if (canOpen) {
+                  await Linking.openURL(emailUrl);
+                } else {
+                  Alert.alert('Error', 'Unable to open email client');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to open email client');
+                console.error('Error opening email:', error);
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  // Final safety check - should never reach here if project is null, but just in case
+  if (!project) {
+    return null;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
@@ -322,22 +308,13 @@ export default function ProjectDetailScreen() {
         <View style={styles.headerContent}>
           <View style={styles.headerTitleRow}>
             <Text style={[styles.headerTitle, { color: textColor }]} numberOfLines={1}>
-              {project.name}
+              {project?.name || 'Loading...'}
             </Text>
-            <TouchableOpacity
-              onPress={() => toggleFavorite(project.id)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Star
-                size={24}
-                color={isFavorite ? '#F59E0B' : textSecondary}
-                fill={isFavorite ? '#F59E0B' : 'none'}
-              />
-            </TouchableOpacity>
           </View>
           <View style={styles.headerSubtitle}>
-            <View style={[styles.statusDot, { backgroundColor: status.dot }]} />
+            <View style={[styles.statusDot, { backgroundColor: statusColors[project?.status || 'pending']?.dot || statusColors.pending.dot }]} />
             <Text style={[styles.headerSubtitleText, { color: textSecondary }]}>
-              {project.status.replace('-', ' ').toUpperCase()}
+              {(project?.status || 'pending').replace('-', ' ').toUpperCase()}
             </Text>
           </View>
         </View>
@@ -353,12 +330,6 @@ export default function ProjectDetailScreen() {
             onPress={() => handleContact('email')}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Mail size={20} color={textColor} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={handleShare}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Share2 size={20} color={textColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -524,30 +495,10 @@ export default function ProjectDetailScreen() {
             {/* Action Buttons */}
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#EFF6FF', borderColor }]}
-                onPress={() => setShowDocuments(true)}>
-                <FileText size={20} color="#3B82F6" />
-                <Text style={[styles.actionButtonText, { color: '#3B82F6' }]}>
-                  Documents ({project.documents.length})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#FEF3C7', borderColor }]}
                 onPress={() => setShowRequestUpdate(true)}>
                 <Ionicons name="chatbubble-outline" size={20} color="#F59E0B" />
                 <Text style={[styles.actionButtonText, { color: '#F59E0B' }]}>Request Update</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#FEE2E2', borderColor }]}
-                onPress={() => setShowIssueReport(true)}>
-                <AlertCircle size={20} color="#EF4444" />
-                <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Report Issue</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#EFF6FF', borderColor }]}
-                onPress={handleExport}>
-                <Download size={20} color="#3B82F6" />
-                <Text style={[styles.actionButtonText, { color: '#3B82F6' }]}>Export</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -582,20 +533,6 @@ export default function ProjectDetailScreen() {
         projectId={project.id}
         projectName={project.name}
         projectManager={project.projectManager}
-      />
-
-      <IssueReportModal
-        visible={showIssueReport}
-        onClose={() => setShowIssueReport(false)}
-        projectId={project.id}
-        projectName={project.name}
-      />
-
-      <DocumentViewer
-        visible={showDocuments}
-        onClose={() => setShowDocuments(false)}
-        documents={project.documents}
-        projectName={project.name}
       />
     </View>
   );
@@ -958,6 +895,33 @@ const styles = StyleSheet.create({
   updateDescription: {
     fontSize: 14,
     lineHeight: 20,
+    marginBottom: 12,
+  },
+  fileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    gap: 12,
+  },
+  fileInfo: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  fileSize: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  retryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
   emptyState: {
     alignItems: 'center',

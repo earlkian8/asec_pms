@@ -21,8 +21,32 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/projects', [ClientDashboardController::class, 'projects']);
     Route::get('/dashboard/projects/export', [ClientDashboardController::class, 'exportProjects']);
     
+    // Project detail route
+    Route::get('/projects/{id}', [ClientDashboardController::class, 'projectDetail']);
+    
     // Request Update routes
     Route::post('/request-update', [ClientDashboardController::class, 'requestUpdate']);
+    
+    // Progress update file download
+    Route::get('/projects/{projectId}/progress-updates/{updateId}/download', [ClientDashboardController::class, 'downloadProgressUpdateFile'])
+        ->name('client.progress-updates.download');
+    Route::options('/projects/{projectId}/progress-updates/{updateId}/download', function (Request $request) {
+        $origin = $request->header('Origin');
+        
+        $response = response('', 200)
+            ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            ->header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With, Accept')
+            ->header('Access-Control-Max-Age', '3600');
+        
+        if ($origin) {
+            $response->header('Access-Control-Allow-Origin', $origin)
+                     ->header('Access-Control-Allow-Credentials', 'true');
+        } else {
+            $response->header('Access-Control-Allow-Origin', '*');
+        }
+        
+        return $response;
+    });
 });
 
 // Default user route (for admin/other users)

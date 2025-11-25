@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.106:8000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.104:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -57,6 +57,19 @@ class ApiService {
       });
 
       if (responseType === 'blob') {
+        if (!response.ok) {
+          // Try to get error message from response
+          const errorText = await response.text();
+          let errorMessage = 'Failed to download file';
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorMessage;
+          } catch {
+            // If not JSON, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
         return await response.blob();
       }
 

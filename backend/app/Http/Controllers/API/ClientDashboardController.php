@@ -7,11 +7,14 @@ use App\Models\Project;
 use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMilestone;
+use App\Models\ProjectTask;
+use App\Models\ProgressUpdate;
 use App\Models\InventoryItem;
 use App\Models\ClientUpdateRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class ClientDashboardController extends Controller
 {
@@ -369,6 +372,248 @@ class ClientDashboardController extends Controller
                 'created_at' => $updateRequest->created_at,
             ],
         ], 201);
+    }
+
+    /**
+     * Get project details for authenticated client
+     */
+    public function projectDetail(Request $request, $id)
+    {
+        $client = $request->user();
+        
+        // Get project and verify ownership
+        $project = Project::where('id', $id)
+            ->where('client_id', $client->id)
+            ->with([
+                'team.user',
+                'milestones.tasks.assignedUser',
+                'milestones.tasks.progressUpdates.createdBy',
+            ])
+            ->first();
+
+        if (!$project) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Project not found or does not belong to you',
+            ], 404);
+        }
+
+        // Calculate progress from milestones
+        $milestones = $project->milestones;
+        $progress = 0;
+        if ($milestones->count() > 0) {
+            $totalProgress = $milestones->sum(function ($milestone) {
+                $tasks = $milestone->tasks ?? collect();
+                if ($tasks->count() > 0) {
+                    $completedTasks = $tasks->where('status', 'completed')->count();
+                    return ($completedTasks / $tasks->count()) * 100;
+                }
+                return $milestone->status === 'completed' ? 100 : ($milestone->status === 'in_progress' ? 50 : 0);
+            });
+            $progress = round($totalProgress / $milestones->count());
+        }
+
+        // Calculate spent
+        $projectId = $project->id;
+        $materialCosts = DB::table('project_material_allocations')
+            ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->where('project_material_allocations.project_id', $projectId)
+            ->sum(DB::raw('project_material_allocations.quantity_allocated * inventory_items.unit_price'));
+        
+        $laborCosts = ProjectLaborCost::where('project_id', $projectId)
+            ->sum(DB::raw('hours_worked * hourly_rate'));
+        
+        $spent = (float) $materialCosts + (float) $laborCosts;
+
+        // Get project manager
+        $projectManager = $project->team
+            ->where('role', 'Project Manager')
+            ->where('is_active', true)
+            ->first();
+        $projectManagerName = $projectManager ? $projectManager->user->name : 'N/A';
+
+        // Map backend status to frontend status
+        $statusMap = [
+            'active' => 'active',
+            'on_hold' => 'on-hold',
+            'completed' => 'completed',
+            'planning' => 'pending',
+            'cancelled' => 'on-hold',
+        ];
+
+        // Format milestones with tasks and progress updates
+        $formattedMilestones = $milestones->map(function ($milestone) {
+            $tasks = $milestone->tasks->map(function ($task) {
+                $progressUpdates = $task->progressUpdates->map(function ($update) {
+                    return [
+                        'id' => (string) $update->id,
+                        'description' => $update->description,
+                        'author' => $update->createdBy ? $update->createdBy->name : 'Unknown',
+                        'date' => $update->created_at->toISOString(),
+                    ];
+                })->sortByDesc('date')->values();
+
+                return [
+                    'id' => (string) $task->id,
+                    'name' => $task->title,
+                    'description' => $task->description ?? '',
+                    'status' => $task->status === 'completed' ? 'completed' : ($task->status === 'in_progress' ? 'in-progress' : 'pending'),
+                    'assignedTo' => $task->assignedUser ? $task->assignedUser->name : 'Unassigned',
+                    'dueDate' => $task->due_date,
+                ];
+            });
+
+            return [
+                'id' => (string) $milestone->id,
+                'name' => $milestone->name,
+                'description' => $milestone->description ?? '',
+                'status' => $milestone->status === 'completed' ? 'completed' : ($milestone->status === 'in_progress' ? 'in-progress' : 'pending'),
+                'progress' => $tasks->count() > 0 
+                    ? round(($tasks->where('status', 'completed')->count() / $tasks->count()) * 100)
+                    : ($milestone->status === 'completed' ? 100 : ($milestone->status === 'in_progress' ? 50 : 0)),
+                'dueDate' => $milestone->due_date,
+                'completedDate' => $milestone->status === 'completed' ? $milestone->updated_at->toDateString() : null,
+                'tasks' => $tasks,
+            ];
+        });
+
+        // Collect all progress updates from all tasks, sorted by date
+        $allProgressUpdates = collect();
+        foreach ($milestones as $milestone) {
+            foreach ($milestone->tasks as $task) {
+                foreach ($task->progressUpdates as $update) {
+                    $allProgressUpdates->push([
+                        'id' => (string) $update->id,
+                        'title' => $task->title . ' - ' . $milestone->name,
+                        'description' => $update->description,
+                        'type' => 'progress',
+                        'author' => $update->createdBy ? $update->createdBy->name : 'Unknown',
+                        'date' => $update->created_at->toISOString(),
+                    ]);
+                }
+            }
+        }
+        $allProgressUpdates = $allProgressUpdates->sortByDesc('date')->values();
+
+        // Format team members
+        $teamMembers = $project->team
+            ->where('is_active', true)
+            ->map(function ($teamMember) {
+                return [
+                    'id' => (string) $teamMember->id,
+                    'name' => $teamMember->user->name,
+                    'role' => $teamMember->role,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => (string) $project->id,
+                'name' => $project->project_name,
+                'description' => $project->description ?? '',
+                'status' => $statusMap[$project->status] ?? 'pending',
+                'progress' => $progress,
+                'startDate' => $project->start_date,
+                'expectedCompletion' => $project->planned_end_date,
+                'budget' => (float) $project->contract_amount,
+                'spent' => $spent,
+                'location' => $project->location ?? '',
+                'projectManager' => $projectManagerName,
+                'milestones' => $formattedMilestones,
+                'recentUpdates' => $allProgressUpdates->take(20)->all(), // Latest 20 updates
+                'teamMembers' => $teamMembers,
+            ],
+        ]);
+    }
+
+    /**
+     * Download progress update file for authenticated client
+     */
+    public function downloadProgressUpdateFile(Request $request, $projectId, $updateId)
+    {
+        $client = $request->user();
+        
+        // Verify that the project belongs to the authenticated client
+        $project = Project::where('id', $projectId)
+            ->where('client_id', $client->id)
+            ->first();
+
+        if (!$project) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Project not found or does not belong to you',
+            ], 404);
+        }
+
+        // Find the progress update
+        $progressUpdate = ProgressUpdate::find($updateId);
+        
+        if (!$progressUpdate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Progress update not found',
+            ], 404);
+        }
+
+        // Verify the progress update belongs to a task in this project
+        $task = ProjectTask::find($progressUpdate->project_task_id);
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found',
+            ], 404);
+        }
+
+        $milestone = ProjectMilestone::find($task->project_milestone_id);
+        if (!$milestone || $milestone->project_id !== $project->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Progress update does not belong to this project',
+            ], 403);
+        }
+
+        if (!$progressUpdate->file_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No file attached to this progress update',
+            ], 404);
+        }
+
+        $disk = env('FILESYSTEM_DISK', 'public');
+
+        if (!Storage::disk($disk)->exists($progressUpdate->file_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File not found on server',
+            ], 404);
+        }
+
+        // Get the file content
+        $fileContent = Storage::disk($disk)->get($progressUpdate->file_path);
+        $mimeType = Storage::disk($disk)->mimeType($progressUpdate->file_path) ?? 'application/octet-stream';
+
+        // Get the origin from the request for CORS
+        $origin = $request->header('Origin');
+        
+        // Build response with file
+        $response = response($fileContent, 200)
+            ->header('Content-Type', $mimeType)
+            ->header('Content-Disposition', 'attachment; filename="' . $progressUpdate->original_name . '"')
+            ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            ->header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With, Accept')
+            ->header('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type');
+        
+        // Set CORS origin (required when using credentials)
+        if ($origin) {
+            $response->header('Access-Control-Allow-Origin', $origin)
+                     ->header('Access-Control-Allow-Credentials', 'true');
+        } else {
+            // Fallback for same-origin requests or when origin is not provided
+            $response->header('Access-Control-Allow-Origin', '*');
+        }
+        
+        return $response;
     }
 }
 

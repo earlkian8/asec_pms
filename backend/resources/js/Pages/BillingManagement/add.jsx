@@ -19,7 +19,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
+import { Loader2, Save } from "lucide-react";
 
 const AddBilling = ({ setShowAddModal, projects = [] }) => {
   const [selectedProject, setSelectedProject] = useState(null);
@@ -65,7 +66,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
   }, [data.project_id]);
 
   const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
@@ -75,9 +76,14 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
     post(route("billing-management.store"), {
       preserveScroll: true,
-      onSuccess: () => {
+      onSuccess: (page) => {
         setShowAddModal(false);
-        toast.success("Billing created successfully!");
+        const flash = page.props.flash;
+        if (flash && flash.error) {
+          toast.error(flash.error);
+        } else {
+          toast.success("Billing created successfully!");
+        }
       },
       onError: (errors) => {
         if (errors.error) {
@@ -91,15 +97,15 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
   return (
     <Dialog open onOpenChange={setShowAddModal}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Billing</DialogTitle>
+          <DialogTitle className="text-zinc-800">Add New Billing</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Project */}
-          <div>
-            <Label>Project <span class="text-red-500">*</span></Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Project <span className="text-red-500">*</span></Label>
             <Select
               value={data.project_id}
               onValueChange={(value) => setData("project_id", value)}
@@ -118,14 +124,14 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.project_id} />
           </div>
 
-          {/* Billing Type (auto-filled from project) - Moved after Project */}
+          {/* Billing Type (auto-filled from project) */}
           {selectedProject && (
-            <div>
-              <Label>Billing Type <span class="text-red-500">*</span></Label>
+            <div className="col-span-2">
+              <Label className="text-zinc-800">Billing Type <span className="text-red-500">*</span></Label>
               <Input
                 value={data.billing_type === 'fixed_price' ? 'Fixed Price' : data.billing_type === 'milestone' ? 'Milestone' : ''}
                 readOnly
-                className="bg-gray-50 border-gray-300 text-gray-600"
+                className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
               />
               <InputError message={errors.billing_type} />
             </div>
@@ -133,8 +139,8 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
           {/* Milestone (only for milestone-based billing) */}
           {data.billing_type === 'milestone' && (
-            <div>
-              <Label>Milestone <span class="text-red-500">*</span></Label>
+            <div className="col-span-2">
+              <Label className="text-zinc-800">Milestone <span className="text-red-500">*</span></Label>
               <Select
                 value={data.milestone_id}
                 onValueChange={(value) => {
@@ -164,24 +170,24 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
           {/* Contract Amount Info (read-only) */}
           {selectedProject && selectedProject.contract_amount && (
-            <div>
-              <Label>Contract Amount</Label>
+            <div className="col-span-2">
+              <Label className="text-zinc-800">Contract Amount</Label>
               <Input
                 value={`₱${parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 readOnly
-                className="bg-gray-50 border-gray-300 text-gray-600"
+                className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
               />
               <p className="text-xs text-gray-500 mt-1">
                 {data.billing_type === 'fixed_price' 
                   ? 'Billing amount should not exceed contract amount'
-                  : 'For milestone billing, enter the milestone billing amount'}
+                  : 'For milestone billing, amount is calculated from milestone percentage'}
               </p>
             </div>
           )}
 
           {/* Billing Amount */}
-          <div>
-            <Label>Billing Amount <span class="text-red-500">*</span></Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Billing Amount <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -224,7 +230,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
           {/* Billing Date */}
           <div>
-            <Label>Billing Date <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Billing Date <span className="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.billing_date}
@@ -236,7 +242,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
           {/* Due Date */}
           <div>
-            <Label>Due Date</Label>
+            <Label className="text-zinc-800">Due Date</Label>
             <Input
               type="date"
               value={data.due_date}
@@ -248,8 +254,8 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
           </div>
 
           {/* Description */}
-          <div>
-            <Label>Description</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Description</Label>
             <Textarea
               value={data.description}
               onChange={(e) => setData("description", e.target.value)}
@@ -260,12 +266,33 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.description} />
           </div>
 
-          <DialogFooter className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+          {/* Footer Buttons */}
+          <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowAddModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={processing}>
-              Add Billing
+            <Button
+              type="submit"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Create Billing
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -275,4 +302,3 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 };
 
 export default AddBilling;
-

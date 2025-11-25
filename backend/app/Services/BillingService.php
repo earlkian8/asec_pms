@@ -13,6 +13,19 @@ class BillingService
         $status = request('status');
         $projectId = request('project_id');
         $billingType = request('billing_type');
+        $startDate = request('start_date');
+        $endDate = request('end_date');
+        $sortBy = request('sort_by', 'created_at');
+        $sortOrder = request('sort_order', 'desc');
+
+        // Validate sort column
+        $allowedSortColumns = ['created_at', 'billing_code', 'billing_date', 'due_date', 'billing_amount', 'status', 'billing_type'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort order
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $billings = Billing::with([
             'project:id,project_code,project_name,client_id',
@@ -39,7 +52,13 @@ class BillingService
             ->when($billingType, function ($query, $billingType) {
                 $query->where('billing_type', $billingType);
             })
-            ->orderBy('created_at', 'desc')
+            ->when($startDate, function ($query, $startDate) {
+                $query->whereDate('billing_date', '>=', $startDate);
+            })
+            ->when($endDate, function ($query, $endDate) {
+                $query->whereDate('billing_date', '<=', $endDate);
+            })
+            ->orderBy($sortBy, $sortOrder)
             ->paginate(15)
             ->withQueryString();
 
@@ -51,12 +70,26 @@ class BillingService
             return $billing;
         });
 
+        // Get unique values for filter options
+        $statuses = Billing::distinct()->whereNotNull('status')->pluck('status')->sort()->values();
+        $billingTypes = Billing::distinct()->whereNotNull('billing_type')->pluck('billing_type')->sort()->values();
+
         return [
             'billings' => $billings,
             'search' => $search,
-            'status' => $status,
-            'project_id' => $projectId,
-            'billing_type' => $billingType,
+            'filters' => [
+                'status' => $status,
+                'project_id' => $projectId,
+                'billing_type' => $billingType,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
+            'filterOptions' => [
+                'statuses' => $statuses,
+                'billingTypes' => $billingTypes,
+            ],
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
         ];
     }
 

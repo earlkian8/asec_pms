@@ -12,6 +12,7 @@ import InputError from "@/Components/InputError";
 import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
+import { Loader2, Save } from "lucide-react";
 
 const EditBilling = ({ setShowEditModal, billing }) => {
   const { data, setData, put, errors, processing } = useForm({
@@ -22,7 +23,7 @@ const EditBilling = ({ setShowEditModal, billing }) => {
   });
 
   const inputClass = (error, readOnly = false) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (readOnly
       ? "bg-zinc-100 text-zinc-600 cursor-not-allowed"
       : error
@@ -34,9 +35,14 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 
     put(route("billing-management.update", billing.id), {
       preserveScroll: true,
-      onSuccess: () => {
+      onSuccess: (page) => {
         setShowEditModal(false);
-        toast.success("Billing updated successfully!");
+        const flash = page.props.flash;
+        if (flash && flash.error) {
+          toast.error(flash.error);
+        } else {
+          toast.success("Billing updated successfully!");
+        }
       },
       onError: (errors) => {
         if (errors.error) {
@@ -50,15 +56,15 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 
   return (
     <Dialog open onOpenChange={setShowEditModal}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Billing</DialogTitle>
+          <DialogTitle className="text-zinc-800">Edit Billing</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Billing Code (read-only) */}
-          <div>
-            <Label>Billing Code</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Billing Code</Label>
             <Input
               value={billing.billing_code}
               readOnly
@@ -67,8 +73,8 @@ const EditBilling = ({ setShowEditModal, billing }) => {
           </div>
 
           {/* Project (read-only) */}
-          <div>
-            <Label>Project</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Project</Label>
             <Input
               value={`${billing.project?.project_code} - ${billing.project?.project_name}`}
               readOnly
@@ -77,30 +83,30 @@ const EditBilling = ({ setShowEditModal, billing }) => {
           </div>
 
           {/* Billing Type (read-only) */}
-          <div>
-            <Label>Billing Type</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Billing Type</Label>
             <Input
               value={billing.billing_type === 'fixed_price' ? 'Fixed Price' : billing.billing_type === 'milestone' ? 'Milestone' : ''}
               readOnly
-              className="bg-gray-50 border-gray-300 text-gray-600"
+              className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
             />
           </div>
 
           {/* Milestone (if milestone-based) */}
           {billing.billing_type === 'milestone' && billing.milestone && (
-            <div>
-              <Label>Milestone</Label>
+            <div className="col-span-2">
+              <Label className="text-zinc-800">Milestone</Label>
               <Input
                 value={billing.milestone.name + (billing.milestone.billing_percentage ? ` (${billing.milestone.billing_percentage}%)` : '')}
                 readOnly
-                className="bg-gray-50 border-gray-300 text-gray-600"
+                className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
               />
             </div>
           )}
 
           {/* Billing Amount */}
-          <div>
-            <Label>Billing Amount <span class="text-red-500">*</span></Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Billing Amount <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -148,7 +154,7 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 
           {/* Billing Date */}
           <div>
-            <Label>Billing Date <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Billing Date <span className="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.billing_date}
@@ -160,7 +166,7 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 
           {/* Due Date */}
           <div>
-            <Label>Due Date</Label>
+            <Label className="text-zinc-800">Due Date</Label>
             <Input
               type="date"
               value={data.due_date}
@@ -172,8 +178,8 @@ const EditBilling = ({ setShowEditModal, billing }) => {
           </div>
 
           {/* Description */}
-          <div>
-            <Label>Description</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Description</Label>
             <Textarea
               value={data.description}
               onChange={(e) => setData("description", e.target.value)}
@@ -184,12 +190,33 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             <InputError message={errors.description} />
           </div>
 
-          <DialogFooter className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+          {/* Footer Buttons */}
+          <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEditModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={processing}>
-              Update Billing
+            <Button
+              type="submit"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Save Changes
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -199,4 +226,3 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 };
 
 export default EditBilling;
-

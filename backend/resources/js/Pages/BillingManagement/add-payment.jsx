@@ -18,7 +18,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
+import { Loader2, Save, CreditCard } from "lucide-react";
 
 const AddPayment = ({ setShowPaymentModal, billing }) => {
   const remainingAmount = parseFloat(billing.billing_amount || 0) - parseFloat(billing.total_paid || 0);
@@ -32,7 +33,7 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
   });
 
   const inputClass = (error, readOnly = false) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (readOnly
       ? "bg-zinc-100 text-zinc-600 cursor-not-allowed"
       : error
@@ -50,9 +51,14 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
     post(route("billing-management.add-payment", billing.id), {
       preserveScroll: true,
-      onSuccess: () => {
+      onSuccess: (page) => {
         setShowPaymentModal(false);
-        toast.success("Payment recorded successfully!");
+        const flash = page.props.flash;
+        if (flash && flash.error) {
+          toast.error(flash.error);
+        } else {
+          toast.success("Payment recorded successfully!");
+        }
       },
       onError: (errors) => {
         if (errors.error) {
@@ -66,15 +72,15 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
   return (
     <Dialog open onOpenChange={setShowPaymentModal}>
-      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle className="text-zinc-800">Record Payment</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Billing Info (read-only) */}
-          <div>
-            <Label>Billing Code</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Billing Code</Label>
             <Input
               value={billing.billing_code}
               readOnly
@@ -82,8 +88,8 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
             />
           </div>
 
-          <div>
-            <Label>Project</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Project</Label>
             <Input
               value={`${billing.project?.project_code} - ${billing.project?.project_name}`}
               readOnly
@@ -91,9 +97,9 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="col-span-2 grid grid-cols-2 gap-2">
             <div>
-              <Label>Billing Amount</Label>
+              <Label className="text-zinc-800">Billing Amount</Label>
               <Input
                 value={`₱${parseFloat(billing.billing_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 readOnly
@@ -101,7 +107,7 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
               />
             </div>
             <div>
-              <Label>Remaining Amount</Label>
+              <Label className="text-zinc-800">Remaining Amount</Label>
               <Input
                 value={`₱${remainingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 readOnly
@@ -111,9 +117,8 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
           </div>
 
           {/* Payment Amount */}
-          <div>
-            <Label>Payment Amount <span class="text-red-500">*</span>
-</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Payment Amount <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -132,7 +137,7 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
           {/* Payment Date */}
           <div>
-            <Label>Payment Date <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Payment Date <span className="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.payment_date}
@@ -144,7 +149,7 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 
           {/* Payment Method */}
           <div>
-            <Label>Payment Method <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Payment Method <span className="text-red-500">*</span></Label>
             <Select
               value={data.payment_method}
               onValueChange={(value) => setData("payment_method", value)}
@@ -164,8 +169,8 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
           </div>
 
           {/* Reference Number */}
-          <div>
-            <Label>Reference Number</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Reference Number</Label>
             <Input
               value={data.reference_number}
               onChange={(e) => setData("reference_number", e.target.value)}
@@ -176,8 +181,8 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
           </div>
 
           {/* Notes */}
-          <div>
-            <Label>Notes</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Notes</Label>
             <Textarea
               value={data.notes}
               onChange={(e) => setData("notes", e.target.value)}
@@ -188,12 +193,33 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
             <InputError message={errors.notes} />
           </div>
 
-          <DialogFooter className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowPaymentModal(false)}>
+          {/* Footer Buttons */}
+          <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPaymentModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={processing}>
-              Record Payment
+            <Button
+              type="submit"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <CreditCard size={16} />
+                  Record Payment
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -203,4 +229,3 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
 };
 
 export default AddPayment;
-

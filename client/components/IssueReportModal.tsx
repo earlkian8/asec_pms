@@ -30,7 +30,7 @@ export default function IssueReportModal({
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [loading, setLoading] = useState(false);
-  const { addNotification } = useApp();
+  const { refreshNotifications } = useApp();
 
   const issueTypes = [
     { value: 'quality', label: 'Quality Issue' },
@@ -40,24 +40,20 @@ export default function IssueReportModal({
     { value: 'other', label: 'Other' },
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!issueType || !title.trim() || !description.trim()) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    // TODO: Replace with actual API call when issue reporting endpoint is available
+    // For now, simulate API call
+    setTimeout(async () => {
       setLoading(false);
-      addNotification({
-        type: 'issue',
-        title: 'Issue Reported',
-        message: `Your ${issueTypes.find((t) => t.value === issueType)?.label.toLowerCase()} for ${projectName} has been reported`,
-        date: new Date().toISOString(),
-        projectId,
-      });
       Alert.alert('Success', 'Issue reported successfully! The project team will review it.');
+      // Refresh notifications to get any new ones from backend
+      await refreshNotifications();
       setIssueType('');
       setTitle('');
       setDescription('');

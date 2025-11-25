@@ -24,10 +24,11 @@ use App\Services\ProgressUpdateService;
 use App\Services\MaterialAllocationService;
 use App\Services\LaborCostService;
 use App\Services\ProjectOverviewService;
+use App\Traits\ClientNotificationTrait;
 
 class ProjectsController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, ClientNotificationTrait;
 
     protected $projectTeamService;
     protected $projectFilesService;
@@ -230,10 +231,19 @@ class ProjectsController extends Controller
             'billing_type'          => ['nullable', 'in:fixed_price,milestone'],
         ]);
 
+        // Check if status changed
+        $oldStatus = $project->status;
+        $newStatus = $validated['status'] ?? $oldStatus;
+
         // Update the project
         $project->update($validated);
 
         $this->adminActivityLogs('Project', 'Update', 'Updated Project ' . $project->project_name);
+
+        // Create notification for client if status changed
+        if ($oldStatus !== $newStatus) {
+            $this->notifyProjectStatusChange($project, $oldStatus, $newStatus);
+        }
 
         return redirect()->back()->with('success', 'Project updated successfully.');
     }

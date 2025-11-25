@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ClientAuthController;
 use App\Http\Controllers\Api\ClientDashboardController;
+use App\Http\Controllers\Api\ClientNotificationController;
 
 // Public routes
 Route::prefix('client')->group(function () {
@@ -47,6 +48,14 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
         
         return $response;
     });
+    
+    // Notification routes
+    Route::get('/notifications', [ClientNotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [ClientNotificationController::class, 'unreadCount']);
+    Route::put('/notifications/{id}/read', [ClientNotificationController::class, 'markAsRead']);
+    Route::put('/notifications/read-all', [ClientNotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [ClientNotificationController::class, 'destroy']);
+    Route::delete('/notifications', [ClientNotificationController::class, 'clearAll']);
 });
 
 // Default user route (for admin/other users)

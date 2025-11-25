@@ -8,10 +8,11 @@ use App\Models\ProjectMilestone;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\ClientNotificationTrait;
 
 class ProjectMilestonesController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, ClientNotificationTrait;
 
     // Store new milestone
     public function store(Project $project, Request $request)
@@ -32,6 +33,9 @@ class ProjectMilestonesController extends Controller
             'Created',
             'Created milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
         );
+
+        // Create notification for client
+        $this->notifyMilestoneStatusChange($project, $milestone->name, $milestone->status);
 
     }
 
@@ -64,6 +68,7 @@ class ProjectMilestonesController extends Controller
             }
         }
 
+        $oldStatus = $milestone->status;
         $milestone->update($data);
 
         $this->adminActivityLogs(
@@ -71,6 +76,15 @@ class ProjectMilestonesController extends Controller
             'Updated',
             'Updated milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
         );
+
+        // Create notification for client if status changed
+        if ($oldStatus !== $data['status']) {
+            if ($data['status'] === 'completed') {
+                $this->notifyMilestoneCompleted($project, $milestone->name);
+            } else {
+                $this->notifyMilestoneStatusChange($project, $milestone->name, $data['status']);
+            }
+        }
 
     }
 

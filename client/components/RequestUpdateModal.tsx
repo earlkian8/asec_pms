@@ -31,7 +31,7 @@ export default function RequestUpdateModal({
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const { addNotification } = useApp();
+  const { refreshNotifications } = useApp();
 
   const handleSubmit = async () => {
     if (!subject.trim() || !message.trim()) {
@@ -49,14 +49,9 @@ export default function RequestUpdateModal({
       });
 
       if (response.success) {
-        addNotification({
-          type: 'update',
-          title: 'Update Request Sent',
-          message: `Your update request for ${projectName} has been sent to ${projectManager}`,
-          date: new Date().toISOString(),
-          projectId,
-        });
         Alert.alert('Success', 'Update request sent successfully!');
+        // Refresh notifications to get any new ones from backend
+        await refreshNotifications();
         setSubject('');
         setMessage('');
         onClose();

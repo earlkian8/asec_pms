@@ -7,12 +7,13 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\ClientNotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProgressUpdatesController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, ClientNotificationTrait;
 
     // Store progress update
     public function store(Request $request)
@@ -58,6 +59,11 @@ class ProgressUpdatesController extends Controller
             'Created',
             'Created progress update for task "' . $task->title . '" in milestone "' . $milestone->name . '"'
         );
+
+        // Create notification for client
+        if ($milestone->project) {
+            $this->notifyProgressUpdate($milestone->project, $task->title, $milestone->name);
+        }
 
         return back()->with('success', 'Progress update created successfully');
     }

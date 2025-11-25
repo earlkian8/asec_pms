@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectIssue;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\ClientNotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProjectIssuesController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, ClientNotificationTrait;
 
     // Store issue
     public function store(Request $request)
@@ -48,6 +49,9 @@ class ProjectIssuesController extends Controller
             'Created',
             'Created issue "' . $data['title'] . '" for project "' . $project->project_name . '"'
         );
+
+        // Create notification for client
+        $this->notifyProjectIssue($project, $data['title']);
 
         return back()->with('success', 'Issue created successfully');
     }

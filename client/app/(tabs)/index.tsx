@@ -40,7 +40,7 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { favorites, toggleFavorite, unreadCount } = useApp();
+  const { favorites, toggleFavorite, unreadCount, refreshNotifications } = useApp();
   const { statistics, projects, loading, refresh } = useDashboard();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -54,9 +54,9 @@ export default function HomeScreen() {
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await refresh();
+    await Promise.all([refresh(), refreshNotifications()]);
     setRefreshing(false);
-  }, [refresh]);
+  }, [refresh, refreshNotifications]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {

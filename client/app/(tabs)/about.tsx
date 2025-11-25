@@ -8,12 +8,14 @@ import {
   Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { FIRM_CONTACT } from '@/constants/contact';
 
 export default function AboutScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const backgroundColor = '#F3F4F6'; // gray-100
@@ -60,13 +62,6 @@ export default function AboutScreen() {
         showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={[styles.profileHeader, { backgroundColor: cardBg, borderColor }]}>
-          <LinearGradient
-            colors={['#3B82F6', '#2563EB']}
-            style={styles.avatarContainer}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}>
-            <Ionicons name="person" size={48} color="#FFFFFF" />
-          </LinearGradient>
           <Text style={[styles.profileName, { color: textColor }]}>{user?.name || 'Client'}</Text>
           <Text style={[styles.profileCompany, { color: textSecondary }]}>
             {user?.company || 'Construction Client'}
@@ -87,23 +82,26 @@ export default function AboutScreen() {
         {/* Support */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: textColor }]}>Support & Resources</Text>
-          <InfoCard
-            icon="help-circle-outline"
-            title="Help Center"
-            value="Get help with your account"
-            onPress={() => Linking.openURL('https://help.example.com')}
-          />
-          <InfoCard
-            icon="document-text-outline"
-            title="Documentation"
-            value="View user guides and tutorials"
-            onPress={() => Linking.openURL('https://docs.example.com')}
-          />
+          <TouchableOpacity
+            style={[styles.helpCenterCard, { backgroundColor: cardBg, borderColor }]}
+            onPress={() => router.push('/help-center')}
+            activeOpacity={0.7}>
+            <View style={[styles.helpCenterIconContainer, { backgroundColor: '#F3F4F6' }]}>
+              <Ionicons name="help-circle-outline" size={24} color="#3B82F6" />
+            </View>
+            <View style={styles.helpCenterContent}>
+              <Text style={[styles.helpCenterTitle, { color: textColor }]}>Help Center</Text>
+              <Text style={[styles.helpCenterText, { color: textSecondary }]}>
+                Find answers to common questions and learn how to use the platform effectively.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={textSecondary} />
+          </TouchableOpacity>
           <InfoCard
             icon="chatbubbles-outline"
             title="Contact Support"
-            value="Get in touch with our team"
-            onPress={() => Linking.openURL('mailto:support@example.com')}
+            value={`${FIRM_CONTACT.email}`}
+            onPress={() => Linking.openURL(`mailto:${FIRM_CONTACT.email}?subject=Support Request`)}
           />
         </View>
 
@@ -117,23 +115,6 @@ export default function AboutScreen() {
               Your comprehensive construction project management portal. Track progress, view milestones, and stay updated on all your projects in one place.
             </Text>
           </View>
-        </View>
-
-        {/* Legal */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Legal</Text>
-          <InfoCard
-            icon="document-outline"
-            title="Terms of Service"
-            value="Read our terms and conditions"
-            onPress={() => Linking.openURL('https://example.com/terms')}
-          />
-          <InfoCard
-            icon="shield-checkmark-outline"
-            title="Privacy Policy"
-            value="How we protect your data"
-            onPress={() => Linking.openURL('https://example.com/privacy')}
-          />
         </View>
 
         {/* Logout */}
@@ -171,14 +152,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 24,
-  },
-  avatarContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
   },
   profileName: {
     fontSize: 24,
@@ -275,6 +248,33 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     fontWeight: '400',
+  },
+  helpCenterCard: {
+    flexDirection: 'row',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  helpCenterIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  helpCenterContent: {
+    flex: 1,
+  },
+  helpCenterTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  helpCenterText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
 

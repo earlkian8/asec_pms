@@ -47,4 +47,9 @@ class Client extends Authenticatable
     {
         return $this->hasMany(Project::class, 'client_id');
     }
+
+    public function notifications()
+    {
+        return $this->hasMany(ClientNotification::class);
+    }
 }

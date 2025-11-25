@@ -60,6 +60,16 @@ class ProjectTasksController extends Controller
             $data['assigned_to'] = null;
         }
 
+        // Validate: Cannot mark as completed without at least 1 progress update
+        if ($data['status'] === 'completed') {
+            $progressUpdatesCount = $task->progressUpdates()->count();
+            if ($progressUpdatesCount === 0) {
+                return back()->withErrors([
+                    'status' => 'Cannot mark task as completed. Please add at least one progress update first.'
+                ]);
+            }
+        }
+
         $task->update($data);
 
         $this->adminActivityLogs(
@@ -81,6 +91,16 @@ class ProjectTasksController extends Controller
         $data = $request->validate([
             'status' => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
+
+        // Validate: Cannot mark as completed without at least 1 progress update
+        if ($data['status'] === 'completed') {
+            $progressUpdatesCount = $task->progressUpdates()->count();
+            if ($progressUpdatesCount === 0) {
+                return back()->withErrors([
+                    'status' => 'Cannot mark task as completed. Please add at least one progress update first.'
+                ]);
+            }
+        }
 
         $oldStatus = $task->status;
         $task->update($data);

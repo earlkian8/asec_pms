@@ -60,6 +60,23 @@ console.log('taskData:', taskData);
 
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
+  // Helper function to get progress updates count from a task
+  const getProgressUpdatesCount = (task) => {
+    const rawProgressUpdates = task.progressUpdates || task.progress_updates;
+    if (!rawProgressUpdates) return 0;
+    
+    if (Array.isArray(rawProgressUpdates)) {
+      return rawProgressUpdates.length;
+    }
+    if (rawProgressUpdates.data && Array.isArray(rawProgressUpdates.data)) {
+      return rawProgressUpdates.data.length;
+    }
+    if (rawProgressUpdates.data && Array.isArray(rawProgressUpdates.data.data)) {
+      return rawProgressUpdates.data.data.length;
+    }
+    return 0;
+  };
+
   const handleStatusChange = (task, newStatus) => {
     // Find the milestone ID for this task
     const milestoneId = task.project_milestone_id || 
@@ -73,13 +90,28 @@ console.log('taskData:', taskData);
       return;
     }
 
+    // Validate: Cannot mark as completed without at least 1 progress update
+    if (newStatus === 'completed') {
+      const progressUpdatesCount = getProgressUpdatesCount(task);
+      if (progressUpdatesCount === 0) {
+        toast.error('Cannot mark task as completed. Please add at least one progress update first.');
+        return;
+      }
+    }
+
     router.put(
       route('project-management.project-tasks.update-status', [milestoneId, task.id]),
       { status: newStatus },
       {
         preserveScroll: true,
         onSuccess: () => toast.success('Task status updated successfully'),
-        onError: () => toast.error('Failed to update task status')
+        onError: (errors) => {
+          if (errors?.status) {
+            toast.error(errors.status);
+          } else {
+            toast.error('Failed to update task status');
+          }
+        }
       }
     );
   };
@@ -136,7 +168,13 @@ console.log('taskData:', taskData);
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem 
+                          value="completed"
+                          disabled={getProgressUpdatesCount(task) === 0}
+                        >
+                          Completed
+                          {getProgressUpdatesCount(task) === 0 && ' (Requires progress update)'}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>

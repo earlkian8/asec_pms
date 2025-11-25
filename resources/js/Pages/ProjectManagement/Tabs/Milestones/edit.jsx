@@ -25,8 +25,25 @@ const EditMilestone = ({ setShowEditModal, milestone, project }) => {
     status: milestone.status || "pending",
   });
 
+  // Helper function to check if all tasks in a milestone are completed
+  const areAllTasksCompleted = (milestone) => {
+    const tasks = milestone.tasks || [];
+    if (tasks.length === 0) return true; // No tasks means it can be completed
+    
+    const allCompleted = tasks.every(task => task.status === 'completed');
+    return allCompleted;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Validate: Cannot mark as completed unless all tasks are completed
+    if (data.status === 'completed' && !areAllTasksCompleted(milestone)) {
+      const tasks = milestone.tasks || [];
+      const incompleteTasks = tasks.filter(task => task.status !== 'completed').length;
+      toast.error(`Cannot mark milestone as completed. ${incompleteTasks} task(s) still need to be completed.`);
+      return;
+    }
 
     put(route("project-management.project-milestones.update", [project.id, milestone.id]), {
       preserveScroll: true,
@@ -39,7 +56,13 @@ const EditMilestone = ({ setShowEditModal, milestone, project }) => {
           toast.success("Milestone updated successfully!");
         }
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: (errors) => {
+        if (errors?.status) {
+          toast.error(errors.status);
+        } else {
+          toast.error("Please check the form for errors");
+        }
+      },
     });
   };
 
@@ -139,10 +162,21 @@ const EditMilestone = ({ setShowEditModal, milestone, project }) => {
               <SelectContent>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem 
+                  value="completed"
+                  disabled={!areAllTasksCompleted(milestone)}
+                >
+                  Completed
+                  {!areAllTasksCompleted(milestone) && ' (All tasks must be completed)'}
+                </SelectItem>
               </SelectContent>
             </Select>
             <InputError message={errors.status} />
+            {!areAllTasksCompleted(milestone) && data.status !== 'completed' && (
+              <p className="text-xs text-gray-500 mt-1">
+                Complete all tasks to mark this milestone as completed.
+              </p>
+            )}
           </div>
 
           {/* Footer Buttons */}

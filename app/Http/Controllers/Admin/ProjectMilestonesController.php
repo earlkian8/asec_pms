@@ -47,6 +47,23 @@ class ProjectMilestonesController extends Controller
             'status' => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 
+        // Validate: Cannot mark as completed unless all tasks are completed
+        if ($data['status'] === 'completed') {
+            $tasks = $milestone->tasks;
+            $totalTasks = $tasks->count();
+            
+            if ($totalTasks > 0) {
+                $completedTasks = $tasks->where('status', 'completed')->count();
+                $incompleteTasks = $totalTasks - $completedTasks;
+                
+                if ($incompleteTasks > 0) {
+                    return back()->withErrors([
+                        'status' => "Cannot mark milestone as completed. {$incompleteTasks} task(s) still need to be completed."
+                    ]);
+                }
+            }
+        }
+
         $milestone->update($data);
 
         $this->adminActivityLogs(

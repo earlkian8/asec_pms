@@ -28,6 +28,8 @@ import {
   Filter,
   Search,
   AlertCircle,
+  Flag,
+  Minus,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddMilestone from './add';
@@ -254,19 +256,79 @@ export default function MilestonesTab({ project, milestoneData }) {
     const Icon = statusInfo.icon;
     
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full font-semibold shadow-sm ${
-        statusInfo.color === 'yellow' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
-        statusInfo.color === 'blue' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
-        statusInfo.color === 'green' ? 'bg-green-100 text-green-800 border border-green-300' :
-        statusInfo.color === 'red' ? 'bg-red-100 text-red-800 border border-red-300' :
-        'bg-gray-100 text-gray-800 border border-gray-300'
+      <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md font-medium ${
+        statusInfo.color === 'yellow' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+        statusInfo.color === 'blue' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+        statusInfo.color === 'green' ? 'bg-green-50 text-green-700 border border-green-200' :
+        statusInfo.color === 'red' ? 'bg-red-50 text-red-700 border border-red-200' :
+        'bg-gray-50 text-gray-700 border border-gray-200'
       }`}>
-        <Icon size={12} className="opacity-80" />
+        <Icon size={12} className="opacity-70" />
         {statusInfo.label}
       </span>
     );
   };
 
+  // Helper function to check if all tasks in a milestone are completed
+  const areAllTasksCompleted = (milestone) => {
+    const tasks = milestone.tasks || [];
+    if (tasks.length === 0) return true; // No tasks means it can be completed
+    
+    const allCompleted = tasks.every(task => task.status === 'completed');
+    return allCompleted;
+  };
+
+  const handleMilestoneStatusChange = (milestone, newStatus) => {
+    // Validate: Cannot mark as completed unless all tasks are completed
+    if (newStatus === 'completed') {
+      if (!areAllTasksCompleted(milestone)) {
+        const tasks = milestone.tasks || [];
+        const incompleteTasks = tasks.filter(task => task.status !== 'completed').length;
+        toast.error(`Cannot mark milestone as completed. ${incompleteTasks} task(s) still need to be completed.`);
+        return;
+      }
+    }
+
+    router.put(
+      route('project-management.project-milestones.update', [project.id, milestone.id]),
+      {
+        name: milestone.name,
+        description: milestone.description || '',
+        start_date: milestone.start_date || '',
+        due_date: milestone.due_date || '',
+        billing_percentage: milestone.billing_percentage || '',
+        status: newStatus,
+      },
+      {
+        preserveScroll: true,
+        onSuccess: () => toast.success('Milestone status updated successfully'),
+        onError: (errors) => {
+          if (errors?.status) {
+            toast.error(errors.status);
+          } else {
+            toast.error('Failed to update milestone status');
+          }
+        }
+      }
+    );
+  };
+
+  // Helper function to get progress updates count from a task
+  const getProgressUpdatesCount = (task) => {
+    const rawProgressUpdates = task.progressUpdates || task.progress_updates;
+    if (!rawProgressUpdates) return 0;
+    
+    if (Array.isArray(rawProgressUpdates)) {
+      return rawProgressUpdates.length;
+    }
+    if (rawProgressUpdates.data && Array.isArray(rawProgressUpdates.data)) {
+      return rawProgressUpdates.data.length;
+    }
+    if (rawProgressUpdates.data && Array.isArray(rawProgressUpdates.data.data)) {
+      return rawProgressUpdates.data.data.length;
+    }
+    return 0;
+  };
 
   const handleTaskStatusChange = (task, newStatus) => {
     const milestoneId = task.project_milestone_id || task.milestone?.id;
@@ -275,13 +337,28 @@ export default function MilestonesTab({ project, milestoneData }) {
       return;
     }
 
+    // Validate: Cannot mark as completed without at least 1 progress update
+    if (newStatus === 'completed') {
+      const progressUpdatesCount = getProgressUpdatesCount(task);
+      if (progressUpdatesCount === 0) {
+        toast.error('Cannot mark task as completed. Please add at least one progress update first.');
+        return;
+      }
+    }
+
     router.put(
       route('project-management.project-tasks.update-status', [milestoneId, task.id]),
       { status: newStatus },
       {
         preserveScroll: true,
         onSuccess: () => toast.success('Task status updated successfully'),
-        onError: () => toast.error('Failed to update task status')
+        onError: (errors) => {
+          if (errors?.status) {
+            toast.error(errors.status);
+          } else {
+            toast.error('Failed to update task status');
+          }
+        }
       }
     );
   };
@@ -394,35 +471,85 @@ export default function MilestonesTab({ project, milestoneData }) {
                     <>
                       <TableRow 
                         key={milestone.id}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+                        className={`cursor-pointer transition-colors border-l-4 ${
+                          isSelected 
+                            ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100' 
+                            : 'bg-gray-50 border-l-gray-400 hover:bg-gray-100'
                         }`}
                         onClick={() => toggleMilestone(milestone.id)}
                       >
                         <TableCell className="text-xs sm:text-sm">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleMilestone(milestone.id);
-                            }}
-                            className="p-1 hover:bg-gray-200 rounded transition"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown size={16} className="text-gray-600" />
-                            ) : (
-                              <ChevronRight size={16} className="text-gray-600" />
-                            )}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleMilestone(milestone.id);
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded transition"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown size={16} className="text-gray-700" />
+                              ) : (
+                                <ChevronRight size={16} className="text-gray-700" />
+                              )}
+                            </button>
+                            <Flag size={16} className="text-blue-600 flex-shrink-0" />
+                          </div>
                         </TableCell>
                         <TableCell className="text-xs sm:text-sm">
                           <div>
-                            <div className="font-medium text-gray-900">{milestone.name}</div>
+                            <div className="font-semibold text-gray-900 flex items-center gap-2">
+                              {milestone.name}
+                              <span className="text-xs font-normal text-gray-500">(Milestone)</span>
+                            </div>
                             {milestone.description && (
-                              <div className="text-xs text-gray-500 line-clamp-1 mt-0.5">{milestone.description}</div>
+                              <div className="text-xs text-gray-600 line-clamp-1 mt-0.5">{milestone.description}</div>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs sm:text-sm">{getStatusBadge(milestone.status)}</TableCell>
+                        <TableCell className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
+                          {has('project-milestones.update') ? (
+                            <Select
+                              value={milestone.status}
+                              onValueChange={(value) => handleMilestoneStatusChange(milestone, value)}
+                            >
+                              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent p-0 hover:bg-gray-100 rounded">
+                                <SelectValue>
+                                  {getStatusBadge(milestone.status)}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending" className="focus:bg-yellow-50">
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                    Pending
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="in_progress" className="focus:bg-blue-50">
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                    In Progress
+                                  </span>
+                                </SelectItem>
+                                <SelectItem 
+                                  value="completed" 
+                                  className="focus:bg-green-50"
+                                  disabled={!areAllTasksCompleted(milestone)}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                    Completed
+                                    {!areAllTasksCompleted(milestone) && (
+                                      <span className="text-xs text-gray-400 ml-1">(All tasks must be completed)</span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div>{getStatusBadge(milestone.status)}</div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs sm:text-sm text-gray-600">{formatDate(milestone.due_date)}</TableCell>
                         <TableCell className="text-xs sm:text-sm">
                           <div className="flex items-center gap-2">
@@ -496,14 +623,16 @@ export default function MilestonesTab({ project, milestoneData }) {
                         
                         return (
                           <>
-                            {/* Whitespace spacer between milestone and tasks */}
+                            {/* Visual separator between milestone and tasks */}
                             {isExpanded && tasks.length > 0 && (
-                              <TableRow className="bg-white hover:bg-white border-0">
-                                <TableCell colSpan={7} className="p-0 h-1 bg-white"></TableCell>
+                              <TableRow className="bg-gray-50 hover:bg-gray-50 border-0">
+                                <TableCell colSpan={7} className="p-0 h-2 bg-gray-50">
+                                  <div className="h-full border-l-2 border-dashed border-gray-300 ml-6"></div>
+                                </TableCell>
                               </TableRow>
                             )}
                             {/* Tasks under milestone */}
-                            {isExpanded && tasks.map(task => {
+                            {isExpanded && tasks.map((task, taskIndex) => {
                               const isTaskExpanded = expandedTasks.has(task.id);
                               // Ensure task has milestone relationship for download URLs
                               // Laravel serializes relationships - check both camelCase and snake_case
@@ -558,20 +687,28 @@ export default function MilestonesTab({ project, milestoneData }) {
                           <>
                             <TableRow 
                               key={`task-${task.id}`}
-                              className="bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                              className="bg-white hover:bg-blue-50/30 cursor-pointer transition-colors border-l-4 border-l-blue-200"
                               onClick={() => {
                                 setSelectedTaskForDetail(taskWithMilestone);
                                 setShowTaskDetailModal(true);
                               }}
                             >
-                              <TableCell className="text-xs sm:text-sm pl-8">
-                                <div className="flex items-center gap-2">
-                                  <FileText size={14} className="text-gray-400" />
+                              <TableCell className="text-xs sm:text-sm">
+                                <div className="flex items-center gap-2 pl-8">
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      <Minus size={12} className="text-gray-400" />
+                                    </div>
+                                    <FileText size={14} className="text-blue-500 flex-shrink-0" />
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell className="text-xs sm:text-sm">
                                 <div className="pl-2">
-                                  <div className="font-medium text-gray-800">{task.title}</div>
+                                  <div className="font-medium text-gray-700 flex items-center gap-2">
+                                    {task.title}
+                                    <span className="text-xs font-normal text-gray-500">(Task)</span>
+                                  </div>
                                   {task.description && (
                                     <div className="text-xs text-gray-500 line-clamp-1 mt-0.5">{task.description}</div>
                                   )}
@@ -601,10 +738,17 @@ export default function MilestonesTab({ project, milestoneData }) {
                                           In Progress
                                         </span>
                                       </SelectItem>
-                                      <SelectItem value="completed" className="focus:bg-green-50">
+                                      <SelectItem 
+                                        value="completed" 
+                                        className="focus:bg-green-50"
+                                        disabled={progressUpdates.length === 0}
+                                      >
                                         <span className="flex items-center gap-2">
                                           <span className="w-2 h-2 rounded-full bg-green-500"></span>
                                           Completed
+                                          {progressUpdates.length === 0 && (
+                                            <span className="text-xs text-gray-400 ml-1">(Requires progress update)</span>
+                                          )}
                                         </span>
                                       </SelectItem>
                                     </SelectContent>
@@ -666,20 +810,28 @@ export default function MilestonesTab({ project, milestoneData }) {
                         );
                       })}
                       
-                      {/* Whitespace spacer between milestone and milestone-level issues */}
+                      {/* Visual separator between tasks and milestone-level issues */}
                       {isExpanded && milestoneIssues.length > 0 && (
                         <>
-                          <TableRow className="bg-white hover:bg-white border-0">
-                            <TableCell colSpan={7} className="p-0 h-1 bg-white"></TableCell>
+                          <TableRow className="bg-gray-50 hover:bg-gray-50 border-0">
+                            <TableCell colSpan={7} className="p-0 h-2 bg-gray-50">
+                              <div className="h-full border-l-2 border-dashed border-gray-300 ml-6"></div>
+                            </TableCell>
                           </TableRow>
                           {milestoneIssues.map(issue => {
                             return (
                             <TableRow 
                               key={`milestone-issue-${issue.id}`}
-                              className="bg-white hover:bg-gray-50 transition-colors"
+                              className="bg-white hover:bg-orange-50/30 transition-colors border-l-4 border-l-orange-200"
                             >
-                              <TableCell className="text-xs sm:text-sm pl-8">
-                                <div className="flex items-center gap-2">
+                              <TableCell className="text-xs sm:text-sm">
+                                <div className="flex items-center gap-2 pl-8">
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      <Minus size={12} className="text-gray-400" />
+                                    </div>
+                                    <AlertCircle size={14} className="text-orange-500 flex-shrink-0" />
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell className="text-xs sm:text-sm" colSpan={6}>
@@ -687,8 +839,10 @@ export default function MilestonesTab({ project, milestoneData }) {
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-1">
-                                        <AlertCircle size={14} className="text-orange-600" />
-                                        <p className="text-sm text-gray-700 font-medium">{issue.title || 'Untitled Issue'}</p>
+                                        <p className="text-sm text-gray-700 font-medium flex items-center gap-2">
+                                          {issue.title || 'Untitled Issue'}
+                                          <span className="text-xs font-normal text-gray-500">(Issue)</span>
+                                        </p>
                                       </div>
                                       {issue.description && (
                                         <p className="text-xs text-gray-600 mb-2">{issue.description}</p>

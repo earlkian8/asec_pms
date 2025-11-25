@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from "sonner";
-import { AlertTriangle, Building2, Mail, Key, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, Building2, Mail, Key, Eye, EyeOff, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -135,22 +135,30 @@ const ResetPassword = ({ setShowResetModal, client }) => {
         <DialogFooter className="flex flex-row justify-end gap-2">
           <Button
             type="button"
-            className="px-4 py-2 text-gray-900 transition bg-white border border-gray-300 rounded hover:bg-gray-50 hover:border-gray-400"
+            variant="outline"
             onClick={() => setShowResetModal(false)}
             disabled={processing}
+            className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
           >
             Cancel
           </Button>
           <Button
             type="button"
-            className="flex items-center gap-2 px-4 py-2 text-white transition bg-red-500 rounded hover:bg-red-600 disabled:opacity-50"
+            className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleReset}
             disabled={processing}
           >
-            {processing && (
-              <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin"></div>
+            {processing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Resetting...
+              </>
+            ) : (
+              <>
+                <Key size={16} />
+                Reset Password
+              </>
             )}
-            {processing ? 'Resetting...' : 'Reset Password'}
           </Button>
         </DialogFooter>
       </DialogContent>

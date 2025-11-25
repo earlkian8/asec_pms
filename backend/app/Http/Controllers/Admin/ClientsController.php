@@ -17,6 +17,21 @@ class ClientsController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $clientType = $request->input('client_type');
+        $isActive = $request->input('is_active');
+        $city = $request->input('city');
+        $province = $request->input('province');
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        // Validate sort column
+        $allowedSortColumns = ['created_at', 'client_name', 'client_code', 'client_type', 'is_active', 'city', 'province', 'email'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort order
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $clients = Client::when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
@@ -29,13 +44,43 @@ class ClientsController extends Controller
                       ->orWhere('province', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('created_at', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(10);
+            ->when($clientType, function ($query, $clientType) {
+                $query->where('client_type', $clientType);
+            })
+            ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
+                $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
+            })
+            ->when($city, function ($query, $city) {
+                $query->where('city', 'like', "%{$city}%");
+            })
+            ->when($province, function ($query, $province) {
+                $query->where('province', 'like', "%{$province}%");
+            })
+            ->orderBy($sortBy, $sortOrder)
+            ->paginate(10)
+            ->withQueryString();
+
+        // Get unique values for filter options
+        $clientTypes = Client::distinct()->whereNotNull('client_type')->pluck('client_type')->sort()->values();
+        $cities = Client::distinct()->whereNotNull('city')->pluck('city')->sort()->values();
+        $provinces = Client::distinct()->whereNotNull('province')->pluck('province')->sort()->values();
 
         return Inertia::render('ClientManagement/index', [
             'clients' => $clients,
             'search' => $search,
+            'filters' => [
+                'client_type' => $clientType,
+                'is_active' => $isActive,
+                'city' => $city,
+                'province' => $province,
+            ],
+            'filterOptions' => [
+                'clientTypes' => $clientTypes,
+                'cities' => $cities,
+                'provinces' => $provinces,
+            ],
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
         ]);
     }
 

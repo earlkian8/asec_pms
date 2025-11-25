@@ -25,8 +25,56 @@ class InventoryItemsController extends Controller
 
     public function index(Request $request)
     {
-        $data = $this->inventoryService->getInventoryData();
-        
+        $search = $request->input('search');
+        $category = $request->input('category');
+        $isActive = $request->input('is_active');
+        $isLowStock = $request->input('is_low_stock');
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        // Validate sort column
+        $allowedSortColumns = ['created_at', 'item_code', 'item_name', 'category', 'current_stock', 'min_stock_level', 'unit_price', 'is_active'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort order
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
+
+        $items = InventoryItem::with(['createdBy'])
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('item_code', 'like', "%{$search}%")
+                      ->orWhere('item_name', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->when($category, function ($query, $category) {
+                $query->where('category', $category);
+            })
+            ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
+                $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
+            })
+            ->orderBy($sortBy, $sortOrder)
+            ->paginate(10)
+            ->withQueryString(); // keep search when paginating
+
+        // Add is_low_stock flag to each item
+        $items->getCollection()->transform(function ($item) {
+            $item->is_low_stock = $item->isLowStock();
+            return $item;
+        });
+
+        // Filter by low stock after calculating the flag
+        if ($isLowStock === 'true') {
+            $items->setCollection(
+                $items->getCollection()->filter(function ($item) {
+                    return $item->is_low_stock;
+                })
+            );
+        }
+
         // Get all active projects for stock out dropdown
         $projects = Project::whereIn('status', ['planning', 'active', 'on_hold'])
             ->orderBy('project_name', 'asc')
@@ -38,13 +86,32 @@ class InventoryItemsController extends Controller
         // Get receiving reports data for the receiving reports tab
         $receivingReportsData = $this->inventoryService->getReceivingReports();
 
-        $data['projects'] = $projects;
-        $data['transactions'] = $transactionsData['transactions'];
-        $data['transactionsSearch'] = $transactionsData['search'];
-        $data['receivingReports'] = $receivingReportsData['receivingReports'];
-        $data['receivingReportsSearch'] = $receivingReportsData['search'];
+        // Get unique categories for filter options
+        $categories = InventoryItem::distinct()
+            ->whereNotNull('category')
+            ->pluck('category')
+            ->sort()
+            ->values();
 
-        return Inertia::render('InventoryManagement/index', $data);
+        return Inertia::render('InventoryManagement/index', [
+            'items' => $items,
+            'search' => $search,
+            'projects' => $projects,
+            'transactions' => $transactionsData['transactions'],
+            'transactionsSearch' => $transactionsData['search'],
+            'receivingReports' => $receivingReportsData['receivingReports'],
+            'receivingReportsSearch' => $receivingReportsData['search'],
+            'filters' => [
+                'category' => $category,
+                'is_active' => $isActive,
+                'is_low_stock' => $isLowStock,
+            ],
+            'filterOptions' => [
+                'categories' => $categories,
+            ],
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
+        ]);
     }
 
     public function store(Request $request)

@@ -10,17 +10,37 @@ class InventoryService
     public function getInventoryData()
     {
         $search = request('search');
+        $category = request('category');
+        $isActive = request('is_active');
+        $isLowStock = request('is_low_stock');
+        $sortBy = request('sort_by', 'item_name');
+        $sortOrder = request('sort_order', 'asc');
+
+        // Validate sort column
+        $allowedSortColumns = ['item_code', 'item_name', 'category', 'current_stock', 'min_stock_level', 'unit_price', 'is_active', 'created_at'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'item_name';
+        }
+
+        // Validate sort order
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'asc';
 
         $items = InventoryItem::with(['createdBy'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('item_code', 'ilike', "%{$search}%")
-                      ->orWhere('item_name', 'ilike', "%{$search}%")
-                      ->orWhere('category', 'ilike', "%{$search}%")
-                      ->orWhere('description', 'ilike', "%{$search}%");
+                    $q->where('item_code', 'like', "%{$search}%")
+                      ->orWhere('item_name', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('item_name', 'asc')
+            ->when($category, function ($query, $category) {
+                $query->where('category', $category);
+            })
+            ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
+                $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
+            })
+            ->orderBy($sortBy, $sortOrder)
             ->paginate(15)
             ->withQueryString();
 
@@ -30,9 +50,35 @@ class InventoryService
             return $item;
         });
 
+        // Filter by low stock after calculating the flag
+        if ($isLowStock === 'true') {
+            $items->setCollection(
+                $items->getCollection()->filter(function ($item) {
+                    return $item->is_low_stock;
+                })
+            );
+        }
+
+        // Get unique categories for filter options
+        $categories = InventoryItem::distinct()
+            ->whereNotNull('category')
+            ->pluck('category')
+            ->sort()
+            ->values();
+
         return [
             'items' => $items,
             'search' => $search,
+            'filters' => [
+                'category' => $category,
+                'is_active' => $isActive,
+                'is_low_stock' => $isLowStock,
+            ],
+            'filterOptions' => [
+                'categories' => $categories,
+            ],
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
         ];
     }
 

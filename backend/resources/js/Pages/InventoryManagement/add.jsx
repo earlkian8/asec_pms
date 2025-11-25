@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -13,6 +14,7 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
 import { Switch } from "@/Components/ui/switch";
+import { Loader2, Package } from "lucide-react";
 
 const AddInventoryItem = ({ setShowAddModal }) => {
   const { data, setData, post, errors, processing } = useForm({
@@ -28,7 +30,7 @@ const AddInventoryItem = ({ setShowAddModal }) => {
   });
 
   const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
@@ -38,26 +40,39 @@ const AddInventoryItem = ({ setShowAddModal }) => {
 
     post(route("inventory-management.store"), {
       preserveScroll: true,
-      onSuccess: () => {
+      onSuccess: (page) => {
         setShowAddModal(false);
-        toast.success("Inventory item created successfully!");
+        const flash = page.props.flash;
+        if (flash && flash.error) {
+          toast.error(flash.error);
+        } else {
+          toast.success("Inventory item created successfully!");
+        }
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: () => {
+        toast.error("Please check the form for errors");
+      },
     });
   };
 
   return (
     <Dialog open onOpenChange={setShowAddModal}>
-      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Inventory Item</DialogTitle>
+          <DialogTitle className="text-zinc-800">Add New Inventory Item</DialogTitle>
+          <DialogDescription className="text-zinc-600">
+            Create a new inventory item with its details below.
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Item Name */}
-          <div>
-            <Label>Item Name <span class="text-red-500">*</span></Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">
+              Item Name <span className="text-red-500">*</span>
+            </Label>
             <Input
+              type="text"
               value={data.item_name}
               onChange={(e) => setData("item_name", e.target.value)}
               placeholder="Enter item name"
@@ -67,21 +82,23 @@ const AddInventoryItem = ({ setShowAddModal }) => {
           </div>
 
           {/* Description */}
-          <div>
-            <Label>Description</Label>
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Description</Label>
             <Textarea
               value={data.description}
               onChange={(e) => setData("description", e.target.value)}
               placeholder="Enter item description"
               className={inputClass(errors.description)}
+              rows={3}
             />
             <InputError message={errors.description} />
           </div>
 
           {/* Category */}
           <div>
-            <Label>Category</Label>
+            <Label className="text-zinc-800">Category</Label>
             <Input
+              type="text"
               value={data.category}
               onChange={(e) => setData("category", e.target.value)}
               placeholder="e.g., Construction Materials, Tools"
@@ -92,8 +109,11 @@ const AddInventoryItem = ({ setShowAddModal }) => {
 
           {/* Unit of Measure */}
           <div>
-            <Label>Unit of Measure <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">
+              Unit of Measure <span className="text-red-500">*</span>
+            </Label>
             <Input
+              type="text"
               value={data.unit_of_measure}
               onChange={(e) => setData("unit_of_measure", e.target.value)}
               placeholder="e.g., pieces, kg, meters, liters"
@@ -104,7 +124,7 @@ const AddInventoryItem = ({ setShowAddModal }) => {
 
           {/* Min Stock Level */}
           <div>
-            <Label>Minimum Stock Level</Label>
+            <Label className="text-zinc-800">Minimum Stock Level</Label>
             <Input
               type="number"
               step="0.01"
@@ -115,11 +135,12 @@ const AddInventoryItem = ({ setShowAddModal }) => {
               className={inputClass(errors.min_stock_level)}
             />
             <InputError message={errors.min_stock_level} />
+            <p className="text-xs text-gray-500 mt-1">Alert when stock falls below this level</p>
           </div>
 
           {/* Unit Price */}
           <div>
-            <Label>Unit Price</Label>
+            <Label className="text-zinc-800">Unit Price</Label>
             <Input
               type="number"
               step="0.01"
@@ -130,11 +151,12 @@ const AddInventoryItem = ({ setShowAddModal }) => {
               className={inputClass(errors.unit_price)}
             />
             <InputError message={errors.unit_price} />
+            <p className="text-xs text-gray-500 mt-1">Default unit price for this item</p>
           </div>
 
           {/* Initial Stock */}
           <div>
-            <Label>Initial Stock (Optional)</Label>
+            <Label className="text-zinc-800">Initial Stock (Optional)</Label>
             <Input
               type="number"
               step="0.01"
@@ -151,7 +173,7 @@ const AddInventoryItem = ({ setShowAddModal }) => {
           {/* Initial Stock Unit Price */}
           {data.initial_stock && (
             <div>
-              <Label>Initial Stock Unit Price (Optional)</Label>
+              <Label className="text-zinc-800">Initial Stock Unit Price (Optional)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -162,31 +184,53 @@ const AddInventoryItem = ({ setShowAddModal }) => {
                 className={inputClass(errors.initial_stock_unit_price)}
               />
               <InputError message={errors.initial_stock_unit_price} />
+              <p className="text-xs text-gray-500 mt-1">Unit price for the initial stock</p>
             </div>
           )}
 
           {/* Is Active */}
-          <div className="flex items-center gap-3">
+          <div className="col-span-2 flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <Switch
               id="is_active"
               checked={data.is_active}
               onCheckedChange={(checked) => setData("is_active", checked)}
               className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
             />
-            <Label htmlFor="is_active" className="cursor-pointer">
+            <Label htmlFor="is_active" className="cursor-pointer text-zinc-800">
               {data.is_active ? 'Active' : 'Inactive'}
-              <span className={`ml-2 text-xs ${data.is_active ? 'text-green-600' : 'text-red-600'}`}>
-                ({data.is_active ? 'Enabled' : 'Disabled'})
+              <span className={`ml-2 text-xs font-medium ${data.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                ({data.is_active ? 'Item will be available for use' : 'Item will be disabled'})
               </span>
             </Label>
           </div>
 
-          <DialogFooter className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+          {/* Footer Buttons */}
+          <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowAddModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={processing}>
-              Add Item
+            <Button
+              type="submit"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Package size={16} />
+                  Create Item
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -196,4 +240,3 @@ const AddInventoryItem = ({ setShowAddModal }) => {
 };
 
 export default AddInventoryItem;
-

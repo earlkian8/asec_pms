@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -14,6 +15,7 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
+import { Loader2, ArrowUpFromLine } from "lucide-react";
 
 const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
   const { data, setData, post, errors, processing } = useForm({
@@ -28,7 +30,7 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
   const [showProjectSelect, setShowProjectSelect] = useState(false);
 
   const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
@@ -48,11 +50,16 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
     }
 
     post(route("inventory-management.stock-out", item.id), {
-      preserveScroll: false,
-      onSuccess: () => {
+      preserveScroll: true,
+      onSuccess: (page) => {
         setShowStockOutModal(false);
-        toast.success("Stock removed successfully!");
         router.reload({ only: ['items'] });
+        const flash = page.props.flash;
+        if (flash && flash.error) {
+          toast.error(flash.error);
+        } else {
+          toast.success("Stock removed successfully!");
+        }
       },
       onError: (errors) => {
         if (errors.error) {
@@ -66,22 +73,35 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
 
   return (
     <Dialog open onOpenChange={setShowStockOutModal}>
-      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Stock Out - {item.item_name}</DialogTitle>
+          <DialogTitle className="text-zinc-800">Stock Out - {item.item_name}</DialogTitle>
+          <DialogDescription className="text-zinc-600">
+            Remove stock from this inventory item. Select the reason and provide details.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Current Stock Info */}
-          <div className="bg-gray-50 p-3 rounded">
-            <p className="text-sm text-gray-600">
-              Available Stock: <span className="font-medium">{item.current_stock} {item.unit_of_measure}</span>
-            </p>
+          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-orange-700 uppercase tracking-wide">Available Stock</p>
+                <p className="text-2xl font-bold text-orange-900 mt-1">
+                  {parseFloat(item.current_stock || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.unit_of_measure}
+                </p>
+              </div>
+              <div className="bg-orange-200 rounded-full p-3">
+                <ArrowUpFromLine className="h-5 w-5 text-orange-700" />
+              </div>
+            </div>
           </div>
 
           {/* Quantity */}
           <div>
-            <Label>Quantity *</Label>
+            <Label className="text-zinc-800">
+              Quantity <span className="text-red-500">*</span>
+            </Label>
             <Input
               type="number"
               step="0.01"
@@ -93,12 +113,14 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               className={inputClass(errors.quantity)}
             />
             <InputError message={errors.quantity} />
-            <p className="text-xs text-gray-500 mt-1">Unit: {item.unit_of_measure}</p>
+            <p className="text-xs text-gray-500 mt-1">Unit: {item.unit_of_measure} (Max: {parseFloat(item.current_stock || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
           </div>
 
           {/* Stock Out Type */}
           <div>
-            <Label>Stock Out Type *</Label>
+            <Label className="text-zinc-800">
+              Stock Out Type <span className="text-red-500">*</span>
+            </Label>
             <Select
               value={data.stock_out_type}
               onValueChange={handleStockOutTypeChange}
@@ -113,12 +135,15 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               </SelectContent>
             </Select>
             <InputError message={errors.stock_out_type} />
+            <p className="text-xs text-gray-500 mt-1">Select the reason for removing stock</p>
           </div>
 
           {/* Project Selection (only for project_use) */}
           {showProjectSelect && (
             <div>
-              <Label>Project *</Label>
+              <Label className="text-zinc-800">
+                Project <span className="text-red-500">*</span>
+              </Label>
               <Select
                 value={data.project_id ? data.project_id.toString() : ""}
                 onValueChange={(value) => setData("project_id", value)}
@@ -141,12 +166,13 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
                 </SelectContent>
               </Select>
               <InputError message={errors.project_id} />
+              <p className="text-xs text-gray-500 mt-1">Select the project this stock is allocated to</p>
             </div>
           )}
 
           {/* Unit Price */}
           <div>
-            <Label>Unit Price (Optional)</Label>
+            <Label className="text-zinc-800">Unit Price (Optional)</Label>
             <Input
               type="number"
               step="0.01"
@@ -157,11 +183,12 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               className={inputClass(errors.unit_price)}
             />
             <InputError message={errors.unit_price} />
+            <p className="text-xs text-gray-500 mt-1">Price per unit for this stock out transaction</p>
           </div>
 
           {/* Transaction Date */}
           <div>
-            <Label>Transaction Date</Label>
+            <Label className="text-zinc-800">Transaction Date</Label>
             <Input
               type="date"
               value={data.transaction_date}
@@ -173,22 +200,44 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
 
           {/* Notes */}
           <div>
-            <Label>Notes</Label>
+            <Label className="text-zinc-800">Notes</Label>
             <Textarea
               value={data.notes}
               onChange={(e) => setData("notes", e.target.value)}
-              placeholder="Additional notes about this stock out..."
+              placeholder="Additional notes about this stock out transaction..."
               className={inputClass(errors.notes)}
+              rows={3}
             />
             <InputError message={errors.notes} />
           </div>
 
+          {/* Footer Buttons */}
           <DialogFooter className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowStockOutModal(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowStockOutModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={processing}>
-              Remove Stock
+            <Button
+              type="submit"
+              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                <>
+                  <ArrowUpFromLine size={16} />
+                  Remove Stock
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -198,4 +247,3 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
 };
 
 export default StockOut;
-

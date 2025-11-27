@@ -32,11 +32,16 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
   const [processing, setProcessing] = useState(false)
   const [errors, setErrors] = useState({})
 
-  const filteredUsers = users.filter((u) => {
+  // Ensure users is always an array
+  const safeUsers = Array.isArray(users) ? users : []
+
+  const filteredUsers = safeUsers.filter((u) => {
+    if (!u) return false
     const fullName = `${u.name || ''}`.toLowerCase()
+    const email = u.email ? u.email.toLowerCase() : ''
     return (
       fullName.includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      email.includes(search.toLowerCase())
     )
   })
 
@@ -69,7 +74,7 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
   // Auto-populate role when user is selected
   const handleUserToggle = (userId) => {
     toggleUser(userId);
-    const user = users.find(u => u.id === userId);
+    const user = safeUsers.find(u => u && u.id === userId);
     if (user && user.role && !formData[userId]?.role) {
       handleChange(userId, 'role', user.role);
     }
@@ -95,14 +100,16 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
     // Validate required fields
     const validationErrors = {}
     for (const userId of selectedUsers) {
+      const user = safeUsers.find(u => u && u.id === userId)
+      const userName = user?.name || 'User'
       if (!formData[userId]?.role) {
-        validationErrors[`user_${userId}_role`] = `Please enter a role for ${users.find(u => u.id === userId)?.name}`
+        validationErrors[`user_${userId}_role`] = `Please enter a role for ${userName}`
       }
       if (!formData[userId]?.hourly_rate || parseFloat(formData[userId]?.hourly_rate) <= 0) {
-        validationErrors[`user_${userId}_hourly_rate`] = `Please enter a valid hourly rate for ${users.find(u => u.id === userId)?.name}`
+        validationErrors[`user_${userId}_hourly_rate`] = `Please enter a valid hourly rate for ${userName}`
       }
       if (!formData[userId]?.start_date) {
-        validationErrors[`user_${userId}_start_date`] = `Please enter a start date for ${users.find(u => u.id === userId)?.name}`
+        validationErrors[`user_${userId}_start_date`] = `Please enter a start date for ${userName}`
       }
     }
 

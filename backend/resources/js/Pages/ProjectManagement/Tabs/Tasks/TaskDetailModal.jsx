@@ -12,9 +12,6 @@ import { usePermission } from '@/utils/permissions';
 import AddProgressUpdate from '../ProgressUpdate/add';
 import EditProgressUpdate from '../ProgressUpdate/edit';
 import DeleteProgressUpdate from '../ProgressUpdate/delete';
-import AddIssue from '../Issues/add';
-import EditIssue from '../Issues/edit';
-import DeleteIssue from '../Issues/delete';
 
 // PDF.js for PDF preview
 import * as pdfjsLib from "pdfjs-dist";
@@ -340,18 +337,11 @@ const CsvPreview = ({ fileUrl }) => {
 const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, allTasks, onRefresh }) => {
   const { has } = usePermission();
   const { props } = usePage();
-  const [activeTab, setActiveTab] = useState('progress-updates');
   const [showAddProgressModal, setShowAddProgressModal] = useState(false);
   const [showEditProgressModal, setShowEditProgressModal] = useState(false);
   const [showDeleteProgressModal, setShowDeleteProgressModal] = useState(false);
   const [editProgressUpdate, setEditProgressUpdate] = useState(null);
   const [deleteProgressUpdate, setDeleteProgressUpdate] = useState(null);
-  
-  const [showAddIssueModal, setShowAddIssueModal] = useState(false);
-  const [showEditIssueModal, setShowEditIssueModal] = useState(false);
-  const [showDeleteIssueModal, setShowDeleteIssueModal] = useState(false);
-  const [editIssue, setEditIssue] = useState(null);
-  const [deleteIssue, setDeleteIssue] = useState(null);
 
   // Get fresh task data from milestoneData after reload
   const getFreshTask = () => {
@@ -381,23 +371,13 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
   const currentTask = getFreshTask();
 
-  // Reset active tab when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab('progress-updates');
-    }
-  }, [isOpen]);
-
   if (!currentTask) return null;
 
-  // Get progress updates and issues for this task
+  // Get progress updates for this task
   const rawProgressUpdates = currentTask.progressUpdates || currentTask.progress_updates || [];
   const progressUpdates = Array.isArray(rawProgressUpdates) 
     ? rawProgressUpdates 
     : (rawProgressUpdates.data || []);
-
-  const rawTaskIssues = currentTask.issues || currentTask.task_issues || [];
-  const taskIssues = Array.isArray(rawTaskIssues) ? rawTaskIssues : [];
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -632,35 +612,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     );
   };
 
-  const getIssueStatusBadge = (status) => {
-    const statusConfig = {
-      open: { bg: 'bg-red-100', text: 'text-red-800', label: 'Open' },
-      in_progress: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'In Progress' },
-      resolved: { bg: 'bg-green-100', text: 'text-green-800', label: 'Resolved' },
-      closed: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Closed' },
-    };
-    const config = statusConfig[status] || statusConfig.open;
-    return (
-      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${config.bg} ${config.text}`}>
-        {config.label}
-      </span>
-    );
-  };
-
-  const getPriorityBadge = (priority) => {
-    const priorityConfig = {
-      low: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Low' },
-      medium: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Medium' },
-      high: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'High' },
-      critical: { bg: 'bg-red-100', text: 'text-red-800', label: 'Critical' },
-    };
-    const config = priorityConfig[priority] || priorityConfig.medium;
-    return (
-      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${config.bg} ${config.text}`}>
-        {config.label}
-      </span>
-    );
-  };
 
   return (
     <>
@@ -726,51 +677,9 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200">
-              <div className="flex gap-6">
-                <button
-                  onClick={() => setActiveTab('progress-updates')}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'progress-updates'
-                      ? 'border-blue-600 text-blue-600 font-semibold'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Progress Updates
-                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                    activeTab === 'progress-updates'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {progressUpdates.length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('issues')}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'issues'
-                      ? 'border-orange-600 text-orange-600 font-semibold'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Issues
-                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                    activeTab === 'issues'
-                      ? 'bg-orange-100 text-orange-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {taskIssues.length}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Tab Content */}
+            {/* Progress Updates Section */}
             <div className="mt-4">
-              {/* Progress Updates Tab */}
-              {activeTab === 'progress-updates' && (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <div className="max-h-[600px] overflow-y-auto pr-2">
                     {progressUpdates.length > 0 ? (
                       <div className="relative">
@@ -908,120 +817,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                     )}
                   </div>
                 </div>
-              )}
-
-              {/* Issues Tab */}
-              {activeTab === 'issues' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Issues
-                      </h3>
-                    </div>
-                    {has('project-issues.create') && (
-                      <Button
-                        onClick={() => setShowAddIssueModal(true)}
-                        size="sm"
-                        className="h-8 px-3 text-xs bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
-                      >
-                        <Plus size={14} className="mr-1.5" />
-                        Add Issue
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="max-h-[600px] overflow-y-auto pr-2">
-                    {taskIssues.length > 0 ? (
-                      <div className="space-y-3">
-                        {taskIssues.map((issue) => (
-                          <div 
-                            key={issue.id} 
-                            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group hover:border-orange-300"
-                          >
-                            <div className="p-4">
-                              <div className="flex items-start justify-between gap-3 mb-3">
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-base font-semibold text-gray-900 mb-1.5">{issue.title}</h4>
-                                  {issue.description && (
-                                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
-                                      {issue.description}
-                                    </p>
-                                  )}
-                                </div>
-                                
-                                {/* Action buttons */}
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                  {has('project-issues.update') && (
-                                    <button
-                                      onClick={() => {
-                                        setEditIssue(issue);
-                                        setShowEditIssueModal(true);
-                                      }}
-                                      className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors"
-                                      title="Edit issue"
-                                    >
-                                      <SquarePen size={16} />
-                                    </button>
-                                  )}
-                                  {has('project-issues.delete') && (
-                                    <button
-                                      onClick={() => {
-                                        setDeleteIssue(issue);
-                                        setShowDeleteIssueModal(true);
-                                      }}
-                                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
-                                      title="Delete issue"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Badges and Metadata */}
-                              <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-gray-100">
-                                <div className="flex items-center flex-wrap gap-2">
-                                  {getIssueStatusBadge(issue.status)}
-                                  {getPriorityBadge(issue.priority)}
-                                </div>
-                                
-                                <div className="flex items-center gap-3 text-xs text-gray-500">
-                                  {issue.assignedTo && (
-                                    <div className="flex items-center gap-1.5">
-                                      <User size={14} />
-                                      <span className="truncate max-w-[120px]">{issue.assignedTo?.name || 'Unassigned'}</span>
-                                    </div>
-                                  )}
-                                  {issue.due_date && (
-                                    <div className="flex items-center gap-1.5">
-                                      <Calendar size={14} />
-                                      <span>{formatDate(issue.due_date)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
-                            <FileText className="w-8 h-8 text-orange-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">No issues reported</p>
-                            <p className="text-xs text-gray-500 mt-1">Issues will appear here when reported</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </DialogContent>
@@ -1078,59 +873,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
         />
       )}
 
-      {/* Issue Modals */}
-      {showAddIssueModal && (
-        <AddIssue
-          setShowAddModal={(value) => {
-            setShowAddIssueModal(value);
-            if (!value && onRefresh) {
-              // Refresh task data after closing modal
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          project={project}
-          milestones={milestones}
-          tasks={allTasks}
-          users={users}
-          preselectedTask={currentTask}
-        />
-      )}
-
-      {showEditIssueModal && editIssue && (
-        <EditIssue
-          setShowEditModal={(value) => {
-            setShowEditIssueModal(value);
-            if (!value && onRefresh) {
-              // Refresh task data after closing modal
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          issue={editIssue}
-          project={project}
-          milestones={milestones}
-          tasks={allTasks}
-          users={users}
-        />
-      )}
-
-      {showDeleteIssueModal && deleteIssue && (
-        <DeleteIssue
-          setShowDeleteModal={(value) => {
-            setShowDeleteIssueModal(value);
-            if (!value && onRefresh) {
-              // Refresh task data after closing modal
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          issue={deleteIssue}
-        />
-      )}
     </>
   );
 };

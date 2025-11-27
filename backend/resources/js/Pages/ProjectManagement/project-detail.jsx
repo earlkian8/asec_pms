@@ -10,11 +10,12 @@ import MilestonesTab from './Tabs/Milestones';
 import TeamTab from './Tabs/Team/index';
 import MaterialAllocationTab from './Tabs/MaterialAllocation';
 import LaborCostTab from './Tabs/LaborCost';
+import RequestUpdatesTab from './Tabs/RequestUpdates';
 // import BudgetTab from './Tabs/Budget';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData, milestoneData, materialAllocationData, laborCostData, overviewData } = usePage().props;
+    const { project, teamData, milestoneData, materialAllocationData, laborCostData, overviewData, requestUpdatesData } = usePage().props;
     const { has } = usePermission();
 
     const breadcrumbs = [
@@ -54,6 +55,12 @@ export default function ProjectDetail() {
             label: "Labor Cost", 
             component: <LaborCostTab project={project} laborCostData={laborCostData} />,
             permission: 'labor-costs.view'
+        },
+        { 
+            key: "request-updates", 
+            label: "Request Updates", 
+            component: <RequestUpdatesTab project={project} requestUpdatesData={requestUpdatesData} />,
+            permission: 'projects.view'
         },
     ];
 

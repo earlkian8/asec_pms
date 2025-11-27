@@ -18,13 +18,30 @@ import { Loader2, Save } from "lucide-react"
 import InputError from "@/Components/InputError"
 
 export default function EditProjectTeam({ setShowEditModal, projectTeam, project }) {
-  const { data, setData, put, errors, processing } = useForm({
+  // Format dates for input fields (YYYY-MM-DD)
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    return date.toISOString().split('T')[0];
+  };
+
+  const { data, setData, put, errors, processing, transform } = useForm({
     role: projectTeam?.role || "",
-    hourly_rate: projectTeam?.hourly_rate || "",
-    start_date: projectTeam?.start_date || "",
-    end_date: projectTeam?.end_date || "",
-    is_active: projectTeam?.is_active || false,
+    hourly_rate: projectTeam?.hourly_rate ? parseFloat(projectTeam.hourly_rate) : 0,
+    start_date: formatDateForInput(projectTeam?.start_date),
+    end_date: formatDateForInput(projectTeam?.end_date),
+    is_active: projectTeam?.is_active ?? false,
   })
+
+  // Transform data before submission
+  transform((data) => ({
+    role: data.role.trim(),
+    hourly_rate: parseFloat(data.hourly_rate) || 0,
+    start_date: data.start_date || null,
+    end_date: data.end_date || null,
+    is_active: Boolean(data.is_active),
+  }))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -42,8 +59,14 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
             toast.success("Team member updated successfully")
           }
         },
-        onError: () => {
-          toast.error("Please check the form for errors")
+        onError: (errors) => {
+          console.error('Update errors:', errors)
+          if (errors && Object.keys(errors).length > 0) {
+            const firstError = Object.values(errors)[0]
+            toast.error(Array.isArray(firstError) ? firstError[0] : firstError)
+          } else {
+            toast.error("Please check the form for errors")
+          }
         },
       }
     )
@@ -87,7 +110,7 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
               step="0.01"
               min="0"
               value={data.hourly_rate}
-              onChange={(e) => setData("hourly_rate", e.target.value)}
+              onChange={(e) => setData("hourly_rate", parseFloat(e.target.value) || 0)}
               placeholder="Enter hourly rate"
               className={inputClass(errors.hourly_rate)}
             />

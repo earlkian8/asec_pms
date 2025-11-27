@@ -12,6 +12,7 @@ use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
 use App\Models\User;
 use App\Models\InventoryItem;
+use App\Models\ClientUpdateRequest;
 use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -337,6 +338,12 @@ class ProjectsController extends Controller
     // Get project overview data
     $overviewData = $this->projectOverviewService->getProjectOverviewData($project);
 
+    // Get request updates for this project
+    $requestUpdates = ClientUpdateRequest::with(['client'])
+        ->where('project_id', $project->id)
+        ->orderBy('created_at', 'desc')
+        ->get();
+
     return Inertia::render('ProjectManagement/project-detail', [
         'project' => $project,
         'teamData' => $teamData,
@@ -345,7 +352,22 @@ class ProjectsController extends Controller
         'materialAllocationData' => $materialAllocationData,
         'laborCostData' => $laborCostData,
         'overviewData' => $overviewData,
+        'requestUpdatesData' => $requestUpdates,
     ]);
+}
+
+public function destroyRequestUpdate(Project $project, ClientUpdateRequest $clientUpdateRequest)
+{
+    // Verify the request belongs to this project
+    if ($clientUpdateRequest->project_id !== $project->id) {
+        return redirect()->back()->with('error', 'Request update does not belong to this project.');
+    }
+
+    $clientUpdateRequest->delete();
+
+    $this->adminActivityLogs('Client Update Request', 'Delete', 'Deleted request update for project ' . $project->project_name);
+
+    return redirect()->back()->with('success', 'Request update deleted successfully.');
 }
 
     

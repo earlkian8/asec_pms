@@ -12,7 +12,7 @@ import {
 import { Button } from '@/Components/ui/button';
 import { Loader2, AlertTriangle, Trash2, MessageSquare } from 'lucide-react';
 
-const DeleteRequest = ({ setShowDeleteModal, request }) => {
+const DeleteRequest = ({ setShowDeleteModal, request, project }) => {
   const [processing, setProcessing] = useState(false);
 
   const handleDelete = (e) => {
@@ -20,7 +20,7 @@ const DeleteRequest = ({ setShowDeleteModal, request }) => {
     setProcessing(true);
 
     router.delete(
-      route('client-management.request-updates.destroy', request.id),
+      route('project-management.request-updates.destroy', [project.id, request.id]),
       {
         preserveScroll: true,
         onSuccess: (page) => {

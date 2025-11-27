@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
         $adminUser = User::firstOrCreate(
             ['email' => $adminEmail],
             [
-                'name' => 'Super Admin',
+                'name' => 'Earl Kian',
                 'password' => Hash::make('password'),
                 'email_verified_at' => now(),
             ]
@@ -38,11 +38,11 @@ class DatabaseSeeder extends Seeder
         // Ensure Super Admin role is assigned (remove other roles first)
         $adminUser->syncRoles(['Super Admin']);
         
-        $this->command->info("Super Admin role assigned to: {$adminEmail}");
+        // $this->command->info("Super Admin role assigned to: {$adminEmail}");
 
-        // Seed project data (clients, inventory, projects with all submodules, and additional users)
-        $this->call([
-            ProjectDataSeeder::class,
-        ]);
+        // // Seed project data (clients, inventory, projects with all submodules, and additional users)
+        // $this->call([
+        //     ProjectDataSeeder::class,
+        // ]);
     }
 }

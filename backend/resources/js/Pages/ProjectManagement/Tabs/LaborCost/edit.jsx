@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Loader2, Save } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -103,7 +104,7 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
   };
 
   const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
@@ -125,7 +126,7 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Employee */}
           <div>
-            <Label className="text-zinc-800">Employee <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Employee <span className="text-red-500">*</span></Label>
             <Select
               value={data.user_id ? data.user_id.toString() : ""}
               onValueChange={handleUserChange}
@@ -152,7 +153,7 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
 
           {/* Work Date */}
           <div>
-            <Label className="text-zinc-800">Work Date <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Work Date <span className="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.work_date}
@@ -164,7 +165,7 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
 
           {/* Hours Worked - Period Selection */}
           <div>
-            <Label className="text-zinc-800">Hours Worked <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Hours Worked <span className="text-red-500">*</span></Label>
             <Select
               value={period}
               onValueChange={handlePeriodChange}
@@ -193,7 +194,7 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
 
           {/* Hourly Rate */}
           <div>
-            <Label className="text-zinc-800">Hourly Rate <span class="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Hourly Rate <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
@@ -245,20 +246,32 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
           </div>
 
           {/* Footer Buttons */}
-          <DialogFooter className="flex justify-end gap-2 mt-4">
+          <DialogFooter className="flex justify-end gap-2 mt-4 border-t pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowEditModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="bg-zinc-800 text-white hover:bg-zinc-900 transition"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               disabled={processing}
             >
-              Update Labor Cost
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Update Labor Cost
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -268,4 +281,3 @@ const EditLaborCost = ({ setShowEditModal, project, laborCost, teamMembers }) =>
 };
 
 export default EditLaborCost;
-

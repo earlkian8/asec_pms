@@ -12,6 +12,21 @@ class ProjectTeamService
     public function getProjectTeamData(Project $project, $request = null)
     {
         $search = request('search');
+        $role = request('role');
+        $status = request('status');
+        $startDate = request('start_date');
+        $endDate = request('end_date');
+        $sortBy = request('sort_by', 'created_at');
+        $sortOrder = request('sort_order', 'desc');
+
+        // Validate sort column
+        $allowedSortColumns = ['created_at', 'role', 'hourly_rate', 'start_date', 'end_date', 'is_active'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'created_at';
+        }
+
+        // Validate sort order
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $projectTeams = ProjectTeam::with('user')
             ->where('project_id', $project->id)
@@ -23,7 +38,19 @@ class ProjectTeamService
                     })->orWhere('role', 'ilike', "%{$search}%");
                 });
             })
-            ->orderBy('created_at', 'desc')
+            ->when($role, function ($query, $role) {
+                $query->where('role', 'ilike', "%{$role}%");
+            })
+            ->when($status !== null && $status !== '', function ($query) use ($status) {
+                $query->where('is_active', $status === 'active' || $status === '1' || $status === true);
+            })
+            ->when($startDate, function ($query, $startDate) {
+                $query->whereDate('start_date', '>=', $startDate);
+            })
+            ->when($endDate, function ($query, $endDate) {
+                $query->whereDate('end_date', '<=', $endDate);
+            })
+            ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
             ->withQueryString();
 
@@ -46,9 +73,29 @@ class ProjectTeamService
                 ];
             });
 
+        // Get unique roles and statuses for filters
+        $roles = ProjectTeam::where('project_id', $project->id)
+            ->distinct()
+            ->whereNotNull('role')
+            ->pluck('role')
+            ->sort()
+            ->values();
+
         return [
             'projectTeams' => $projectTeams,
             'employees'    => $employees,
+            'filterOptions' => [
+                'roles' => $roles,
+            ],
+            'filters' => [
+                'role' => $role,
+                'status' => $status,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ],
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
+            'search' => $search,
         ];
     }
 }

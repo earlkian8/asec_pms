@@ -195,7 +195,7 @@ export default function HomeScreen() {
                 <Text style={[styles.projectName, { color: textColor }]} numberOfLines={1}>
                   {project.name}
                 </Text>
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
                     toggleFavorite(project.id);
@@ -206,7 +206,7 @@ export default function HomeScreen() {
                     color={isFavorite ? '#F59E0B' : textSecondary}
                     fill={isFavorite ? '#F59E0B' : 'none'}
                   />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
               <Text style={[styles.projectLocation, { color: textSecondary }]} numberOfLines={1}>
                 {project.location}
@@ -262,11 +262,11 @@ export default function HomeScreen() {
             onPress={() => handleContact(project, 'email')}>
             <Mail size={16} color="#3B82F6" />
           </TouchableOpacity>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonSmall]}
             onPress={() => handleShare(project)}>
             <Share2 size={16} color={textSecondary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonText]}
             onPress={() => handleRequestUpdate(project)}>

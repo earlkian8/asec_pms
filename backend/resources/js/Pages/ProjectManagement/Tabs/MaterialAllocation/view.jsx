@@ -12,7 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import { Button } from "@/Components/ui/button";
 import { User, Calendar, Package, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
@@ -164,17 +164,22 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold">Quantity</TableHead>
-                      <TableHead className="font-semibold">Condition</TableHead>
-                      <TableHead className="font-semibold">Received By</TableHead>
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="font-semibold">Notes</TableHead>
+                    <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                      <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Quantity</TableHead>
+                      <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Condition</TableHead>
+                      <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Received By</TableHead>
+                      <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Date</TableHead>
+                      <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {receivingReports.map(report => (
-                      <TableRow key={report.id} className="hover:bg-gray-50 transition">
+                    {receivingReports.map((report, index) => (
+                      <TableRow 
+                        key={report.id} 
+                        className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150 ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                        }`}
+                      >
                         <TableCell>
                           <div className="font-medium text-gray-900">
                             {report.quantity_received} {inventoryItem.unit_of_measure || 'units'}
@@ -212,11 +217,12 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
           </div>
         </div>
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end mt-6 border-t pt-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => setShowViewModal(false)}
+            className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
           >
             Close
           </Button>

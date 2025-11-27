@@ -110,7 +110,7 @@ export default function AboutScreen() {
           <Text style={[styles.sectionTitle, { color: textColor }]}>About</Text>
           <View style={[styles.aboutCard, { backgroundColor: cardBg, borderColor }]}>
             <Text style={[styles.aboutTitle, { color: textColor }]}>Client Portal</Text>
-            <Text style={[styles.aboutVersion, { color: textSecondary }]}>Version 1.0.0</Text>
+            <Text style={[styles.aboutVersion, { color: textSecondary }]}>Version 1.0</Text>
             <Text style={[styles.aboutDescription, { color: textSecondary }]}>
               Your comprehensive construction project management portal. Track progress, view milestones, and stay updated on all your projects in one place.
             </Text>
@@ -127,7 +127,7 @@ export default function AboutScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: textSecondary }]}>
-            © 2024 Construction Management System
+            © Abdurauf Sawadjaan Engineering Consultancy
           </Text>
         </View>
       </ScrollView>

@@ -340,6 +340,7 @@ const CsvPreview = ({ fileUrl }) => {
 const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, allTasks, onRefresh }) => {
   const { has } = usePermission();
   const { props } = usePage();
+  const [activeTab, setActiveTab] = useState('progress-updates');
   const [showAddProgressModal, setShowAddProgressModal] = useState(false);
   const [showEditProgressModal, setShowEditProgressModal] = useState(false);
   const [showDeleteProgressModal, setShowDeleteProgressModal] = useState(false);
@@ -379,6 +380,13 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   };
 
   const currentTask = getFreshTask();
+
+  // Reset active tab when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('progress-updates');
+    }
+  }, [isOpen]);
 
   if (!currentTask) return null;
 
@@ -657,256 +665,363 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-y-auto p-5">
-          <DialogHeader className="pb-3 border-b border-gray-200">
-            <DialogTitle className="text-lg font-semibold">{currentTask.title}</DialogTitle>
+        <DialogContent className="w-[95vw] max-w-[1200px] max-h-[90vh] overflow-y-auto p-0">
+          {/* Header with gradient background */}
+          <DialogHeader className="px-6 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-t-lg">
+            <DialogTitle className="text-xl font-bold text-white">{currentTask.title}</DialogTitle>
             {currentTask.description && (
-              <p className="text-sm text-gray-600 mt-1.5">{currentTask.description}</p>
+              <p className="text-sm text-blue-100 mt-2 leading-relaxed">{currentTask.description}</p>
             )}
           </DialogHeader>
 
-          <div className="space-y-4 mt-3">
-            {/* Task Info - Compact Horizontal Layout */}
-            <div className="flex items-center gap-4 px-3 py-2 bg-gray-50 rounded border border-gray-200">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium text-gray-500">Status:</span>
-                {getStatusBadge(currentTask.status)}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={14} className="text-gray-400" />
-                <span className="text-sm text-gray-700">{formatDate(currentTask.due_date)}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <User size={14} className="text-gray-400" />
-                <span className="text-sm text-gray-700">
-                  {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                <span className="text-xs font-medium text-gray-500">Milestone:</span>
-                <span className="text-sm text-gray-700 truncate">
-                  {currentTask.milestone?.name || 'N/A'}
-                </span>
+          <div className="p-6 space-y-6">
+            {/* Task Info - Enhanced Card Layout */}
+            <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Calendar size={18} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Due Date</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{formatDate(currentTask.due_date)}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <User size={18} className="text-indigo-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Assigned To</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5 truncate">
+                      {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <span className="text-xs font-bold text-purple-600">M</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Milestone</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5 truncate">
+                      {currentTask.milestone?.name || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</p>
+                    <div className="mt-0.5">
+                      {getStatusBadge(currentTask.status)}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Progress Updates Section - Grid Layout */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-gray-900">
+            {/* Tabs */}
+            <div className="border-b border-gray-200">
+              <div className="flex gap-6">
+                <button
+                  onClick={() => setActiveTab('progress-updates')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'progress-updates'
+                      ? 'border-blue-600 text-blue-600 font-semibold'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
                   Progress Updates
-                  <span className="text-gray-500 font-normal ml-1.5">({progressUpdates.length})</span>
-                </h3>
-                {has('progress-updates.create') && (
-                  <Button
-                    onClick={() => setShowAddProgressModal(true)}
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                  >
-                    <Plus size={14} className="mr-1.5" />
-                    Add Update
-                  </Button>
-                )}
-              </div>
-
-              <div className="max-h-[600px] overflow-y-auto pr-1">
-                {progressUpdates.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {progressUpdates.map((update) => (
-                      <div 
-                        key={update.id} 
-                        className="border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors group overflow-hidden flex flex-col"
-                      >
-                        {/* File Preview */}
-                        {getFilePreview(update)}
-                        
-                        {/* Content */}
-                        <div className="p-3 flex-1 flex flex-col">
-                          <p className="text-sm text-gray-800 mb-2 leading-relaxed line-clamp-3 flex-1">
-                            {update.description || 'No description'}
-                          </p>
-                          
-                          {/* File Info */}
-                          {update.file_path && getDownloadUrl(update) && (
-                            <div className="mb-2">
-                              <a
-                                href={getDownloadUrl(update)}
-                                className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {getFileIcon(update)}
-                                <span className="truncate">{update.original_name || 'Download File'}</span>
-                                {update.file_size && (
-                                  <span className="text-gray-400 ml-1">({formatFileSize(update.file_size)})</span>
-                                )}
-                              </a>
-                            </div>
-                          )}
-                          
-                          {/* Metadata */}
-                          <div className="flex items-center flex-wrap gap-1.5 text-xs text-gray-500 mt-auto pt-2 border-t border-gray-100">
-                            <span>{update.createdBy?.name || 'Unknown'}</span>
-                            <span>•</span>
-                            <span>{formatDate(update.created_at)}</span>
-                          </div>
-                        </div>
-                        
-                        {/* Actions */}
-                        <div className="flex gap-1 p-2 bg-gray-50 border-t border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                          {update.file_path && getDownloadUrl(update) && has('progress-updates.view') && (
-                            <a
-                              href={getDownloadUrl(update)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                <Download size={14} />
-                              </Button>
-                            </a>
-                          )}
-                          {has('progress-updates.update') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => {
-                                setEditProgressUpdate({
-                                  ...update,
-                                  task: currentTask
-                                });
-                                setShowEditProgressModal(true);
-                              }}
-                            >
-                              <SquarePen size={14} />
-                            </Button>
-                          )}
-                          {has('progress-updates.delete') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
-                              onClick={() => {
-                                setDeleteProgressUpdate({
-                                  ...update,
-                                  task: currentTask
-                                });
-                                setShowDeleteProgressModal(true);
-                              }}
-                            >
-                              <Trash2 size={14} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 rounded-md border border-gray-200">
-                    No progress updates yet
-                  </div>
-                )}
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                    activeTab === 'progress-updates'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {progressUpdates.length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('issues')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'issues'
+                      ? 'border-orange-600 text-orange-600 font-semibold'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Issues
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                    activeTab === 'issues'
+                      ? 'bg-orange-100 text-orange-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {taskIssues.length}
+                  </span>
+                </button>
               </div>
             </div>
 
-            {/* Issues Section - Grid Layout */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-gray-900">
-                  Issues
-                  <span className="text-gray-500 font-normal ml-1.5">({taskIssues.length})</span>
-                </h3>
-                {has('project-issues.create') && (
-                  <Button
-                    onClick={() => setShowAddIssueModal(true)}
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                  >
-                    <Plus size={14} className="mr-1.5" />
-                    Add Issue
-                  </Button>
-                )}
-              </div>
-
-              <div className="max-h-[600px] overflow-y-auto pr-1">
-                {taskIssues.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {taskIssues.map((issue) => (
-                      <div 
-                        key={issue.id} 
-                        className="border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors group overflow-hidden flex flex-col"
-                      >
-                        {/* Issue Header */}
-                        <div className="p-3 flex-1 flex flex-col">
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <h4 className="text-sm font-medium text-gray-900 flex-1 line-clamp-2">{issue.title}</h4>
-                            <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {has('project-issues.update') && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => {
-                                    setEditIssue(issue);
-                                    setShowEditIssueModal(true);
-                                  }}
-                                >
-                                  <SquarePen size={14} />
-                                </Button>
-                              )}
-                              {has('project-issues.delete') && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
-                                  onClick={() => {
-                                    setDeleteIssue(issue);
-                                    setShowDeleteIssueModal(true);
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              )}
+            {/* Tab Content */}
+            <div className="mt-4">
+              {/* Progress Updates Tab */}
+              {activeTab === 'progress-updates' && (
+                <div className="space-y-4">
+                  <div className="max-h-[600px] overflow-y-auto pr-2">
+                    {progressUpdates.length > 0 ? (
+                      <div className="relative">
+                        {/* Timeline line */}
+                        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-200 via-indigo-200 to-blue-200"></div>
+                        
+                        <div className="space-y-6">
+                          {progressUpdates.map((update, index) => (
+                            <div 
+                              key={update.id} 
+                              className="relative pl-12 group"
+                            >
+                              {/* Timeline dot */}
+                              <div className="absolute left-0 top-1.5 w-8 h-8 flex items-center justify-center">
+                                <div className="w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white border-2 border-blue-600 shadow-sm"></div>
+                              </div>
+                              
+                              {/* Update Card */}
+                              <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group-hover:border-blue-300">
+                                {/* Header with user info */}
+                                <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-sm">
+                                        {(update.createdBy?.name || 'U').charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-semibold text-gray-900">
+                                          {update.createdBy?.name || 'Unknown User'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                          <Calendar size={12} />
+                                          {formatDate(update.created_at)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Action buttons */}
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {update.file_path && getDownloadUrl(update) && has('progress-updates.view') && (
+                                        <a
+                                          href={getDownloadUrl(update)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors"
+                                          title="Download file"
+                                        >
+                                          <Download size={16} />
+                                        </a>
+                                      )}
+                                      {has('progress-updates.update') && (
+                                        <button
+                                          onClick={() => {
+                                            setEditProgressUpdate({
+                                              ...update,
+                                              task: currentTask
+                                            });
+                                            setShowEditProgressModal(true);
+                                          }}
+                                          className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors"
+                                          title="Edit update"
+                                        >
+                                          <SquarePen size={16} />
+                                        </button>
+                                      )}
+                                      {has('progress-updates.delete') && (
+                                        <button
+                                          onClick={() => {
+                                            setDeleteProgressUpdate({
+                                              ...update,
+                                              task: currentTask
+                                            });
+                                            setShowDeleteProgressModal(true);
+                                          }}
+                                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
+                                          title="Delete update"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Content */}
+                                <div className="p-4 space-y-3">
+                                  {/* Description */}
+                                  {update.description && (
+                                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                      {update.description}
+                                    </p>
+                                  )}
+                                  
+                                  {/* File Preview */}
+                                  {update.file_path && getDownloadUrl(update) && (
+                                    <div className="space-y-2">
+                                      <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                        {getFilePreview(update)}
+                                      </div>
+                                      
+                                      {/* File download link */}
+                                      <a
+                                        href={getDownloadUrl(update)}
+                                        className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-sm font-medium group/link"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        {getFileIcon(update)}
+                                        <span className="truncate max-w-[200px]">{update.original_name || 'Download File'}</span>
+                                        {update.file_size && (
+                                          <span className="text-blue-500 text-xs ml-1">({formatFileSize(update.file_size)})</span>
+                                        )}
+                                        <Download size={14} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-gray-400" />
                           </div>
-                          
-                          {issue.description && (
-                            <p className="text-sm text-gray-600 mb-3 leading-relaxed line-clamp-3 flex-1">
-                              {issue.description}
-                            </p>
-                          )}
-                          
-                          {/* Badges */}
-                          <div className="flex items-center flex-wrap gap-2 mb-3">
-                            {getIssueStatusBadge(issue.status)}
-                            {getPriorityBadge(issue.priority)}
-                          </div>
-                          
-                          {/* Metadata */}
-                          <div className="flex items-center gap-3 text-xs text-gray-500 mt-auto pt-2 border-t border-gray-100">
-                            {issue.assignedTo && (
-                              <div className="flex items-center gap-1">
-                                <User size={12} />
-                                <span className="truncate">{issue.assignedTo?.name || 'Unassigned'}</span>
-                              </div>
-                            )}
-                            {issue.due_date && (
-                              <div className="flex items-center gap-1">
-                                <Calendar size={12} />
-                                <span>{formatDate(issue.due_date)}</span>
-                              </div>
-                            )}
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">No progress updates yet</p>
+                            <p className="text-xs text-gray-500 mt-1">Progress updates will appear here</p>
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 rounded-md border border-gray-200">
-                    No issues yet
+                </div>
+              )}
+
+              {/* Issues Tab */}
+              {activeTab === 'issues' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1 w-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Issues
+                      </h3>
+                    </div>
+                    {has('project-issues.create') && (
+                      <Button
+                        onClick={() => setShowAddIssueModal(true)}
+                        size="sm"
+                        className="h-8 px-3 text-xs bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                      >
+                        <Plus size={14} className="mr-1.5" />
+                        Add Issue
+                      </Button>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  <div className="max-h-[600px] overflow-y-auto pr-2">
+                    {taskIssues.length > 0 ? (
+                      <div className="space-y-3">
+                        {taskIssues.map((issue) => (
+                          <div 
+                            key={issue.id} 
+                            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group hover:border-orange-300"
+                          >
+                            <div className="p-4">
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-base font-semibold text-gray-900 mb-1.5">{issue.title}</h4>
+                                  {issue.description && (
+                                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+                                      {issue.description}
+                                    </p>
+                                  )}
+                                </div>
+                                
+                                {/* Action buttons */}
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                  {has('project-issues.update') && (
+                                    <button
+                                      onClick={() => {
+                                        setEditIssue(issue);
+                                        setShowEditIssueModal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors"
+                                      title="Edit issue"
+                                    >
+                                      <SquarePen size={16} />
+                                    </button>
+                                  )}
+                                  {has('project-issues.delete') && (
+                                    <button
+                                      onClick={() => {
+                                        setDeleteIssue(issue);
+                                        setShowDeleteIssueModal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
+                                      title="Delete issue"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Badges and Metadata */}
+                              <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-gray-100">
+                                <div className="flex items-center flex-wrap gap-2">
+                                  {getIssueStatusBadge(issue.status)}
+                                  {getPriorityBadge(issue.priority)}
+                                </div>
+                                
+                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                  {issue.assignedTo && (
+                                    <div className="flex items-center gap-1.5">
+                                      <User size={14} />
+                                      <span className="truncate max-w-[120px]">{issue.assignedTo?.name || 'Unassigned'}</span>
+                                    </div>
+                                  )}
+                                  {issue.due_date && (
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar size={14} />
+                                      <span>{formatDate(issue.due_date)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-orange-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">No issues reported</p>
+                            <p className="text-xs text-gray-500 mt-1">Issues will appear here when reported</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>

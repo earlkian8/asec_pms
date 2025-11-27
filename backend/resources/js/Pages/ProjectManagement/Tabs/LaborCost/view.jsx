@@ -29,7 +29,7 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
 
   return (
     <Dialog open onOpenChange={setShowViewModal}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-zinc-800 text-xl">Labor Cost Details</DialogTitle>
           <DialogDescription className="text-zinc-600">
@@ -73,17 +73,24 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
               </div>
               {laborCost.description && (
                 <div className="md:col-span-2">
-                  <span className="text-sm font-medium text-gray-700">Description:</span>
-                  <p className="text-sm text-gray-900 mt-1">{laborCost.description}</p>
+                  <span className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">
+                    <FileText size={14} />
+                    Description:
+                  </span>
+                  <p className="text-sm text-gray-900 mt-1 bg-white p-3 rounded-lg border border-gray-200">
+                    {laborCost.description}
+                  </p>
                 </div>
               )}
               {laborCost.notes && (
                 <div className="md:col-span-2">
                   <span className="text-sm font-medium text-gray-700">Notes:</span>
-                  <p className="text-sm text-gray-900 mt-1">{laborCost.notes}</p>
+                  <p className="text-sm text-gray-900 mt-1 bg-white p-3 rounded-lg border border-gray-200">
+                    {laborCost.notes}
+                  </p>
                 </div>
               )}
-              {createdBy && (
+              {createdBy && createdBy.name && (
                 <div>
                   <span className="text-sm font-medium text-gray-700">Created By:</span>
                   <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-900">
@@ -105,11 +112,12 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
           </div>
         </div>
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end mt-6 border-t pt-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => setShowViewModal(false)}
+            className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
           >
             Close
           </Button>
@@ -120,4 +128,3 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
 };
 
 export default ViewLaborCost;
-

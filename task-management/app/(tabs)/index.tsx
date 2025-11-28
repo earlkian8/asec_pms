@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,46 +19,77 @@ import {
   FileText,
   ArrowRight,
   BarChart3,
+  Folder,
+  ChevronRight,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { mockTasks, mockUser } from '@/data/mockData';
 import { AppColors, getStatusColor, getPriorityColor } from '@/utils/colors';
-import { formatDate, isOverdue } from '@/utils/dateUtils';
+import { formatDate, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { apiService } from '@/services/api';
+import { Task } from '@/types';
 import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
 import Logo from '@/components/Logo';
+
+interface DashboardStats {
+  total: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+  critical: number;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    total: 0,
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+    overdue: 0,
+    critical: 0,
+  });
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const stats = useMemo(() => {
-    const total = mockTasks.length;
-    const pending = mockTasks.filter((t) => t.status === 'pending').length;
-    const inProgress = mockTasks.filter((t) => t.status === 'in_progress').length;
-    const completed = mockTasks.filter((t) => t.status === 'completed').length;
-    const overdue = mockTasks.filter(
-      (t) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'completed'
-    ).length;
-    const critical = mockTasks.filter(
-      (t) => t.priority === 'critical' && t.status !== 'completed'
-    ).length;
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch statistics and upcoming tasks in parallel
+      const [statsResponse, tasksResponse] = await Promise.all([
+        apiService.get<DashboardStats>('/task-management/dashboard/statistics'),
+        apiService.get<Task[]>('/task-management/dashboard/upcoming-tasks?limit=5'),
+      ]);
 
-    return { total, pending, inProgress, completed, overdue, critical };
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data);
+      }
+
+      if (tasksResponse.success && tasksResponse.data) {
+        setUpcomingTasks(Array.isArray(tasksResponse.data) ? tasksResponse.data : []);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
   }, []);
 
-  const upcomingTasks = useMemo(() => {
-    return mockTasks
-      .filter((t) => t.status !== 'completed' && t.dueDate)
-      .sort((a, b) => {
-        const dateA = new Date(a.dueDate!).getTime();
-        const dateB = new Date(b.dueDate!).getTime();
-        return dateA - dateB;
-      })
-      .slice(0, 5);
-  }, []);
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
 
   const StatCard = ({
     icon: Icon,
@@ -93,17 +126,32 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={AppColors.primary} />
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={AppColors.primary}
+        />
+      }
     >
       {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: AppColors.textSecondary }]}>Welcome back,</Text>
-          <Text style={[styles.userName, { color: AppColors.text }]}>{user?.name || mockUser.name}</Text>
+          <Text style={[styles.userName, { color: AppColors.text }]}>{user?.name || 'User'}</Text>
         </View>
         <Logo width={120} height={30} />
       </View>
@@ -191,8 +239,9 @@ export default function HomeScreen() {
 
             {upcomingTasks.length > 0 ? (
               upcomingTasks.map((task, index) => {
-            const statusColor = getStatusColor(task.status);
-            const overdue = task.dueDate && isOverdue(task.dueDate);
+                const statusColor = getStatusColor(task.status);
+                const overdue = task.dueDate && isOverdue(task.dueDate);
+                const daysUntil = task.dueDate ? getDaysUntilDue(task.dueDate) : null;
 
                 return (
                   <AnimatedCard
@@ -202,57 +251,74 @@ export default function HomeScreen() {
                     onPress={() => router.push(`/task-detail?id=${task.id}`)}
                     style={styles.taskCard}
                   >
-                <View style={styles.taskCardHeader}>
-                  <View style={styles.taskCardTitleRow}>
-                    <View
-                      style={[
-                        styles.statusIndicator,
-                        { backgroundColor: statusColor },
-                      ]}
-                    />
-                    <Text style={[styles.taskCardTitle, { color: AppColors.text }]} numberOfLines={1}>
-                      {task.title}
-                    </Text>
-                  </View>
-                  {task.priority && (
-                    <View
-                      style={[
-                        styles.priorityBadge,
-                        {
-                          backgroundColor:
-                            getPriorityColor(task.priority) + '20',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.priorityText,
-                          { color: getPriorityColor(task.priority) },
-                        ]}
-                      >
-                        {task.priority.toUpperCase()}
-                      </Text>
+                    <View style={styles.taskHeader}>
+                      <View style={styles.taskTitleRow}>
+                        <View
+                          style={[
+                            styles.statusIndicator,
+                            { backgroundColor: statusColor },
+                          ]}
+                        />
+                        <Text style={[styles.taskTitle, { color: AppColors.text }]} numberOfLines={2}>
+                          {task.title}
+                        </Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            {
+                              backgroundColor: statusColor + '20',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusText,
+                              { color: statusColor },
+                            ]}
+                          >
+                            {task.status.replace('_', ' ').toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                  )}
-                </View>
-                <View style={styles.taskCardMeta}>
-                  <View style={styles.taskCardMetaItem}>
-                    <Calendar
-                      size={14}
-                      color={overdue ? AppColors.error : AppColors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.taskCardMetaText,
-                        { color: overdue ? AppColors.error : AppColors.textSecondary },
-                        overdue && styles.overdueText,
-                      ]}
-                    >
-                      {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
+
+                    <Text style={[styles.taskDescription, { color: AppColors.textSecondary }]} numberOfLines={2}>
+                      {task.description || 'No description provided for this task.'}
                     </Text>
-                  </View>
-                    <Text style={[styles.taskCardProject, { color: AppColors.textSecondary }]}>{task.projectName}</Text>
-                  </View>
+
+                    <View style={styles.taskMeta}>
+                      <View style={styles.metaRow}>
+                        <View style={styles.metaItem}>
+                          <Calendar
+                            size={14}
+                            color={overdue ? AppColors.error : AppColors.textSecondary}
+                          />
+                          <Text
+                            style={[
+                              styles.metaText,
+                              { color: overdue ? AppColors.error : AppColors.textSecondary },
+                              overdue && styles.overdueText,
+                            ]}
+                          >
+                            {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
+                            {overdue && ' (Overdue)'}
+                            {!overdue && daysUntil !== null && daysUntil <= 3 && daysUntil > 0 && ` (${daysUntil}d left)`}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.metaRow}>
+                        <View style={styles.metaItem}>
+                          <Folder size={14} color={AppColors.textSecondary} />
+                          <Text style={[styles.metaText, { color: AppColors.textSecondary }]}>{task.projectName}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={[styles.taskFooter, { borderTopColor: AppColors.border }]}>
+                      <Text style={[styles.milestoneText, { color: AppColors.textSecondary }]}>{task.milestoneName}</Text>
+                      <ChevronRight size={20} color={AppColors.textSecondary} />
+                    </View>
                   </AnimatedCard>
                 );
               })
@@ -426,15 +492,10 @@ const styles = StyleSheet.create({
   taskCard: {
     marginBottom: 12,
   },
-  taskCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  taskHeader: {
     marginBottom: 12,
-    gap: 12,
   },
-  taskCardTitleRow: {
-    flex: 1,
+  taskTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -444,10 +505,11 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 2,
   },
-  taskCardTitle: {
+  taskTitle: {
     flex: 1,
     fontSize: 18,
     fontWeight: '700',
+    lineHeight: 24,
   },
   priorityBadge: {
     paddingHorizontal: 10,
@@ -459,24 +521,51 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  taskCardMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  taskCardMetaItem: {
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  taskDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  taskMeta: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flex: 1,
   },
-  taskCardMetaText: {
+  metaText: {
     fontSize: 13,
     fontWeight: '500',
   },
   overdueText: {
     fontWeight: '600',
   },
-  taskCardProject: {
+  taskFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  milestoneText: {
     fontSize: 12,
     fontWeight: '500',
   },
@@ -519,5 +608,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: AppColors.background,
   },
 });

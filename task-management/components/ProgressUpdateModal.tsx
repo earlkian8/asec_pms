@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,14 @@ import {
 import { X, Upload, FileText, Send } from 'lucide-react-native';
 import { AppColors } from '@/utils/colors';
 
+import { ProgressUpdate } from '@/types';
+
 interface ProgressUpdateModalProps {
   visible: boolean;
   onClose: () => void;
   taskTitle: string;
   taskId: number;
+  editingUpdate?: ProgressUpdate | null;
   onSubmit: (description: string, file?: any) => void;
 }
 
@@ -26,33 +29,68 @@ export default function ProgressUpdateModal({
   visible,
   onClose,
   taskTitle,
+  editingUpdate,
   onSubmit,
 }: ProgressUpdateModalProps) {
   const [description, setDescription] = useState('');
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  // Load editing data when modal opens
+  useEffect(() => {
+    if (visible) {
+      if (editingUpdate) {
+        setDescription(editingUpdate.description || '');
+        setSelectedFile(null); // Don't pre-load file, user needs to re-upload if changing
+      } else {
+        setDescription('');
+        setSelectedFile(null);
+      }
+    }
+  }, [visible, editingUpdate]);
+
+  const handleSubmit = async () => {
     if (!description.trim()) {
       Alert.alert('Error', 'Please enter a description for your progress update');
       return;
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await onSubmit(description, selectedFile);
+      if (!editingUpdate) {
+        setDescription('');
+        setSelectedFile(null);
+      }
+    } catch (error) {
+      // Error handling is done in parent
+    } finally {
       setLoading(false);
-      onSubmit(description, selectedFile);
-      setDescription('');
-      setSelectedFile(null);
-      onClose();
-      Alert.alert('Success', 'Progress update added successfully');
-    }, 1000);
+    }
   };
 
   const handleFileSelect = () => {
-    // In a real app, this would open file picker
-    Alert.alert('File Upload', 'File picker would open here. In production, use expo-document-picker or similar.');
+    // For web, use input element
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '*/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          // Check file size (20MB max)
+          if (file.size > 20 * 1024 * 1024) {
+            Alert.alert('Error', 'File size must be less than 20MB');
+            return;
+          }
+          setSelectedFile(file);
+        }
+      };
+      input.click();
+    } else {
+      // For mobile, would use expo-document-picker
+      Alert.alert('File Upload', 'File picker would open here. In production, use expo-document-picker.');
+    }
   };
 
   const handleRemoveFile = () => {
@@ -75,7 +113,9 @@ export default function ProgressUpdateModal({
             {/* Header */}
             <View style={styles.header}>
               <View>
-                <Text style={styles.title}>Add Progress Update</Text>
+                <Text style={styles.title}>
+                  {editingUpdate ? 'Edit Progress Update' : 'Add Progress Update'}
+                </Text>
                 <Text style={styles.subtitle} numberOfLines={1}>
                   {taskTitle}
                 </Text>
@@ -89,6 +129,7 @@ export default function ProgressUpdateModal({
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
             >
               {/* Description Input */}
               <View style={styles.inputSection}>
@@ -102,6 +143,7 @@ export default function ProgressUpdateModal({
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
+                  editable={true}
                 />
                 <Text style={styles.helperText}>
                   {description.length} characters
@@ -133,6 +175,28 @@ export default function ProgressUpdateModal({
                       <X size={18} color={AppColors.error} />
                     </TouchableOpacity>
                   </View>
+                ) : editingUpdate?.file_path ? (
+                  <View style={styles.fileContainer}>
+                    <View style={styles.fileInfo}>
+                      <FileText size={20} color={AppColors.primary} />
+                      <View style={styles.fileDetails}>
+                        <Text style={styles.fileName} numberOfLines={1}>
+                          {editingUpdate.original_name || 'Existing file'}
+                        </Text>
+                        <Text style={styles.fileSize}>
+                          {editingUpdate.file_size
+                            ? `${(editingUpdate.file_size / 1024).toFixed(2)} KB`
+                            : 'File attached'}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.uploadButton}
+                      onPress={handleFileSelect}
+                    >
+                      <Text style={styles.uploadButtonText}>Replace</Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <TouchableOpacity
                     style={styles.uploadButton}
@@ -146,6 +210,7 @@ export default function ProgressUpdateModal({
                 )}
                 <Text style={styles.helperText}>
                   Supported: Images, PDFs, Documents (Max 20MB)
+                  {editingUpdate && !selectedFile && editingUpdate.file_path && ' - Click Replace to change file'}
                 </Text>
               </View>
             </ScrollView>
@@ -195,6 +260,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
+    flexDirection: 'column',
     shadowColor: AppColors.shadowDark,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,
@@ -224,7 +290,8 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   scrollContent: {
     padding: 20,
@@ -245,7 +312,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: AppColors.text,
     minHeight: 120,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: AppColors.border,
     textAlignVertical: 'top',
   },

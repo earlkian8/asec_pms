@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,10 @@ import {
   TextInput,
   RefreshControl,
   ScrollView,
+  ActivityIndicator,
+  Modal,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,51 +22,124 @@ import {
   Clock,
   AlertCircle,
   Calendar,
-  User,
+  Folder,
   ChevronRight,
   Plus,
+  X,
+  ArrowUpDown,
+  Check,
 } from 'lucide-react-native';
-import { mockTasks } from '@/data/mockData';
 import { Task } from '@/types';
-import { AppColors, getStatusColor, getPriorityColor } from '@/utils/colors';
+import { AppColors, getStatusColor } from '@/utils/colors';
 import { formatDate, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
+import { apiService } from '@/services/api';
 import AnimatedCard from '@/components/AnimatedCard';
 
-type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
+type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue' | 'critical';
+type SortOption = 'due_date_asc' | 'due_date_desc' | 'created_at_desc' | 'created_at_asc' | 'title_asc' | 'title_desc';
 
 export default function TasksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('due_date_asc');
   const [refreshing, setRefreshing] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    loadTasks();
+  }, [statusFilter, debouncedSearchQuery]);
+
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      let endpoint = '/task-management/tasks';
+      const params: string[] = [];
+      
+      if (statusFilter !== 'all') {
+        params.push(`status=${statusFilter}`);
+      }
+      
+      if (debouncedSearchQuery.trim()) {
+        params.push(`search=${encodeURIComponent(debouncedSearchQuery.trim())}`);
+      }
+      
+      if (params.length > 0) {
+        endpoint += `?${params.join('&')}`;
+      }
+      
+      const response = await apiService.get<Task[]>(endpoint);
+
+      if (response.success && response.data) {
+        setTasks(Array.isArray(response.data) ? response.data : []);
+      }
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Tasks are filtered by the API, but we sort them client-side
   const filteredTasks = useMemo(() => {
-    let filtered = [...mockTasks];
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((task) => task.status === statusFilter);
+    const sorted = [...tasks];
+    
+    switch (sortOption) {
+      case 'due_date_asc':
+        sorted.sort((a, b) => {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        });
+        break;
+      case 'due_date_desc':
+        sorted.sort((a, b) => {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+        });
+        break;
+      case 'created_at_desc':
+        sorted.sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        break;
+      case 'created_at_asc':
+        sorted.sort((a, b) => {
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+        break;
+      case 'title_asc':
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'title_desc':
+        sorted.sort((a, b) => b.title.localeCompare(a.title));
+        break;
     }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (task) =>
-          task.title.toLowerCase().includes(query) ||
-          task.description.toLowerCase().includes(query) ||
-          task.projectName.toLowerCase().includes(query) ||
-          task.milestoneName.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [searchQuery, statusFilter]);
+    
+    return sorted;
+  }, [tasks, sortOption]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    loadTasks();
   };
 
   const renderTaskCard = ({ item, index }: { item: Task; index: number }) => {
@@ -88,31 +165,28 @@ export default function TasksScreen() {
             <Text style={[styles.taskTitle, { color: AppColors.text }]} numberOfLines={2}>
               {item.title}
             </Text>
-            {item.priority && (
-              <View
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: statusColor + '20',
+                },
+              ]}
+            >
+              <Text
                 style={[
-                  styles.priorityBadge,
-                  {
-                    backgroundColor:
-                      getPriorityColor(item.priority) + '20',
-                  },
+                  styles.statusText,
+                  { color: statusColor },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.priorityText,
-                    { color: getPriorityColor(item.priority) },
-                  ]}
-                >
-                  {item.priority.toUpperCase()}
-                </Text>
-              </View>
-            )}
+                {item.status.replace('_', ' ').toUpperCase()}
+              </Text>
+            </View>
           </View>
         </View>
 
         <Text style={[styles.taskDescription, { color: AppColors.textSecondary }]} numberOfLines={2}>
-          {item.description}
+          {item.description || 'No description provided for this task.'}
         </Text>
 
         <View style={styles.taskMeta}>
@@ -138,7 +212,7 @@ export default function TasksScreen() {
 
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
-              <User size={14} color={AppColors.textSecondary} />
+              <Folder size={14} color={AppColors.textSecondary} />
               <Text style={[styles.metaText, { color: AppColors.textSecondary }]}>{item.projectName}</Text>
             </View>
           </View>
@@ -154,12 +228,12 @@ export default function TasksScreen() {
 
   const statusCounts = useMemo(() => {
     return {
-      all: mockTasks.length,
-      pending: mockTasks.filter((t) => t.status === 'pending').length,
-      in_progress: mockTasks.filter((t) => t.status === 'in_progress').length,
-      completed: mockTasks.filter((t) => t.status === 'completed').length,
+      all: tasks.length,
+      pending: tasks.filter((t) => t.status === 'pending').length,
+      in_progress: tasks.filter((t) => t.status === 'in_progress').length,
+      completed: tasks.filter((t) => t.status === 'completed').length,
     };
-  }, []);
+  }, [tasks]);
 
   return (
     <View style={styles.container}>
@@ -173,81 +247,192 @@ export default function TasksScreen() {
       </View>
 
       <View style={[styles.searchContainer, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
-        <View style={[styles.searchInputContainer, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
-          <Search size={20} color={AppColors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: AppColors.text }]}
-            placeholder="Search tasks..."
-            placeholderTextColor={AppColors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <View style={styles.searchRow}>
+          <View style={[styles.searchInputContainer, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
+            <Search size={20} color={AppColors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: AppColors.text }]}
+              placeholder="Search tasks..."
+              placeholderTextColor={AppColors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: statusFilter !== 'all' ? AppColors.primary : AppColors.background,
+                borderColor: statusFilter !== 'all' ? AppColors.primary : AppColors.border,
+              },
+            ]}
+            onPress={() => setShowFilterModal(true)}
+          >
+            <Filter
+              size={20}
+              color={statusFilter !== 'all' ? '#FFFFFF' : AppColors.textSecondary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconButton, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}
+            onPress={() => setShowSortModal(true)}
+          >
+            <ArrowUpDown size={20} color={AppColors.textSecondary} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={[styles.filterContainer, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={AppColors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredTasks}
+          renderItem={renderTaskCard}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={AppColors.primary}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <AlertCircle size={48} color={AppColors.textSecondary} />
+              <Text style={[styles.emptyText, { color: AppColors.text }]}>No tasks found</Text>
+              <Text style={[styles.emptySubtext, { color: AppColors.textSecondary }]}>
+                {searchQuery
+                  ? 'Try adjusting your search or filters'
+                  : 'You have no tasks assigned'}
+              </Text>
+            </View>
+          }
+        />
+      )}
+
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {(['all', 'pending', 'in_progress', 'completed'] as StatusFilter[]).map(
-            (status) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: statusFilter === status ? AppColors.primary : AppColors.card,
-                    borderColor: statusFilter === status ? AppColors.primary : AppColors.border,
-                  },
-                ]}
-                onPress={() => setStatusFilter(status)}
-              >
-                <Text
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowFilterModal(false)}
+          >
+            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: AppColors.text }]}>Filter Tasks</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <X size={24} color={AppColors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              {(['all', 'pending', 'in_progress', 'completed'] as StatusFilter[]).map((status) => (
+                <TouchableOpacity
+                  key={status}
                   style={[
-                    styles.filterChipText,
+                    styles.filterOption,
                     {
-                      color: statusFilter === status ? '#FFFFFF' : AppColors.textSecondary,
+                      backgroundColor: statusFilter === status ? AppColors.primary + '10' : 'transparent',
                     },
                   ]}
+                  onPress={() => {
+                    setStatusFilter(status);
+                    setShowFilterModal(false);
+                  }}
                 >
-                  {status === 'all'
-                    ? 'All'
-                    : status.replace('_', ' ').toUpperCase()}{' '}
-                  ({statusCounts[status]})
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
-        </ScrollView>
-      </View>
-
-      <FlatList
-        data={filteredTasks}
-        renderItem={renderTaskCard}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={AppColors.primary}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <AlertCircle size={48} color={AppColors.textSecondary} />
-            <Text style={[styles.emptyText, { color: AppColors.text }]}>No tasks found</Text>
-            <Text style={[styles.emptySubtext, { color: AppColors.textSecondary }]}>
-              {searchQuery
-                ? 'Try adjusting your search or filters'
-                : 'You have no tasks assigned'}
-            </Text>
+                  <View style={styles.filterOptionContent}>
+                    <Text style={[styles.filterOptionText, { color: AppColors.text }]}>
+                      {status === 'all'
+                        ? 'All Tasks'
+                        : status.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </Text>
+                    <Text style={[styles.filterOptionCount, { color: AppColors.textSecondary }]}>
+                      {statusCounts[status as keyof typeof statusCounts] || 0} tasks
+                    </Text>
+                  </View>
+                  {statusFilter === status && (
+                    <Check size={20} color={AppColors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
-        }
-      />
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Sort Modal */}
+      <Modal
+        visible={showSortModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSortModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowSortModal(false)}
+          >
+            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: AppColors.text }]}>Sort Tasks</Text>
+              <TouchableOpacity onPress={() => setShowSortModal(false)}>
+                <X size={24} color={AppColors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              {[
+                { value: 'due_date_asc', label: 'Due Date (Earliest First)' },
+                { value: 'due_date_desc', label: 'Due Date (Latest First)' },
+                { value: 'created_at_desc', label: 'Recently Created' },
+                { value: 'created_at_asc', label: 'Oldest First' },
+                { value: 'title_asc', label: 'Title (A-Z)' },
+                { value: 'title_desc', label: 'Title (Z-A)' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.filterOption,
+                    {
+                      backgroundColor: sortOption === option.value ? AppColors.primary + '10' : 'transparent',
+                    },
+                  ]}
+                  onPress={() => {
+                    setSortOption(option.value as SortOption);
+                    setShowSortModal(false);
+                  }}
+                >
+                  <Text style={[styles.filterOptionText, { color: AppColors.text }]}>
+                    {option.label}
+                  </Text>
+                  {sortOption === option.value && (
+                    <Check size={20} color={AppColors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -279,7 +464,13 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
   },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
   searchInputContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
@@ -293,23 +484,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '400',
   },
-  filterContainer: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  filterScroll: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  iconButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
     borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  filterChipText: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: AppColors.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalScroll: {
+    maxHeight: 400,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+  },
+  filterOptionContent: {
+    flex: 1,
+  },
+  filterOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  filterOptionCount: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   listContent: {
     padding: 20,
@@ -343,6 +571,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   priorityText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  statusText: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -399,5 +637,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
   },
 });

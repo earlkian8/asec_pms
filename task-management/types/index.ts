@@ -13,7 +13,9 @@ export interface Task {
   dueDate: string;
   status: 'pending' | 'in_progress' | 'completed';
   projectName: string;
+  projectId?: number;
   milestoneName: string;
+  milestoneId?: number;
   priority?: 'low' | 'medium' | 'high' | 'critical';
   createdAt: string;
   updatedAt: string;
@@ -24,6 +26,7 @@ export interface ProgressUpdate {
   project_task_id: number;
   description: string | null;
   file_path: string | null;
+  file_url?: string | null; // URL to access the file
   original_name: string | null;
   file_type: string | null;
   file_size: number | null;

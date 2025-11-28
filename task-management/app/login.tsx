@@ -35,8 +35,8 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (result.success) {
-      // Navigate to tasks screen on successful login
-      router.replace('/(tabs)/tasks');
+      // Navigate to home screen on successful login
+      router.replace('/(tabs)');
     } else {
       Alert.alert('Login Failed', result.message || 'Please check your credentials and try again.');
     }
@@ -115,7 +115,7 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Demo: Use any email and password to login
+            Enter your credentials to access your tasks
           </Text>
         </View>
       </ScrollView>

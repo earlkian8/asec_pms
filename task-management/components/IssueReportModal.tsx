@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { X, Send, AlertCircle } from 'lucide-react-native';
 import { AppColors, getPriorityColor } from '@/utils/colors';
+import { Issue } from '@/types';
 
 interface IssueReportModalProps {
   visible: boolean;
@@ -21,6 +22,7 @@ interface IssueReportModalProps {
   projectId: number;
   projectMilestoneId: number | null;
   projectTaskId: number;
+  editingIssue?: Issue | null;
   onSubmit: (title: string, description: string, priority: string) => void;
 }
 
@@ -35,6 +37,7 @@ export default function IssueReportModal({
   visible,
   onClose,
   taskTitle,
+  editingIssue,
   onSubmit,
 }: IssueReportModalProps) {
   const [title, setTitle] = useState('');
@@ -42,7 +45,22 @@ export default function IssueReportModal({
   const [priority, setPriority] = useState<string>('medium');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  // Load editing data when modal opens
+  useEffect(() => {
+    if (visible) {
+      if (editingIssue) {
+        setTitle(editingIssue.title || '');
+        setDescription(editingIssue.description || '');
+        setPriority(editingIssue.priority || 'medium');
+      } else {
+        setTitle('');
+        setDescription('');
+        setPriority('medium');
+      }
+    }
+  }, [visible, editingIssue]);
+
+  const handleSubmit = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a title for the issue');
       return;
@@ -54,16 +72,18 @@ export default function IssueReportModal({
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await onSubmit(title, description, priority);
+      if (!editingIssue) {
+        setTitle('');
+        setDescription('');
+        setPriority('medium');
+      }
+    } catch (error) {
+      // Error handling is done in parent
+    } finally {
       setLoading(false);
-      onSubmit(title, description, priority);
-      setTitle('');
-      setDescription('');
-      setPriority('medium');
-      onClose();
-      Alert.alert('Success', 'Issue reported successfully');
-    }, 1000);
+    }
   };
 
   return (
@@ -82,7 +102,9 @@ export default function IssueReportModal({
             {/* Header */}
             <View style={styles.header}>
               <View>
-                <Text style={styles.title}>Report Issue</Text>
+                <Text style={styles.title}>
+                  {editingIssue ? 'Edit Issue' : 'Report Issue'}
+                </Text>
                 <Text style={styles.subtitle} numberOfLines={1}>
                   {taskTitle}
                 </Text>
@@ -96,6 +118,7 @@ export default function IssueReportModal({
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
             >
               {/* Title Input */}
               <View style={styles.inputSection}>
@@ -106,6 +129,7 @@ export default function IssueReportModal({
                   placeholderTextColor={AppColors.textSecondary}
                   value={title}
                   onChangeText={setTitle}
+                  editable={true}
                 />
               </View>
 
@@ -121,6 +145,7 @@ export default function IssueReportModal({
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
+                  editable={true}
                 />
                 <Text style={styles.helperText}>
                   {description.length} characters
@@ -206,7 +231,7 @@ export default function IssueReportModal({
               >
                 <Send size={18} color="#ffffff" />
                 <Text style={styles.submitButtonText}>
-                  {loading ? 'Submitting...' : 'Report Issue'}
+                  {loading ? 'Saving...' : editingIssue ? 'Update Issue' : 'Report Issue'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -232,6 +257,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
+    flexDirection: 'column',
     shadowColor: AppColors.shadowDark,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,
@@ -261,7 +287,8 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   scrollContent: {
     padding: 20,
@@ -281,7 +308,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: AppColors.text,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: AppColors.border,
   },
   textArea: {
@@ -291,7 +318,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: AppColors.text,
     minHeight: 120,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: AppColors.border,
     textAlignVertical: 'top',
   },

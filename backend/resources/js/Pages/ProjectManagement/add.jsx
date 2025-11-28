@@ -92,10 +92,10 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
         </DialogHeader>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-6 px-2">
+        <div className="flex items-center justify-center mb-6 px-2 gap-4">
           {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
-            <div key={step} className="flex items-center flex-1">
-              <div className="flex flex-col items-center flex-1">
+            <div key={step} className="flex items-center">
+              <div className="flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
                     step < currentStep
@@ -108,7 +108,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
                   {step < currentStep ? <Check size={20} /> : step}
                 </div>
                 <span
-                  className={`text-xs mt-2 text-center ${
+                  className={`text-xs mt-2 text-center whitespace-nowrap ${
                     step <= currentStep ? "text-zinc-700 font-medium" : "text-gray-400"
                   }`}
                 >
@@ -117,7 +117,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
               </div>
               {step < totalSteps && (
                 <div
-                  className={`h-1 flex-1 mx-2 transition-all ${
+                  className={`h-1 w-16 mx-4 transition-all ${
                     step < currentStep ? "bg-green-500" : "bg-gray-200"
                   }`}
                 />

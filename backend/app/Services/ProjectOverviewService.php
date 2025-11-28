@@ -137,8 +137,8 @@ class ProjectOverviewService
         }
 
         // Project timeline information
-        $daysElapsed = $project->start_date ? now()->diffInDays($project->start_date) : 0;
-        $daysRemaining = $project->planned_end_date ? max(0, now()->diffInDays($project->planned_end_date, false)) : null;
+        $daysElapsed = $project->start_date ? (int) now()->diffInDays($project->start_date) : 0;
+        $daysRemaining = $project->planned_end_date ? max(0, (int) now()->diffInDays($project->planned_end_date, false)) : null;
         $isOverdue = $project->planned_end_date && now()->greaterThan($project->planned_end_date) && $project->status !== 'completed';
 
         return [

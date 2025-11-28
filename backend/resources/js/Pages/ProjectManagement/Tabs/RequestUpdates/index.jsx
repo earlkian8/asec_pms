@@ -10,7 +10,7 @@ import {
 } from "@/Components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
-import { Trash2, Search, MessageSquare, Calendar, AlertCircle, User } from 'lucide-react';
+import { Trash2, Search, MessageSquare, Calendar, AlertCircle } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import { toast } from 'sonner';
 import DeleteRequest from './delete';
@@ -30,9 +30,7 @@ export default function RequestUpdatesTab({ project, requestUpdatesData }) {
     const searchLower = searchInput.toLowerCase();
     return (
       request.subject?.toLowerCase().includes(searchLower) ||
-      request.message?.toLowerCase().includes(searchLower) ||
-      request.client?.client_name?.toLowerCase().includes(searchLower) ||
-      request.client?.client_code?.toLowerCase().includes(searchLower)
+      request.message?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -51,10 +49,9 @@ export default function RequestUpdatesTab({ project, requestUpdatesData }) {
   };
 
   const columns = [
-    { header: 'Client', width: '20%' },
-    { header: 'Subject', width: '25%' },
-    { header: 'Message', width: '35%' },
-    { header: 'Date', width: '15%' },
+    { header: 'Subject', width: '30%' },
+    { header: 'Message', width: '45%' },
+    { header: 'Date', width: '20%' },
     { header: 'Actions', width: '5%' },
   ];
 
@@ -138,7 +135,7 @@ export default function RequestUpdatesTab({ project, requestUpdatesData }) {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Search requests by subject, message, or client..."
+              placeholder="Search requests by subject or message..."
               value={searchInput}
               onChange={handleSearch}
               className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
@@ -148,7 +145,7 @@ export default function RequestUpdatesTab({ project, requestUpdatesData }) {
 
         {/* Table */}
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white relative z-0">
-          <Table className="min-w-[1000px] w-full">
+          <Table className="min-w-[800px] w-full">
             <TableHeader>
               <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                 {columns.map((col, i) => (
@@ -171,23 +168,6 @@ export default function RequestUpdatesTab({ project, requestUpdatesData }) {
                       index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                     }`}
                   >
-                    <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                      {request.client ? (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <div>
-                            <span className="font-medium">{capitalizeText(request.client.client_name)}</span>
-                            {request.client.client_code && (
-                              <span className="text-gray-500 text-xs block font-mono">
-                                {request.client.client_code}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 italic">N/A</span>
-                      )}
-                    </TableCell>
                     <TableCell className="text-left px-4 py-4 text-sm font-medium text-gray-900">
                       <div className="flex items-center gap-2">
                         <MessageSquare className="h-4 w-4 text-gray-400" />

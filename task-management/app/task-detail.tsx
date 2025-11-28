@@ -10,7 +10,6 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
   Calendar,
   User,
   Flag,
@@ -28,6 +27,9 @@ import { AppColors, getStatusColor, getPriorityColor, getIssueStatusColor } from
 import { formatDate, formatDateTime, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
 import ProgressUpdateModal from '@/components/ProgressUpdateModal';
 import IssueReportModal from '@/components/IssueReportModal';
+import { ArrowLeft } from 'lucide-react-native';
+import AnimatedCard from '@/components/AnimatedCard';
+import AnimatedView from '@/components/AnimatedView';
 
 export default function TaskDetailScreen() {
   const router = useRouter();
@@ -42,12 +44,11 @@ export default function TaskDetailScreen() {
   if (!task) {
     return (
       <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color={AppColors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Task Not Found</Text>
-        </View>
+        <Header
+          title="Task Not Found"
+          showBackButton
+          onBackPress={() => router.back()}
+        />
       </View>
     );
   }
@@ -82,7 +83,8 @@ export default function TaskDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Task Header Card */}
-        <View style={styles.card}>
+        <AnimatedView delay={100}>
+          <AnimatedCard index={0} delay={150} style={styles.card}>
           <View style={styles.taskHeader}>
             <View style={styles.taskTitleRow}>
               <Text style={styles.taskTitle}>{task.title}</Text>
@@ -169,26 +171,33 @@ export default function TaskDetailScreen() {
               </View>
             )}
           </View>
-        </View>
+          </AnimatedCard>
+        </AnimatedView>
 
         {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.primaryButton]}
-            onPress={handleAddProgress}
-          >
-            <Plus size={20} color={AppColors.primary} />
-            <Text style={[styles.primaryButtonText, { color: AppColors.primary }]}>Add Progress Update</Text>
-          </TouchableOpacity>
+        <AnimatedView delay={200}>
+          <View style={styles.actionButtons}>
+            <AnimatedCard
+              index={0}
+              delay={250}
+              onPress={handleAddProgress}
+              style={[styles.actionButton, styles.primaryButton]}
+            >
+              <Plus size={20} color={AppColors.primary} />
+              <Text style={[styles.primaryButtonText, { color: AppColors.primary }]}>Add Progress Update</Text>
+            </AnimatedCard>
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.secondaryButton]}
-            onPress={handleReportIssue}
-          >
-            <AlertCircle size={20} color={AppColors.error} />
-            <Text style={[styles.secondaryButtonText, { color: AppColors.error }]}>Report Issue</Text>
-          </TouchableOpacity>
-        </View>
+            <AnimatedCard
+              index={1}
+              delay={300}
+              onPress={handleReportIssue}
+              style={[styles.actionButton, styles.secondaryButton]}
+            >
+              <AlertCircle size={20} color={AppColors.error} />
+              <Text style={[styles.secondaryButtonText, { color: AppColors.error }]}>Report Issue</Text>
+            </AnimatedCard>
+          </View>
+        </AnimatedView>
 
         {/* Progress Updates Section */}
         <View style={styles.section}>
@@ -360,6 +369,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: AppColors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 32,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -384,20 +400,8 @@ const styles = StyleSheet.create({
   headerRight: {
     width: 40,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 32,
-  },
   card: {
-    backgroundColor: AppColors.card,
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: AppColors.border,
   },
   taskHeader: {
     marginBottom: 16,
@@ -489,8 +493,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
     gap: 8,
   },
   primaryButton: {

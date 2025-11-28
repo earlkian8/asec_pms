@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PermissionSeeder::class,
             RoleSeeder::class,
+            InventorySeeder::class,
         ]);
 
         // Create or update admin user with Super Admin role
@@ -40,8 +41,9 @@ class DatabaseSeeder extends Seeder
         
         // $this->command->info("Super Admin role assigned to: {$adminEmail}");
 
-        // // Seed project data (clients, inventory, projects with all submodules, and additional users)
+        // // Seed project data (inventory, clients, projects with all submodules, and additional users)
         // $this->call([
+        //     InventorySeeder::class,
         //     ProjectDataSeeder::class,
         // ]);
     }

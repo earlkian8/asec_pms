@@ -14,9 +14,11 @@ import { useRouter } from 'expo-router';
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react-native';
 import { AppColors } from '@/utils/colors';
 import Logo from '@/components/Logo';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,12 +31,15 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    const result = await login(email, password);
+    setLoading(false);
+
+    if (result.success) {
       // Navigate to tasks screen on successful login
       router.replace('/(tabs)/tasks');
-    }, 1000);
+    } else {
+      Alert.alert('Login Failed', result.message || 'Please check your credentials and try again.');
+    }
   };
 
   return (
@@ -178,17 +183,17 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   loginButton: {
-    backgroundColor: AppColors.primary,
+    backgroundColor: '#111827', // zinc-900
     borderRadius: 12,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: AppColors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   loginButtonDisabled: {
     opacity: 0.6,

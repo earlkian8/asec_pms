@@ -22,6 +22,7 @@ import { mockTasks, mockProgressUpdates } from '@/data/mockData';
 import { Task, ProgressUpdate } from '@/types';
 import { AppColors } from '@/utils/colors';
 import { formatDate, formatDateTime } from '@/utils/dateUtils';
+import AnimatedCard from '@/components/AnimatedCard';
 
 type HistoryFilter = 'all' | 'completed' | 'updates';
 
@@ -91,16 +92,19 @@ export default function HistoryScreen() {
 
   const renderItem = ({
     item,
+    index,
   }: {
     item: { type: 'task' | 'update'; item: Task | (ProgressUpdate & { task?: Task }) };
+    index: number;
   }) => {
     if (item.type === 'task') {
       const task = item.item as Task;
       return (
-        <TouchableOpacity
-          style={styles.card}
+        <AnimatedCard
+          index={index}
+          delay={100}
           onPress={() => router.push(`/task-detail?id=${task.id}`)}
-          activeOpacity={0.7}
+          style={styles.card}
         >
           <View style={styles.cardHeader}>
             <View style={styles.cardIconContainer}>
@@ -122,17 +126,18 @@ export default function HistoryScreen() {
             </View>
             <Text style={styles.cardProject}>{task.projectName}</Text>
           </View>
-        </TouchableOpacity>
+        </AnimatedCard>
       );
     } else {
       const update = item.item as ProgressUpdate & { task?: Task };
       return (
-        <TouchableOpacity
-          style={styles.card}
+        <AnimatedCard
+          index={index}
+          delay={100}
           onPress={() =>
             update.task && router.push(`/task-detail?id=${update.task.id}`)
           }
-          activeOpacity={0.7}
+          style={styles.card}
         >
           <View style={styles.cardHeader}>
             <View style={styles.cardIconContainer}>
@@ -163,7 +168,7 @@ export default function HistoryScreen() {
               </View>
             )}
           </View>
-        </TouchableOpacity>
+        </AnimatedCard>
       );
     }
   };
@@ -182,7 +187,7 @@ export default function HistoryScreen() {
       <View style={[styles.searchContainer, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
         <View style={[styles.searchInputContainer, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
           <Search size={20} color={AppColors.textSecondary} />
-          <TextInput
+            <TextInput
             style={[styles.searchInput, { color: AppColors.text }]}
             placeholder="Search history..."
             placeholderTextColor={AppColors.textSecondary}
@@ -318,12 +323,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: AppColors.card,
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: AppColors.border,
   },
   cardHeader: {
     flexDirection: 'row',

@@ -121,13 +121,6 @@ export default function Reports({
       <Head title="Reports & Analytics" />
 
       <div className="w-full sm:px-6 lg:px-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-            <p className="text-gray-600 mt-1">Comprehensive insights into your project management system</p>
-          </div>
-        </div>
 
         {/* Filters */}
         <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">

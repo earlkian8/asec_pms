@@ -22,11 +22,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { mockTasks, mockUser } from '@/data/mockData';
 import { AppColors, getStatusColor, getPriorityColor } from '@/utils/colors';
 import { formatDate, isOverdue } from '@/utils/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import AnimatedCard from '@/components/AnimatedCard';
+import AnimatedView from '@/components/AnimatedView';
 import Logo from '@/components/Logo';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   const stats = useMemo(() => {
     const total = mockTasks.length;
@@ -99,102 +103,105 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: AppColors.textSecondary }]}>Welcome back,</Text>
-          <Text style={[styles.userName, { color: AppColors.text }]}>{mockUser.name}</Text>
+          <Text style={[styles.userName, { color: AppColors.text }]}>{user?.name || mockUser.name}</Text>
         </View>
         <Logo width={120} height={30} />
       </View>
 
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.twoColumnRow}>
-          <View style={styles.halfWidthCard}>
-            <StatCard
-              icon={BarChart3}
-              label="Total Tasks"
-              value={stats.total}
-              color={AppColors.primary}
-              gradient={['#3B82F6', '#2563EB']}
-              onPress={() => router.push('/(tabs)/tasks')}
-            />
+        {/* Stats Grid */}
+        <AnimatedView delay={100}>
+          <View style={styles.statsGrid}>
+            <View style={styles.twoColumnRow}>
+              <View style={styles.halfWidthCard}>
+                <StatCard
+                  icon={BarChart3}
+                  label="Total Tasks"
+                  value={stats.total}
+                  color={AppColors.primary}
+                  gradient={['#3B82F6', '#2563EB']}
+                  onPress={() => router.push('/(tabs)/tasks')}
+                />
+              </View>
+              <View style={styles.halfWidthCard}>
+                <StatCard
+                  icon={Clock}
+                  label="In Progress"
+                  value={stats.inProgress}
+                  color={AppColors.inProgress}
+                  gradient={['#3B82F6', '#2563EB']}
+                  onPress={() => router.push('/(tabs)/tasks?filter=in_progress')}
+                />
+              </View>
+            </View>
+            <View style={styles.fullWidthCard}>
+              <StatCard
+                icon={CheckCircle2}
+                label="Completed"
+                value={stats.completed}
+                color={AppColors.completed}
+                gradient={['#10B981', '#059669']}
+                onPress={() => router.push('/(tabs)/history')}
+              />
+            </View>
+            <View style={styles.fullWidthCard}>
+              <StatCard
+                icon={AlertCircle}
+                label="Overdue"
+                value={stats.overdue}
+                color={AppColors.error}
+                gradient={['#EF4444', '#DC2626']}
+                onPress={() => router.push('/(tabs)/tasks?filter=overdue')}
+              />
+            </View>
           </View>
-          <View style={styles.halfWidthCard}>
-            <StatCard
-              icon={Clock}
-              label="In Progress"
-              value={stats.inProgress}
-              color={AppColors.inProgress}
-              gradient={['#3B82F6', '#2563EB']}
-              onPress={() => router.push('/(tabs)/tasks?filter=in_progress')}
-            />
-          </View>
-        </View>
-        <View style={styles.fullWidthCard}>
-          <StatCard
-            icon={CheckCircle2}
-            label="Completed"
-            value={stats.completed}
-            color={AppColors.completed}
-            gradient={['#10B981', '#059669']}
-            onPress={() => router.push('/(tabs)/history')}
-          />
-        </View>
-        <View style={styles.fullWidthCard}>
-          <StatCard
-            icon={AlertCircle}
-            label="Overdue"
-            value={stats.overdue}
-            color={AppColors.error}
-            gradient={['#EF4444', '#DC2626']}
-            onPress={() => router.push('/(tabs)/tasks?filter=overdue')}
-          />
-        </View>
-      </View>
+        </AnimatedView>
 
-      {/* Priority Alert */}
-      {stats.critical > 0 && (
-        <View style={[styles.alertCard, { backgroundColor: AppColors.warning + '10', borderColor: AppColors.warning + '30' }]}>
-          <View style={[styles.alertIconContainer, { backgroundColor: AppColors.warning + '20' }]}>
-            <AlertCircle size={24} color={AppColors.critical} />
-          </View>
-          <View style={styles.alertContent}>
-            <Text style={[styles.alertTitle, { color: AppColors.text }]}>Critical Tasks</Text>
-            <Text style={[styles.alertText, { color: AppColors.textSecondary }]}>
-              You have {stats.critical} critical task{stats.critical !== 1 ? 's' : ''} requiring immediate attention
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.alertButton}
-            onPress={() => router.push('/(tabs)/tasks?filter=critical')}
-          >
-            <ArrowRight size={20} color={AppColors.critical} />
-          </TouchableOpacity>
-        </View>
-      )}
+        {/* Priority Alert */}
+        {stats.critical > 0 && (
+          <AnimatedView delay={200}>
+            <AnimatedCard
+              onPress={() => router.push('/(tabs)/tasks?filter=critical')}
+              style={[styles.alertCard, { backgroundColor: AppColors.warning + '10', borderColor: AppColors.warning + '30' }]}>
+              <View style={[styles.alertIconContainer, { backgroundColor: AppColors.warning + '20' }]}>
+                <AlertCircle size={24} color={AppColors.critical} />
+              </View>
+              <View style={styles.alertContent}>
+                <Text style={[styles.alertTitle, { color: AppColors.text }]}>Critical Tasks</Text>
+                <Text style={[styles.alertText, { color: AppColors.textSecondary }]}>
+                  You have {stats.critical} critical task{stats.critical !== 1 ? 's' : ''} requiring immediate attention
+                </Text>
+              </View>
+              <ArrowRight size={20} color={AppColors.critical} />
+            </AnimatedCard>
+          </AnimatedView>
+        )}
 
-      {/* Upcoming Tasks */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Calendar size={20} color={AppColors.text} />
-            <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Upcoming Tasks</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
-            <Text style={[styles.seeAllText, { color: AppColors.primary }]}>See All</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Upcoming Tasks */}
+        <AnimatedView delay={300}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <Calendar size={20} color={AppColors.text} />
+                <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Upcoming Tasks</Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
+                <Text style={[styles.seeAllText, { color: AppColors.primary }]}>See All</Text>
+              </TouchableOpacity>
+            </View>
 
-        {upcomingTasks.length > 0 ? (
-          upcomingTasks.map((task) => {
+            {upcomingTasks.length > 0 ? (
+              upcomingTasks.map((task, index) => {
             const statusColor = getStatusColor(task.status);
             const overdue = task.dueDate && isOverdue(task.dueDate);
 
-            return (
-              <TouchableOpacity
-                key={task.id}
-                style={[styles.taskCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}
-                onPress={() => router.push(`/task-detail?id=${task.id}`)}
-                activeOpacity={0.7}
-              >
+                return (
+                  <AnimatedCard
+                    key={task.id}
+                    index={index}
+                    delay={400}
+                    onPress={() => router.push(`/task-detail?id=${task.id}`)}
+                    style={styles.taskCard}
+                  >
                 <View style={styles.taskCardHeader}>
                   <View style={styles.taskCardTitleRow}>
                     <View
@@ -244,46 +251,55 @@ export default function HomeScreen() {
                       {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
                     </Text>
                   </View>
-                  <Text style={[styles.taskCardProject, { color: AppColors.textSecondary }]}>{task.projectName}</Text>
+                    <Text style={[styles.taskCardProject, { color: AppColors.textSecondary }]}>{task.projectName}</Text>
+                  </View>
+                  </AnimatedCard>
+                );
+              })
+            ) : (
+              <AnimatedView delay={400}>
+                <View style={[styles.emptyState, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+                  <CheckCircle2 size={32} color={AppColors.success} />
+                  <Text style={[styles.emptyText, { color: AppColors.text }]}>All caught up!</Text>
+                  <Text style={[styles.emptySubtext, { color: AppColors.textSecondary }]}>
+                    You have no upcoming tasks
+                  </Text>
                 </View>
-              </TouchableOpacity>
-            );
-          })
-        ) : (
-          <View style={[styles.emptyState, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
-            <CheckCircle2 size={32} color={AppColors.success} />
-            <Text style={[styles.emptyText, { color: AppColors.text }]}>All caught up!</Text>
-            <Text style={[styles.emptySubtext, { color: AppColors.textSecondary }]}>
-              You have no upcoming tasks
-            </Text>
+              </AnimatedView>
+            )}
           </View>
-        )}
-      </View>
+        </AnimatedView>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Quick Actions</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={[styles.quickActionCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}
-            onPress={() => router.push('/(tabs)/tasks')}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: AppColors.primary + '20' }]}>
-              <FileText size={24} color={AppColors.primary} />
+        {/* Quick Actions */}
+        <AnimatedView delay={500}>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Quick Actions</Text>
+            <View style={styles.quickActions}>
+              <AnimatedCard
+                index={0}
+                delay={600}
+                onPress={() => router.push('/(tabs)/tasks')}
+                style={styles.quickActionCard}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: AppColors.primary + '20' }]}>
+                  <FileText size={24} color={AppColors.primary} />
+                </View>
+                <Text style={[styles.quickActionText, { color: AppColors.text }]}>View All Tasks</Text>
+              </AnimatedCard>
+              <AnimatedCard
+                index={1}
+                delay={650}
+                onPress={() => router.push('/(tabs)/history')}
+                style={styles.quickActionCard}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: AppColors.success + '20' }]}>
+                  <TrendingUp size={24} color={AppColors.success} />
+                </View>
+                <Text style={[styles.quickActionText, { color: AppColors.text }]}>View History</Text>
+              </AnimatedCard>
             </View>
-            <Text style={[styles.quickActionText, { color: AppColors.text }]}>View All Tasks</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.quickActionCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}
-            onPress={() => router.push('/(tabs)/history')}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: AppColors.success + '20' }]}>
-              <TrendingUp size={24} color={AppColors.success} />
-            </View>
-            <Text style={[styles.quickActionText, { color: AppColors.text }]}>View History</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+          </View>
+        </AnimatedView>
     </ScrollView>
   );
 }
@@ -359,9 +375,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
-    padding: 16,
     marginBottom: 24,
-    borderWidth: 1,
     gap: 12,
   },
   alertIconContainer: {
@@ -410,10 +424,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   taskCard: {
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 12,
-    borderWidth: 1,
   },
   taskCardHeader: {
     flexDirection: 'row',
@@ -494,9 +505,7 @@ const styles = StyleSheet.create({
   quickActionCard: {
     flex: 1,
     borderRadius: 12,
-    padding: 20,
     alignItems: 'center',
-    borderWidth: 1,
   },
   quickActionIcon: {
     width: 56,

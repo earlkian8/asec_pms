@@ -1103,7 +1103,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
                                 title="Add Task"
                               >
-                                <Plus size={14} />
+                                <Plus size={18} />
                               </button>
                             )}
                             {has('project-milestones.update') && (
@@ -1115,7 +1115,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
                                 title="Edit Milestone"
                               >
-                                <SquarePen size={14} />
+                                <SquarePen size={18} />
                               </button>
                             )}
                             {has('project-milestones.delete') && (
@@ -1127,7 +1127,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
                                 title="Delete Milestone"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={18} />
                               </button>
                             )}
                           </div>
@@ -1216,9 +1216,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 <div className="flex items-center gap-2 pl-8">
                                   <div className="flex items-center gap-1">
                                     <div className="w-4 h-4 flex items-center justify-center">
-                                      <Minus size={12} className="text-gray-400" />
+                                      <Minus size={18} className="text-gray-400" />
                                     </div>
-                                    <FileText size={14} className="text-blue-500 flex-shrink-0" />
+                                    <FileText size={18} className="text-blue-500 flex-shrink-0" />
                                   </div>
                                 </div>
                               </TableCell>
@@ -1281,7 +1281,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 <div className="flex items-center gap-1.5 text-sm text-gray-600">
                                   {taskWithMilestone.assignedUser?.name || taskWithMilestone.assigned_user?.name ? (
                                     <>
-                                      <User size={14} className="text-gray-400" />
+                                      <User size={18} className="text-gray-400" />
                                       <span className="line-clamp-1">
                                         {taskWithMilestone.assignedUser?.name || taskWithMilestone.assigned_user?.name}
                                       </span>
@@ -1297,7 +1297,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                 </span>
                               </TableCell>
                               <TableCell className="text-xs sm:text-sm" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex justify-end gap-1">
+                                <div className="flex gap-1">
                                   {has('project-tasks.update') && (
                                     <button
                                       onClick={() => {
@@ -1307,7 +1307,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                       className="p-1.5 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition"
                                       title="Edit Task"
                                     >
-                                      <SquarePen size={14} />
+                                      <SquarePen size={18} />
                                     </button>
                                   )}
                                   {has('project-tasks.delete') && (
@@ -1319,7 +1319,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                       className="p-1.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700 transition"
                                       title="Delete Task"
                                     >
-                                      <Trash2 size={14} />
+                                      <Trash2 size={18} />
                                     </button>
                                   )}
                                 </div>
@@ -1388,7 +1388,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                           className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
                                           title="Edit Issue"
                                         >
-                                          <SquarePen size={14} />
+                                          <SquarePen size={18} />
                                         </button>
                                       )}
                                       {has('project-issues.delete') && (
@@ -1400,7 +1400,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                                           className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-red-600 transition"
                                           title="Delete Issue"
                                         >
-                                          <Trash2 size={14} />
+                                          <Trash2 size={18} />
                                         </button>
                                       )}
                                     </div>

@@ -26,6 +26,7 @@ import { mockTasks } from '@/data/mockData';
 import { Task } from '@/types';
 import { AppColors, getStatusColor, getPriorityColor } from '@/utils/colors';
 import { formatDate, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
+import AnimatedCard from '@/components/AnimatedCard';
 
 type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
 
@@ -64,16 +65,17 @@ export default function TasksScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const renderTaskCard = ({ item }: { item: Task }) => {
+  const renderTaskCard = ({ item, index }: { item: Task; index: number }) => {
     const statusColor = getStatusColor(item.status);
     const overdue = item.dueDate && isOverdue(item.dueDate);
     const daysUntil = item.dueDate ? getDaysUntilDue(item.dueDate) : null;
 
     return (
-      <TouchableOpacity
-        style={[styles.taskCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}
+      <AnimatedCard
+        index={index}
+        delay={100}
         onPress={() => router.push(`/task-detail?id=${item.id}`)}
-        activeOpacity={0.7}
+        style={styles.taskCard}
       >
         <View style={styles.taskHeader}>
           <View style={styles.taskTitleRow}>
@@ -146,7 +148,7 @@ export default function TasksScreen() {
           <Text style={[styles.milestoneText, { color: AppColors.textSecondary }]}>{item.milestoneName}</Text>
           <ChevronRight size={20} color={AppColors.textSecondary} />
         </View>
-      </TouchableOpacity>
+      </AnimatedCard>
     );
   };
 
@@ -314,10 +316,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   taskCard: {
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 12,
-    borderWidth: 1,
   },
   taskHeader: {
     marginBottom: 12,

@@ -83,13 +83,30 @@ class TaskManagementTaskController extends Controller
         $task->status = $request->status;
         $task->save();
 
+        // Reload task with relationships
+        $task->load(['milestone.project', 'assignedUser']);
+
+        $formattedTask = [
+            'id' => $task->id,
+            'title' => $task->title,
+            'description' => $task->description,
+            'assignedTo' => $task->assigned_to,
+            'assignedToName' => $task->assignedUser->name ?? 'Unassigned',
+            'dueDate' => $task->due_date ? Carbon::parse($task->due_date)->format('Y-m-d') : null,
+            'status' => $task->status,
+            'projectName' => $task->milestone->project->project_name ?? 'Unknown Project',
+            'projectId' => $task->milestone->project->id ?? null,
+            'milestoneName' => $task->milestone->name ?? 'Unknown Milestone',
+            'milestoneId' => $task->milestone->id ?? null,
+            'priority' => $this->getTaskPriority($task),
+            'createdAt' => $task->created_at->toISOString(),
+            'updatedAt' => $task->updated_at->toISOString(),
+        ];
+
         return response()->json([
             'success' => true,
             'message' => 'Task status updated successfully',
-            'data' => [
-                'id' => $task->id,
-                'status' => $task->status,
-            ],
+            'data' => $formattedTask,
         ]);
     }
 

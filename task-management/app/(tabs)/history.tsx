@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,37 +20,63 @@ import {
   Filter,
   Clock,
 } from 'lucide-react-native';
-import { mockTasks, mockProgressUpdates } from '@/data/mockData';
 import { Task, ProgressUpdate } from '@/types';
 import { AppColors } from '@/utils/colors';
 import { formatDate, formatDateTime } from '@/utils/dateUtils';
 import AnimatedCard from '@/components/AnimatedCard';
+import { apiService } from '@/services/api';
 
 type HistoryFilter = 'all' | 'completed' | 'updates';
+
+interface HistoryData {
+  completedTasks: Task[];
+  progressUpdates: Array<ProgressUpdate & { task?: Task }>;
+}
 
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<HistoryFilter>('all');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [allProgressUpdates, setAllProgressUpdates] = useState<Array<ProgressUpdate & { task?: Task }>>([]);
 
-  const completedTasks = useMemo(() => {
-    return mockTasks.filter((t) => t.status === 'completed');
+  const loadHistoryData = async () => {
+    try {
+      setError(null);
+      const response = await apiService.get<HistoryData>('/task-management/dashboard/history');
+
+      // Type guard to check if response is ApiResponse
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data) {
+          setCompletedTasks(response.data.completedTasks || []);
+          setAllProgressUpdates(response.data.progressUpdates || []);
+        } else {
+          setError(response.message || 'Failed to load history');
+        }
+      } else {
+        setError('Invalid response from server');
+      }
+    } catch (err) {
+      console.error('Error loading history:', err);
+      setError('Failed to load history. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistoryData();
   }, []);
 
-  const allProgressUpdates = useMemo(() => {
-    const updates: Array<ProgressUpdate & { task?: Task }> = [];
-    Object.entries(mockProgressUpdates).forEach(([taskId, taskUpdates]) => {
-      const task = mockTasks.find((t) => t.id === parseInt(taskId, 10));
-      taskUpdates.forEach((update) => {
-        updates.push({ ...update, task });
-      });
-    });
-    return updates.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  }, []);
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadHistoryData();
+  };
 
   const filteredData = useMemo(() => {
     let data: Array<{ type: 'task' | 'update'; item: Task | (ProgressUpdate & { task?: Task }) }> = [];
@@ -80,11 +108,11 @@ export default function HistoryScreen() {
     return data.sort((a, b) => {
       const dateA =
         a.type === 'task'
-          ? new Date(a.item.updatedAt).getTime()
+          ? new Date((a.item as Task).updatedAt).getTime()
           : new Date((a.item as ProgressUpdate).created_at).getTime();
       const dateB =
         b.type === 'task'
-          ? new Date(b.item.updatedAt).getTime()
+          ? new Date((b.item as Task).updatedAt).getTime()
           : new Date((b.item as ProgressUpdate).created_at).getTime();
       return dateB - dateA;
     });
@@ -112,8 +140,14 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>{task.title}</Text>
-              <Text style={styles.cardSubtitle} numberOfLines={2}>
-                {task.description}
+              <Text 
+                style={[
+                  styles.cardSubtitle,
+                  !task.description && styles.placeholderText,
+                ]} 
+                numberOfLines={2}
+              >
+                {task.description || 'No description provided'}
               </Text>
             </View>
           </View>
@@ -147,8 +181,14 @@ export default function HistoryScreen() {
               <Text style={styles.cardTitle}>
                 Progress Update: {update.task?.title || 'Unknown Task'}
               </Text>
-              <Text style={styles.cardSubtitle} numberOfLines={2}>
-                {update.description || 'No description'}
+              <Text 
+                style={[
+                  styles.cardSubtitle,
+                  !update.description && styles.placeholderText,
+                ]} 
+                numberOfLines={2}
+              >
+                {update.description || 'No description provided'}
               </Text>
             </View>
           </View>
@@ -172,6 +212,33 @@ export default function HistoryScreen() {
       );
     }
   };
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={AppColors.primary} />
+        <Text style={[styles.loadingText, { color: AppColors.textSecondary }]}>
+          Loading history...
+        </Text>
+      </View>
+    );
+  }
+
+  if (error && !refreshing) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={[styles.errorText, { color: AppColors.error || '#ef4444' }]}>
+          {error}
+        </Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: AppColors.primary }]}
+          onPress={loadHistoryData}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -242,6 +309,13 @@ export default function HistoryScreen() {
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={AppColors.primary}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Clock size={48} color={AppColors.textSecondary} />
@@ -352,6 +426,10 @@ const styles = StyleSheet.create({
     color: AppColors.textSecondary,
     lineHeight: 20,
   },
+  placeholderText: {
+    fontStyle: 'italic',
+    color: AppColors.textSecondary + '80',
+  },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -405,6 +483,30 @@ const styles = StyleSheet.create({
     color: AppColors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

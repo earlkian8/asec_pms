@@ -7,12 +7,12 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { X, Send, AlertCircle } from 'lucide-react-native';
 import { AppColors, getPriorityColor } from '@/utils/colors';
+import { useDialog } from '@/contexts/DialogContext';
 import { Issue } from '@/types';
 
 interface IssueReportModalProps {
@@ -40,6 +40,7 @@ export default function IssueReportModal({
   editingIssue,
   onSubmit,
 }: IssueReportModalProps) {
+  const dialog = useDialog();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<string>('medium');
@@ -57,20 +58,29 @@ export default function IssueReportModal({
         setDescription('');
         setPriority('medium');
       }
+      setValidationErrors({});
     }
   }, [visible, editingIssue]);
 
+  const [validationErrors, setValidationErrors] = useState<{ title?: string; description?: string }>({});
+
   const handleSubmit = async () => {
+    const errors: { title?: string; description?: string } = {};
+    
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title for the issue');
-      return;
+      errors.title = 'Please enter a title for the issue';
     }
 
     if (!description.trim()) {
-      Alert.alert('Error', 'Please describe the issue');
+      errors.description = 'Please describe the issue';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       return;
     }
 
+    setValidationErrors({});
     setLoading(true);
     try {
       await onSubmit(title, description, priority);
@@ -124,32 +134,57 @@ export default function IssueReportModal({
               <View style={styles.inputSection}>
                 <Text style={styles.label}>Issue Title *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    validationErrors.title && styles.inputError,
+                  ]}
                   placeholder="Brief description of the issue"
                   placeholderTextColor={AppColors.textSecondary}
                   value={title}
-                  onChangeText={setTitle}
-                  editable={true}
+                  onChangeText={(text) => {
+                    setTitle(text);
+                    setValidationErrors(prev => ({ ...prev, title: undefined }));
+                  }}
+                  editable={!loading}
                 />
+                {validationErrors.title && (
+                  <View style={styles.errorContainer}>
+                    <AlertCircle size={14} color={AppColors.error} />
+                    <Text style={styles.errorText}>{validationErrors.title}</Text>
+                  </View>
+                )}
               </View>
 
               {/* Description Input */}
               <View style={styles.inputSection}>
                 <Text style={styles.label}>Description *</Text>
                 <TextInput
-                  style={styles.textArea}
+                  style={[
+                    styles.textArea,
+                    validationErrors.description && styles.textAreaError,
+                  ]}
                   placeholder="Provide detailed information about the issue, steps to reproduce, expected vs actual behavior..."
                   placeholderTextColor={AppColors.textSecondary}
                   value={description}
-                  onChangeText={setDescription}
+                  onChangeText={(text) => {
+                    setDescription(text);
+                    setValidationErrors(prev => ({ ...prev, description: undefined }));
+                  }}
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
-                  editable={true}
+                  editable={!loading}
                 />
-                <Text style={styles.helperText}>
-                  {description.length} characters
-                </Text>
+                {validationErrors.description ? (
+                  <View style={styles.errorContainer}>
+                    <AlertCircle size={14} color={AppColors.error} />
+                    <Text style={styles.errorText}>{validationErrors.description}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.helperText}>
+                    {description.length} characters
+                  </Text>
+                )}
               </View>
 
               {/* Priority Selection */}
@@ -326,6 +361,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: AppColors.textSecondary,
     marginTop: 8,
+  },
+  inputError: {
+    borderColor: AppColors.error,
+    backgroundColor: AppColors.error + '10',
+  },
+  textAreaError: {
+    borderColor: AppColors.error,
+    backgroundColor: AppColors.error + '10',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    color: AppColors.error,
+    fontWeight: '500',
   },
   priorityContainer: {
     flexDirection: 'row',

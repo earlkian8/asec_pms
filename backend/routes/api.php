@@ -69,12 +69,14 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
 // Task Management Protected routes
 Route::prefix('task-management')->middleware('auth:sanctum')->group(function () {
     Route::get('/me', [TaskManagementAuthController::class, 'me']);
+    Route::put('/profile', [TaskManagementAuthController::class, 'updateProfile']);
     Route::post('/logout', [TaskManagementAuthController::class, 'logout']);
     Route::post('/logout-all', [TaskManagementAuthController::class, 'logoutAll']);
     
     // Dashboard routes
     Route::get('/dashboard/statistics', [TaskManagementDashboardController::class, 'statistics']);
     Route::get('/dashboard/upcoming-tasks', [TaskManagementDashboardController::class, 'upcomingTasks']);
+    Route::get('/dashboard/history', [TaskManagementDashboardController::class, 'history']);
     Route::get('/tasks', [TaskManagementDashboardController::class, 'tasks']);
     
     // Task detail routes

@@ -7,12 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { X, Upload, FileText, Send } from 'lucide-react-native';
+import { X, Upload, FileText, Send, CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { AppColors } from '@/utils/colors';
+import { useDialog } from '@/contexts/DialogContext';
 
 import { ProgressUpdate } from '@/types';
 
@@ -32,9 +33,11 @@ export default function ProgressUpdateModal({
   editingUpdate,
   onSubmit,
 }: ProgressUpdateModalProps) {
+  const dialog = useDialog();
   const [description, setDescription] = useState('');
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Load editing data when modal opens
   useEffect(() => {
@@ -46,15 +49,17 @@ export default function ProgressUpdateModal({
         setDescription('');
         setSelectedFile(null);
       }
+      setValidationError(null);
     }
   }, [visible, editingUpdate]);
 
   const handleSubmit = async () => {
     if (!description.trim()) {
-      Alert.alert('Error', 'Please enter a description for your progress update');
+      setValidationError('Please enter a description for your progress update');
       return;
     }
 
+    setValidationError(null);
     setLoading(true);
     try {
       await onSubmit(description, selectedFile);
@@ -80,16 +85,17 @@ export default function ProgressUpdateModal({
         if (file) {
           // Check file size (20MB max)
           if (file.size > 20 * 1024 * 1024) {
-            Alert.alert('Error', 'File size must be less than 20MB');
+            dialog.showError('File size must be less than 20MB', 'File Too Large');
             return;
           }
           setSelectedFile(file);
+          setValidationError(null);
         }
       };
       input.click();
     } else {
       // For mobile, would use expo-document-picker
-      Alert.alert('File Upload', 'File picker would open here. In production, use expo-document-picker.');
+      dialog.showInfo('File picker would open here. In production, use expo-document-picker.', 'File Upload');
     }
   };
 
@@ -135,19 +141,32 @@ export default function ProgressUpdateModal({
               <View style={styles.inputSection}>
                 <Text style={styles.label}>Description *</Text>
                 <TextInput
-                  style={styles.textArea}
+                  style={[
+                    styles.textArea,
+                    validationError && styles.textAreaError,
+                  ]}
                   placeholder="Describe your progress, what you've completed, any blockers, or next steps..."
                   placeholderTextColor={AppColors.textSecondary}
                   value={description}
-                  onChangeText={setDescription}
+                  onChangeText={(text) => {
+                    setDescription(text);
+                    setValidationError(null);
+                  }}
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
-                  editable={true}
+                  editable={!loading}
                 />
-                <Text style={styles.helperText}>
-                  {description.length} characters
-                </Text>
+                {validationError ? (
+                  <View style={styles.errorContainer}>
+                    <AlertCircle size={14} color={AppColors.error} />
+                    <Text style={styles.errorText}>{validationError}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.helperText}>
+                    {description.length} characters
+                  </Text>
+                )}
               </View>
 
               {/* File Upload Section */}
@@ -411,6 +430,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  textAreaError: {
+    borderColor: AppColors.error,
+    backgroundColor: AppColors.error + '10',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    color: AppColors.error,
+    fontWeight: '500',
   },
 });
 

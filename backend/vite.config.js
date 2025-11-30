@@ -12,7 +12,7 @@ export default defineConfig({
     ],
     server: {
         hmr: {
-            host: 'greensync-6i8z6.ondigitalocean.app',
+            host: 'https://asec-pms-inqqb.ondigitalocean.app/',
             // host: 'localhost',
         },
     },

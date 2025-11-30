@@ -35,11 +35,12 @@ class ClientDashboardController extends Controller
         $totalBudget = $projects->sum('contract_amount');
         
         // Calculate total spent (material costs + labor costs) - optimized
-        // Material costs: join with inventory items
+        // Material costs: join with inventory items - only count received materials
         $materialCosts = DB::table('project_material_allocations')
             ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->whereIn('project_material_allocations.project_id', $projectIds)
-            ->sum(DB::raw('project_material_allocations.quantity_allocated * inventory_items.unit_price'));
+            ->where('project_material_allocations.quantity_received', '>', 0)
+            ->sum(DB::raw('project_material_allocations.quantity_received * inventory_items.unit_price'));
         
         // Labor costs
         $laborCosts = ProjectLaborCost::whereIn('project_id', $projectIds)
@@ -134,11 +135,12 @@ class ClientDashboardController extends Controller
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
         
-        // Pre-calculate all material costs
+        // Pre-calculate all material costs - only count received materials
         $materialCostsByProject = DB::table('project_material_allocations')
             ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->whereIn('project_material_allocations.project_id', $projectIds)
-            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_allocated * inventory_items.unit_price) as total'))
+            ->where('project_material_allocations.quantity_received', '>', 0)
+            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * inventory_items.unit_price) as total'))
             ->groupBy('project_material_allocations.project_id')
             ->pluck('total', 'project_id');
         
@@ -229,11 +231,12 @@ class ClientDashboardController extends Controller
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
         
-        // Pre-calculate costs
+        // Pre-calculate costs - only count received materials
         $materialCostsByProject = DB::table('project_material_allocations')
             ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->whereIn('project_material_allocations.project_id', $projectIds)
-            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_allocated * inventory_items.unit_price) as total'))
+            ->where('project_material_allocations.quantity_received', '>', 0)
+            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * inventory_items.unit_price) as total'))
             ->groupBy('project_material_allocations.project_id')
             ->pluck('total', 'project_id');
         
@@ -413,12 +416,13 @@ class ClientDashboardController extends Controller
             $progress = round($totalProgress / $milestones->count());
         }
 
-        // Calculate spent
+        // Calculate spent - only count received materials
         $projectId = $project->id;
         $materialCosts = DB::table('project_material_allocations')
             ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->where('project_material_allocations.project_id', $projectId)
-            ->sum(DB::raw('project_material_allocations.quantity_allocated * inventory_items.unit_price'));
+            ->where('project_material_allocations.quantity_received', '>', 0)
+            ->sum(DB::raw('project_material_allocations.quantity_received * inventory_items.unit_price'));
         
         $laborCosts = ProjectLaborCost::where('project_id', $projectId)
             ->sum(DB::raw('hours_worked * hourly_rate'));
@@ -477,23 +481,21 @@ class ClientDashboardController extends Controller
             ];
         });
 
-        // Collect all progress updates from all tasks, sorted by date
-        $allProgressUpdates = collect();
-        foreach ($milestones as $milestone) {
-            foreach ($milestone->tasks as $task) {
-                foreach ($task->progressUpdates as $update) {
-                    $allProgressUpdates->push([
-                        'id' => (string) $update->id,
-                        'title' => $task->title . ' - ' . $milestone->name,
-                        'description' => $update->description,
-                        'type' => 'progress',
-                        'author' => $update->createdBy ? $update->createdBy->name : 'Unknown',
-                        'date' => $update->created_at->toISOString(),
-                    ]);
-                }
-            }
-        }
-        $allProgressUpdates = $allProgressUpdates->sortByDesc('date')->values();
+        // Get client update requests for this project
+        $requestUpdates = ClientUpdateRequest::where('project_id', $project->id)
+            ->where('client_id', $client->id)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($request) {
+                return [
+                    'id' => (string) $request->id,
+                    'title' => $request->subject,
+                    'description' => $request->message,
+                    'type' => 'request',
+                    'author' => 'You', // Client is the author
+                    'date' => $request->created_at->toISOString(),
+                ];
+            });
 
         // Format team members
         $teamMembers = $project->team
@@ -521,7 +523,7 @@ class ClientDashboardController extends Controller
                 'location' => $project->location ?? '',
                 'projectManager' => $projectManagerName,
                 'milestones' => $formattedMilestones,
-                'recentUpdates' => $allProgressUpdates->take(20)->all(), // Latest 20 updates
+                'recentUpdates' => $requestUpdates->all(), // Client's request updates
                 'teamMembers' => $teamMembers,
             ],
         ]);

@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppProvider } from '@/contexts/AppContext';
+import { DialogProvider } from '@/contexts/DialogContext';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -57,8 +58,10 @@ export default function RootLayout() {
       <ThemeProvider value={DefaultTheme}>
         <AuthProvider>
           <AppProvider>
-            <RootLayoutNav />
-            <StatusBar style="auto" />
+            <DialogProvider>
+              <RootLayoutNav />
+              <StatusBar style="auto" />
+            </DialogProvider>
           </AppProvider>
         </AuthProvider>
       </ThemeProvider>

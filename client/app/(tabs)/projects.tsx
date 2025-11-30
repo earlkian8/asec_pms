@@ -8,10 +8,11 @@ import {
   Dimensions,
   TextInput,
   RefreshControl,
-  Alert,
   Modal,
   ActivityIndicator,
   Linking,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,8 +20,11 @@ import { useProjects, Project } from '@/hooks/useProjects';
 import { FIRM_CONTACT } from '@/constants/contact';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Phone, Mail, ArrowUpDown } from 'lucide-react-native';
+import { Phone, Mail, ArrowUpDown, Filter } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
+import AnimatedCard from '@/components/AnimatedCard';
+import AnimatedView from '@/components/AnimatedView';
+import { useDialog } from '@/contexts/DialogContext';
 
 const { width } = Dimensions.get('window');
 
@@ -32,11 +36,13 @@ export default function ProjectsScreen() {
   const [sortBy, setSortBy] = useState<SortOption>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showSortModal, setShowSortModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const dialog = useDialog();
 
   // Use API hook with debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -71,54 +77,46 @@ export default function ProjectsScreen() {
     if (method === 'call') {
       const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
       
-      Alert.alert(
-        'Contact Project Manager',
+      dialog.showConfirm(
         `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Call',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(phoneUrl);
-                if (canOpen) {
-                  await Linking.openURL(phoneUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open phone dialer');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open phone dialer');
-                console.error('Error opening phone:', error);
-              }
-            },
-          },
-        ]
+        async () => {
+          try {
+            const canOpen = await Linking.canOpenURL(phoneUrl);
+            if (canOpen) {
+              await Linking.openURL(phoneUrl);
+            } else {
+              dialog.showError('Unable to open phone dialer');
+            }
+          } catch (error) {
+            dialog.showError('Failed to open phone dialer');
+            console.error('Error opening phone:', error);
+          }
+        },
+        'Contact Project Manager',
+        'Call',
+        'Cancel'
       );
     } else {
       const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
       
-      Alert.alert(
-        'Contact Project Manager',
+      dialog.showConfirm(
         `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Email',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(emailUrl);
-                if (canOpen) {
-                  await Linking.openURL(emailUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open email client');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open email client');
-                console.error('Error opening email:', error);
-              }
-            },
-          },
-        ]
+        async () => {
+          try {
+            const canOpen = await Linking.canOpenURL(emailUrl);
+            if (canOpen) {
+              await Linking.openURL(emailUrl);
+            } else {
+              dialog.showError('Unable to open email client');
+            }
+          } catch (error) {
+            dialog.showError('Failed to open email client');
+            console.error('Error opening email:', error);
+          }
+        },
+        'Contact Project Manager',
+        'Email',
+        'Cancel'
       );
     }
   };
@@ -152,16 +150,17 @@ export default function ProjectsScreen() {
     pending: { bg: '#F3F4F6', text: '#4B5563', dot: '#6B7280' }, // gray-100/gray-600
   };
 
-  const ProjectCard = ({ project }: { project: Project }) => {
+  const ProjectCard = ({ project, index }: { project: Project; index: number }) => {
     const status = statusColors[project.status] || statusColors.pending;
     const budgetPercent = (project.spent / project.budget) * 100;
 
     return (
-      <View style={[styles.projectCard, { backgroundColor: cardBg, borderColor }]}>
-        <TouchableOpacity
-          onPress={() => router.push(`/project/${project.id}`)}
-          activeOpacity={0.7}>
-          <View style={styles.projectCardHeader}>
+      <AnimatedCard
+        index={index}
+        delay={100}
+        onPress={() => router.push(`/project/${project.id}`)}
+        style={StyleSheet.flatten([styles.projectCard, { backgroundColor: cardBg, borderColor }])}>
+        <View style={styles.projectCardHeader}>
             <View style={styles.projectCardTitleContainer}>
               <View style={styles.projectTitleRow}>
                 <View style={[styles.statusDot, { backgroundColor: status.dot }]} />
@@ -170,7 +169,7 @@ export default function ProjectsScreen() {
                 </Text>
               </View>
               <Text style={[styles.projectCardLocation, { color: textSecondary }]} numberOfLines={1}>
-                <Ionicons name="location-outline" size={12} color={textSecondary} /> {project.location}
+                <Ionicons name="location-outline" size={12} color={textSecondary} /> {project.location || 'No location specified'}
               </Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
@@ -180,8 +179,8 @@ export default function ProjectsScreen() {
             </View>
           </View>
 
-        <Text style={[styles.projectCardDescription, { color: textSecondary }]} numberOfLines={2}>
-          {project.description}
+        <Text style={[styles.projectCardDescription, { color: textSecondary }, !project.description && styles.placeholderText]} numberOfLines={2}>
+          {project.description || 'No description provided for this project.'}
         </Text>
 
         <View style={styles.projectCardStats}>
@@ -226,21 +225,53 @@ export default function ProjectsScreen() {
           </View>
         </View>
 
+          {/* Budget Section */}
+          <View style={styles.budgetSection}>
+            <View style={styles.budgetHeader}>
+              <View style={styles.budgetInfoRow}>
+                <Ionicons name="wallet-outline" size={16} color={textSecondary} />
+                <Text style={[styles.budgetLabel, { color: textSecondary }]}>Budget Usage</Text>
+              </View>
+              <Text style={[styles.budgetPercent, { color: textColor }]}>
+                {Math.round(budgetPercent)}%
+              </Text>
+            </View>
+            <View style={styles.budgetDetails}>
+              <View style={styles.budgetDetailItem}>
+                <Text style={[styles.budgetDetailLabel, { color: textSecondary }]}>Spent</Text>
+                <Text style={[styles.budgetDetailValue, { color: textColor }]}>
+                  {formatCurrency(project.spent)}
+                </Text>
+              </View>
+              <View style={styles.budgetDivider} />
+              <View style={styles.budgetDetailItem}>
+                <Text style={[styles.budgetDetailLabel, { color: textSecondary }]}>Total Budget</Text>
+                <Text style={[styles.budgetDetailValue, { color: textColor }]}>
+                  {formatCurrency(project.budget)}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.budgetBar, { backgroundColor: '#E5E7EB' }]}>
+              <View
+                style={[
+                  styles.budgetBarFill,
+                  {
+                    width: `${Math.min(budgetPercent, 100)}%`,
+                    backgroundColor: budgetPercent > 90 ? '#EF4444' : budgetPercent > 75 ? '#F59E0B' : '#10B981',
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
           <View style={styles.projectCardFooter}>
             <View style={styles.footerItem}>
               <Ionicons name="person-outline" size={14} color={textSecondary} />
-              <Text style={[styles.footerText, { color: textSecondary }]}>
-                {project.projectManager}
-              </Text>
-            </View>
-            <View style={styles.footerItem}>
-              <Ionicons name="wallet-outline" size={14} color={textSecondary} />
-              <Text style={[styles.footerText, { color: textSecondary }]}>
-                {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
+              <Text style={[styles.footerText, { color: textSecondary }, !project.projectManager && styles.placeholderText]}>
+                {project.projectManager || 'No project manager assigned'}
               </Text>
             </View>
           </View>
-        </TouchableOpacity>
 
         {/* Action Buttons */}
         <View style={styles.projectActions}>
@@ -260,7 +291,7 @@ export default function ProjectsScreen() {
             <Text style={[styles.actionButtonTextLabel, { color: '#3B82F6' }]}>Request Update</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </AnimatedCard>
     );
   };
 
@@ -293,53 +324,45 @@ export default function ProjectsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B82F6" />
         }>
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: inputBg, borderColor }]}>
-          <Ionicons name="search-outline" size={20} color={textSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: textColor }]}
-            placeholder="Search projects..."
-            placeholderTextColor={textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={textSecondary} />
+        {/* Search Bar with Filter and Sort */}
+        <View style={[styles.searchContainer, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+          <View style={styles.searchRow}>
+            <View style={[styles.searchInputContainer, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="search-outline" size={20} color={textSecondary} style={styles.searchIcon} />
+              <TextInput
+                style={[styles.searchInput, { color: textColor }]}
+                placeholder="Search projects..."
+                placeholderTextColor={textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color={textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.iconButton,
+                {
+                  backgroundColor: filterStatus !== null ? '#3B82F6' : inputBg,
+                  borderColor: filterStatus !== null ? '#3B82F6' : borderColor,
+                },
+              ]}
+              onPress={() => setShowFilterModal(true)}>
+              <Filter
+                size={20}
+                color={filterStatus !== null ? '#FFFFFF' : textSecondary}
+              />
             </TouchableOpacity>
-          )}
+            <TouchableOpacity
+              style={[styles.iconButton, { backgroundColor: inputBg, borderColor }]}
+              onPress={() => setShowSortModal(true)}>
+              <ArrowUpDown size={20} color={textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
-
-        {/* Status Filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterContainer}
-          contentContainerStyle={styles.filterContent}>
-          {statusOptions.map((status) => {
-            const isActive = filterStatus === status || (status === 'all' && filterStatus === null);
-            return (
-              <TouchableOpacity
-                key={status}
-                onPress={() => setFilterStatus(status === 'all' ? null : status)}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: isActive ? '#3B82F6' : cardBg,
-                    borderColor: isActive ? '#3B82F6' : borderColor,
-                  },
-                ]}>
-                <Text
-                  style={[
-                    styles.filterText,
-                    { color: isActive ? '#FFFFFF' : textSecondary },
-                  ]}>
-                  {status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
 
         {/* Projects List */}
         {loading && !refreshing ? (
@@ -362,8 +385,8 @@ export default function ProjectsScreen() {
           </View>
         ) : filteredProjects.length > 0 ? (
           <View style={styles.projectsList}>
-            {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+            {filteredProjects.map((project, index) => (
+              <ProjectCard key={project.id} project={project} index={index} />
             ))}
           </View>
         ) : (
@@ -377,10 +400,60 @@ export default function ProjectsScreen() {
         )}
       </ScrollView>
 
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowFilterModal(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterModal(false)}>
+          <View style={[styles.modalContent, { backgroundColor: cardBg, borderColor }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: textColor }]}>Filter Projects</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Ionicons name="close" size={24} color={textColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              {statusOptions.map((status) => {
+                const isActive = filterStatus === status || (status === 'all' && filterStatus === null);
+                return (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.filterOption,
+                      {
+                        backgroundColor: isActive ? '#3B82F610' : 'transparent',
+                      },
+                    ]}
+                    onPress={() => {
+                      setFilterStatus(status === 'all' ? null : status);
+                      setShowFilterModal(false);
+                    }}>
+                    <Text style={[styles.filterOptionText, { color: textColor }]}>
+                      {status === 'all'
+                        ? 'All Projects'
+                        : status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
+                    </Text>
+                    {isActive && (
+                      <Ionicons name="checkmark" size={20} color="#3B82F6" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Sort Modal */}
       <Modal visible={showSortModal} transparent animationType="fade" onRequestClose={() => setShowSortModal(false)}>
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.sortModalOverlay}
           activeOpacity={1}
           onPress={() => setShowSortModal(false)}>
           <View style={[styles.sortModal, { backgroundColor: cardBg, borderColor }]}>
@@ -482,38 +555,82 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   searchContainer: {
+    padding: 20,
+    borderBottomWidth: 1,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  searchInputContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    height: 52,
     borderWidth: 1,
+    gap: 12,
   },
   searchIcon: {
-    marginRight: 12,
+    marginRight: 0,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     fontWeight: '400',
   },
-  filterContainer: {
-    marginBottom: 20,
+  iconButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  filterContent: {
-    gap: 8,
-    paddingRight: 20,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    maxHeight: '80%',
     borderWidth: 1,
   },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  filterOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   projectsList: {
     gap: 16,
@@ -532,7 +649,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   projectCardTitleContainer: {
     flex: 1,
@@ -573,15 +690,15 @@ const styles = StyleSheet.create({
   projectCardDescription: {
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   projectCardStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 16,
+    paddingVertical: 12,
     marginBottom: 16,
     borderRadius: 12,
-            backgroundColor: '#F3F4F6',
+    backgroundColor: '#F3F4F6',
   },
   statItem: {
     alignItems: 'center',
@@ -628,6 +745,63 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 5,
   },
+  budgetSection: {
+    marginTop: 16,
+    marginBottom: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  budgetInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  budgetLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  budgetPercent: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  budgetDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
+  budgetDetailItem: {
+    flex: 1,
+  },
+  budgetDetailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  budgetDetailValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  budgetDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  budgetBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  budgetBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
   projectCardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -643,6 +817,10 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  placeholderText: {
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
   emptyState: {
     alignItems: 'center',
@@ -708,7 +886,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  modalOverlay: {
+  sortModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',

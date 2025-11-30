@@ -6,11 +6,11 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/contexts/AppContext';
+import { useDialog } from '@/contexts/DialogContext';
 import { apiService } from '@/services/api';
 
 interface RequestUpdateModalProps {
@@ -32,10 +32,11 @@ export default function RequestUpdateModal({
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const { refreshNotifications } = useApp();
+  const dialog = useDialog();
 
   const handleSubmit = async () => {
     if (!subject.trim() || !message.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      dialog.showError('Please fill in all fields');
       return;
     }
 
@@ -49,18 +50,18 @@ export default function RequestUpdateModal({
       });
 
       if (response.success) {
-        Alert.alert('Success', 'Update request sent successfully!');
+        dialog.showSuccess('Update request sent successfully!');
         // Refresh notifications to get any new ones from backend
         await refreshNotifications();
         setSubject('');
         setMessage('');
         onClose();
       } else {
-        Alert.alert('Error', response.message || 'Failed to send update request. Please try again.');
+        dialog.showError(response.message || 'Failed to send update request. Please try again.');
       }
     } catch (error) {
       console.error('Request update error:', error);
-      Alert.alert('Error', 'Failed to send update request. Please check your connection and try again.');
+      dialog.showError('Failed to send update request. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -94,7 +95,10 @@ export default function RequestUpdateModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: textColor }]}>Subject *</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: textColor }]}>Subject</Text>
+                <Text style={styles.requiredAsterisk}> *</Text>
+              </View>
               <TextInput
                 style={[styles.input, { backgroundColor: '#F9FAFB', borderColor, color: textColor }]}
                 placeholder="Enter subject"
@@ -105,7 +109,10 @@ export default function RequestUpdateModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: textColor }]}>Message *</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: textColor }]}>Message</Text>
+                <Text style={styles.requiredAsterisk}> *</Text>
+              </View>
               <TextInput
                 style={[
                   styles.textArea,
@@ -192,10 +199,18 @@ const styles = StyleSheet.create({
   inputSection: {
     marginBottom: 20,
   },
+  labelRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+  },
+  requiredAsterisk: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   input: {
     borderWidth: 1,

@@ -10,4 +10,10 @@ export default defineConfig({
         }),
         react(),
     ],
+    server: {
+        hmr: {
+            host: 'greensync-6i8z6.ondigitalocean.app',
+            // host: 'localhost',
+        },
+    },
 });

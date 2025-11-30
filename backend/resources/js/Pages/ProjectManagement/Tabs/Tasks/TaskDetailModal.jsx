@@ -5,8 +5,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "@/Components/ui/dialog";
+import { Button } from "@/Components/ui/button";
 import { Plus, Download, SquarePen, Trash2, FileText, Image as ImageIcon, Calendar, User } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddProgressUpdate from '../ProgressUpdate/add';

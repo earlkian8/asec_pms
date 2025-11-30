@@ -7,9 +7,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@/Components/ui/table";
+import { Input } from "@/Components/ui/input";
+import { Button } from "@/Components/ui/button";
 import { toast } from 'sonner';
 import { LayoutGrid, List, File, Upload, Download, Trash2, Check, FileText, ImageIcon } from 'lucide-react';
 import AddFileModal from './add';

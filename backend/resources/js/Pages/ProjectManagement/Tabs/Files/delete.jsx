@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter
-} from "@/components/ui/dialog";
-import { Button } from '@/components/ui/button';
+} from "@/Components/ui/dialog";
+import { Button } from '@/Components/ui/button';
 
 const DeleteFile = ({ setShowDeleteModal, file }) => {
   const handleDelete = (e) => {

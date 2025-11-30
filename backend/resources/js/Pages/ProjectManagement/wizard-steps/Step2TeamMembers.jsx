@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 
 export default function Step2TeamMembers({ users }) {
   const { teamMembers, addTeamMember, removeTeamMember, updateTeamMember, projectData } = useProjectWizard();

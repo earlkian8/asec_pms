@@ -26,12 +26,12 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/Components/ui/dropdown-menu';
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+} from '@/Components/ui/collapsible';
 import { Toaster } from '@/Components/ui/sonner';
 export default function AuthenticatedLayout({ header, children, breadcrumbs = [] }) {
     const user = usePage().props.auth.user;

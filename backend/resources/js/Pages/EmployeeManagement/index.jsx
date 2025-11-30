@@ -8,11 +8,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Trash2, SquarePen } from 'lucide-react';
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@/Components/ui/switch";
 import { toast } from 'sonner';
 
 import AddEmployee from './add';

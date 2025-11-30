@@ -14,7 +14,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 
 export default function Step4MaterialAllocation({ inventoryItems }) {
   const { materialAllocations, addMaterialAllocation, removeMaterialAllocation } = useProjectWizard();

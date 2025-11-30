@@ -6,9 +6,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@/Components/ui/table";
+import { Input } from "@/Components/ui/input";
+import { Button } from "@/Components/ui/button";
 import { toast } from 'sonner';
 import { LayoutGrid, List, Trash2, SquarePen, Image as ImageIcon, File, Download, FileText } from 'lucide-react';
 import AddProgressUpdate from './add';

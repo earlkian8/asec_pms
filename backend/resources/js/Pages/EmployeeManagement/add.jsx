@@ -13,6 +13,7 @@ import InputError from '@/Components/InputError';
 import { Label } from '@/Components/ui/label';
 import { Button } from '@/Components/ui/button';
 import { Switch } from '@/Components/ui/switch';
+import { Loader2, Save } from 'lucide-react';
 
 const AddEmployee = ({ setShowAddModal }) => {
   const { data, setData, post, errors, processing } = useForm({
@@ -35,9 +36,8 @@ const AddEmployee = ({ setShowAddModal }) => {
     });
   };
 
-  // ✅ Reusable input style with error handling
   const inputClass = (error, readOnly = false) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
+    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (readOnly
       ? "bg-zinc-100 text-zinc-600 cursor-not-allowed"
       : error
@@ -53,16 +53,16 @@ const AddEmployee = ({ setShowAddModal }) => {
             Enter the details for the new employee below.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* First Name */}
           <div>
-            <Label className="text-zinc-800">First Name</Label>
+            <Label className="text-zinc-800">First Name *</Label>
             <Input
               type="text"
               value={data.first_name}
               onChange={e => setData('first_name', e.target.value)}
-              placeholder="Enter first name"
+              placeholder="John"
               className={inputClass(errors.first_name)}
             />
             <InputError message={errors.first_name} />
@@ -70,12 +70,12 @@ const AddEmployee = ({ setShowAddModal }) => {
 
           {/* Last Name */}
           <div>
-            <Label className="text-zinc-800">Last Name</Label>
+            <Label className="text-zinc-800">Last Name *</Label>
             <Input
               type="text"
               value={data.last_name}
               onChange={e => setData('last_name', e.target.value)}
-              placeholder="Enter last name"
+              placeholder="Doe"
               className={inputClass(errors.last_name)}
             />
             <InputError message={errors.last_name} />
@@ -83,12 +83,12 @@ const AddEmployee = ({ setShowAddModal }) => {
 
           {/* Email */}
           <div>
-            <Label className="text-zinc-800">Email</Label>
+            <Label className="text-zinc-800">Email *</Label>
             <Input
               type="email"
               value={data.email}
               onChange={e => setData('email', e.target.value)}
-              placeholder="Enter email address"
+              placeholder="employee@example.com"
               className={inputClass(errors.email)}
             />
             <InputError message={errors.email} />
@@ -101,27 +101,27 @@ const AddEmployee = ({ setShowAddModal }) => {
               type="text"
               value={data.phone}
               onChange={e => setData('phone', e.target.value)}
-              placeholder="Enter phone number (optional)"
+              placeholder="+63 123 456 7890"
               className={inputClass(errors.phone)}
             />
             <InputError message={errors.phone} />
           </div>
 
           {/* Position */}
-          <div>
+          <div className="md:col-span-2">
             <Label className="text-zinc-800">Position</Label>
             <Input
               type="text"
               value={data.position}
               onChange={e => setData('position', e.target.value)}
-              placeholder="Enter job position"
+              placeholder="Software Engineer"
               className={inputClass(errors.position)}
             />
             <InputError message={errors.position} />
           </div>
 
           {/* Active Status */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 md:col-span-2">
             <Switch
               id="is_active"
               checked={data.is_active}
@@ -137,20 +137,32 @@ const AddEmployee = ({ setShowAddModal }) => {
           </div>
 
           {/* Buttons */}
-          <DialogFooter className="flex flex-row gap-2 justify-end mt-4">
+          <DialogFooter className="flex flex-row gap-2 justify-end mt-4 md:col-span-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowAddModal(false)}
+              disabled={processing}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="bg-zinc-800 text-white hover:bg-zinc-900 transition"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               disabled={processing}
             >
-              Add Employee
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Add Employee
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

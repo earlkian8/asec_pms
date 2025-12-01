@@ -89,13 +89,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             icon: Users,
             type: 'single'
         },
-        // {
-        //     title: 'Employee Management',
-        //     href: route('employee-management.index'),
-        //     routeName: 'employee-management.*',
-        //     icon: UserCheck,
-        //     type: 'single'
-        // },
+        {
+            title: 'Employee Management',
+            href: route('employee-management.index'),
+            routeName: 'employee-management.*',
+            icon: UserCheck,
+            type: 'single'
+        },
         {
             title: 'Inventory Management',
             href: route('inventory-management.index'),
@@ -168,6 +168,11 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             if (module.title === 'Client Management') {
                 return hasModuleAccess([
                     'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
+                ]) ? module : null;
+            }
+            if (module.title === 'Employee Management') {
+                return hasModuleAccess([
+                    'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status'
                 ]) ? module : null;
             }
             if (module.title === 'Inventory Management') {

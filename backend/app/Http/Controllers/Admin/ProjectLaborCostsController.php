@@ -17,7 +17,8 @@ class ProjectLaborCostsController extends Controller
     public function store(Project $project, Request $request)
     {
         $data = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
+            'assignable_id' => ['required', 'integer'],
+            'assignable_type' => ['required', 'in:user,employee'],
             'work_date' => ['required', 'date'],
             'hours_worked' => ['required', 'numeric', 'min:0.01'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
@@ -25,15 +26,34 @@ class ProjectLaborCostsController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        // Validate ID based on type
+        if ($data['assignable_type'] === 'user') {
+            $request->validate([
+                'assignable_id' => ['exists:users,id'],
+            ]);
+            $data['user_id'] = $data['assignable_id'];
+            $data['employee_id'] = null;
+        } else {
+            $request->validate([
+                'assignable_id' => ['exists:employees,id'],
+            ]);
+            $data['employee_id'] = $data['assignable_id'];
+            $data['user_id'] = null;
+        }
+
         $data['project_id'] = $project->id;
         $data['created_by'] = auth()->id();
+        unset($data['assignable_id']); // Remove assignable_id as it's not a column
 
         $laborCost = ProjectLaborCost::create($data);
+        $laborCost->load(['user', 'employee']);
+
+        $assignableName = $laborCost->assignable_name;
 
         $this->adminActivityLogs(
             'Labor Cost',
             'Created',
-            'Created labor cost entry for ' . $laborCost->user->name . ' - ' . $data['hours_worked'] . ' hours on ' . $data['work_date'] . ' for project "' . $project->project_name . '"'
+            'Created labor cost entry for ' . $assignableName . ' - ' . $data['hours_worked'] . ' hours on ' . $data['work_date'] . ' for project "' . $project->project_name . '"'
         );
 
         return back()->with('success', 'Labor cost entry created successfully.');
@@ -43,7 +63,8 @@ class ProjectLaborCostsController extends Controller
     public function update(Project $project, Request $request, ProjectLaborCost $laborCost)
     {
         $data = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
+            'assignable_id' => ['required', 'integer'],
+            'assignable_type' => ['required', 'in:user,employee'],
             'work_date' => ['required', 'date'],
             'hours_worked' => ['required', 'numeric', 'min:0.01'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
@@ -51,12 +72,32 @@ class ProjectLaborCostsController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        // Validate ID based on type
+        if ($data['assignable_type'] === 'user') {
+            $request->validate([
+                'assignable_id' => ['exists:users,id'],
+            ]);
+            $data['user_id'] = $data['assignable_id'];
+            $data['employee_id'] = null;
+        } else {
+            $request->validate([
+                'assignable_id' => ['exists:employees,id'],
+            ]);
+            $data['employee_id'] = $data['assignable_id'];
+            $data['user_id'] = null;
+        }
+
+        unset($data['assignable_id']); // Remove assignable_id as it's not a column
+
         $laborCost->update($data);
+        $laborCost->load(['user', 'employee']);
+
+        $assignableName = $laborCost->assignable_name;
 
         $this->adminActivityLogs(
             'Labor Cost',
             'Updated',
-            'Updated labor cost entry for ' . $laborCost->user->name . ' for project "' . $project->project_name . '"'
+            'Updated labor cost entry for ' . $assignableName . ' for project "' . $project->project_name . '"'
         );
 
         return back()->with('success', 'Labor cost entry updated successfully.');
@@ -65,7 +106,8 @@ class ProjectLaborCostsController extends Controller
     // Delete labor cost
     public function destroy(Project $project, ProjectLaborCost $laborCost)
     {
-        $userName = $laborCost->user->name;
+        $laborCost->load(['user', 'employee']);
+        $assignableName = $laborCost->assignable_name;
         $workDate = $laborCost->work_date;
 
         $laborCost->delete();
@@ -73,7 +115,7 @@ class ProjectLaborCostsController extends Controller
         $this->adminActivityLogs(
             'Labor Cost',
             'Deleted',
-            'Deleted labor cost entry for ' . $userName . ' on ' . $workDate . ' from project "' . $project->project_name . '"'
+            'Deleted labor cost entry for ' . $assignableName . ' on ' . $workDate . ' from project "' . $project->project_name . '"'
         );
 
         return back()->with('success', 'Labor cost entry deleted successfully.');

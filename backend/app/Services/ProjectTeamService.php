@@ -28,14 +28,20 @@ class ProjectTeamService
         // Validate sort order
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
-        $projectTeams = ProjectTeam::with('user')
+        $projectTeams = ProjectTeam::with(['user', 'employee'])
             ->where('project_id', $project->id)
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('user', function ($userQuery) use ($search) {
                         $userQuery->where('name', 'ilike', "%{$search}%")
                             ->orWhere('email', 'ilike', "%{$search}%");
-                    })->orWhere('role', 'ilike', "%{$search}%");
+                    })
+                    ->orWhereHas('employee', function ($employeeQuery) use ($search) {
+                        $employeeQuery->where('first_name', 'ilike', "%{$search}%")
+                            ->orWhere('last_name', 'ilike', "%{$search}%")
+                            ->orWhere('email', 'ilike', "%{$search}%");
+                    })
+                    ->orWhere('role', 'ilike', "%{$search}%");
                 });
             })
             ->when($role, function ($query, $role) {
@@ -54,13 +60,21 @@ class ProjectTeamService
             ->paginate(10)
             ->withQueryString();
 
-        // Get user IDs already in the project team
+        // Get user IDs and employee IDs already in the project team
         $existingUserIds = ProjectTeam::where('project_id', $project->id)
+            ->whereNotNull('user_id')
             ->pluck('user_id')
             ->filter()
             ->toArray();
         
-        $employees = User::with('roles')
+        $existingEmployeeIds = ProjectTeam::where('project_id', $project->id)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->filter()
+            ->toArray();
+        
+        // Get available users
+        $users = User::with('roles')
             ->whereNotIn('id', $existingUserIds)
             ->orderBy('name')
             ->get()
@@ -70,8 +84,28 @@ class ProjectTeamService
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->roles->first()?->name ?? 'No Role',
+                    'type' => 'user',
                 ];
             });
+        
+        // Get available employees
+        $employees = Employee::where('is_active', true)
+            ->whereNotIn('id', $existingEmployeeIds)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get()
+            ->map(function ($employee) {
+                return [
+                    'id' => $employee->id,
+                    'name' => $employee->first_name . ' ' . $employee->last_name,
+                    'email' => $employee->email,
+                    'position' => $employee->position ?? 'No Position',
+                    'type' => 'employee',
+                ];
+            });
+        
+        // Combine users and employees
+        $allAssignables = $users->concat($employees);
 
         // Get unique roles and statuses for filters
         $roles = ProjectTeam::where('project_id', $project->id)
@@ -83,7 +117,9 @@ class ProjectTeamService
 
         return [
             'projectTeams' => $projectTeams,
+            'users'        => $users,
             'employees'    => $employees,
+            'allAssignables' => $allAssignables,
             'filterOptions' => [
                 'roles' => $roles,
             ],

@@ -9,7 +9,8 @@ import { Button } from "@/Components/ui/button";
 import { User, Calendar, Clock, DollarSign, FileText } from "lucide-react";
 
 const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
-  const user = laborCost.user || laborCost.user_id || {};
+  const assignableName = laborCost.assignable_name || laborCost.user?.name || (laborCost.employee?.first_name + ' ' + laborCost.employee?.last_name) || 'Unknown';
+  const assignableType = laborCost.assignable_type || (laborCost.user_id ? 'user' : 'employee');
   const createdBy = laborCost.created_by || laborCost.createdBy || {};
   const totalCost = (laborCost.hours_worked || 0) * (laborCost.hourly_rate || 0);
 
@@ -46,10 +47,15 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <span className="text-sm font-medium text-gray-700">Employee:</span>
+                <span className="text-sm font-medium text-gray-700">Team Member:</span>
                 <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-900">
                   <User size={14} className="text-gray-400" />
-                  <span>{user.name || 'Unknown'}</span>
+                  <span>{assignableName}</span>
+                  {assignableType === 'employee' && (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                      Employee
+                    </span>
+                  )}
                 </div>
               </div>
               <div>

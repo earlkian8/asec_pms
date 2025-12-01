@@ -109,11 +109,11 @@ Route::middleware('auth')->group(function () {
 
     // Employee Management
     Route::prefix('employee-management')->name('employee-management.')->group(function(){
-        Route::get('/', [EmployeesController::class, 'index'])->name('index');
-        Route::post('/store', [EmployeesController::class, 'store'])->name('store');
-        Route::put('/update/{employee}', [EmployeesController::class, 'update'])->name('update');
-        Route::delete('/delete/{employee}', [EmployeesController::class, 'destroy'])->name('destroy');
-        Route::put('/update-status/{employee}', [EmployeesController::class, 'handleStatus'])->name('update-status');
+        Route::get('/', [EmployeesController::class, 'index'])->middleware('permission:employees.view')->name('index');
+        Route::post('/store', [EmployeesController::class, 'store'])->middleware('permission:employees.create')->name('store');
+        Route::put('/update/{employee}', [EmployeesController::class, 'update'])->middleware('permission:employees.update')->name('update');
+        Route::delete('/delete/{employee}', [EmployeesController::class, 'destroy'])->middleware('permission:employees.delete')->name('destroy');
+        Route::put('/update-status/{employee}', [EmployeesController::class, 'handleStatus'])->middleware('permission:employees.update-status')->name('update-status');
     });
     // Client Management
     Route::prefix('client-management')->name('client-management.')->group(function(){

@@ -9,6 +9,8 @@ class ProjectLaborCost extends Model
     protected $fillable = [
         'project_id',
         'user_id',
+        'employee_id',
+        'assignable_type',
         'work_date',
         'hours_worked',
         'hourly_rate',
@@ -24,6 +26,10 @@ class ProjectLaborCost extends Model
         'hourly_rate' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'assignable_name',
+    ];
+
     public function project()
     {
         return $this->belongsTo(Project::class);
@@ -32,6 +38,49 @@ class ProjectLaborCost extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the employee for this labor cost.
+     */
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
+    /**
+     * Get the assignable (user or employee) for this labor cost.
+     */
+    public function assignable()
+    {
+        if ($this->assignable_type === 'employee' && $this->employee_id) {
+            return $this->employee();
+        }
+        return $this->user();
+    }
+
+    /**
+     * Get the name of the assignable (user or employee).
+     */
+    public function getAssignableNameAttribute()
+    {
+        // If assignable_type is set, use it
+        if ($this->assignable_type === 'employee' && $this->employee) {
+            return $this->employee->full_name;
+        }
+        if ($this->assignable_type === 'user' && $this->user) {
+            return $this->user->name;
+        }
+        
+        // Fallback: if assignable_type is not set (legacy records), check which one exists
+        if ($this->employee_id && $this->employee) {
+            return $this->employee->full_name;
+        }
+        if ($this->user_id && $this->user) {
+            return $this->user->name;
+        }
+        
+        return 'N/A';
     }
 
     public function createdBy()

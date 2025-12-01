@@ -322,7 +322,10 @@ export default function TeamTab({ project, teamData }) {
       { is_active: !team.is_active },
       {
         preserveScroll: true,
-        onSuccess: () => toast.success(`${team.user?.name} status updated.`),
+        onSuccess: () => {
+          const name = team.assignable_name || team.user?.name || (team.employee?.first_name + ' ' + team.employee?.last_name) || 'Team member';
+          toast.success(`${name} status updated.`);
+        },
         onError: () => toast.error("Failed to update status.")
       }
     );
@@ -731,10 +734,21 @@ export default function TeamTab({ project, teamData }) {
                     </TableCell>
                   )}
                   <TableCell className="text-left px-4 py-4 text-sm font-medium text-gray-900">
-                    {team.user?.name || '---'}
+                    <div className="flex items-center gap-2">
+                      {team.assignable_name || (team.user?.name || team.employee?.first_name + ' ' + team.employee?.last_name || '---')}
+                      {team.assignable_type === 'employee' ? (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                          Employee
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                          User
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                    {team.user?.email || '---'}
+                    {team.user?.email || team.employee?.email || '---'}
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm">
                     <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
@@ -853,7 +867,7 @@ export default function TeamTab({ project, teamData }) {
       {showAddModal && (
         <AddProjectTeam
           setShowAddModal={setShowAddModal}
-          users={employees}
+          assignables={teamData?.allAssignables || []}
           project={project}
         />
       )}

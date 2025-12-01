@@ -11,6 +11,7 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
 use App\Models\User;
+use App\Models\Employee;
 use App\Models\InventoryItem;
 use App\Models\ClientUpdateRequest;
 use App\Traits\ActivityLogsTrait;
@@ -24,12 +25,14 @@ use App\Services\TaskService;
 use App\Services\ProgressUpdateService;
 use App\Services\MaterialAllocationService;
 use App\Services\LaborCostService;
+use App\Services\MiscellaneousExpenseService;
 use App\Services\ProjectOverviewService;
 use App\Traits\ClientNotificationTrait;
+use App\Traits\NotificationTrait;
 
 class ProjectsController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     protected $projectTeamService;
     protected $projectFilesService;
@@ -38,8 +41,9 @@ class ProjectsController extends Controller
     protected $progressUpdateService;
     protected $materialAllocationService;
     protected $laborCostService;
+    protected $miscellaneousExpenseService;
     protected $projectOverviewService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService, ProjectOverviewService $projectOverviewService)
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService, MiscellaneousExpenseService $miscellaneousExpenseService, ProjectOverviewService $projectOverviewService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
@@ -48,6 +52,7 @@ class ProjectsController extends Controller
         $this->progressUpdateService = $progressUpdateService;
         $this->materialAllocationService = $materialAllocationService;
         $this->laborCostService = $laborCostService;
+        $this->miscellaneousExpenseService = $miscellaneousExpenseService;
         $this->projectOverviewService = $projectOverviewService;
     }
     public function index(Request $request)
@@ -122,8 +127,27 @@ class ProjectsController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->roles->first()?->name ?? 'No Role',
+                'type' => 'user',
             ];
         });
+        
+        // Get employees for team assignment
+        $employees = Employee::where('is_active', true)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'email', 'position'])
+            ->map(function ($employee) {
+                return [
+                    'id' => $employee->id,
+                    'name' => $employee->first_name . ' ' . $employee->last_name,
+                    'email' => $employee->email,
+                    'position' => $employee->position ?? 'No Position',
+                    'type' => 'employee',
+                ];
+            });
+        
+        // Combine users and employees
+        $allAssignables = $users->concat($employees)->sortBy('name')->values();
         
         // Get inventory items for material allocation
         $inventoryItems = InventoryItem::where('is_active', true)
@@ -139,7 +163,7 @@ class ProjectsController extends Controller
             'projects'   => $projects,
             'search'     => $search,
             'clients'    => $clients,
-            'users'      => $users,
+            'users'      => $allAssignables, // Combined users and employees
             'inventoryItems' => $inventoryItems,
             'filters' => [
                 'client_id' => $clientId,
@@ -178,7 +202,8 @@ class ProjectsController extends Controller
             
             // Team members (optional)
             'team_members'          => ['nullable', 'array'],
-            'team_members.*.id'     => ['required', 'exists:users,id'],
+            'team_members.*.id'     => ['required', 'integer'],
+            'team_members.*.type'   => ['required', 'in:user,employee'],
             'team_members.*.role'   => ['required', 'string', 'max:50'],
             'team_members.*.hourly_rate' => ['required', 'numeric', 'min:0'],
             'team_members.*.start_date'  => ['required', 'date'],
@@ -199,6 +224,16 @@ class ProjectsController extends Controller
             'material_allocations.*.quantity_allocated' => ['required', 'numeric', 'min:0.01'],
             'material_allocations.*.notes' => ['nullable', 'string'],
             
+            // Labor costs (optional)
+            'labor_costs' => ['nullable', 'array'],
+            'labor_costs.*.assignable_id' => ['required', 'integer'],
+            'labor_costs.*.assignable_type' => ['required', 'in:user,employee'],
+            'labor_costs.*.work_date' => ['required', 'date'],
+            'labor_costs.*.hours_worked' => ['required', 'numeric', 'min:0.01'],
+            'labor_costs.*.hourly_rate' => ['required', 'numeric', 'min:0'],
+            'labor_costs.*.description' => ['nullable', 'string', 'max:500'],
+            'labor_costs.*.notes' => ['nullable', 'string'],
+            
         ]);
 
         DB::beginTransaction();
@@ -216,15 +251,34 @@ class ProjectsController extends Controller
 
             // Create team members
             if (!empty($validated['team_members'])) {
+                // Validate IDs based on type
+                foreach ($validated['team_members'] as $index => $member) {
+                    if ($member['type'] === 'user') {
+                        if (!\App\Models\User::where('id', $member['id'])->exists()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                "team_members.{$index}.id" => ['The selected team member ID is invalid for user type.'],
+                            ]);
+                        }
+                    } elseif ($member['type'] === 'employee') {
+                        if (!\App\Models\Employee::where('id', $member['id'])->where('is_active', true)->exists()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                "team_members.{$index}.id" => ['The selected team member ID is invalid for employee type.'],
+                            ]);
+                        }
+                    }
+                }
+                
                 foreach ($validated['team_members'] as $member) {
                     ProjectTeam::create([
-                        'project_id'   => $project->id,
-                        'user_id'      => $member['id'],
-                        'role'         => $member['role'],
-                        'hourly_rate'  => $member['hourly_rate'],
-                        'start_date'   => $member['start_date'],
-                        'end_date'     => $member['end_date'] ?? null,
-                        'is_active'    => true,
+                        'project_id'      => $project->id,
+                        'user_id'         => $member['type'] === 'user' ? $member['id'] : null,
+                        'employee_id'     => $member['type'] === 'employee' ? $member['id'] : null,
+                        'assignable_type' => $member['type'],
+                        'role'            => $member['role'],
+                        'hourly_rate'     => $member['hourly_rate'],
+                        'start_date'      => $member['start_date'],
+                        'end_date'        => $member['end_date'] ?? null,
+                        'is_active'       => true,
                     ]);
                 }
             }
@@ -260,9 +314,53 @@ class ProjectsController extends Controller
                 }
             }
 
+            // Create labor costs
+            if (!empty($validated['labor_costs'])) {
+                // Validate IDs based on type
+                foreach ($validated['labor_costs'] as $index => $laborCost) {
+                    if ($laborCost['assignable_type'] === 'user') {
+                        if (!\App\Models\User::where('id', $laborCost['assignable_id'])->exists()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                "labor_costs.{$index}.assignable_id" => ['The selected team member ID is invalid for user type.'],
+                            ]);
+                        }
+                    } elseif ($laborCost['assignable_type'] === 'employee') {
+                        if (!\App\Models\Employee::where('id', $laborCost['assignable_id'])->where('is_active', true)->exists()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                "labor_costs.{$index}.assignable_id" => ['The selected team member ID is invalid for employee type.'],
+                            ]);
+                        }
+                    }
+                }
+                
+                foreach ($validated['labor_costs'] as $laborCost) {
+                    ProjectLaborCost::create([
+                        'project_id'      => $project->id,
+                        'user_id'         => $laborCost['assignable_type'] === 'user' ? $laborCost['assignable_id'] : null,
+                        'employee_id'     => $laborCost['assignable_type'] === 'employee' ? $laborCost['assignable_id'] : null,
+                        'assignable_type' => $laborCost['assignable_type'],
+                        'work_date'       => $laborCost['work_date'],
+                        'hours_worked'    => $laborCost['hours_worked'],
+                        'hourly_rate'     => $laborCost['hourly_rate'],
+                        'description'    => $laborCost['description'] ?? null,
+                        'notes'           => $laborCost['notes'] ?? null,
+                        'created_by'      => auth()->id(),
+                    ]);
+                }
+            }
+
             DB::commit();
 
             $this->adminActivityLogs('Project', 'Add', 'Added Project ' . $project->project_name . ' with team, milestones, materials, and labor costs');
+
+            // System-wide notification for new project
+            $this->createSystemNotification(
+                'general',
+                'New Project Created',
+                "A new project '{$project->project_name}' has been created.",
+                $project,
+                route('project-management.view', $project->id)
+            );
 
             return redirect()->back()->with('success', 'Project created successfully with all related data.');
         } catch (\Exception $e) {
@@ -296,10 +394,14 @@ class ProjectsController extends Controller
 
         $this->adminActivityLogs('Project', 'Update', 'Updated Project ' . $project->project_name);
 
-        // Create notification for client if status changed
-        if ($oldStatus !== $newStatus) {
-            $this->notifyProjectStatusChange($project, $oldStatus, $newStatus);
-        }
+        // System-wide notification for any project update
+        $this->createSystemNotification(
+            'general',
+            'Project Updated',
+            "Project '{$project->project_name}' has been updated.",
+            $project,
+            route('project-management.view', $project->id)
+        );
 
         return redirect()->back()->with('success', 'Project updated successfully.');
     }
@@ -311,6 +413,15 @@ class ProjectsController extends Controller
         $project->delete();
 
         $this->adminActivityLogs('Project', 'Delete', 'Deleted Project ' . $projectName);
+
+        // System-wide notification for project deletion
+        $this->createSystemNotification(
+            'general',
+            'Project Deleted',
+            "Project '{$projectName}' has been deleted.",
+            null,
+            route('project-management.index')
+        );
 
         return redirect()->back()->with('success', 'Project deleted successfully.');
     }
@@ -335,6 +446,9 @@ class ProjectsController extends Controller
     // Get labor cost data
     $laborCostData = $this->laborCostService->getProjectLaborCostsData($project);
 
+    // Get miscellaneous expenses data
+    $miscellaneousExpenseData = $this->miscellaneousExpenseService->getProjectMiscellaneousExpensesData($project);
+
     // Get project overview data
     $overviewData = $this->projectOverviewService->getProjectOverviewData($project);
 
@@ -351,6 +465,7 @@ class ProjectsController extends Controller
         'milestoneData' => $milestoneData,
         'materialAllocationData' => $materialAllocationData,
         'laborCostData' => $laborCostData,
+        'miscellaneousExpenseData' => $miscellaneousExpenseData,
         'overviewData' => $overviewData,
         'requestUpdatesData' => $requestUpdates,
     ]);

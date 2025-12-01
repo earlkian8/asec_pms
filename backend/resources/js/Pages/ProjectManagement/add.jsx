@@ -39,6 +39,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
       team_members: allData.teamMembers,
       milestones: allData.milestones,
       material_allocations: allData.materialAllocations,
+      labor_costs: allData.laborCosts || [],
     }, {
       preserveScroll: true,
       onSuccess: (page) => {

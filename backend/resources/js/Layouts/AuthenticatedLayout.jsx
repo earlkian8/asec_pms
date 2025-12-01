@@ -1,8 +1,9 @@
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
+import { useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { usePermission } from '@/utils/permissions';
 import { 
     Menu,
@@ -33,8 +34,10 @@ import {
     CollapsibleTrigger,
 } from '@/Components/ui/collapsible';
 import { Toaster } from '@/Components/ui/sonner';
+import NotificationIcon from '@/Components/NotificationIcon';
 export default function AuthenticatedLayout({ header, children, breadcrumbs = [] }) {
-    const user = usePage().props.auth.user;
+    const { props, url } = usePage();
+    const user = props.auth.user;
     const { has, hasAny } = usePermission();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -58,6 +61,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [sidebarOpen]);
+
 
     // Get current route for active state
     const currentRoute = route().current();
@@ -89,13 +93,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             icon: Users,
             type: 'single'
         },
-        // {
-        //     title: 'Employee Management',
-        //     href: route('employee-management.index'),
-        //     routeName: 'employee-management.*',
-        //     icon: UserCheck,
-        //     type: 'single'
-        // },
+        {
+            title: 'Employee Management',
+            href: route('employee-management.index'),
+            routeName: 'employee-management.*',
+            icon: UserCheck,
+            type: 'single'
+        },
         {
             title: 'Inventory Management',
             href: route('inventory-management.index'),
@@ -170,6 +174,11 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
                 ]) ? module : null;
             }
+            if (module.title === 'Employee Management') {
+                return hasModuleAccess([
+                    'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status'
+                ]) ? module : null;
+            }
             if (module.title === 'Inventory Management') {
                 return hasModuleAccess([
                     'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
@@ -211,6 +220,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         }).filter(module => module !== null);
     }, [has, hasAny]);
 
+
     const renderNavigationItem = (item) => {
     if (item.type === 'single') {
         const isActive = Array.isArray(item.routeName) 
@@ -223,7 +233,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 key={item.title}
                 href={item.href}
                 className={`
-                    group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
+                    group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative
                     ${isActive 
                         ? 'bg-black/70 text-white shadow-lg' 
                         : 'text-black hover:text-white hover:bg-black/70'
@@ -260,7 +270,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 <CollapsibleTrigger asChild>
                     <button 
                         className={`
-                            group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
+                            group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative
                             ${hasActiveChild
                                 ? 'bg-black/70 text-white' 
                                 : 'text-black hover:text-white hover:bg-black/70'
@@ -274,7 +284,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                             {item.title}
                         </span>
                         {!sidebarCollapsed && (
-                            <ChevronRight className={`ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90`} />
+                            <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                         )}
                     </button>
                 </CollapsibleTrigger>
@@ -293,7 +303,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                                         key={subItem.title}
                                         href={subItem.href}
                                         className={`
-                                            group flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all duration-200
+                                            group flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 relative
                                             ${isActive
                                                 ? 'bg-black/70 text-white shadow-sm'
                                                 : 'text-black hover:text-white hover:bg-black/70'
@@ -301,7 +311,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                                         `}
                                     >
                                         <SubIcon className="flex-shrink-0 h-4 w-4 mr-2" />
-                                        <span className="truncate">{subItem.title}</span>
+                                        <span className="truncate flex-1">{subItem.title}</span>
                                     </Link>
                                 );
                             })}
@@ -350,6 +360,9 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
 
                 {/* Header content */}
                 <div className="flex items-center space-x-4">
+                    {/* Notification Icon */}
+                    <NotificationIcon />
+                    
                     {/* User dropdown using shadcn */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>

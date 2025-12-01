@@ -627,7 +627,8 @@ export default function LaborCostTab({ project, laborCostData }) {
           <TableBody>
             {laborCosts.length > 0 ? (
               laborCosts.map((cost, index) => {
-                const user = cost.user || cost.user_id || {};
+                const assignableName = cost.assignable_name || cost.user?.name || (cost.employee?.first_name + ' ' + cost.employee?.last_name) || 'Unknown';
+                const assignableType = cost.assignable_type || (cost.user_id ? 'user' : 'employee');
                 const totalCost = (cost.hours_worked || 0) * (cost.hourly_rate || 0);
                 
                 return (
@@ -640,7 +641,12 @@ export default function LaborCostTab({ project, laborCostData }) {
                     <TableCell className="text-left px-4 py-4 text-sm font-medium text-gray-900">
                       <div className="flex items-center gap-2">
                         <User size={16} className="text-gray-400" />
-                        <span>{user.name || 'Unknown'}</span>
+                        <span>{assignableName}</span>
+                        {assignableType === 'employee' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                            Employee
+                          </span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-left px-4 py-4 text-sm text-gray-700">

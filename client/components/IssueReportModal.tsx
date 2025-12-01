@@ -6,11 +6,11 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/contexts/AppContext';
+import { useDialog } from '@/contexts/DialogContext';
 
 interface IssueReportModalProps {
   visible: boolean;
@@ -31,6 +31,7 @@ export default function IssueReportModal({
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [loading, setLoading] = useState(false);
   const { refreshNotifications } = useApp();
+  const dialog = useDialog();
 
   const issueTypes = [
     { value: 'quality', label: 'Quality Issue' },
@@ -42,7 +43,7 @@ export default function IssueReportModal({
 
   const handleSubmit = async () => {
     if (!issueType || !title.trim() || !description.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      dialog.showError('Please fill in all required fields');
       return;
     }
 
@@ -51,7 +52,7 @@ export default function IssueReportModal({
     // For now, simulate API call
     setTimeout(async () => {
       setLoading(false);
-      Alert.alert('Success', 'Issue reported successfully! The project team will review it.');
+      dialog.showSuccess('Issue reported successfully! The project team will review it.');
       // Refresh notifications to get any new ones from backend
       await refreshNotifications();
       setIssueType('');

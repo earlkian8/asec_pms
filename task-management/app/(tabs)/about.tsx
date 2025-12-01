@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,22 +10,53 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, Mail, HelpCircle, MessageCircle, LogOut, ChevronRight, Info } from 'lucide-react-native';
+import { User, Mail, HelpCircle, MessageCircle, LogOut, ChevronRight, Info, Edit } from 'lucide-react-native';
 import { AppColors } from '@/utils/colors';
 import { FIRM_CONTACT } from '@/constants/contact';
 import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
+import ProfileUpdateModal from '@/components/ProfileUpdateModal';
+import { apiService } from '@/services/api';
+import { useDialog } from '@/contexts/DialogContext';
 
 export default function AboutScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, checkAuth } = useAuth();
+  const dialog = useDialog();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const backgroundColor = AppColors.background;
   const cardBg = AppColors.card;
   const textColor = AppColors.text;
   const textSecondary = AppColors.textSecondary;
   const borderColor = AppColors.border;
+
+  const handleUpdateProfile = async (name: string, email: string, currentPassword?: string, newPassword?: string) => {
+    try {
+      const payload: any = { name, email };
+      if (currentPassword && newPassword) {
+        payload.current_password = currentPassword;
+        payload.password = newPassword;
+        payload.password_confirmation = newPassword;
+      }
+
+      const response = await apiService.put('/task-management/profile', payload);
+
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success) {
+          dialog.showSuccess('Profile updated successfully');
+          setShowProfileModal(false);
+          // Refresh user data
+          await checkAuth();
+        } else {
+          dialog.showError(response.message || 'Failed to update profile');
+        }
+      }
+    } catch (error) {
+      dialog.showError('Failed to update profile. Please try again.');
+    }
+  };
 
   const InfoCard = ({
     icon: Icon,
@@ -69,7 +100,15 @@ export default function AboutScreen() {
         {/* Account Information */}
         <AnimatedView delay={100}>
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>Account Information</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>Account Information</Text>
+              <TouchableOpacity
+                onPress={() => setShowProfileModal(true)}
+                style={styles.editButton}
+              >
+                <Edit size={18} color={AppColors.primary} />
+              </TouchableOpacity>
+            </View>
             <AnimatedCard index={0} delay={150}>
               <InfoCard icon={User} title="Full Name" value={user?.name || 'N/A'} />
             </AnimatedCard>
@@ -146,6 +185,15 @@ export default function AboutScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Profile Update Modal */}
+      <ProfileUpdateModal
+        visible={showProfileModal}
+        currentName={user?.name || ''}
+        currentEmail={user?.email || ''}
+        onClose={() => setShowProfileModal(false)}
+        onUpdate={handleUpdateProfile}
+      />
     </View>
   );
 }
@@ -182,11 +230,21 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 12,
     letterSpacing: 0.3,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: AppColors.background,
   },
   infoCard: {
     flexDirection: 'row',

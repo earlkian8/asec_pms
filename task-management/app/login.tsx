@@ -8,17 +8,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, LogIn, Eye, EyeOff } from 'lucide-react-native';
 import { AppColors } from '@/utils/colors';
 import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/contexts/DialogContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const dialog = useDialog();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,7 +27,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+      dialog.showError('Please enter both email and password', 'Error');
       return;
     }
 
@@ -38,7 +39,7 @@ export default function LoginScreen() {
       // Navigate to home screen on successful login
       router.replace('/(tabs)');
     } else {
-      Alert.alert('Login Failed', result.message || 'Please check your credentials and try again.');
+      dialog.showError(result.message || 'Please check your credentials and try again.', 'Login Failed');
     }
   };
 

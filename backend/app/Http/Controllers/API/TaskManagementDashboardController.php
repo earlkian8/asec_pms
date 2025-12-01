@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProjectTask;
+use App\Models\ProgressUpdate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class TaskManagementDashboardController extends Controller
@@ -171,6 +173,134 @@ class TaskManagementDashboardController extends Controller
         return response()->json([
             'success' => true,
             'data' => $formattedTasks,
+        ]);
+    }
+
+    /**
+     * Get history data (completed tasks and progress updates) for authenticated user
+     */
+    public function history(Request $request)
+    {
+        $user = $request->user();
+        $search = $request->get('search');
+
+        // Get completed tasks
+        $completedTasksQuery = ProjectTask::where('assigned_to', $user->id)
+            ->where('status', 'completed')
+            ->with([
+                'milestone.project',
+                'assignedUser'
+            ]);
+
+        // Apply search filter to completed tasks
+        if ($search) {
+            $completedTasksQuery->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('milestone.project', function ($q) use ($search) {
+                        $q->where('project_name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $completedTasks = $completedTasksQuery
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        $formattedCompletedTasks = $completedTasks->map(function ($task) {
+            return [
+                'id' => $task->id,
+                'title' => $task->title,
+                'description' => $task->description,
+                'assignedTo' => $task->assigned_to,
+                'assignedToName' => $task->assignedUser->name ?? 'Unassigned',
+                'dueDate' => $task->due_date ? Carbon::parse($task->due_date)->format('Y-m-d') : null,
+                'status' => $task->status,
+                'projectName' => $task->milestone->project->project_name ?? 'Unknown Project',
+                'projectId' => $task->milestone->project->id ?? null,
+                'milestoneName' => $task->milestone->name ?? 'Unknown Milestone',
+                'milestoneId' => $task->milestone->id ?? null,
+                'priority' => $this->getTaskPriority($task),
+                'createdAt' => $task->created_at->toISOString(),
+                'updatedAt' => $task->updated_at->toISOString(),
+            ];
+        });
+
+        // Get all progress updates for tasks assigned to the user
+        $progressUpdatesQuery = ProgressUpdate::whereHas('task', function ($q) use ($user) {
+            $q->where('assigned_to', $user->id);
+        })
+            ->with([
+                'task.milestone.project',
+                'task.assignedUser',
+                'createdBy'
+            ]);
+
+        // Apply search filter to progress updates
+        if ($search) {
+            $progressUpdatesQuery->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhereHas('task', function ($q) use ($search) {
+                        $q->where('title', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $progressUpdates = $progressUpdatesQuery
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $formattedProgressUpdates = $progressUpdates->map(function ($update) {
+            $fileUrl = null;
+            if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
+                $fileUrl = url(Storage::disk('public')->url($update->file_path));
+            }
+
+            $task = $update->task;
+            $formattedTask = null;
+            if ($task) {
+                $formattedTask = [
+                    'id' => $task->id,
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'assignedTo' => $task->assigned_to,
+                    'assignedToName' => $task->assignedUser->name ?? 'Unassigned',
+                    'dueDate' => $task->due_date ? Carbon::parse($task->due_date)->format('Y-m-d') : null,
+                    'status' => $task->status,
+                    'projectName' => $task->milestone->project->project_name ?? 'Unknown Project',
+                    'projectId' => $task->milestone->project->id ?? null,
+                    'milestoneName' => $task->milestone->name ?? 'Unknown Milestone',
+                    'milestoneId' => $task->milestone->id ?? null,
+                    'priority' => $this->getTaskPriority($task),
+                    'createdAt' => $task->created_at->toISOString(),
+                    'updatedAt' => $task->updated_at->toISOString(),
+                ];
+            }
+
+            return [
+                'id' => $update->id,
+                'project_task_id' => $update->project_task_id,
+                'description' => $update->description,
+                'file_path' => $update->file_path,
+                'file_url' => $fileUrl,
+                'original_name' => $update->original_name,
+                'file_type' => $update->file_type,
+                'file_size' => $update->file_size,
+                'created_by' => $update->created_by,
+                'created_by_name' => $update->createdBy->name ?? 'Unknown User',
+                'created_at' => $update->created_at->toISOString(),
+                'updated_at' => $update->updated_at->toISOString(),
+                'task' => $formattedTask,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'completedTasks' => $formattedCompletedTasks,
+                'progressUpdates' => $formattedProgressUpdates,
+            ],
         ]);
     }
 

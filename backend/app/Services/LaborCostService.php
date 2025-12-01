@@ -20,6 +20,11 @@ class LaborCostService
                     $q->whereHas('user', function ($userQuery) use ($search) {
                         $userQuery->where('name', 'ilike', "%{$search}%");
                     })
+                    ->orWhereHas('employee', function ($employeeQuery) use ($search) {
+                        $employeeQuery->where('first_name', 'ilike', "%{$search}%")
+                            ->orWhere('last_name', 'ilike', "%{$search}%")
+                            ->orWhere('email', 'ilike', "%{$search}%");
+                    })
                     ->orWhere('description', 'ilike', "%{$search}%")
                     ->orWhere('notes', 'ilike', "%{$search}%");
                 });
@@ -32,6 +37,7 @@ class LaborCostService
             })
             ->with([
                 'user',
+                'employee',
                 'createdBy'
             ])
             ->orderBy('work_date', 'desc')
@@ -39,19 +45,31 @@ class LaborCostService
             ->paginate(10)
             ->withQueryString();
 
-        // Get project team members for dropdown with hourly rates
+        // Get project team members for dropdown with hourly rates (both users and employees)
         $teamMembers = $project->team()
             ->active()
             ->current()
-            ->with('user')
+            ->with(['user', 'employee'])
             ->get()
             ->map(function ($teamMember) {
-                return [
-                    'id' => $teamMember->user->id,
-                    'name' => $teamMember->user->name,
-                    'email' => $teamMember->user->email,
-                    'hourly_rate' => $teamMember->hourly_rate,
-                ];
+                if ($teamMember->assignable_type === 'employee' && $teamMember->employee) {
+                    return [
+                        'id' => $teamMember->employee->id,
+                        'name' => $teamMember->employee->first_name . ' ' . $teamMember->employee->last_name,
+                        'email' => $teamMember->employee->email,
+                        'hourly_rate' => $teamMember->hourly_rate,
+                        'type' => 'employee',
+                    ];
+                } elseif ($teamMember->user) {
+                    return [
+                        'id' => $teamMember->user->id,
+                        'name' => $teamMember->user->name,
+                        'email' => $teamMember->user->email,
+                        'hourly_rate' => $teamMember->hourly_rate,
+                        'type' => 'user',
+                    ];
+                }
+                return null;
             })
             ->filter();
 

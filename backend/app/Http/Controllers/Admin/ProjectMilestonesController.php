@@ -5,14 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
+use App\Traits\NotificationTrait;
 
 class ProjectMilestonesController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     // Store new milestone
     public function store(Project $project, Request $request)
@@ -36,6 +38,15 @@ class ProjectMilestonesController extends Controller
 
         // Create notification for client
         $this->notifyMilestoneStatusChange($project, $milestone->name, $milestone->status);
+
+        // System-wide notification for new milestone
+        $this->createSystemNotification(
+            'milestone',
+            'New Milestone Created',
+            "A new milestone '{$milestone->name}' has been created for project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
 
     }
 
@@ -77,14 +88,14 @@ class ProjectMilestonesController extends Controller
             'Updated milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
         );
 
-        // Create notification for client if status changed
-        if ($oldStatus !== $data['status']) {
-            if ($data['status'] === 'completed') {
-                $this->notifyMilestoneCompleted($project, $milestone->name);
-            } else {
-                $this->notifyMilestoneStatusChange($project, $milestone->name, $data['status']);
-            }
-        }
+        // System-wide notification for milestone update
+        $this->createSystemNotification(
+            'milestone',
+            'Milestone Updated',
+            "Milestone '{$milestone->name}' has been updated for project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
 
     }
 
@@ -100,5 +111,13 @@ class ProjectMilestonesController extends Controller
             'Deleted milestone "' . $milestoneName . '" from project "' . $project->project_name . '"'
         );
 
+        // System-wide notification for milestone deletion
+        $this->createSystemNotification(
+            'milestone',
+            'Milestone Deleted',
+            "Milestone '{$milestoneName}' has been deleted from project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
     }
 }

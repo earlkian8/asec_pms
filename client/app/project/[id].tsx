@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Dimensions,
   RefreshControl,
-  Alert,
   ActivityIndicator,
   Linking,
 } from 'react-native';
@@ -18,12 +17,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Phone, Mail } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
 import { useProjectDetail, ProjectDetail, ProgressUpdate } from '@/hooks/useProjectDetail';
+import AnimatedCard from '@/components/AnimatedCard';
+import AnimatedView from '@/components/AnimatedView';
+import { useDialog } from '@/contexts/DialogContext';
 
 const { width } = Dimensions.get('window');
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const dialog = useDialog();
   const [refreshing, setRefreshing] = useState(false);
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
 
@@ -78,7 +81,7 @@ export default function ProjectDetailScreen() {
     </View>
   );
 
-  const MilestoneCard = ({ milestone }: { milestone: ProjectDetail['milestones'][0] }) => {
+  const MilestoneCard = ({ milestone, index }: { milestone: ProjectDetail['milestones'][0]; index: number }) => {
     const milestoneStatusColors: Record<string, { bg: string; text: string; icon: string }> = {
       completed: { bg: '#D1FAE5', text: '#065F46', icon: 'checkmark-circle' }, // green-100/green-700
       'in-progress': { bg: '#DBEAFE', text: '#1E40AF', icon: 'time' }, // blue-100/blue-700
@@ -89,7 +92,10 @@ export default function ProjectDetailScreen() {
     const msStatus = milestoneStatusColors[milestone.status] || milestoneStatusColors.pending;
 
     return (
-      <View style={[styles.milestoneCard, { backgroundColor: cardBg, borderColor }]}>
+      <AnimatedCard
+        index={index}
+        delay={100}
+        style={[styles.milestoneCard, { backgroundColor: cardBg, borderColor }]}>
         <View style={styles.milestoneHeader}>
           <View style={styles.milestoneTitleRow}>
             <View style={[styles.milestoneStatusBadge, { backgroundColor: msStatus.bg }]}>
@@ -99,9 +105,11 @@ export default function ProjectDetailScreen() {
               </Text>
             </View>
           </View>
-          <Text style={[styles.milestoneName, { color: textColor }]}>{milestone.name}</Text>
-          <Text style={[styles.milestoneDescription, { color: textSecondary }]}>
-            {milestone.description}
+          <Text style={[styles.milestoneName, { color: textColor }, !milestone.name && styles.placeholderText]}>
+            {milestone.name || 'Unnamed Milestone'}
+          </Text>
+          <Text style={[styles.milestoneDescription, { color: textSecondary }, !milestone.description && styles.placeholderText]}>
+            {milestone.description || 'No description provided for this milestone.'}
           </Text>
         </View>
 
@@ -161,21 +169,22 @@ export default function ProjectDetailScreen() {
               return (
                 <View key={task.id} style={styles.taskItem}>
                   <Ionicons name={taskStatus.icon as any} size={16} color={taskStatus.color} />
-                  <Text style={[styles.taskName, { color: textColor }]}>{task.name}</Text>
-                  <Text style={[styles.taskAssignee, { color: textSecondary }]}>
-                    {task.assignedTo}
+                  <Text style={[styles.taskName, { color: textColor }]}>{task.name || 'Unnamed Task'}</Text>
+                  <Text style={[styles.taskAssignee, { color: textSecondary }, !task.assignedTo && styles.placeholderText]}>
+                    {task.assignedTo || 'Unassigned'}
                   </Text>
                 </View>
               );
             })}
           </View>
         )}
-      </View>
+      </AnimatedCard>
     );
   };
 
-  const UpdateCard = ({ update }: { update: ProgressUpdate }) => {
+  const UpdateCard = ({ update, index }: { update: ProgressUpdate; index: number }) => {
     const updateTypeColors: Record<string, { bg: string; icon: string }> = {
+      request: { bg: '#F59E0B', icon: 'chatbubble-ellipses' },
       progress: { bg: '#3B82F6', icon: 'trending-up' },
       milestone: { bg: '#10B981', icon: 'flag' },
       issue: { bg: '#EF4444', icon: 'alert-circle' },
@@ -185,28 +194,31 @@ export default function ProjectDetailScreen() {
     const updateType = updateTypeColors[update.type] || updateTypeColors.general;
 
     return (
-      <View style={[styles.updateCard, { backgroundColor: cardBg, borderColor }]}>
+      <AnimatedCard
+        index={index}
+        delay={100}
+        style={[styles.updateCard, { backgroundColor: cardBg, borderColor }]}>
         <View style={styles.updateHeader}>
           <View style={[styles.updateIconContainer, { backgroundColor: `${updateType.bg}15` }]}>
             <Ionicons name={updateType.icon as any} size={20} color={updateType.bg} />
           </View>
           <View style={styles.updateContent}>
-            <Text style={[styles.updateTitle, { color: textColor }]}>{update.title}</Text>
+            <Text style={[styles.updateTitle, { color: textColor }, !update.title && styles.placeholderText]}>
+              {update.title || 'Untitled Update'}
+            </Text>
             <Text style={[styles.updateDate, { color: textSecondary }]}>
               {new Date(update.date).toLocaleDateString('en-US', {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric',
-              })} • {update.author}
+              })} • {update.author || 'Unknown Author'}
             </Text>
           </View>
         </View>
-        {update.description && (
-          <Text style={[styles.updateDescription, { color: textSecondary }]}>
-            {update.description}
-          </Text>
-        )}
-      </View>
+        <Text style={[styles.updateDescription, { color: textSecondary }, !update.description && styles.placeholderText]}>
+          {update.description || 'No description provided for this update.'}
+        </Text>
+      </AnimatedCard>
     );
   };
 
@@ -241,54 +253,46 @@ export default function ProjectDetailScreen() {
     if (method === 'call') {
       const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
       
-      Alert.alert(
-        'Contact Project Manager',
+      dialog.showConfirm(
         `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Call',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(phoneUrl);
-                if (canOpen) {
-                  await Linking.openURL(phoneUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open phone dialer');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open phone dialer');
-                console.error('Error opening phone:', error);
-              }
-            },
-          },
-        ]
+        async () => {
+          try {
+            const canOpen = await Linking.canOpenURL(phoneUrl);
+            if (canOpen) {
+              await Linking.openURL(phoneUrl);
+            } else {
+              dialog.showError('Unable to open phone dialer');
+            }
+          } catch (error) {
+            dialog.showError('Failed to open phone dialer');
+            console.error('Error opening phone:', error);
+          }
+        },
+        'Contact Project Manager',
+        'Call',
+        'Cancel'
       );
     } else {
       const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
       
-      Alert.alert(
-        'Contact Project Manager',
+      dialog.showConfirm(
         `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Email',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(emailUrl);
-                if (canOpen) {
-                  await Linking.openURL(emailUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open email client');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open email client');
-                console.error('Error opening email:', error);
-              }
-            },
-          },
-        ]
+        async () => {
+          try {
+            const canOpen = await Linking.canOpenURL(emailUrl);
+            if (canOpen) {
+              await Linking.openURL(emailUrl);
+            } else {
+              dialog.showError('Unable to open email client');
+            }
+          } catch (error) {
+            dialog.showError('Failed to open email client');
+            console.error('Error opening email:', error);
+          }
+        },
+        'Contact Project Manager',
+        'Email',
+        'Cancel'
       );
     }
   };
@@ -422,18 +426,20 @@ export default function ProjectDetailScreen() {
               <Text style={[styles.sectionTitle, { color: textColor }]}>Project Details</Text>
               <View style={styles.detailRow}>
                 <Ionicons name="location-outline" size={20} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }]}>{project.location}</Text>
+                <Text style={[styles.detailText, { color: textColor }, !project.location && styles.placeholderText]}>
+                  {project.location || 'No location specified'}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Ionicons name="person-outline" size={20} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }]}>
-                  Project Manager: {project.projectManager}
+                <Text style={[styles.detailText, { color: textColor }, !project.projectManager && styles.placeholderText]}>
+                  Project Manager: {project.projectManager || 'No project manager assigned'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
                 <Ionicons name="document-text-outline" size={20} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }]}>
-                  {project.description}
+                <Text style={[styles.detailText, { color: textColor }, !project.description && styles.placeholderText]}>
+                  {project.description || 'No description provided for this project.'}
                 </Text>
               </View>
             </View>
@@ -484,8 +490,12 @@ export default function ProjectDetailScreen() {
                       <Ionicons name="person" size={20} color="#FFFFFF" />
                     </View>
                     <View style={styles.teamInfo}>
-                      <Text style={[styles.teamName, { color: textColor }]}>{member.name}</Text>
-                      <Text style={[styles.teamRole, { color: textSecondary }]}>{member.role}</Text>
+                      <Text style={[styles.teamName, { color: textColor }, !member.name && styles.placeholderText]}>
+                        {member.name || 'Unnamed Team Member'}
+                      </Text>
+                      <Text style={[styles.teamRole, { color: textSecondary }, !member.role && styles.placeholderText]}>
+                        {member.role || 'No role specified'}
+                      </Text>
                     </View>
                   </View>
                 ))}
@@ -506,8 +516,8 @@ export default function ProjectDetailScreen() {
 
         {selectedTab === 'milestones' && (
           <View style={styles.milestonesList}>
-            {project.milestones.map((milestone) => (
-              <MilestoneCard key={milestone.id} milestone={milestone} />
+            {project.milestones.map((milestone, index) => (
+              <MilestoneCard key={milestone.id} milestone={milestone} index={index} />
             ))}
           </View>
         )}
@@ -515,11 +525,14 @@ export default function ProjectDetailScreen() {
         {selectedTab === 'updates' && (
           <View style={styles.updatesList}>
             {project.recentUpdates.length > 0 ? (
-              project.recentUpdates.map((update) => <UpdateCard key={update.id} update={update} />)
+              project.recentUpdates.map((update, index) => <UpdateCard key={update.id} update={update} index={index} />)
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="document-text-outline" size={64} color={textSecondary} />
-                <Text style={[styles.emptyStateText, { color: textColor }]}>No updates yet</Text>
+                <Ionicons name="chatbubble-ellipses-outline" size={64} color={textSecondary} />
+                <Text style={[styles.emptyStateText, { color: textColor }]}>No request updates yet</Text>
+                <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
+                  Submit a request update to see it here
+                </Text>
               </View>
             )}
           </View>
@@ -933,6 +946,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 16,
   },
+  emptyStateSubtext: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   actionButtonsContainer: {
     gap: 12,
     marginTop: 20,
@@ -949,6 +968,10 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  placeholderText: {
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
 });
 

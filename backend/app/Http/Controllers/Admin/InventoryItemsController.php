@@ -6,15 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\InventoryTransaction;
 use App\Models\Project;
+use App\Models\User;
 use App\Services\InventoryService;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InventoryItemsController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     protected $inventoryService;
 
@@ -168,6 +170,15 @@ class InventoryItemsController extends Controller
             'Created inventory item "' . $item->item_name . '" with code "' . $item->item_code . '"' . ($initialStock > 0 ? ' with initial stock of ' . $initialStock : '')
         );
 
+        // System-wide notification for new inventory item
+        $this->createSystemNotification(
+            'general',
+            'New Inventory Item Added',
+            "A new inventory item '{$item->item_name}' ({$item->item_code}) has been added" . ($initialStock > 0 ? " with initial stock of {$initialStock}" : "") . ".",
+            null,
+            route('inventory-management.index')
+        );
+
         return back()->with('success', 'Inventory item created successfully');
     }
 
@@ -190,6 +201,15 @@ class InventoryItemsController extends Controller
             'Inventory Item',
             'Updated',
             'Updated inventory item "' . $inventoryItem->item_name . '"'
+        );
+
+        // System-wide notification for inventory item update
+        $this->createSystemNotification(
+            'general',
+            'Inventory Item Updated',
+            "Inventory item '{$inventoryItem->item_name}' ({$inventoryItem->item_code}) has been updated.",
+            null,
+            route('inventory-management.index')
         );
 
         return back()->with('success', 'Inventory item updated successfully');
@@ -217,6 +237,15 @@ class InventoryItemsController extends Controller
             'Deleted inventory item "' . $itemName . '" with code "' . $itemCode . '"'
         );
 
+        // System-wide notification for inventory item deletion
+        $this->createSystemNotification(
+            'general',
+            'Inventory Item Deleted',
+            "Inventory item '{$itemName}' ({$itemCode}) has been deleted.",
+            null,
+            route('inventory-management.index')
+        );
+
         return back()->with('success', 'Inventory item deleted successfully');
     }
 
@@ -228,6 +257,9 @@ class InventoryItemsController extends Controller
             'transaction_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
+
+        // Check if item was low stock before adding
+        $wasLowStock = $inventoryItem->isLowStock();
 
         $transaction = InventoryTransaction::create([
             'inventory_item_id' => $inventoryItem->id,
@@ -241,11 +273,26 @@ class InventoryItemsController extends Controller
 
         // Update current stock
         $this->inventoryService->updateItemStock($inventoryItem);
+        $inventoryItem->refresh();
+        $isStillLowStock = $inventoryItem->isLowStock();
 
         $this->adminActivityLogs(
             'Inventory Transaction',
             'Stock In',
             'Added ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' to "' . $inventoryItem->item_name . '"'
+        );
+
+        // System-wide notification for stock in
+        $message = "Stock in: {$data['quantity']} {$inventoryItem->unit_of_measure} added to '{$inventoryItem->item_name}'.";
+        if ($wasLowStock && !$isStillLowStock) {
+            $message .= " Low stock alert resolved.";
+        }
+        $this->createSystemNotification(
+            'general',
+            'Stock Added',
+            $message,
+            null,
+            route('inventory-management.index')
         );
 
         return back()->with('success', 'Stock added successfully');
@@ -321,6 +368,25 @@ class InventoryItemsController extends Controller
             'Stock Out',
             'Removed ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' from "' . $inventoryItem->item_name . '" (' . $data['stock_out_type'] . ')'
         );
+
+        // System-wide notification for stock out (especially if it causes low stock)
+        if ($data['stock_out_type'] !== 'project_use') {
+            $this->inventoryService->updateItemStock($inventoryItem);
+            $inventoryItem->refresh();
+            $isLowStock = $inventoryItem->isLowStock();
+
+            $message = "Stock out: {$data['quantity']} {$inventoryItem->unit_of_measure} removed from '{$inventoryItem->item_name}' ({$data['stock_out_type']}).";
+            if ($isLowStock) {
+                $message .= " WARNING: Item is now below minimum stock level!";
+            }
+            $this->createSystemNotification(
+                $isLowStock ? 'issue' : 'general',
+                $isLowStock ? 'Low Stock Alert' : 'Stock Removed',
+                $message,
+                null,
+                route('inventory-management.index')
+            );
+        }
 
         return back()->with('success', 'Stock removed successfully');
     }

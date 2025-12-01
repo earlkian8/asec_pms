@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -34,15 +33,18 @@ import { formatDate, formatDateTime, isOverdue, getDaysUntilDue } from '@/utils/
 import { apiService } from '@/services/api';
 import ProgressUpdateModal from '@/components/ProgressUpdateModal';
 import IssueReportModal from '@/components/IssueReportModal';
+import StatusSelectorModal from '@/components/StatusSelectorModal';
 import { ArrowLeft } from 'lucide-react-native';
 import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/contexts/DialogContext';
 
 export default function TaskDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const dialog = useDialog();
   const { id } = useLocalSearchParams<{ id: string }>();
   const taskId = parseInt(id || '0', 10);
   
@@ -56,6 +58,8 @@ export default function TaskDetailScreen() {
   const [editingProgressUpdate, setEditingProgressUpdate] = useState<ProgressUpdate | null>(null);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
   const [fabExpanded, setFabExpanded] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showStatusSelector, setShowStatusSelector] = useState(false);
   
   // Animation values for FAB options - start from bottom (0) and move up (negative values)
   const progressUpdateOpacity = useSharedValue(0);
@@ -118,23 +122,27 @@ export default function TaskDetailScreen() {
   const loadTask = async () => {
     try {
       const response = await apiService.get<Task>(`/task-management/tasks/${taskId}`);
-      if (response.success && response.data) {
-        setTask(response.data);
-      } else {
-        Alert.alert('Error', response.message || 'Failed to load task');
-        router.back();
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data) {
+          setTask(response.data);
+        } else {
+          dialog.showError(response.message || 'Failed to load task', 'Error');
+          setTimeout(() => router.back(), 1500);
+        }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load task');
-      router.back();
+      dialog.showError('Failed to load task', 'Error');
+      setTimeout(() => router.back(), 1500);
     }
   };
 
   const loadProgressUpdates = async () => {
     try {
       const response = await apiService.get<ProgressUpdate[]>(`/task-management/tasks/${taskId}/progress-updates`);
-      if (response.success && response.data) {
-        setProgressUpdates(Array.isArray(response.data) ? response.data : []);
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data) {
+          setProgressUpdates(Array.isArray(response.data) ? response.data : []);
+        }
       }
     } catch (error) {
       console.error('Error loading progress updates:', error);
@@ -144,8 +152,10 @@ export default function TaskDetailScreen() {
   const loadIssues = async () => {
     try {
       const response = await apiService.get<Issue[]>(`/task-management/tasks/${taskId}/issues`);
-      if (response.success && response.data) {
-        setIssues(Array.isArray(response.data) ? response.data : []);
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data) {
+          setIssues(Array.isArray(response.data) ? response.data : []);
+        }
       }
     } catch (error) {
       console.error('Error loading issues:', error);
@@ -168,29 +178,26 @@ export default function TaskDetailScreen() {
   };
 
   const handleDeleteProgress = (update: ProgressUpdate) => {
-    Alert.alert(
-      'Delete Progress Update',
+    dialog.showConfirm(
       'Are you sure you want to delete this progress update?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await apiService.delete(`/task-management/tasks/${taskId}/progress-updates/${update.id}`);
-              if (response.success) {
-                Alert.alert('Success', 'Progress update deleted successfully');
-                loadProgressUpdates();
-              } else {
-                Alert.alert('Error', response.message || 'Failed to delete progress update');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete progress update');
+      async () => {
+        try {
+          const response = await apiService.delete(`/task-management/tasks/${taskId}/progress-updates/${update.id}`);
+          if (typeof response === 'object' && 'success' in response) {
+            if (response.success) {
+              dialog.showSuccess('Progress update deleted successfully');
+              loadProgressUpdates();
+            } else {
+              dialog.showError(response.message || 'Failed to delete progress update');
             }
-          },
-        },
-      ]
+          }
+        } catch (error) {
+          dialog.showError('Failed to delete progress update');
+        }
+      },
+      'Delete Progress Update',
+      'Delete',
+      'Cancel'
     );
   };
 
@@ -211,13 +218,14 @@ export default function TaskDetailScreen() {
           link.click();
           document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
+          dialog.showSuccess('File download started');
         } else {
           // For React Native, you would use expo-file-system or similar
-          Alert.alert('Download', 'File download started');
+          dialog.showInfo('File download started', 'Download');
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to download file');
+      dialog.showError('Failed to download file');
     }
   };
 
@@ -232,30 +240,79 @@ export default function TaskDetailScreen() {
   };
 
   const handleDeleteIssue = (issue: Issue) => {
-    Alert.alert(
-      'Delete Issue',
+    dialog.showConfirm(
       'Are you sure you want to delete this issue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await apiService.delete(`/task-management/tasks/${taskId}/issues/${issue.id}`);
-              if (response.success) {
-                Alert.alert('Success', 'Issue deleted successfully');
-                loadIssues();
-              } else {
-                Alert.alert('Error', response.message || 'Failed to delete issue');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete issue');
+      async () => {
+        try {
+          const response = await apiService.delete(`/task-management/tasks/${taskId}/issues/${issue.id}`);
+          if (typeof response === 'object' && 'success' in response) {
+            if (response.success) {
+              dialog.showSuccess('Issue deleted successfully');
+              loadIssues();
+            } else {
+              dialog.showError(response.message || 'Failed to delete issue');
             }
-          },
-        },
-      ]
+          }
+        } catch (error) {
+          dialog.showError('Failed to delete issue');
+        }
+      },
+      'Delete Issue',
+      'Delete',
+      'Cancel'
     );
+  };
+
+  const handleUpdateStatus = async (newStatus: 'pending' | 'in_progress' | 'completed') => {
+    if (!task || task.status === newStatus || updatingStatus) {
+      return;
+    }
+
+    // Validate: Cannot mark as completed without at least 1 progress update
+    if (newStatus === 'completed' && progressUpdates.length === 0) {
+      dialog.showError(
+        'Cannot mark task as completed. Please add at least one progress update first.',
+        'Progress Update Required'
+      );
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+      const response = await apiService.put(`/task-management/tasks/${taskId}/status`, {
+        status: newStatus,
+      });
+
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data && typeof response.data === 'object' && 'id' in response.data) {
+          // Update local task state with full task data from API
+          setTask(response.data as Task);
+          dialog.showSuccess('Task status updated successfully');
+        } else {
+          dialog.showError(response.message || 'Failed to update task status');
+        }
+      } else {
+        dialog.showError('Invalid response from server');
+      }
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      dialog.showError('Failed to update task status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const openStatusSelector = () => {
+    if (!task || updatingStatus) return;
+    setShowStatusSelector(true);
+  };
+
+  const handleStatusSelect = (newStatus: 'pending' | 'in_progress' | 'completed') => {
+    if (!task || task.status === newStatus || updatingStatus) {
+      return;
+    }
+
+    handleUpdateStatus(newStatus);
   };
 
   if (loading && !task) {
@@ -312,21 +369,36 @@ export default function TaskDetailScreen() {
           <View style={styles.taskHeader}>
             <View style={styles.taskTitleRow}>
               <Text style={styles.taskTitle}>{task.title}</Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: statusColor + '20' },
-                ]}
+              <TouchableOpacity
+                onPress={openStatusSelector}
+                disabled={updatingStatus}
+                activeOpacity={0.7}
               >
                 <View
-                  style={[styles.statusDot, { backgroundColor: statusColor }]}
-                />
-                <Text
-                  style={[styles.statusText, { color: statusColor }]}
+                  style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor: statusColor + '20',
+                      opacity: updatingStatus ? 0.6 : 1,
+                    },
+                  ]}
                 >
-                  {task.status.replace('_', ' ').toUpperCase()}
-                </Text>
-              </View>
+                  {updatingStatus ? (
+                    <ActivityIndicator size="small" color={statusColor} />
+                  ) : (
+                    <>
+                      <View
+                        style={[styles.statusDot, { backgroundColor: statusColor }]}
+                      />
+                      <Text
+                        style={[styles.statusText, { color: statusColor }]}
+                      >
+                        {task.status.replace('_', ' ').toUpperCase()}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -372,23 +444,40 @@ export default function TaskDetailScreen() {
               <CheckCircle2 size={18} color={statusColor} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Status</Text>
-                <View
-                  style={[
-                    styles.statusBadgeSmall,
-                    {
-                      backgroundColor: statusColor + '20',
-                    },
-                  ]}
+                <TouchableOpacity
+                  onPress={openStatusSelector}
+                  disabled={updatingStatus}
+                  activeOpacity={0.7}
+                  style={styles.statusUpdateButton}
                 >
-                  <Text
+                  <View
                     style={[
-                      styles.statusTextSmall,
-                      { color: statusColor },
+                      styles.statusBadgeSmall,
+                      {
+                        backgroundColor: statusColor + '20',
+                        opacity: updatingStatus ? 0.6 : 1,
+                      },
                     ]}
                   >
-                    {task.status.replace('_', ' ').toUpperCase()}
-                  </Text>
-                </View>
+                    {updatingStatus ? (
+                      <ActivityIndicator size="small" color={statusColor} />
+                    ) : (
+                      <>
+                        <Text
+                          style={[
+                            styles.statusTextSmall,
+                            { color: statusColor },
+                          ]}
+                        >
+                          {task.status.replace('_', ' ').toUpperCase()}
+                        </Text>
+                        <Text style={[styles.statusChangeHint, { color: statusColor }]}>
+                          Tap to change
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -719,16 +808,18 @@ export default function TaskDetailScreen() {
               );
             }
 
-            if (response.success) {
-              Alert.alert('Success', editingProgressUpdate ? 'Progress update updated successfully' : 'Progress update added successfully');
-              setShowProgressModal(false);
-              setEditingProgressUpdate(null);
-              loadProgressUpdates();
-            } else {
-              Alert.alert('Error', response.message || 'Failed to save progress update');
+            if (typeof response === 'object' && 'success' in response) {
+              if (response.success) {
+                dialog.showSuccess(editingProgressUpdate ? 'Progress update updated successfully' : 'Progress update added successfully');
+                setShowProgressModal(false);
+                setEditingProgressUpdate(null);
+                loadProgressUpdates();
+              } else {
+                dialog.showError(response.message || 'Failed to save progress update');
+              }
             }
           } catch (error) {
-            Alert.alert('Error', 'Failed to save progress update');
+            dialog.showError('Failed to save progress update');
           }
         }}
       />
@@ -763,19 +854,32 @@ export default function TaskDetailScreen() {
               });
             }
 
-            if (response.success) {
-              Alert.alert('Success', editingIssue ? 'Issue updated successfully' : 'Issue reported successfully');
-              setShowIssueModal(false);
-              setEditingIssue(null);
-              loadIssues();
-            } else {
-              Alert.alert('Error', response.message || 'Failed to save issue');
+            if (typeof response === 'object' && 'success' in response) {
+              if (response.success) {
+                dialog.showSuccess(editingIssue ? 'Issue updated successfully' : 'Issue reported successfully');
+                setShowIssueModal(false);
+                setEditingIssue(null);
+                loadIssues();
+              } else {
+                dialog.showError(response.message || 'Failed to save issue');
+              }
             }
           } catch (error) {
-            Alert.alert('Error', 'Failed to save issue');
+            dialog.showError('Failed to save issue');
           }
         }}
       />
+
+      {/* Status Selector Modal */}
+      {task && (
+        <StatusSelectorModal
+          visible={showStatusSelector}
+          currentStatus={task.status}
+          progressUpdatesCount={progressUpdates.length}
+          onClose={() => setShowStatusSelector(false)}
+          onSelect={handleStatusSelect}
+        />
+      )}
     </View>
   );
 }
@@ -905,14 +1009,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   statusBadgeSmall: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 100,
   },
   statusTextSmall: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  statusUpdateButton: {
+    alignSelf: 'flex-start',
+  },
+  statusChangeHint: {
+    fontSize: 9,
+    fontWeight: '400',
+    fontStyle: 'italic',
+    marginLeft: 4,
   },
   fabContainer: {
     position: 'absolute',

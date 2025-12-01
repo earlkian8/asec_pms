@@ -104,8 +104,11 @@ class ProjectsController extends Controller
                 $query->whereDate('planned_end_date', '<=', $endDate);
             })
             ->orderBy($sortBy, $sortOrder)
-            ->paginate(10)
-            ->withQueryString(); // keep search when paginating
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         // Calculate progress for each project based on milestones
         $projects->getCollection()->transform(function ($project) {

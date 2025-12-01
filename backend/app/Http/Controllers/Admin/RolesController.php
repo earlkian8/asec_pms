@@ -39,8 +39,11 @@ class RolesController extends Controller
 
         $roles = $query->withCount('users') // counts assigned users
                     ->orderBy($sortBy, $sortOrder)
-                    ->paginate(10)
-                    ->withQueryString();
+                    ->when($sortBy !== 'created_at', function ($query) {
+                        // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                        $query->orderBy('created_at', 'desc');
+                    })
+                    ->paginate(10);
 
         return Inertia::render('UserManagement/Roles/index', [
             'roles' => $roles,

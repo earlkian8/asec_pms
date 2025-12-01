@@ -154,9 +154,16 @@ export default function RolesIndex() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = {
+        sort_by: sortBy,
+        sort_order: sortOrder,
+      };
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('user-management.roles-and-permissions.index'),
-        { search: searchInput, sort_by: sortBy, sort_order: sortOrder },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -167,11 +174,13 @@ export default function RolesIndex() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       sort_by: sortBy,
       sort_order: sortOrder,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('user-management.roles-and-permissions.index'),

@@ -59,8 +59,11 @@ class ClientsController extends Controller
                 $query->where('province', 'like', "%{$province}%");
             })
             ->orderBy($sortBy, $sortOrder)
-            ->paginate(10)
-            ->withQueryString();
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         // Get unique values for filter options
         $clientTypes = Client::distinct()->whereNotNull('client_type')->pluck('client_type')->sort()->values();
@@ -199,7 +202,7 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return redirect()->back()->with('success', 'Client updated successfully.');
+        return back()->withQueryString()->with('success', 'Client updated successfully.');
     }
 
     public function destroy(Client $client)
@@ -252,7 +255,7 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return back()->with('success', 'Client status updated successfully.');
+        return back()->withQueryString()->with('success', 'Client status updated successfully.');
     }
 
     public function resetPassword(Client $client)

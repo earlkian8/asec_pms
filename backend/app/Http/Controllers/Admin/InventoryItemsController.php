@@ -59,8 +59,11 @@ class InventoryItemsController extends Controller
                 $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
             })
             ->orderBy($sortBy, $sortOrder)
-            ->paginate(10)
-            ->withQueryString(); // keep search when paginating
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         // Add is_low_stock flag to each item
         $items->getCollection()->transform(function ($item) {
@@ -407,6 +410,7 @@ class InventoryItemsController extends Controller
             'Updated inventory item "' . $inventoryItem->item_name . '" status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
 
+        // Inertia handles state preservation via 'only' option in frontend
         return back()->with('success', 'Inventory item status updated successfully.');
     }
 

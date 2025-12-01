@@ -49,6 +49,9 @@ const EditClient = ({ client, setShowEditModal }) => {
     e.preventDefault();
 
     put(route('client-management.update', client.id), {
+      preserveScroll: true,
+      preserveState: true,
+      only: ['clients'],
       onSuccess: () => {
         setShowEditModal(false);
         toast.success('Client Updated Successfully!');

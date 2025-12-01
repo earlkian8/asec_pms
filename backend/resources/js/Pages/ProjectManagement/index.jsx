@@ -295,7 +295,11 @@ export default function ProjectsIndex() {
     });
     setSortBy('created_at');
     setSortOrder('desc');
-    router.get(route('project-management.index'), { search: searchInput }, {
+    const params = {};
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
+    router.get(route('project-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -316,9 +320,13 @@ export default function ProjectsIndex() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = {};
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('project-management.index'),
-        { search: searchInput },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -329,7 +337,6 @@ export default function ProjectsIndex() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       ...(localFilters.client_id && { client_id: localFilters.client_id }),
       ...(localFilters.status && { status: localFilters.status }),
@@ -340,6 +347,9 @@ export default function ProjectsIndex() {
       sort_by: sortBy,
       sort_order: sortOrder,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('project-management.index'),

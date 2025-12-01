@@ -29,6 +29,9 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
     e.preventDefault();
 
     put(route('employee-management.update', employee.id), {
+      preserveScroll: true,
+      preserveState: true,
+      only: ['employees'],
       onSuccess: () => {
         setShowEditModal(false);
         toast.success('Employee Updated Successfully!');

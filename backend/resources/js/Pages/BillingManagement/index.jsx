@@ -275,7 +275,11 @@ export default function BillingManagement() {
     });
     setSortBy('created_at');
     setSortOrder('desc');
-    router.get(route('billing-management.index'), { search: searchInput, tab: activeTab }, {
+    const params = { tab: activeTab };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
+    router.get(route('billing-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -296,9 +300,13 @@ export default function BillingManagement() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = { tab: activeTab };
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('billing-management.index'),
-        { search: searchInput, tab: activeTab },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -309,7 +317,6 @@ export default function BillingManagement() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       ...(localFilters.status && { status: localFilters.status }),
       ...(localFilters.project_id && { project_id: localFilters.project_id }),
@@ -320,6 +327,9 @@ export default function BillingManagement() {
       sort_order: sortOrder,
       tab: activeTab,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('billing-management.index'),

@@ -251,9 +251,17 @@ export default function UsersIndex() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = {
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        ...(localFilters.role && { role: localFilters.role }),
+      };
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('user-management.users.index'),
-        { search: searchInput, sort_by: sortBy, sort_order: sortOrder, ...(localFilters.role && { role: localFilters.role }) },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -264,12 +272,14 @@ export default function UsersIndex() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       ...(localFilters.role && { role: localFilters.role }),
       sort_by: sortBy,
       sort_order: sortOrder,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('user-management.users.index'),

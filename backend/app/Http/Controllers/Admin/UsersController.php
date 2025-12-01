@@ -52,8 +52,11 @@ class UsersController extends Controller
         $users = $query
                       ->with('roles')
                       ->orderBy($sortBy, $sortOrder)
-                      ->paginate(10)
-                      ->withQueryString();
+                      ->when($sortBy !== 'created_at', function ($query) {
+                          // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                          $query->orderBy('created_at', 'desc');
+                      })
+                      ->paginate(10);
 
         // Get all roles for the dropdowns
         $roles = Role::all(['id', 'name']);

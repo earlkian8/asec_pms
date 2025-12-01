@@ -461,7 +461,11 @@ class ReportsController extends Controller
                     return 0;
                 });
 
-            $totalSpent = $laborCosts + $materialCosts;
+            // Miscellaneous expenses
+            $miscellaneousExpenses = \App\Models\ProjectMiscellaneousExpense::where('project_id', $project->id)
+                ->sum('amount');
+
+            $totalSpent = $laborCosts + $materialCosts + $miscellaneousExpenses;
             $budget = $project->contract_amount;
             $variance = $budget - $totalSpent;
             $variancePercentage = $budget > 0 ? ($variance / $budget) * 100 : 0;
@@ -473,6 +477,7 @@ class ReportsController extends Controller
                 'budget' => $budget,
                 'labor_cost' => $laborCosts,
                 'material_cost' => $materialCosts,
+                'miscellaneous_expenses' => $miscellaneousExpenses,
                 'total_spent' => $totalSpent,
                 'variance' => $variance,
                 'variance_percentage' => round($variancePercentage, 2),

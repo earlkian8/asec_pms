@@ -34,7 +34,7 @@ export interface ProgressUpdate {
   id: string;
   title: string;
   description: string;
-  type: 'progress';
+  type: 'request' | 'progress';
   author: string;
   date: string;
   file?: ProgressUpdateFile | null; // Optional - files are not displayed in client app

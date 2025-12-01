@@ -43,14 +43,20 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
     }
 
     // Ensure assigned_to is null if empty string, otherwise convert to integer
+    let assignedToValue = null;
+    if (data.assigned_to && data.assigned_to !== "none" && data.assigned_to !== "") {
+      const parsedValue = typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to;
+      if (!isNaN(parsedValue) && parsedValue > 0) {
+        assignedToValue = parsedValue;
+      }
+    }
+
     const submitData = {
       ...data,
       project_milestone_id: typeof milestoneId === 'string' 
         ? parseInt(milestoneId) 
         : milestoneId,
-      assigned_to: data.assigned_to && data.assigned_to !== "none" 
-        ? (typeof data.assigned_to === 'string' ? parseInt(data.assigned_to) : data.assigned_to)
-        : null,
+      assigned_to: assignedToValue,
     };
 
     post(route("project-management.project-tasks.store"), {
@@ -62,7 +68,13 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
       },
       onError: (errors) => {
         console.error('Task creation errors:', errors);
-        toast.error("Please check the form for errors");
+        if (errors?.assigned_to) {
+          toast.error(errors.assigned_to);
+        } else if (errors?.message) {
+          toast.error(errors.message);
+        } else {
+          toast.error("Please check the form for errors");
+        }
       },
     });
   };

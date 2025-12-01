@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Project;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
+use App\Models\ProjectMiscellaneousExpense;
 use App\Models\Billing;
 use App\Models\BillingPayment;
 use App\Models\ProjectMilestone;
@@ -39,8 +40,12 @@ class ProjectOverviewService
 
         $totalMaterialQuantity = $materialAllocations->sum('quantity_received');
 
+        // Calculate Miscellaneous Expenses
+        $miscellaneousExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)->get();
+        $totalMiscellaneousExpenses = $miscellaneousExpenses->sum('amount');
+
         // Total Budget Used
-        $totalBudgetUsed = $totalLaborCost + $totalMaterialCost;
+        $totalBudgetUsed = $totalLaborCost + $totalMaterialCost + $totalMiscellaneousExpenses;
         $contractAmount = (float) $project->contract_amount;
         $budgetRemaining = $contractAmount - $totalBudgetUsed;
         $budgetUtilizationPercentage = $contractAmount > 0 ? ($totalBudgetUsed / $contractAmount) * 100 : 0;
@@ -123,6 +128,16 @@ class ProjectOverviewService
                 });
             });
 
+        $monthlyMiscellaneousExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)
+            ->where('expense_date', '>=', now()->subMonths(6))
+            ->get()
+            ->groupBy(function ($expense) {
+                return $expense->expense_date->format('Y-m');
+            })
+            ->map(function ($expenses) {
+                return $expenses->sum('amount');
+            });
+
         // Generate last 6 months array
         $last6Months = [];
         for ($i = 5; $i >= 0; $i--) {
@@ -133,6 +148,7 @@ class ProjectOverviewService
                 'month_key' => $monthKey,
                 'labor_cost' => $monthlyLaborCosts->get($monthKey, 0),
                 'material_cost' => $monthlyMaterialCosts->get($monthKey, 0),
+                'miscellaneous_expenses' => $monthlyMiscellaneousExpenses->get($monthKey, 0),
             ];
         }
 
@@ -147,6 +163,7 @@ class ProjectOverviewService
                 'contract_amount' => $contractAmount,
                 'total_labor_cost' => $totalLaborCost,
                 'total_material_cost' => $totalMaterialCost,
+                'total_miscellaneous_expenses' => $totalMiscellaneousExpenses,
                 'total_budget_used' => $totalBudgetUsed,
                 'budget_remaining' => $budgetRemaining,
                 'budget_utilization_percentage' => round($budgetUtilizationPercentage, 2),

@@ -17,25 +17,32 @@ import {
 
 export default function Step2TeamMembers({ users }) {
   const { teamMembers, addTeamMember, removeTeamMember, updateTeamMember, projectData } = useProjectWizard();
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
   const [newMember, setNewMember] = useState({
     role: "",
     hourly_rate: "",
     start_date: "",
   });
 
-  // Auto-populate role when user is selected
-  const handleUserSelect = (userId) => {
-    setSelectedUserId(userId);
-    const user = users.find(u => u.id.toString() === userId);
-    if (user && user.role) {
-      setNewMember(prev => ({ ...prev, role: user.role }));
+  // Auto-populate role when member is selected
+  const handleMemberSelect = (compositeValue) => {
+    // Parse composite value: "type-id"
+    const [type, id] = compositeValue.split('-');
+    setSelectedMemberId(compositeValue);
+    const member = users.find(u => u && u.id && u.id.toString() === id && (u.type || 'user') === type);
+    if (member) {
+      // Auto-fill role from user role or employee position
+      if (member.type === 'user' && member.role) {
+        setNewMember(prev => ({ ...prev, role: member.role }));
+      } else if (member.type === 'employee' && member.position) {
+        setNewMember(prev => ({ ...prev, role: member.position }));
+      }
     }
   };
 
   const handleAddMember = () => {
-    if (!selectedUserId) {
-      toast.error("Please select a user");
+    if (!selectedMemberId) {
+      toast.error("Please select a team member");
       return;
     }
     if (!newMember.role) {
@@ -51,12 +58,23 @@ export default function Step2TeamMembers({ users }) {
       return;
     }
 
-    const user = users.find(u => u.id.toString() === selectedUserId);
-    if (!user) return;
+    // Parse composite value: "type-id"
+    const [memberType, memberIdStr] = selectedMemberId.split('-');
+    const memberIdInt = parseInt(memberIdStr, 10);
+    
+    const member = users.find(u => u && u.id && u.id.toString() === memberIdStr && (u.type || 'user') === memberType);
+    if (!member) {
+      toast.error("Selected team member not found. Please refresh and try again.");
+      return;
+    }
 
-    // Check if user is already added
-    if (teamMembers.some(m => m.id === selectedUserId)) {
-      toast.error("This user is already added to the team");
+    // Check if member is already added (compare by id and type)
+    if (teamMembers.some(m => {
+      const mId = typeof m.id === 'string' ? parseInt(m.id, 10) : m.id;
+      const mType = m.type || 'user';
+      return mId === memberIdInt && mType === memberType;
+    })) {
+      toast.error("This team member is already added to the team");
       return;
     }
 
@@ -71,16 +89,18 @@ export default function Step2TeamMembers({ users }) {
     }
 
     addTeamMember({
-      id: selectedUserId,
-      name: user.name,
-      email: user.email,
+      id: memberIdInt,
+      type: memberType,
+      name: member.name || 'Unknown',
+      email: member.email || '',
       role: newMember.role,
-      hourly_rate: newMember.hourly_rate,
+      hourly_rate: parseFloat(newMember.hourly_rate) || 0,
       start_date: newMember.start_date,
+      end_date: null, // Can be added later if needed
     });
 
     // Reset form
-    setSelectedUserId("");
+    setSelectedMemberId("");
     setNewMember({
       role: "",
       hourly_rate: "",
@@ -88,9 +108,17 @@ export default function Step2TeamMembers({ users }) {
     });
   };
 
-  const availableUsers = users.filter(
-    user => !teamMembers.some(member => member.id === user.id.toString())
-  );
+  const availableMembers = (users || []).filter(member => {
+    if (!member || !member.id) return false;
+    const memberId = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
+    const memberType = member.type || 'user';
+    
+    return !teamMembers.some(tm => {
+      const tmId = typeof tm.id === 'string' ? parseInt(tm.id, 10) : tm.id;
+      const tmType = tm.type || 'user';
+      return tmId === memberId && tmType === memberType;
+    });
+  });
 
   return (
     <div className="space-y-4">
@@ -100,17 +128,32 @@ export default function Step2TeamMembers({ users }) {
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <Label>User <span class="text-red-500">*</span></Label>
-            <Select value={selectedUserId} onValueChange={handleUserSelect}>
+            <Label>Team Member <span class="text-red-500">*</span></Label>
+            <Select value={selectedMemberId || ""} onValueChange={handleMemberSelect}>
               <SelectTrigger>
-                <SelectValue placeholder="Select user" />
+                <SelectValue placeholder="Select team member" />
               </SelectTrigger>
               <SelectContent>
-                {availableUsers.map((user) => (
-                  <SelectItem key={user.id} value={user.id.toString()}>
-                    {user.name} ({user.email})
-                  </SelectItem>
-                ))}
+                {availableMembers.map((member) => {
+                  const compositeValue = `${member.type || 'user'}-${member.id}`;
+                  return (
+                    <SelectItem key={compositeValue} value={compositeValue}>
+                      <div className="flex items-center gap-2">
+                        <span>{member.name} ({member.email})</span>
+                        {member.type === 'employee' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                            Employee
+                          </span>
+                        )}
+                        {member.type === 'user' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            User
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -118,9 +161,8 @@ export default function Step2TeamMembers({ users }) {
           <div>
             <Label>Role <span class="text-red-500">*</span></Label>
             <Input
-              placeholder="Auto-filled from user role"
+              placeholder="Auto-filled from role/position"
               value={newMember.role}
-              readOnly
               onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
               required
             />
@@ -172,6 +214,7 @@ export default function Step2TeamMembers({ users }) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Hourly Rate</TableHead>
                 <TableHead>Start Date</TableHead>
@@ -183,6 +226,17 @@ export default function Step2TeamMembers({ users }) {
                 <TableRow key={index}>
                   <TableCell>{member.name}</TableCell>
                   <TableCell>{member.email}</TableCell>
+                  <TableCell>
+                    {member.type === 'employee' ? (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                        Employee
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        User
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{member.role}</TableCell>
                   <TableCell>{member.hourly_rate ? `₱${parseFloat(member.hourly_rate).toFixed(2)}` : "---"}</TableCell>
                   <TableCell>{member.start_date || "---"}</TableCell>

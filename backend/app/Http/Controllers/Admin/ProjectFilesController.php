@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectFile;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProjectFilesController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
     public function store(Request $request, Project $project)
     {
         
@@ -47,6 +49,15 @@ class ProjectFilesController extends Controller
             "Uploaded file {$file->original_name} to Project {$project->project_name}"
         );
 
+        // System-wide notification for new file
+        $this->createSystemNotification(
+            'general',
+            'New File Uploaded',
+            "A new file '{$file->original_name}' has been uploaded to project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
+
         return redirect()->back()->with('success', 'File uploaded successfully.');
     }
      public function update(Request $request, Project $project, ProjectFile $file)
@@ -71,6 +82,15 @@ class ProjectFilesController extends Controller
             "Updated file {$file->original_name} in Project {$project->project_name}: " .
             "Category: {$oldCategory} → {$file->category}, " .
             "Description changed"
+        );
+
+        // System-wide notification for file update
+        $this->createSystemNotification(
+            'general',
+            'Project File Updated',
+            "File '{$file->original_name}' has been updated in project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
         );
 
         return redirect()->back()->with('success', 'File updated successfully.');
@@ -101,6 +121,15 @@ class ProjectFilesController extends Controller
                 );
 
                 $f->delete();
+
+                // System-wide notification for file deletion
+                $this->createSystemNotification(
+                    'general',
+                    'Project File Deleted',
+                    "File '{$f->original_name}' has been deleted from project '{$project->project_name}'.",
+                    $project,
+                    route('project-management.view', $project->id)
+                );
             }
 
             return redirect()->back()->with('success', 'Selected files deleted successfully.');
@@ -113,13 +142,23 @@ class ProjectFilesController extends Controller
 
         Storage::disk($disk)->delete($file->file_path);
 
+        $fileName = $file->original_name;
+        $file->delete();
+
         $this->adminActivityLogs(
             'Project Files',
             'Delete',
-            "Deleted file {$file->original_name} from Project {$project->project_name}"
+            "Deleted file {$fileName} from Project {$project->project_name}"
         );
 
-        $file->delete();
+        // System-wide notification for file deletion
+        $this->createSystemNotification(
+            'general',
+            'Project File Deleted',
+            "File '{$fileName}' has been deleted from project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
 
         return redirect()->back()->with('success', 'File deleted successfully.');
     }

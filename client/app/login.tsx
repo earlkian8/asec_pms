@@ -8,10 +8,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/contexts/DialogContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import Logo from '@/components/Logo';
@@ -22,11 +22,12 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
+  const dialog = useDialog();
   const router = useRouter();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+      dialog.showError('Please enter both email and password');
       return;
     }
 
@@ -37,7 +38,7 @@ export default function LoginScreen() {
     if (result.success) {
       router.replace('/(tabs)');
     } else {
-      Alert.alert('Login Failed', result.message || 'Invalid credentials. Please try again.');
+      dialog.showError(result.message || 'Invalid credentials. Please try again.', 'Login Failed');
     }
   };
 

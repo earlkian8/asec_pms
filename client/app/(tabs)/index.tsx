@@ -9,7 +9,6 @@ import {
   RefreshControl,
   Share,
   Linking,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +34,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
 import NotificationCenter from '@/components/NotificationCenter';
+import AnimatedCard from '@/components/AnimatedCard';
+import AnimatedView from '@/components/AnimatedView';
+import { useDialog } from '@/contexts/DialogContext';
 
 const { width } = Dimensions.get('window');
 
@@ -44,6 +46,7 @@ export default function HomeScreen() {
   const { statistics, projects, loading, refresh } = useDashboard();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const dialog = useDialog();
   const [refreshing, setRefreshing] = useState(false);
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
   const [selectedProject, setSelectedProject] = useState<DashboardProject | null>(null);
@@ -116,54 +119,46 @@ export default function HomeScreen() {
     if (method === 'call') {
       const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
       
-      Alert.alert(
-        'Contact Project Manager',
+      dialog.showConfirm(
         `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Call',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(phoneUrl);
-                if (canOpen) {
-                  await Linking.openURL(phoneUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open phone dialer');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open phone dialer');
-                console.error('Error opening phone:', error);
-              }
-            },
-          },
-        ]
+        async () => {
+          try {
+            const canOpen = await Linking.canOpenURL(phoneUrl);
+            if (canOpen) {
+              await Linking.openURL(phoneUrl);
+            } else {
+              dialog.showError('Unable to open phone dialer');
+            }
+          } catch (error) {
+            dialog.showError('Failed to open phone dialer');
+            console.error('Error opening phone:', error);
+          }
+        },
+        'Contact Project Manager',
+        'Call',
+        'Cancel'
       );
     } else {
       const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
       
-      Alert.alert(
-        'Contact Project Manager',
+      dialog.showConfirm(
         `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Email',
-            onPress: async () => {
-              try {
-                const canOpen = await Linking.canOpenURL(emailUrl);
-                if (canOpen) {
-                  await Linking.openURL(emailUrl);
-                } else {
-                  Alert.alert('Error', 'Unable to open email client');
-                }
-              } catch (error) {
-                Alert.alert('Error', 'Failed to open email client');
-                console.error('Error opening email:', error);
-              }
-            },
-          },
-        ]
+        async () => {
+          try {
+            const canOpen = await Linking.canOpenURL(emailUrl);
+            if (canOpen) {
+              await Linking.openURL(emailUrl);
+            } else {
+              dialog.showError('Unable to open email client');
+            }
+          } catch (error) {
+            dialog.showError('Failed to open email client');
+            console.error('Error opening email:', error);
+          }
+        },
+        'Contact Project Manager',
+        'Email',
+        'Cancel'
       );
     }
   };
@@ -173,7 +168,7 @@ export default function HomeScreen() {
     setShowRequestUpdate(true);
   };
 
-  const ProjectCard = ({ project }: { project: DashboardProject }) => {
+  const ProjectCard = ({ project, index }: { project: DashboardProject; index: number }) => {
     const statusColors: Record<string, { bg: string; text: string }> = {
       active: { bg: '#D1FAE5', text: '#065F46' }, // green-100/green-700
       'on-hold': { bg: '#FEF3C7', text: '#92400E' }, // yellow-100/yellow-700
@@ -185,10 +180,12 @@ export default function HomeScreen() {
     const isFavorite = favorites.has(project.id);
 
     return (
-      <View style={[styles.projectCard, { backgroundColor: cardBg, borderColor }]}>
-        <TouchableOpacity
-          onPress={() => router.push(`/project/${project.id}`)}
-          activeOpacity={0.7}>
+      <AnimatedCard
+        index={index}
+        delay={400}
+        onPress={() => router.push(`/project/${project.id}`)}
+        style={[styles.projectCard, { backgroundColor: cardBg, borderColor }]}>
+        <View>
           <View style={styles.projectHeader}>
             <View style={styles.projectTitleContainer}>
               <View style={styles.projectTitleRow}>
@@ -209,7 +206,7 @@ export default function HomeScreen() {
                 </TouchableOpacity> */}
               </View>
               <Text style={[styles.projectLocation, { color: textSecondary }]} numberOfLines={1}>
-                {project.location}
+                {project.location || 'No location specified'}
               </Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
@@ -241,14 +238,46 @@ export default function HomeScreen() {
                 Due: {new Date(project.expectedCompletion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </View>
-            <View style={styles.projectInfo}>
-              <Coins size={14} color={textSecondary} />
-              <Text style={[styles.projectInfoText, { color: textSecondary }]}>
-                {formatCurrency(project.spent)} / {formatCurrency(project.budget)}
+          </View>
+
+          {/* Budget Section */}
+          <View style={styles.budgetSection}>
+            <View style={styles.budgetHeader}>
+              <View style={styles.budgetInfoRow}>
+                <Coins size={16} color={textSecondary} />
+                <Text style={[styles.budgetLabel, { color: textSecondary }]}>Budget Usage</Text>
+              </View>
+              <Text style={[styles.budgetPercent, { color: textColor }]}>
+                {Math.round((project.spent / project.budget) * 100)}%
               </Text>
             </View>
+            <View style={styles.budgetDetails}>
+              <View style={styles.budgetDetailItem}>
+                <Text style={[styles.budgetDetailLabel, { color: textSecondary }]}>Spent</Text>
+                <Text style={[styles.budgetDetailValue, { color: textColor }]}>
+                  {formatCurrency(project.spent)}
+                </Text>
+              </View>
+              <View style={styles.budgetDivider} />
+              <View style={styles.budgetDetailItem}>
+                <Text style={[styles.budgetDetailLabel, { color: textSecondary }]}>Total Budget</Text>
+                <Text style={[styles.budgetDetailValue, { color: textColor }]}>
+                  {formatCurrency(project.budget)}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.budgetBar, { backgroundColor: '#E5E7EB' }]}>
+              <View
+                style={[
+                  styles.budgetBarFill,
+                  {
+                    width: `${Math.min((project.spent / project.budget) * 100, 100)}%`,
+                    backgroundColor: (project.spent / project.budget) * 100 > 90 ? '#EF4444' : (project.spent / project.budget) * 100 > 75 ? '#F59E0B' : '#10B981',
+                  },
+                ]}
+              />
+            </View>
           </View>
-        </TouchableOpacity>
 
         {/* Action Buttons */}
         <View style={styles.projectActions}>
@@ -273,7 +302,8 @@ export default function HomeScreen() {
             <Text style={[styles.actionButtonTextLabel, { color: '#3B82F6' }]}>Request Update</Text>
           </TouchableOpacity>
         </View>
-      </View>
+        </View>
+      </AnimatedCard>
     );
   };
 
@@ -312,7 +342,8 @@ export default function HomeScreen() {
         {/* Statistics Grid */}
         {statistics && (
           <>
-            <View style={styles.statsGrid}>
+            <AnimatedView delay={100}>
+              <View style={styles.statsGrid}>
               {/* Row 1: Active Projects and On Time - 2 Columns */}
               <View style={styles.twoColumnRow}>
                 <View style={styles.halfWidthCard}>
@@ -357,9 +388,11 @@ export default function HomeScreen() {
                 />
               </View>
             </View>
+            </AnimatedView>
 
             {/* Budget Overview */}
-            <View style={[styles.budgetCard, { backgroundColor: cardBg, borderColor }]}>
+            <AnimatedView delay={200}>
+              <View style={[styles.budgetCard, { backgroundColor: cardBg, borderColor }]}>
               <Text style={[styles.sectionTitle, { color: textColor }]}>Budget Overview</Text>
               <View style={styles.budgetInfo}>
                 <View style={styles.budgetRow}>
@@ -390,6 +423,7 @@ export default function HomeScreen() {
                 {statistics.totalBudget > 0 ? Math.round((statistics.totalSpent / statistics.totalBudget) * 100) : 0}% of budget used
               </Text>
             </View>
+            </AnimatedView>
           </>
         )}
 
@@ -400,23 +434,25 @@ export default function HomeScreen() {
         )}
 
         {/* Recent Projects */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <AnimatedView delay={300}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: textColor }]}>Active Projects</Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/projects')}>
               <Text style={[styles.seeAll, { color: '#3B82F6' }]}>See All</Text>
             </TouchableOpacity>
           </View>
           {recentProjects.length > 0 ? (
-            recentProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+            recentProjects.map((project, index) => (
+              <ProjectCard key={project.id} project={project} index={index} />
             ))
           ) : (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyStateText, { color: textSecondary }]}>No active projects</Text>
             </View>
           )}
-        </View>
+          </View>
+        </AnimatedView>
       </ScrollView>
 
       {/* Modals */}
@@ -671,6 +707,63 @@ const styles = StyleSheet.create({
   projectInfoText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  budgetSection: {
+    marginTop: 16,
+    marginBottom: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  budgetInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  budgetLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  budgetPercent: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  budgetDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
+  budgetDetailItem: {
+    flex: 1,
+  },
+  budgetDetailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  budgetDetailValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  budgetDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  budgetBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  budgetBarFill: {
+    height: '100%',
+    borderRadius: 4,
   },
   projectActions: {
     flexDirection: 'row',

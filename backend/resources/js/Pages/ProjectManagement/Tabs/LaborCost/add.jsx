@@ -19,7 +19,8 @@ import { Textarea } from "@/Components/ui/textarea";
 
 const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
   const { data, setData, post, errors, processing } = useForm({
-    user_id: "",
+    assignable_id: "",
+    assignable_type: "user",
     work_date: new Date().toISOString().split('T')[0],
     hours_worked: "",
     hourly_rate: "",
@@ -27,37 +28,23 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
     notes: "",
   });
 
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [period, setPeriod] = useState("");
+  const [selectedMember, setSelectedMember] = useState(null);
 
-  // Convert period to hours worked
-  const periodToHours = (selectedPeriod) => {
-    switch (selectedPeriod) {
-      case "weekly":
-        return 40; // Standard work week
-      case "bi-weekly":
-        return 80; // 2 weeks
-      case "month":
-        return 173.33; // Average month (4.33 weeks)
-      default:
-        return 0;
-    }
-  };
-
-  const handlePeriodChange = (selectedPeriod) => {
-    setPeriod(selectedPeriod);
-    const hours = periodToHours(selectedPeriod);
-    setData("hours_worked", hours);
-  };
-
-  const handleUserChange = (userId) => {
-    setData("user_id", userId);
-    const user = teamMembers.find(m => m.id === parseInt(userId));
-    setSelectedUser(user);
+  const handleMemberChange = (compositeValue) => {
+    // Parse composite value: "type-id"
+    const [type, id] = compositeValue.split('-');
+    const memberIdInt = parseInt(id, 10);
+    
+    const member = teamMembers.find(m => m && m.id === memberIdInt && (m.type || 'user') === type);
+    if (!member) return;
+    
+    setData("assignable_id", member.id);
+    setData("assignable_type", member.type || 'user');
+    setSelectedMember(member);
     
     // Auto-fill hourly rate from team member if available
-    if (user && user.hourly_rate) {
-      setData("hourly_rate", user.hourly_rate);
+    if (member && member.hourly_rate) {
+      setData("hourly_rate", member.hourly_rate);
     }
   };
 
@@ -100,23 +87,38 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
-          {/* Employee */}
+          {/* Team Member */}
           <div>
-            <Label className="text-zinc-800">Employee <span className="text-red-500">*</span></Label>
+            <Label className="text-zinc-800">Team Member <span className="text-red-500">*</span></Label>
             <Select
-              value={data.user_id}
-              onValueChange={handleUserChange}
+              value={data.assignable_id && data.assignable_type ? `${data.assignable_type}-${data.assignable_id}` : ""}
+              onValueChange={handleMemberChange}
             >
-              <SelectTrigger className={inputClass(errors.user_id)}>
-                <SelectValue placeholder="Select employee" />
+              <SelectTrigger className={inputClass(errors.assignable_id || errors.assignable_type)}>
+                <SelectValue placeholder="Select team member" />
               </SelectTrigger>
               <SelectContent>
                 {teamMembers.length > 0 ? (
-                  teamMembers.map((member) => (
-                    <SelectItem key={member.id} value={member.id.toString()}>
-                      {member.name}
-                    </SelectItem>
-                  ))
+                  teamMembers.map((member) => {
+                    const compositeValue = `${member.type || 'user'}-${member.id}`;
+                    return (
+                      <SelectItem key={compositeValue} value={compositeValue}>
+                        <div className="flex items-center gap-2">
+                          <span>{member.name}</span>
+                          {member.type === 'employee' && (
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                              Employee
+                            </span>
+                          )}
+                          {member.type === 'user' && (
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                              User
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })
                 ) : (
                   <div className="px-2 py-1.5 text-sm text-gray-500">
                     No team members available. Add team members first.
@@ -124,7 +126,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
                 )}
               </SelectContent>
             </Select>
-            <InputError message={errors.user_id} />
+            <InputError message={errors.assignable_id || errors.assignable_type} />
           </div>
 
           {/* Work Date */}
@@ -139,27 +141,21 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             <InputError message={errors.work_date} />
           </div>
 
-          {/* Hours Worked - Period Selection */}
+          {/* Hours Worked */}
           <div>
             <Label className="text-zinc-800">Hours Worked <span className="text-red-500">*</span></Label>
-            <Select
-              value={period}
-              onValueChange={handlePeriodChange}
-            >
-              <SelectTrigger className={inputClass(errors.hours_worked)}>
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">Weekly (40 hours)</SelectItem>
-                <SelectItem value="bi-weekly">Bi-weekly (80 hours)</SelectItem>
-                <SelectItem value="month">Month (173.33 hours)</SelectItem>
-              </SelectContent>
-            </Select>
-            {period && (
-              <p className="text-xs text-gray-500 mt-1">
-                Calculated hours: {data.hours_worked} hours
-              </p>
-            )}
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="Enter hours worked (e.g., 3.5)"
+              value={data.hours_worked}
+              onChange={(e) => setData("hours_worked", e.target.value)}
+              className={inputClass(errors.hours_worked)}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter the actual hours worked for this work date
+            </p>
             <InputError message={errors.hours_worked} />
           </div>
 

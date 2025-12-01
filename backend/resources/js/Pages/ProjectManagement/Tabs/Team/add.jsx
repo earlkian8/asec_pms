@@ -20,44 +20,48 @@ import {
 import { Checkbox } from "@/Components/ui/checkbox"
 import { router } from "@inertiajs/react"
 import { toast } from "sonner"
-import { Loader2, SquarePen, Search } from "lucide-react"
+import { Loader2, SquarePen, Search, UserCheck, Users } from "lucide-react"
 import AddUser from "@/Pages/UserManagement/Users/add"
+import AddEmployee from "@/Pages/EmployeeManagement/add"
 import InputError from "@/Components/InputError"
 
-export default function AddProjectTeam({ setShowAddModal, users = [], project }) {
+export default function AddProjectTeam({ setShowAddModal, assignables = [], project }) {
   const [search, setSearch] = useState("")
-  const [selectedUsers, setSelectedUsers] = useState([])
+  const [selectedAssignables, setSelectedAssignables] = useState([])
   const [formData, setFormData] = useState({})
-  const [showNewModal, setShowNewModal] = useState(false)
+  const [showNewUserModal, setShowNewUserModal] = useState(false)
+  const [showNewEmployeeModal, setShowNewEmployeeModal] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [errors, setErrors] = useState({})
 
-  // Ensure users is always an array
-  const safeUsers = Array.isArray(users) ? users : []
+  // Ensure assignables is always an array
+  const safeAssignables = Array.isArray(assignables) ? assignables : []
 
-  const filteredUsers = safeUsers.filter((u) => {
-    if (!u) return false
-    const fullName = `${u.name || ''}`.toLowerCase()
-    const email = u.email ? u.email.toLowerCase() : ''
+  const filteredAssignables = safeAssignables.filter((a) => {
+    if (!a) return false
+    const fullName = `${a.name || ''}`.toLowerCase()
+    const email = a.email ? a.email.toLowerCase() : ''
+    const position = a.position ? a.position.toLowerCase() : ''
     return (
       fullName.includes(search.toLowerCase()) ||
-      email.includes(search.toLowerCase())
+      email.includes(search.toLowerCase()) ||
+      position.includes(search.toLowerCase())
     )
   })
 
   const toggleSelectAll = (checked) => {
     if (checked) {
-      setSelectedUsers(filteredUsers.map((u) => u.id))
+      setSelectedAssignables(filteredAssignables.map((a) => a.id))
     } else {
-      setSelectedUsers([])
+      setSelectedAssignables([])
     }
   }
 
-  const toggleUser = (id) => {
-    if (selectedUsers.includes(id)) {
-      setSelectedUsers(selectedUsers.filter((uid) => uid !== id))
+  const toggleAssignable = (id) => {
+    if (selectedAssignables.includes(id)) {
+      setSelectedAssignables(selectedAssignables.filter((aid) => aid !== id))
     } else {
-      setSelectedUsers([...selectedUsers, id])
+      setSelectedAssignables([...selectedAssignables, id])
     }
   }
 
@@ -71,12 +75,16 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
     }))
   }
 
-  // Auto-populate role when user is selected
-  const handleUserToggle = (userId) => {
-    toggleUser(userId);
-    const user = safeUsers.find(u => u && u.id === userId);
-    if (user && user.role && !formData[userId]?.role) {
-      handleChange(userId, 'role', user.role);
+  // Auto-populate role when assignable is selected
+  const handleAssignableToggle = (assignableId) => {
+    toggleAssignable(assignableId);
+    const assignable = safeAssignables.find(a => a && a.id === assignableId);
+    if (assignable) {
+      if (assignable.type === 'user' && assignable.role && !formData[assignableId]?.role) {
+        handleChange(assignableId, 'role', assignable.role);
+      } else if (assignable.type === 'employee' && assignable.position && !formData[assignableId]?.role) {
+        handleChange(assignableId, 'role', assignable.position);
+      }
     }
   }
 
@@ -91,25 +99,35 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
     setProcessing(true)
     setErrors({})
 
-    if (selectedUsers.length === 0) {
-      toast.error("Please select at least one user.")
+    if (selectedAssignables.length === 0) {
+      toast.error("Please select at least one team member.")
+      setProcessing(false)
+      return
+    }
+    
+    // Validate that all selected assignables exist
+    const missingAssignables = selectedAssignables.filter(id => 
+      !safeAssignables.find(a => a && a.id === id)
+    )
+    if (missingAssignables.length > 0) {
+      toast.error("Some selected team members are no longer available. Please refresh and try again.")
       setProcessing(false)
       return
     }
 
     // Validate required fields
     const validationErrors = {}
-    for (const userId of selectedUsers) {
-      const user = safeUsers.find(u => u && u.id === userId)
-      const userName = user?.name || 'User'
-      if (!formData[userId]?.role) {
-        validationErrors[`user_${userId}_role`] = `Please enter a role for ${userName}`
+    for (const assignableId of selectedAssignables) {
+      const assignable = safeAssignables.find(a => a && a.id === assignableId)
+      const assignableName = assignable?.name || 'Team Member'
+      if (!formData[assignableId]?.role) {
+        validationErrors[`assignable_${assignableId}_role`] = `Please enter a role for ${assignableName}`
       }
-      if (!formData[userId]?.hourly_rate || parseFloat(formData[userId]?.hourly_rate) <= 0) {
-        validationErrors[`user_${userId}_hourly_rate`] = `Please enter a valid hourly rate for ${userName}`
+      if (!formData[assignableId]?.hourly_rate || parseFloat(formData[assignableId]?.hourly_rate) <= 0) {
+        validationErrors[`assignable_${assignableId}_hourly_rate`] = `Please enter a valid hourly rate for ${assignableName}`
       }
-      if (!formData[userId]?.start_date) {
-        validationErrors[`user_${userId}_start_date`] = `Please enter a start date for ${userName}`
+      if (!formData[assignableId]?.start_date) {
+        validationErrors[`assignable_${assignableId}_start_date`] = `Please enter a start date for ${assignableName}`
       }
     }
 
@@ -120,17 +138,27 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
       return
     }
 
-    const usersPayload = selectedUsers.map((userId) => ({
-      id: userId,
-      role: formData[userId]?.role,
-      hourly_rate: formData[userId]?.hourly_rate,
-      start_date: formData[userId]?.start_date,
-      end_date: formData[userId]?.end_date || null,
-    }))
+    const assignablesPayload = selectedAssignables
+      .map((assignableId) => {
+        const assignable = safeAssignables.find(a => a && a.id === assignableId)
+        if (!assignable) {
+          console.warn(`Assignable with id ${assignableId} not found`)
+          return null
+        }
+        return {
+          id: parseInt(assignableId, 10),
+          type: assignable.type || 'user',
+          role: formData[assignableId]?.role,
+          hourly_rate: parseFloat(formData[assignableId]?.hourly_rate) || 0,
+          start_date: formData[assignableId]?.start_date,
+          end_date: formData[assignableId]?.end_date || null,
+        }
+      })
+      .filter(item => item !== null) // Remove any null entries
 
     router.post(
       route("project-management.project-teams.store", project.id),
-      { users: usersPayload },
+      { assignables: assignablesPayload },
       {
         preserveScroll: true,
         onSuccess: () => {
@@ -148,9 +176,35 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
     )
   }
 
+  // Handle modal close and refresh
+  const handleUserModalClose = () => {
+    setShowNewUserModal(false);
+    // Refresh the page to get updated assignables
+    setTimeout(() => {
+      router.reload({ only: ['teamData'], preserveScroll: true });
+    }, 100);
+  };
+
+  const handleEmployeeModalClose = () => {
+    setShowNewEmployeeModal(false);
+    // Refresh the page to get updated assignables
+    setTimeout(() => {
+      router.reload({ only: ['teamData'], preserveScroll: true });
+    }, 100);
+  };
+
   return (
     <>
-      {showNewModal && <AddUser setShowAddModal={setShowNewModal} />}
+      {showNewUserModal && (
+        <AddUser 
+          setShowAddModal={handleUserModalClose}
+        />
+      )}
+      {showNewEmployeeModal && (
+        <AddEmployee 
+          setShowAddModal={handleEmployeeModalClose}
+        />
+      )}
 
       <Dialog open onOpenChange={setShowAddModal}>
         <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -158,26 +212,36 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
             <DialogTitle className="text-zinc-800">Add Team Members</DialogTitle>
           </DialogHeader>
 
-          {/* Search + New Button */}
+          {/* Search + New Buttons */}
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />
               <Input
-                placeholder="Search users by name or email..."
+                placeholder="Search by name, email, or position..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 border-gray-300 rounded-lg"
               />
             </div>
 
-            <Button
-              type="button"
-              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200"
-              onClick={() => setShowNewModal(true)}
-            >
-              <SquarePen className="mr-2 h-4 w-4" />
-              New User
-            </Button>
+            {/* <div className="flex gap-2">
+              <Button
+                type="button"
+                className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200"
+                onClick={() => setShowNewUserModal(true)}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                New User
+              </Button>
+              <Button
+                type="button"
+                className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md transition-all duration-200"
+                onClick={() => setShowNewEmployeeModal(true)}
+              >
+                <UserCheck className="mr-2 h-4 w-4" />
+                New Employee
+              </Button>
+            </div> */}
           </div>
 
           {/* Scrollable Table */}
@@ -188,45 +252,46 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                   <TableHead className="w-12">
                     <Checkbox
                       checked={
-                        filteredUsers.length > 0 &&
-                        selectedUsers.length === filteredUsers.length
+                        filteredAssignables.length > 0 &&
+                        selectedAssignables.length === filteredAssignables.length
                       }
                       indeterminate={
-                        selectedUsers.length > 0 &&
-                        selectedUsers.length < filteredUsers.length
+                        selectedAssignables.length > 0 &&
+                        selectedAssignables.length < filteredAssignables.length
                       }
                       onCheckedChange={(checked) => toggleSelectAll(checked)}
                     />
                   </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Name</TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">Email</TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider w-20">Type</TableHead>
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">Name</TableHead>
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[180px]">Email</TableHead>
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[200px]">
                     Role <span className="text-red-500">*</span>
                   </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">
                     Hourly Rate <span className="text-red-500">*</span>
                   </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">
                     Start Date <span className="text-red-500">*</span>
                   </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider">End Date</TableHead>
+                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">End Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => {
-                  const isSelected = selectedUsers.includes(user.id);
-                  const userErrors = {
-                    role: errors[`user_${user.id}_role`],
-                    hourly_rate: errors[`user_${user.id}_hourly_rate`],
-                    start_date: errors[`user_${user.id}_start_date`],
+                {filteredAssignables.map((assignable) => {
+                  const isSelected = selectedAssignables.includes(assignable.id);
+                  const assignableErrors = {
+                    role: errors[`assignable_${assignable.id}_role`],
+                    hourly_rate: errors[`assignable_${assignable.id}_hourly_rate`],
+                    start_date: errors[`assignable_${assignable.id}_start_date`],
                   }
 
                   return (
                     <TableRow
-                      key={user.id}
+                      key={assignable.id}
                       onClick={(e) => {
                         if (e.target.closest("input")) return;
-                        handleUserToggle(user.id);
+                        handleAssignableToggle(assignable.id);
                       }}
                       className={`cursor-pointer transition ${
                         isSelected ? "bg-blue-50/50" : "hover:bg-gray-50"
@@ -235,23 +300,35 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                       <TableCell>
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => toggleUser(user.id)}
+                          onCheckedChange={() => toggleAssignable(assignable.id)}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </TableCell>
-                      <TableCell className="font-medium text-gray-900">{user.name}</TableCell>
-                      <TableCell className="text-gray-700">{user.email}</TableCell>
                       <TableCell>
+                        {assignable.type === 'employee' ? (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                            Employee
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            User
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium text-gray-900">{assignable.name}</TableCell>
+                      <TableCell className="text-gray-700">{assignable.email || '---'}</TableCell>
+                      <TableCell className="min-w-[200px]">
                         <Input
-                          placeholder={user.role || "Role"}
-                          value={formData[user.id]?.role || user.role || ""}
-                          onChange={(e) => handleChange(user.id, "role", e.target.value)}
+                          placeholder={assignable.role || assignable.position || "Enter role"}
+                          value={formData[assignable.id]?.role || assignable.role || assignable.position || ""}
+                          onChange={(e) => handleChange(assignable.id, "role", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          className={inputClass(userErrors.role)}
+                          className={`${inputClass(assignableErrors.role)} min-w-[180px]`}
                           required
+                          title={formData[assignable.id]?.role || assignable.role || assignable.position || "Role"}
                         />
-                        {userErrors.role && (
-                          <InputError message={userErrors.role} className="mt-1" />
+                        {assignableErrors.role && (
+                          <InputError message={assignableErrors.role} className="mt-1" />
                         )}
                       </TableCell>
                       <TableCell>
@@ -260,38 +337,38 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          value={formData[user.id]?.hourly_rate || ""}
-                          onChange={(e) => handleChange(user.id, "hourly_rate", e.target.value)}
+                          value={formData[assignable.id]?.hourly_rate || ""}
+                          onChange={(e) => handleChange(assignable.id, "hourly_rate", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          className={inputClass(userErrors.hourly_rate)}
+                          className={inputClass(assignableErrors.hourly_rate)}
                           required
                         />
-                        {userErrors.hourly_rate && (
-                          <InputError message={userErrors.hourly_rate} className="mt-1" />
+                        {assignableErrors.hourly_rate && (
+                          <InputError message={assignableErrors.hourly_rate} className="mt-1" />
                         )}
                       </TableCell>
                       <TableCell>
                         <Input
                           type="date"
-                          value={formData[user.id]?.start_date || ""}
-                          onChange={(e) => handleChange(user.id, "start_date", e.target.value)}
+                          value={formData[assignable.id]?.start_date || ""}
+                          onChange={(e) => handleChange(assignable.id, "start_date", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                           min={project?.start_date || undefined}
                           max={project?.planned_end_date || undefined}
-                          className={inputClass(userErrors.start_date)}
+                          className={inputClass(assignableErrors.start_date)}
                           required
                         />
-                        {userErrors.start_date && (
-                          <InputError message={userErrors.start_date} className="mt-1" />
+                        {assignableErrors.start_date && (
+                          <InputError message={assignableErrors.start_date} className="mt-1" />
                         )}
                       </TableCell>
                       <TableCell>
                         <Input
                           type="date"
-                          value={formData[user.id]?.end_date || ""}
-                          onChange={(e) => handleChange(user.id, "end_date", e.target.value)}
+                          value={formData[assignable.id]?.end_date || ""}
+                          onChange={(e) => handleChange(assignable.id, "end_date", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          min={formData[user.id]?.start_date || project?.start_date || undefined}
+                          min={formData[assignable.id]?.start_date || project?.start_date || undefined}
                           max={project?.planned_end_date || undefined}
                           className="w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800"
                         />
@@ -299,15 +376,15 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
                     </TableRow>
                   );
                 })}
-                {filteredUsers.length === 0 && (
+                {filteredAssignables.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12">
+                    <TableCell colSpan={8} className="text-center py-12">
                       <div className="flex flex-col items-center justify-center">
                         <div className="bg-gray-100 rounded-full p-4 mb-3">
                           <Search className="h-8 w-8 text-gray-400" />
                         </div>
-                        <p className="text-gray-500 font-medium text-base">No users found</p>
-                        <p className="text-gray-400 text-sm mt-1">Try adjusting your search</p>
+                        <p className="text-gray-500 font-medium text-base">No team members found</p>
+                        <p className="text-gray-400 text-sm mt-1">Try adjusting your search or add new users/employees</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -329,7 +406,7 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={processing || selectedUsers.length === 0}
+              disabled={processing || selectedAssignables.length === 0}
               className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {processing ? (
@@ -340,7 +417,7 @@ export default function AddProjectTeam({ setShowAddModal, users = [], project })
               ) : (
                 <>
                   <SquarePen size={16} />
-                  Add Selected ({selectedUsers.length})
+                  Add Selected ({selectedAssignables.length})
                 </>
               )}
             </Button>

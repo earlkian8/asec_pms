@@ -18,7 +18,7 @@ import {
 
 export default function Step5LaborCost({ users }) {
   const { laborCosts, addLaborCost, removeLaborCost } = useProjectWizard();
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
   const [newLaborCost, setNewLaborCost] = useState({
     work_date: "",
     hours_worked: "",
@@ -28,8 +28,8 @@ export default function Step5LaborCost({ users }) {
   });
 
   const handleAddLaborCost = () => {
-    if (!selectedUserId) {
-      toast.error("Please select a user");
+    if (!selectedMemberId) {
+      toast.error("Please select a team member");
       return;
     }
     if (!newLaborCost.work_date) {
@@ -45,12 +45,20 @@ export default function Step5LaborCost({ users }) {
       return;
     }
 
-    const user = users.find(u => u.id.toString() === selectedUserId);
-    if (!user) return;
+    const member = (users || []).find(u => u && u.id && u.id.toString() === selectedMemberId.toString());
+    if (!member) {
+      toast.error("Selected team member not found. Please refresh and try again.");
+      return;
+    }
+
+    // Ensure type is set
+    const memberType = member.type || 'user';
+    const memberIdInt = parseInt(selectedMemberId, 10);
 
     addLaborCost({
-      user_id: selectedUserId,
-      user_name: user.name,
+      assignable_id: memberIdInt,
+      assignable_type: memberType,
+      assignable_name: member.name || 'Unknown',
       work_date: newLaborCost.work_date,
       hours_worked: parseFloat(newLaborCost.hours_worked),
       hourly_rate: parseFloat(newLaborCost.hourly_rate),
@@ -59,7 +67,7 @@ export default function Step5LaborCost({ users }) {
     });
 
     // Reset form
-    setSelectedUserId("");
+    setSelectedMemberId("");
     setNewLaborCost({
       work_date: "",
       hours_worked: "",
@@ -85,15 +93,27 @@ export default function Step5LaborCost({ users }) {
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <Label>User *</Label>
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+            <Label>Team Member *</Label>
+            <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select user" />
+                <SelectValue placeholder="Select team member" />
               </SelectTrigger>
               <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id.toString()}>
-                    {user.name} ({user.email})
+                {(users || []).filter(m => m && m.id).map((member) => (
+                  <SelectItem key={`${member.type || 'user'}-${member.id}`} value={member.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <span>{member.name} ({member.email})</span>
+                      {member.type === 'employee' && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                          Employee
+                        </span>
+                      )}
+                      {member.type === 'user' && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                          User
+                        </span>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -170,7 +190,8 @@ export default function Step5LaborCost({ users }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
+                <TableHead>Team Member</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Work Date</TableHead>
                 <TableHead>Hours</TableHead>
                 <TableHead>Hourly Rate</TableHead>
@@ -182,9 +203,22 @@ export default function Step5LaborCost({ users }) {
             <TableBody>
               {laborCosts.map((laborCost, index) => {
                 const totalCost = laborCost.hours_worked * laborCost.hourly_rate;
+                const assignableName = laborCost.assignable_name || laborCost.user_name || 'Unknown';
+                const assignableType = laborCost.assignable_type || 'user';
                 return (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{laborCost.user_name}</TableCell>
+                    <TableCell className="font-medium">{assignableName}</TableCell>
+                    <TableCell>
+                      {assignableType === 'employee' ? (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                          Employee
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                          User
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{laborCost.work_date}</TableCell>
                     <TableCell>{laborCost.hours_worked} hrs</TableCell>
                     <TableCell>{formatCurrency(laborCost.hourly_rate)}</TableCell>

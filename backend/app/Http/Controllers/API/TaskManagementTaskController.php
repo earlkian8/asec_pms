@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
+use App\Models\User;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,7 @@ use Carbon\Carbon;
 
 class TaskManagementTaskController extends Controller
 {
+    use NotificationTrait;
     /**
      * Get task detail with related data
      */
@@ -80,16 +83,46 @@ class TaskManagementTaskController extends Controller
             'status' => 'required|in:pending,in_progress,completed',
         ]);
 
+        $oldStatus = $task->status;
         $task->status = $request->status;
         $task->save();
+
+        // Reload task with relationships
+        $task->load(['milestone.project', 'assignedUser']);
+
+        // System-wide notification for task status change
+        if ($task->milestone && $task->milestone->project) {
+            $project = $task->milestone->project;
+            $this->createSystemNotification(
+                'task',
+                'Task Status Updated',
+                "Task '{$task->title}' status has been changed from " . ucfirst(str_replace('_', ' ', $oldStatus)) . " to " . ucfirst(str_replace('_', ' ', $request->status)) . " in project '{$project->project_name}'.",
+                $project,
+                null // API doesn't have web routes
+            );
+        }
+
+        $formattedTask = [
+            'id' => $task->id,
+            'title' => $task->title,
+            'description' => $task->description,
+            'assignedTo' => $task->assigned_to,
+            'assignedToName' => $task->assignedUser->name ?? 'Unassigned',
+            'dueDate' => $task->due_date ? Carbon::parse($task->due_date)->format('Y-m-d') : null,
+            'status' => $task->status,
+            'projectName' => $task->milestone->project->project_name ?? 'Unknown Project',
+            'projectId' => $task->milestone->project->id ?? null,
+            'milestoneName' => $task->milestone->name ?? 'Unknown Milestone',
+            'milestoneId' => $task->milestone->id ?? null,
+            'priority' => $this->getTaskPriority($task),
+            'createdAt' => $task->created_at->toISOString(),
+            'updatedAt' => $task->updated_at->toISOString(),
+        ];
 
         return response()->json([
             'success' => true,
             'message' => 'Task status updated successfully',
-            'data' => [
-                'id' => $task->id,
-                'status' => $task->status,
-            ],
+            'data' => $formattedTask,
         ]);
     }
 
@@ -197,6 +230,19 @@ class TaskManagementTaskController extends Controller
         ]);
 
         $progressUpdate->load('createdBy');
+        $task->load(['milestone.project']);
+
+        // System-wide notification for progress update
+        if ($task->milestone && $task->milestone->project) {
+            $project = $task->milestone->project;
+            $this->createSystemNotification(
+                        'update',
+                        'New Progress Update',
+                        "A new progress update has been added for task '{$task->title}' in milestone '{$task->milestone->name}' for project '{$project->project_name}'.",
+                        $project,
+                        null // API doesn't have web routes
+                    );
+        }
 
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
@@ -484,6 +530,18 @@ class TaskManagementTaskController extends Controller
 
         $issue->load(['reportedBy', 'assignedTo']);
 
+        // System-wide notification for new issue
+        if ($task->milestone && $task->milestone->project) {
+            $project = $task->milestone->project;
+            $this->createSystemNotification(
+                        'issue',
+                        'New Issue Reported',
+                        "A new issue '{$request->title}' has been reported for task '{$task->title}' in project '{$project->project_name}'.",
+                        $project,
+                        null // API doesn't have web routes
+                    );
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Issue reported successfully',
@@ -544,12 +602,25 @@ class TaskManagementTaskController extends Controller
             'priority' => 'required|in:low,medium,high,critical',
         ]);
 
+        $oldPriority = $issue->priority;
         $issue->title = $request->title;
         $issue->description = $request->description;
         $issue->priority = $request->priority;
         $issue->save();
 
-        $issue->load(['reportedBy', 'assignedTo']);
+        $issue->load(['reportedBy', 'assignedTo', 'task.milestone.project']);
+
+        // System-wide notification if priority changed
+        if ($oldPriority !== $request->priority && $issue->task && $issue->task->milestone && $issue->task->milestone->project) {
+            $project = $issue->task->milestone->project;
+            $this->createSystemNotification(
+                'issue',
+                'Issue Priority Updated',
+                "Issue '{$issue->title}' priority has been changed from " . ucfirst($oldPriority) . " to " . ucfirst($request->priority) . " for project '{$project->project_name}'.",
+                $project,
+                null // API doesn't have web routes
+            );
+        }
 
         return response()->json([
             'success' => true,

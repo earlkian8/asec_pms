@@ -7,15 +7,17 @@ use App\Models\Billing;
 use App\Models\BillingPayment;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
+use App\Models\User;
 use App\Services\BillingService;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BillingsController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     protected $billingService;
 
@@ -117,6 +119,15 @@ class BillingsController extends Controller
             'Created billing "' . $billing->billing_code . '" for project "' . $project->project_name . '"'
         );
 
+        // System-wide notification for new billing
+        $this->createSystemNotification(
+            'general',
+            'New Billing Created',
+            "A new billing '{$billing->billing_code}' (₱" . number_format($billing->billing_amount, 2) . ") has been created for project '{$project->project_name}'.",
+            $project,
+            route('billing-management.show', $billing->id)
+        );
+
         return back()->with('success', 'Billing created successfully.');
     }
 
@@ -149,11 +160,22 @@ class BillingsController extends Controller
 
         // Recalculate status after update
         $this->billingService->calculateBillingStatus($billing);
+        $billing->refresh();
+        $project = $billing->project;
 
         $this->adminActivityLogs(
             'Billing',
             'Updated',
             'Updated billing "' . $billing->billing_code . '"'
+        );
+
+        // System-wide notification for billing update
+        $this->createSystemNotification(
+            'general',
+            'Billing Updated',
+            "Billing '{$billing->billing_code}' has been updated" . ($project ? " for project '{$project->project_name}'" : "") . ".",
+            $project,
+            route('billing-management.show', $billing->id)
         );
 
         return back()->with('success', 'Billing updated successfully.');
@@ -173,12 +195,22 @@ class BillingsController extends Controller
         }
         
         // Now delete the billing
+        $project = $billing->project;
         $billing->delete();
 
         $this->adminActivityLogs(
             'Billing',
             'Deleted',
             'Deleted billing "' . $billingCode . '"' . ($paymentCount > 0 ? ' (preserved ' . $paymentCount . ' transaction record(s))' : '')
+        );
+
+        // System-wide notification for billing deletion
+        $this->createSystemNotification(
+            'general',
+            'Billing Deleted',
+            "Billing '{$billingCode}' has been deleted" . ($project ? " for project '{$project->project_name}'" : "") . ".",
+            $project,
+            route('billing-management.index')
         );
 
         return back()->with('success', 'Billing deleted successfully.' . ($paymentCount > 0 ? ' Transaction records have been preserved.' : ''));
@@ -222,12 +254,26 @@ class BillingsController extends Controller
 
         // Update billing status after payment
         $this->billingService->calculateBillingStatus($billing);
+        $billing->refresh();
+        $project = $billing->project;
 
         $this->adminActivityLogs(
             'Billing Payment',
             'Created',
             'Recorded payment "' . $payment->payment_code . '" of ' . number_format((float)$payment->payment_amount, 2) . ' for billing "' . $billing->billing_code . '"'
         );
+
+        // System-wide notification for payment received
+        if ($project) {
+            $status = $billing->status === 'paid' ? 'fully paid' : 'partially paid';
+            $this->createSystemNotification(
+                'general',
+                'Payment Received',
+                "Payment of ₱" . number_format((float)$payment->payment_amount, 2) . " has been received for billing '{$billing->billing_code}'. Billing is now {$status}.",
+                $project,
+                route('billing-management.show', $billing->id)
+            );
+        }
 
         return back()->with('success', 'Payment recorded successfully.');
     }

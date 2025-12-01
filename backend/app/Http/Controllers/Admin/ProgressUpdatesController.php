@@ -6,14 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProgressUpdatesController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     // Store progress update
     public function store(Request $request)
@@ -65,6 +67,17 @@ class ProgressUpdatesController extends Controller
             $this->notifyProgressUpdate($milestone->project, $task->title, $milestone->name);
         }
 
+        // System-wide notification for progress update
+        if ($milestone->project) {
+            $this->createSystemNotification(
+                'update',
+                'New Progress Update',
+                "A new progress update has been added for task '{$task->title}' in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
+                $milestone->project,
+                route('project-management.view', $milestone->project->id)
+            );
+        }
+
         return back()->with('success', 'Progress update created successfully');
     }
 
@@ -110,6 +123,18 @@ class ProgressUpdatesController extends Controller
             'Updated progress update for task "' . $task->title . '" in milestone "' . $milestone->name . '"'
         );
 
+        // System-wide notification for progress update
+        $milestone->load('project');
+        if ($milestone->project) {
+            $this->createSystemNotification(
+                'update',
+                'Progress Update Updated',
+                "Progress update for task '{$task->title}' has been updated in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
+                $milestone->project,
+                route('project-management.view', $milestone->project->id)
+            );
+        }
+
         return back()->with('success', 'Progress update updated successfully');
     }
 
@@ -133,6 +158,18 @@ class ProgressUpdatesController extends Controller
             'Deleted',
             'Deleted progress update for task "' . $task->title . '" in milestone "' . $milestone->name . '"'
         );
+
+        // System-wide notification for progress update deletion
+        $milestone->load('project');
+        if ($milestone->project) {
+            $this->createSystemNotification(
+                'update',
+                'Progress Update Deleted',
+                "Progress update for task '{$task->title}' has been deleted from milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
+                $milestone->project,
+                route('project-management.view', $milestone->project->id)
+            );
+        }
 
         return back()->with('success', 'Progress update deleted successfully');
     }

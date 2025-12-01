@@ -90,5 +90,56 @@ class TaskManagementAuthController extends Controller
             'message' => 'Logged out from all devices successfully',
         ]);
     }
+
+    /**
+     * Update user profile
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'current_password' => 'required_with:password',
+            'password' => 'sometimes|required|string|min:8|confirmed',
+        ]);
+
+        // Update name if provided
+        if ($request->has('name')) {
+            $user->name = $request->name;
+        }
+
+        // Update email if provided
+        if ($request->has('email')) {
+            $user->email = $request->email;
+        }
+
+        // Update password if provided
+        if ($request->has('password')) {
+            // Verify current password
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Current password is incorrect',
+                ], 422);
+            }
+
+            $user->password = Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile updated successfully',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+        ]);
+    }
+
 }
 

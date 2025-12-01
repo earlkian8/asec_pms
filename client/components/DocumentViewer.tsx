@@ -6,10 +6,10 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/contexts/DialogContext';
 import { Document } from '@/data/mockData';
 
 interface DocumentViewerProps {
@@ -25,6 +25,7 @@ export default function DocumentViewer({
   documents,
   projectName,
 }: DocumentViewerProps) {
+  const dialog = useDialog();
   const backgroundColor = '#FFFFFF';
   const textColor = '#111827';
   const textSecondary = '#4B5563';
@@ -38,36 +39,28 @@ export default function DocumentViewer({
   };
 
   const handleDownload = (document: Document) => {
-    Alert.alert(
-      'Download Document',
+    dialog.showConfirm(
       `Would you like to download ${document.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Download',
-          onPress: () => {
-            // In a real app, this would download the file
-            Alert.alert('Info', 'Download functionality would be implemented with file system access');
-          },
-        },
-      ]
+      () => {
+        // In a real app, this would download the file
+        dialog.showInfo('Download functionality would be implemented with file system access');
+      },
+      'Download Document',
+      'Download',
+      'Cancel'
     );
   };
 
   const handleView = (document: Document) => {
-    Alert.alert(
-      'View Document',
+    dialog.showConfirm(
       `Would you like to view ${document.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'View',
-          onPress: () => {
-            // In a real app, this would open the document
-            Alert.alert('Info', 'Document viewer would open here');
-          },
-        },
-      ]
+      () => {
+        // In a real app, this would open the document
+        dialog.showInfo('Document viewer would open here');
+      },
+      'View Document',
+      'View',
+      'Cancel'
     );
   };
 

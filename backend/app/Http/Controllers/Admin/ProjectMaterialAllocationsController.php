@@ -8,14 +8,16 @@ use App\Models\ProjectMaterialAllocation;
 use App\Models\MaterialReceivingReport;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryItem;
+use App\Models\User;
 use App\Services\InventoryService;
+use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Traits\ActivityLogsTrait;
 
 class ProjectMaterialAllocationsController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     protected $inventoryService;
 
@@ -75,6 +77,15 @@ class ProjectMaterialAllocationsController extends Controller
             'Material Receiving Report',
             'Created',
             'Created receiving report for "' . $allocation->inventoryItem->item_name . '" - ' . $data['quantity_received'] . ' ' . $allocation->inventoryItem->unit_of_measure . ' received for project "' . $project->project_name . '"'
+        );
+
+        // System-wide notification for material received
+        $this->createSystemNotification(
+            'general',
+            'Material Received',
+            "Material '{$allocation->inventoryItem->item_name}' ({$data['quantity_received']} {$allocation->inventoryItem->unit_of_measure}) has been received for project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
         );
 
         return back()->with('success', 'Receiving report created successfully.');

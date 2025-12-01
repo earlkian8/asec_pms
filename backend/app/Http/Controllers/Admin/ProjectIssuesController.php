@@ -5,14 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectIssue;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProjectIssuesController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     // Store issue
     public function store(Request $request)
@@ -53,6 +55,16 @@ class ProjectIssuesController extends Controller
         // Create notification for client
         $this->notifyProjectIssue($project, $data['title']);
 
+        // System-wide notification for new issue
+        $assignedText = $data['assigned_to'] ? ' and assigned' : '';
+        $this->createSystemNotification(
+            'issue',
+            'New Project Issue',
+            "A new issue '{$data['title']}' has been reported{$assignedText} for project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
+
         return back()->with('success', 'Issue created successfully');
     }
 
@@ -86,12 +98,24 @@ class ProjectIssuesController extends Controller
             $data['assigned_to'] = null;
         }
 
+        $oldAssignedTo = $issue->assigned_to;
+        $oldStatus = $issue->status;
+
         $issue->update($data);
 
         $this->adminActivityLogs(
             'Project Issue',
             'Updated',
             'Updated issue "' . $issue->title . '" for project "' . $project->project_name . '"'
+        );
+
+        // System-wide notification for issue update
+        $this->createSystemNotification(
+            'issue',
+            'Issue Updated',
+            "Issue '{$issue->title}' has been updated for project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
         );
 
         return back()->with('success', 'Issue updated successfully');
@@ -111,6 +135,15 @@ class ProjectIssuesController extends Controller
             'Project Issue',
             'Deleted',
             'Deleted issue "' . $issueTitle . '" from project "' . $project->project_name . '"'
+        );
+
+        // System-wide notification for issue deletion
+        $this->createSystemNotification(
+            'issue',
+            'Issue Deleted',
+            "Issue '{$issueTitle}' has been deleted from project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
         );
 
         return back()->with('success', 'Issue deleted successfully');

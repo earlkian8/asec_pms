@@ -37,6 +37,14 @@ class Project extends Model
     }
 
     /**
+     * Alias for team() - plural form for better readability
+     */
+    public function teams()
+    {
+        return $this->team();
+    }
+
+    /**
      * Get all active team users (for task assignment dropdown)
      */
     public function teamUsers()
@@ -60,6 +68,11 @@ class Project extends Model
     public function laborCosts()
     {
         return $this->hasMany(ProjectLaborCost::class);
+    }
+
+    public function miscellaneousExpenses()
+    {
+        return $this->hasMany(ProjectMiscellaneousExpense::class);
     }
 
     public function issues()

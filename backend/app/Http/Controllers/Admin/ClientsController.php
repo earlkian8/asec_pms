@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -12,7 +14,7 @@ use Inertia\Inertia;
 
 class ClientsController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     public function index(Request $request)
     {
@@ -133,6 +135,15 @@ class ClientsController extends Controller
 
         $this->adminActivityLogs('Client', 'Add', 'Added Client ' . $client->client_name);
 
+        // System-wide notification for new client
+        $this->createSystemNotification(
+            'general',
+            'New Client Added',
+            "A new client '{$client->client_name}' ({$client->client_code}) has been added to the system.",
+            null,
+            route('client-management.index')
+        );
+
         return redirect()->back()->with('success', 'Client added successfully.');
     }
 
@@ -179,6 +190,15 @@ class ClientsController extends Controller
 
         $this->adminActivityLogs('Client', 'Update', 'Updated Client ' . $oldName);
 
+        // System-wide notification for client update
+        $this->createSystemNotification(
+            'general',
+            'Client Updated',
+            "Client '{$client->client_name}' has been updated.",
+            null,
+            route('client-management.index')
+        );
+
         return redirect()->back()->with('success', 'Client updated successfully.');
     }
 
@@ -195,6 +215,15 @@ class ClientsController extends Controller
 
         $client->delete();
         $this->adminActivityLogs('Client', 'Delete', 'Deleted Client ' . $name);
+
+        // System-wide notification for client deletion
+        $this->createSystemNotification(
+            'general',
+            'Client Deleted',
+            "Client '{$name}' has been deleted.",
+            null,
+            route('client-management.index')
+        );
     }
 
     public function handleStatus(Request $request, Client $client)
@@ -211,6 +240,16 @@ class ClientsController extends Controller
             'Client',
             'Update Status',
             'Updated Client ' . $client->client_name . ' status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
+        );
+
+        // System-wide notification for client status change
+        $status = $request->boolean('is_active') ? 'Active' : 'Inactive';
+        $this->createSystemNotification(
+            'status_change',
+            'Client Status Updated',
+            "Client '{$client->client_name}' status has been changed to {$status}.",
+            null,
+            route('client-management.index')
         );
 
         return back()->with('success', 'Client status updated successfully.');

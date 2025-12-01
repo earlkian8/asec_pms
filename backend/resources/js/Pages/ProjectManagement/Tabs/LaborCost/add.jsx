@@ -29,27 +29,6 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
   });
 
   const [selectedMember, setSelectedMember] = useState(null);
-  const [period, setPeriod] = useState("");
-
-  // Convert period to hours worked
-  const periodToHours = (selectedPeriod) => {
-    switch (selectedPeriod) {
-      case "weekly":
-        return 40; // Standard work week
-      case "bi-weekly":
-        return 80; // 2 weeks
-      case "month":
-        return 173.33; // Average month (4.33 weeks)
-      default:
-        return 0;
-    }
-  };
-
-  const handlePeriodChange = (selectedPeriod) => {
-    setPeriod(selectedPeriod);
-    const hours = periodToHours(selectedPeriod);
-    setData("hours_worked", hours);
-  };
 
   const handleMemberChange = (compositeValue) => {
     // Parse composite value: "type-id"
@@ -162,27 +141,21 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             <InputError message={errors.work_date} />
           </div>
 
-          {/* Hours Worked - Period Selection */}
+          {/* Hours Worked */}
           <div>
             <Label className="text-zinc-800">Hours Worked <span className="text-red-500">*</span></Label>
-            <Select
-              value={period}
-              onValueChange={handlePeriodChange}
-            >
-              <SelectTrigger className={inputClass(errors.hours_worked)}>
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">Weekly (40 hours)</SelectItem>
-                <SelectItem value="bi-weekly">Bi-weekly (80 hours)</SelectItem>
-                <SelectItem value="month">Month (173.33 hours)</SelectItem>
-              </SelectContent>
-            </Select>
-            {period && (
-              <p className="text-xs text-gray-500 mt-1">
-                Calculated hours: {data.hours_worked} hours
-              </p>
-            )}
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="Enter hours worked (e.g., 3.5)"
+              value={data.hours_worked}
+              onChange={(e) => setData("hours_worked", e.target.value)}
+              className={inputClass(errors.hours_worked)}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter the actual hours worked for this work date
+            </p>
             <InputError message={errors.hours_worked} />
           </div>
 

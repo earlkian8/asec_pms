@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -14,7 +15,7 @@ use Spatie\Permission\Models\Role;
 
 class UsersController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     public function index(Request $request)
     {
@@ -99,6 +100,15 @@ class UsersController extends Controller
             'Add',
             'Created User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']
         );
+
+        // System-wide notification for new user
+        $this->createSystemNotification(
+            'general',
+            'New User Created',
+            "A new user '{$user->name}' ({$user->email}) has been created with role '{$validated['role']}'.",
+            null,
+            route('user-management.users.index')
+        );
     }
 
     public function update(Request $request, User $user)
@@ -131,10 +141,21 @@ class UsersController extends Controller
         // Update user role - remove all roles and assign new one
         $user->syncRoles([$validated['role']]);
 
+        $oldRole = $user->roles->first()?->name;
+
         $this->adminActivityLogs(
             'User',
             'Update',
             'Updated User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']
+        );
+
+        // System-wide notification for user update
+        $this->createSystemNotification(
+            'general',
+            'User Updated',
+            "User '{$user->name}' ({$user->email}) has been updated.",
+            null,
+            route('user-management.users.index')
         );
     }
 
@@ -156,6 +177,15 @@ class UsersController extends Controller
             'Reset Password',
             'Reset password for User ' . $user->name . ' (' . $user->email . ')'
         );
+
+        // System-wide notification for password reset
+        $this->createSystemNotification(
+            'general',
+            'User Password Reset',
+            "Password for user '{$user->name}' ({$user->email}) has been reset.",
+            null,
+            route('user-management.users.index')
+        );
     }
 
     public function destroy(User $user)
@@ -165,12 +195,24 @@ class UsersController extends Controller
             return back()->withErrors(['error' => 'You cannot delete your own account.']);
         }
 
+        $userName = $user->name;
+        $userEmail = $user->email;
+
         $this->adminActivityLogs(
             'User',
             'Delete',
-            'Deleted User ' . $user->name . ' (' . $user->email . ')'
+            'Deleted User ' . $userName . ' (' . $userEmail . ')'
         );
 
         $user->delete();
+
+        // System-wide notification for user deletion
+        $this->createSystemNotification(
+            'general',
+            'User Deleted',
+            "User '{$userName}' ({$userEmail}) has been deleted.",
+            null,
+            route('user-management.users.index')
+        );
     }
 }

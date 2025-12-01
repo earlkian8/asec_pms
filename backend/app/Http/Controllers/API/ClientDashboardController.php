@@ -11,6 +11,7 @@ use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\InventoryItem;
 use App\Models\ClientUpdateRequest;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ClientDashboardController extends Controller
 {
+    use NotificationTrait;
     /**
      * Get dashboard statistics for authenticated client
      */
@@ -363,6 +365,15 @@ class ClientDashboardController extends Controller
             'subject' => $request->subject,
             'message' => $request->message,
         ]);
+
+        // System-wide notification for client update request
+        $this->createSystemNotification(
+            'general',
+            'Client Update Request',
+            "Client '{$client->client_name}' has submitted an update request for project '{$project->project_name}': {$request->subject}",
+            $project,
+            null // API doesn't have web routes
+        );
 
         return response()->json([
             'success' => true,

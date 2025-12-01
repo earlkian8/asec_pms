@@ -285,6 +285,28 @@ export default function OverviewTab({ project, overviewData }) {
               </div>
             </div>
 
+            {/* Miscellaneous Expenses */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Receipt className="text-purple-600" size={18} />
+                  <span className="text-sm font-medium text-gray-700">Miscellaneous Expenses</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">{formatCurrency(budget.total_miscellaneous_expenses || 0)}</span>
+              </div>
+              <p className="text-xs text-gray-500">Project expenses</p>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-purple-500 h-2 rounded-full"
+                  style={{
+                    width: budget.contract_amount > 0
+                      ? `${Math.min(((budget.total_miscellaneous_expenses || 0) / budget.contract_amount) * 100, 100)}%`
+                      : '0%'
+                  }}
+                />
+              </div>
+            </div>
+
             {/* Budget Remaining */}
             <div className="bg-green-50 rounded-lg p-4 border border-green-200">
               <div className="flex items-center justify-between">
@@ -506,9 +528,9 @@ export default function OverviewTab({ project, overviewData }) {
           <div className="space-y-4">
             {budget.monthly_breakdown.map((month, index) => {
               const maxCost = Math.max(
-                ...budget.monthly_breakdown.map(m => m.labor_cost + m.material_cost)
+                ...budget.monthly_breakdown.map(m => m.labor_cost + m.material_cost + (m.miscellaneous_expenses || 0))
               );
-              const totalCost = month.labor_cost + month.material_cost;
+              const totalCost = month.labor_cost + month.material_cost + (month.miscellaneous_expenses || 0);
               const percentage = maxCost > 0 ? (totalCost / maxCost) * 100 : 0;
 
               return (
@@ -527,16 +549,24 @@ export default function OverviewTab({ project, overviewData }) {
                       }}
                     />
                     <div
-                      className="bg-orange-500 h-4 absolute top-0 rounded-r-full"
+                      className="bg-orange-500 h-4 absolute top-0"
                       style={{
                         left: `${maxCost > 0 ? (month.labor_cost / maxCost) * 100 : 0}%`,
                         width: `${maxCost > 0 ? (month.material_cost / maxCost) * 100 : 0}%`
+                      }}
+                    />
+                    <div
+                      className="bg-purple-500 h-4 absolute top-0 rounded-r-full"
+                      style={{
+                        left: `${maxCost > 0 ? ((month.labor_cost + month.material_cost) / maxCost) * 100 : 0}%`,
+                        width: `${maxCost > 0 ? ((month.miscellaneous_expenses || 0) / maxCost) * 100 : 0}%`
                       }}
                     />
                   </div>
                   <div className="flex gap-4 text-xs text-gray-500">
                     <span>Labor: {formatCurrency(month.labor_cost)}</span>
                     <span>Materials: {formatCurrency(month.material_cost)}</span>
+                    <span>Misc: {formatCurrency(month.miscellaneous_expenses || 0)}</span>
                   </div>
                 </div>
               );
@@ -550,6 +580,10 @@ export default function OverviewTab({ project, overviewData }) {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-orange-500 rounded"></div>
               <span className="text-xs text-gray-600">Material Cost</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-purple-500 rounded"></div>
+              <span className="text-xs text-gray-600">Miscellaneous Expenses</span>
             </div>
           </div>
         </div>

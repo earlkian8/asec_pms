@@ -25,12 +25,14 @@ use App\Services\TaskService;
 use App\Services\ProgressUpdateService;
 use App\Services\MaterialAllocationService;
 use App\Services\LaborCostService;
+use App\Services\MiscellaneousExpenseService;
 use App\Services\ProjectOverviewService;
 use App\Traits\ClientNotificationTrait;
+use App\Traits\NotificationTrait;
 
 class ProjectsController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     protected $projectTeamService;
     protected $projectFilesService;
@@ -39,8 +41,9 @@ class ProjectsController extends Controller
     protected $progressUpdateService;
     protected $materialAllocationService;
     protected $laborCostService;
+    protected $miscellaneousExpenseService;
     protected $projectOverviewService;
-    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService, ProjectOverviewService $projectOverviewService)
+    public function __construct(ProjectTeamService $projectTeamService, ProjectFilesService $projectFilesService, ProjectMilestonesService $projectMilestonesService, TaskService $projectTasksService, ProgressUpdateService $progressUpdateService, MaterialAllocationService $materialAllocationService, LaborCostService $laborCostService, MiscellaneousExpenseService $miscellaneousExpenseService, ProjectOverviewService $projectOverviewService)
     {
         $this->projectTeamService = $projectTeamService;
         $this->projectFilesService = $projectFilesService;
@@ -49,6 +52,7 @@ class ProjectsController extends Controller
         $this->progressUpdateService = $progressUpdateService;
         $this->materialAllocationService = $materialAllocationService;
         $this->laborCostService = $laborCostService;
+        $this->miscellaneousExpenseService = $miscellaneousExpenseService;
         $this->projectOverviewService = $projectOverviewService;
     }
     public function index(Request $request)
@@ -349,6 +353,15 @@ class ProjectsController extends Controller
 
             $this->adminActivityLogs('Project', 'Add', 'Added Project ' . $project->project_name . ' with team, milestones, materials, and labor costs');
 
+            // System-wide notification for new project
+            $this->createSystemNotification(
+                'general',
+                'New Project Created',
+                "A new project '{$project->project_name}' has been created.",
+                $project,
+                route('project-management.view', $project->id)
+            );
+
             return redirect()->back()->with('success', 'Project created successfully with all related data.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -381,10 +394,14 @@ class ProjectsController extends Controller
 
         $this->adminActivityLogs('Project', 'Update', 'Updated Project ' . $project->project_name);
 
-        // Create notification for client if status changed
-        if ($oldStatus !== $newStatus) {
-            $this->notifyProjectStatusChange($project, $oldStatus, $newStatus);
-        }
+        // System-wide notification for any project update
+        $this->createSystemNotification(
+            'general',
+            'Project Updated',
+            "Project '{$project->project_name}' has been updated.",
+            $project,
+            route('project-management.view', $project->id)
+        );
 
         return redirect()->back()->with('success', 'Project updated successfully.');
     }
@@ -396,6 +413,15 @@ class ProjectsController extends Controller
         $project->delete();
 
         $this->adminActivityLogs('Project', 'Delete', 'Deleted Project ' . $projectName);
+
+        // System-wide notification for project deletion
+        $this->createSystemNotification(
+            'general',
+            'Project Deleted',
+            "Project '{$projectName}' has been deleted.",
+            null,
+            route('project-management.index')
+        );
 
         return redirect()->back()->with('success', 'Project deleted successfully.');
     }
@@ -420,6 +446,9 @@ class ProjectsController extends Controller
     // Get labor cost data
     $laborCostData = $this->laborCostService->getProjectLaborCostsData($project);
 
+    // Get miscellaneous expenses data
+    $miscellaneousExpenseData = $this->miscellaneousExpenseService->getProjectMiscellaneousExpensesData($project);
+
     // Get project overview data
     $overviewData = $this->projectOverviewService->getProjectOverviewData($project);
 
@@ -436,6 +465,7 @@ class ProjectsController extends Controller
         'milestoneData' => $milestoneData,
         'materialAllocationData' => $materialAllocationData,
         'laborCostData' => $laborCostData,
+        'miscellaneousExpenseData' => $miscellaneousExpenseData,
         'overviewData' => $overviewData,
         'requestUpdatesData' => $requestUpdates,
     ]);

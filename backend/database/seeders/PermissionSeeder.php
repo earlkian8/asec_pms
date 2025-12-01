@@ -74,6 +74,12 @@ class PermissionSeeder extends Seeder
             'labor-costs.update',
             'labor-costs.delete',
 
+            // Miscellaneous Expenses
+            'miscellaneous-expenses.view',
+            'miscellaneous-expenses.create',
+            'miscellaneous-expenses.update',
+            'miscellaneous-expenses.delete',
+
             // Clients
             'clients.view',
             'clients.create',

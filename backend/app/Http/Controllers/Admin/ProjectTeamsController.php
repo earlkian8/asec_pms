@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectTeam;
 use App\Models\ProjectTask;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 
 class ProjectTeamsController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     public function store(Request $request, Project $project)
     {
@@ -107,7 +109,7 @@ class ProjectTeamsController extends Controller
             }
 
             try {
-                ProjectTeam::create([
+                $teamMember = ProjectTeam::create([
                     'project_id'      => $project->id,
                     'user_id'        => $assignable['type'] === 'user' ? (int)$assignable['id'] : null,
                     'employee_id'    => $assignable['type'] === 'employee' ? (int)$assignable['id'] : null,
@@ -118,6 +120,21 @@ class ProjectTeamsController extends Controller
                     'end_date'        => $assignable['end_date'] ?? null,
                     'is_active'       => true,
                 ]);
+
+                // System-wide notification for team member added
+                $assignableName = $assignable['type'] === 'user' 
+                    ? User::find($assignable['id'])?->name 
+                    : \App\Models\Employee::find($assignable['id'])?->first_name . ' ' . \App\Models\Employee::find($assignable['id'])?->last_name;
+                
+                if ($assignableName) {
+                    $this->createSystemNotification(
+                        'general',
+                        'Team Member Added',
+                        "{$assignableName} has been added to project '{$project->project_name}' as {$assignable['role']}.",
+                        $project,
+                        route('project-management.view', $project->id)
+                    );
+                }
 
                 $added++;
             } catch (\Exception $e) {
@@ -168,6 +185,15 @@ class ProjectTeamsController extends Controller
                 );
 
                 $team->delete();
+
+                // System-wide notification for team member removal
+                $this->createSystemNotification(
+                    'general',
+                    'Team Member Removed',
+                    "{$assignableName} ({$role}) has been removed from project '{$project->project_name}'.",
+                    $project,
+                    route('project-management.view', $project->id)
+                );
             }
 
             return redirect()->back()->with('success', 'Selected team members removed successfully.');
@@ -198,6 +224,15 @@ class ProjectTeamsController extends Controller
             "Removed {$assignableName} ({$role}) from Project {$project->project_name}"
         );
 
+        // System-wide notification for team member removal
+        $this->createSystemNotification(
+            'general',
+            'Team Member Removed',
+            "{$assignableName} ({$role}) has been removed from project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
+
         return redirect()->back()->with('success', 'Team member removed successfully.');
     }
 
@@ -224,6 +259,15 @@ class ProjectTeamsController extends Controller
             'Project Team',
             'Update Status',
             'Updated ' . $assignableName . ' status to ' . $status . ' in Project ' . $project->project_name
+        );
+
+        // System-wide notification for team member status update
+        $this->createSystemNotification(
+            'general',
+            'Team Member Status Updated',
+            "{$assignableName} status has been updated to {$status} in project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
         );
 
         return redirect()->back()->with('success', 'Team member status updated successfully.');
@@ -295,6 +339,15 @@ class ProjectTeamsController extends Controller
             "Rate: {$oldRate} → {$newRate}, " .
             "Dates: {$oldDates} → {$newDates}, " .
             "Status: {$oldStatus} → {$newStatus}"
+        );
+
+        // System-wide notification for team member update
+        $this->createSystemNotification(
+            'general',
+            'Team Member Updated',
+            "Team member {$oldAssignable} has been updated in project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
         );
 
         return redirect()->back()->with('success', 'Team member updated successfully.');

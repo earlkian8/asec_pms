@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 
 class RolesController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     /**
      * Display a listing of roles.
@@ -68,6 +70,15 @@ class RolesController extends Controller
             'Role',
             'Add',
             'Created Role ' . $role->name
+        );
+
+        // System-wide notification for new role
+        $this->createSystemNotification(
+            'general',
+            'New Role Created',
+            "A new role '{$role->name}' has been created.",
+            null,
+            route('user-management.roles-and-permissions.index')
         );
 
     }
@@ -128,6 +139,15 @@ class RolesController extends Controller
             'Updated permissions for Role ' . $role->name
         );
 
+        // System-wide notification for role permission changes
+        $this->createSystemNotification(
+            'general',
+            'Role Permissions Updated',
+            "The permissions for role '{$role->name}' have been updated.",
+            null,
+            route('user-management.roles-and-permissions.index')
+        );
+
         return redirect()
             ->route('user-management.roles-and-permissions.index')
             ->with('success', 'Role permissions updated successfully.');
@@ -138,13 +158,23 @@ class RolesController extends Controller
      */
     public function destroy(Role $role)
     {
+        $roleName = $role->name;
+
         $this->adminActivityLogs(
             'Role',
             'Delete',
-            'Deleted Role ' . $role->name
+            'Deleted Role ' . $roleName
         );
 
         $role->delete();
 
+        // System-wide notification for role deletion
+        $this->createSystemNotification(
+            'general',
+            'Role Deleted',
+            "Role '{$roleName}' has been deleted.",
+            null,
+            route('user-management.roles-and-permissions.index')
+        );
     }
 }

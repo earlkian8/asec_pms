@@ -4,14 +4,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class EmployeesController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, NotificationTrait;
 
     public function index(Request $request)
     {
@@ -82,6 +84,15 @@ class EmployeesController extends Controller
 
         $this->adminActivityLogs('Employee', 'Add', 'Added Employee ' . $employee->first_name . ' ' . $employee->last_name);
 
+        // System-wide notification for new employee
+        $this->createSystemNotification(
+            'general',
+            'New Employee Added',
+            "A new employee '{$employee->first_name} {$employee->last_name}' ({$employee->position}) has been added to the system.",
+            null,
+            route('employee-management.index')
+        );
+
         return redirect()->back()->with('success', 'Employee added successfully.');
     }
 
@@ -107,6 +118,15 @@ class EmployeesController extends Controller
 
         $this->adminActivityLogs('Employee', 'Update', 'Updated Employee ' . $oldName . ' to ' . $validated['first_name'] . ' ' . $validated['last_name']);
 
+        // System-wide notification for employee update
+        $this->createSystemNotification(
+            'general',
+            'Employee Updated',
+            "Employee '{$validated['first_name']} {$validated['last_name']}' has been updated.",
+            null,
+            route('employee-management.index')
+        );
+
         return redirect()->back()->with('success', 'Employee updated successfully.');
     }
 
@@ -118,6 +138,15 @@ class EmployeesController extends Controller
             $employee->delete();
 
             $this->adminActivityLogs('Employee', 'Delete', 'Deleted Employee ' . $name);
+
+            // System-wide notification for employee deletion
+            $this->createSystemNotification(
+                'general',
+                'Employee Deleted',
+                "Employee '{$name}' has been deleted.",
+                null,
+                route('employee-management.index')
+            );
 
             return redirect()->back()->with('success', 'Employee deleted successfully.');
         } catch (\Illuminate\Database\QueryException $e) {
@@ -154,6 +183,16 @@ class EmployeesController extends Controller
             'Update Status',
             'Updated Employee ' . $employee->first_name . ' ' . $employee->last_name .
             ' status to ' . ($employee->is_active ? 'Active' : 'Inactive')
+        );
+
+        // System-wide notification for employee status change
+        $status = $employee->is_active ? 'Active' : 'Inactive';
+        $this->createSystemNotification(
+            'status_change',
+            'Employee Status Updated',
+            "Employee '{$employee->first_name} {$employee->last_name}' status has been changed to {$status}.",
+            null,
+            route('employee-management.index')
         );
 
         return redirect()->back()->with('success', 'Status updated successfully.');

@@ -13,11 +13,13 @@ use App\Http\Controllers\Admin\ProgressUpdatesController;
 use App\Http\Controllers\Admin\ProjectIssuesController;
 use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
 use App\Http\Controllers\Admin\ProjectLaborCostsController;
+use App\Http\Controllers\Admin\ProjectMiscellaneousExpensesController;
 use App\Http\Controllers\Admin\InventoryItemsController;
 use App\Http\Controllers\Admin\BillingsController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
 use Illuminate\Foundation\Application;
@@ -101,6 +103,13 @@ Route::middleware('auth')->group(function () {
             Route::delete('/destroy/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'destroy'])->middleware('permission:labor-costs.delete')->name('destroy');
         });
 
+        // Miscellaneous Expenses
+        Route::prefix('miscellaneous-expenses')->name('miscellaneous-expenses.')->group(function(){
+            Route::post('/store/{project}', [ProjectMiscellaneousExpensesController::class, 'store'])->middleware('permission:miscellaneous-expenses.create')->name('store');
+            Route::put('/update/{project}/expense/{expense}', [ProjectMiscellaneousExpensesController::class, 'update'])->middleware('permission:miscellaneous-expenses.update')->name('update');
+            Route::delete('/destroy/{project}/expense/{expense}', [ProjectMiscellaneousExpensesController::class, 'destroy'])->middleware('permission:miscellaneous-expenses.delete')->name('destroy');
+        });
+
         // Request Updates
         Route::prefix('request-updates')->name('request-updates.')->group(function(){
             Route::delete('/delete/{project}/{clientUpdateRequest}', [ProjectsController::class, 'destroyRequestUpdate'])->middleware('permission:projects.delete')->name('destroy');
@@ -174,5 +183,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->middleware('permission:billing.delete')->name('destroy');
         Route::get('/view/{billing}', [BillingsController::class, 'show'])->middleware('permission:billing.view')->name('show');
         Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->middleware('permission:billing.add-payment')->name('add-payment');
+    });
+
+    // Notifications
+    Route::prefix('notifications')->name('notifications.')->group(function(){
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::get('/counts-by-type', [NotificationController::class, 'countsByType'])->name('counts-by-type');
+        Route::put('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('mark-as-read');
+        Route::put('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::put('/mark-by-type-read', [NotificationController::class, 'markByTypeAsRead'])->name('mark-by-type-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
 });

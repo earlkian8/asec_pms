@@ -26,7 +26,7 @@ class RoleSeeder extends Seeder
         );
         $superAdmin->syncPermissions($allPermissions);
 
-        // 2. Admin - Most permissions except sensitive user management
+        // 2. Admin - All permissions except user management (users, roles, activity-logs)
         $admin = Role::firstOrCreate(
             ['name' => 'Admin', 'guard_name' => 'web'],
             ['name' => 'Admin', 'guard_name' => 'web']
@@ -42,13 +42,12 @@ class RoleSeeder extends Seeder
             'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
             'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
             'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete',
+            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', 'miscellaneous-expenses.delete',
             'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status',
             'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status',
             'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate',
             'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments',
             'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget',
-            'users.view', // View only
-            'activity-logs.view', // View only
         ]);
 
         // 3. Project Manager
@@ -67,6 +66,7 @@ class RoleSeeder extends Seeder
             'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
             'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
             'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete',
+            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', 'miscellaneous-expenses.delete',
             'clients.view', // View only
             'employees.view', // View only
             'inventory.view', 'inventory.allocate',
@@ -100,57 +100,25 @@ class RoleSeeder extends Seeder
             'reports.view', 'reports.inventory',
         ]);
 
-        // 6. Team Member
-        $teamMember = Role::firstOrCreate(
-            ['name' => 'Team Member', 'guard_name' => 'web'],
-            ['name' => 'Team Member', 'guard_name' => 'web']
+        // 6. Foreman - Field supervisor with project execution capabilities
+        $foreman = Role::firstOrCreate(
+            ['name' => 'Foreman', 'guard_name' => 'web'],
+            ['name' => 'Foreman', 'guard_name' => 'web']
         );
-        $teamMember->syncPermissions([
+        $foreman->syncPermissions([
             'dashboard.view',
-            'projects.view', // Assigned projects only (needs scope implementation)
-            'project-tasks.view', 'project-tasks.update', // Own tasks
-            'progress-updates.view', 'progress-updates.create', 'progress-updates.update', // Own updates
-            'project-files.view', 'project-files.download',
-        ]);
-
-        // 7. HR Manager
-        $hrManager = Role::firstOrCreate(
-            ['name' => 'HR Manager', 'guard_name' => 'web'],
-            ['name' => 'HR Manager', 'guard_name' => 'web']
-        );
-        $hrManager->syncPermissions([
-            'dashboard.view',
-            'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status',
-            'projects.view', // View only for team assignment context
-            'reports.view', 'reports.team-productivity',
-        ]);
-
-        // 8. Sales Manager
-        $salesManager = Role::firstOrCreate(
-            ['name' => 'Sales Manager', 'guard_name' => 'web'],
-            ['name' => 'Sales Manager', 'guard_name' => 'web']
-        );
-        $salesManager->syncPermissions([
-            'dashboard.view',
-            'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status',
-            'projects.view', // View only
-            'billing.view', // View only
-            'reports.view', 'reports.client',
-        ]);
-
-        // 9. Viewer
-        $viewer = Role::firstOrCreate(
-            ['name' => 'Viewer', 'guard_name' => 'web'],
-            ['name' => 'Viewer', 'guard_name' => 'web']
-        );
-        $viewer->syncPermissions([
-            'dashboard.view',
-            'projects.view',
-            'clients.view',
-            'employees.view',
-            'inventory.view',
-            'billing.view',
-            'reports.view',
+            'projects.view', 'projects.view-all', // View assigned projects
+            'project-teams.view', // View team members
+            'project-milestones.view', // View milestones
+            'project-tasks.view', 'project-tasks.update', 'project-tasks.update-status', // Manage tasks
+            'progress-updates.view', 'progress-updates.create', 'progress-updates.update', // Create and update progress
+            'project-files.view', 'project-files.upload', 'project-files.download', // View and upload files
+            'project-issues.view', 'project-issues.create', 'project-issues.update', // Report and manage issues
+            'material-allocations.view', 'material-allocations.receiving-report', // View allocations and create receiving reports
+            'labor-costs.view', 'labor-costs.create', 'labor-costs.update', // Track labor costs
+            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', // Track expenses
+            'employees.view', // View employees for team context
+            'reports.view', 'reports.project-performance', // View project reports
         ]);
 
         $this->command->info('Roles seeded successfully!');

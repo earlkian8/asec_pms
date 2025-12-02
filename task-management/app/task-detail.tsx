@@ -790,7 +790,26 @@ export default function TaskDetailScreen() {
             const formData = new FormData();
             formData.append('description', description);
             if (file) {
-              formData.append('file', file);
+              // Handle both web File objects and Expo file objects
+              if (file.uri) {
+                // React Native/Expo file object - use uri directly
+                const fileName = file.name || `file_${Date.now()}`;
+                const fileType = file.mimeType || 'application/octet-stream';
+                formData.append('file', {
+                  uri: file.uri,
+                  type: fileType,
+                  name: fileName,
+                } as any);
+              } else if (file instanceof File) {
+                // Web File object
+                formData.append('file', file, file.name || `file_${Date.now()}`);
+              } else if (file instanceof Blob) {
+                // Web Blob object (no name property)
+                formData.append('file', file, `file_${Date.now()}`);
+              } else {
+                // Fallback - try to append as-is
+                formData.append('file', file);
+              }
             }
 
             let response;
@@ -815,11 +834,15 @@ export default function TaskDetailScreen() {
                 setEditingProgressUpdate(null);
                 loadProgressUpdates();
               } else {
-                dialog.showError(response.message || 'Failed to save progress update');
+                const errorMessage = response.message || (response.errors ? Object.values(response.errors).flat().join(', ') : 'Failed to save progress update');
+                dialog.showError(errorMessage);
               }
+            } else {
+              dialog.showError('Invalid response from server');
             }
-          } catch (error) {
-            dialog.showError('Failed to save progress update');
+          } catch (error: any) {
+            const errorMessage = error?.message || 'Failed to save progress update';
+            dialog.showError(errorMessage);
           }
         }}
       />

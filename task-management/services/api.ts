@@ -118,7 +118,7 @@ class ApiService {
 
   async post<T>(endpoint: string, body?: any, isFormData?: boolean): Promise<ApiResponse<T>> {
     if (isFormData && body instanceof FormData) {
-      // For file uploads, don't stringify and don't set Content-Type (browser will set it with boundary)
+      // For file uploads, don't stringify and don't set Content-Type (browser/RN will set it with boundary)
       const headers: HeadersInit = {
         'Accept': 'application/json',
       };
@@ -134,7 +134,15 @@ class ApiService {
         body: body,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        return {
+          success: false,
+          message: 'Invalid response from server',
+        };
+      }
 
       if (!response.ok) {
         return {
@@ -158,7 +166,7 @@ class ApiService {
 
   async put<T>(endpoint: string, body?: any, isFormData?: boolean): Promise<ApiResponse<T>> {
     if (isFormData && body instanceof FormData) {
-      // For file uploads, don't stringify and don't set Content-Type (browser will set it with boundary)
+      // For file uploads, don't stringify and don't set Content-Type (browser/RN will set it with boundary)
       const headers: HeadersInit = {
         'Accept': 'application/json',
       };
@@ -174,7 +182,15 @@ class ApiService {
         body: body,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        return {
+          success: false,
+          message: 'Invalid response from server',
+        };
+      }
 
       if (!response.ok) {
         return {

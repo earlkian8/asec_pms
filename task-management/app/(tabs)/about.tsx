@@ -109,7 +109,7 @@ export default function AboutScreen() {
                 <Edit size={18} color={AppColors.primary} />
               </TouchableOpacity>
             </View>
-            <AnimatedCard index={0} delay={150}>
+            <AnimatedCard index={0} delay={150} style={{ marginBottom: 10 }}>
               <InfoCard icon={User} title="Full Name" value={user?.name || 'N/A'} />
             </AnimatedCard>
             <AnimatedCard index={1} delay={200}>

@@ -152,7 +152,7 @@ class TaskManagementTaskController extends Controller
         $formattedUpdates = $updates->map(function ($update) {
             $fileUrl = null;
             if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                $fileUrl = url(Storage::disk('public')->url($update->file_path));
+                $fileUrl = Storage::disk('public')->url($update->file_path);
             }
 
             return [
@@ -246,7 +246,8 @@ class TaskManagementTaskController extends Controller
 
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            $fileUrl = url(Storage::disk('public')->url($progressUpdate->file_path));
+            // Generate URL for public storage file
+            $fileUrl = Storage::disk('public')->url($progressUpdate->file_path);
         }
 
         return response()->json([
@@ -331,7 +332,8 @@ class TaskManagementTaskController extends Controller
 
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            $fileUrl = url(Storage::disk('public')->url($progressUpdate->file_path));
+            // Generate URL for public storage file
+            $fileUrl = Storage::disk('public')->url($progressUpdate->file_path);
         }
 
         return response()->json([

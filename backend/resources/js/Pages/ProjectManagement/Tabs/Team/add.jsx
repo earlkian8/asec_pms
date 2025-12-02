@@ -37,6 +37,13 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
   // Ensure assignables is always an array
   const safeAssignables = Array.isArray(assignables) ? assignables : []
 
+  // Create composite ID (type-id) to uniquely identify users and employees
+  const getCompositeId = (assignable) => {
+    if (!assignable) return null;
+    const type = assignable.type || 'user';
+    return `${type}-${assignable.id}`;
+  };
+
   const filteredAssignables = safeAssignables.filter((a) => {
     if (!a) return false
     const fullName = `${a.name || ''}`.toLowerCase()
@@ -51,17 +58,17 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
 
   const toggleSelectAll = (checked) => {
     if (checked) {
-      setSelectedAssignables(filteredAssignables.map((a) => a.id))
+      setSelectedAssignables(filteredAssignables.map((a) => getCompositeId(a)).filter(id => id !== null))
     } else {
       setSelectedAssignables([])
     }
   }
 
-  const toggleAssignable = (id) => {
-    if (selectedAssignables.includes(id)) {
-      setSelectedAssignables(selectedAssignables.filter((aid) => aid !== id))
+  const toggleAssignable = (compositeId) => {
+    if (selectedAssignables.includes(compositeId)) {
+      setSelectedAssignables(selectedAssignables.filter((aid) => aid !== compositeId))
     } else {
-      setSelectedAssignables([...selectedAssignables, id])
+      setSelectedAssignables([...selectedAssignables, compositeId])
     }
   }
 
@@ -76,14 +83,17 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
   }
 
   // Auto-populate role when assignable is selected
-  const handleAssignableToggle = (assignableId) => {
-    toggleAssignable(assignableId);
-    const assignable = safeAssignables.find(a => a && a.id === assignableId);
+  const handleAssignableToggle = (compositeId) => {
+    toggleAssignable(compositeId);
+    const assignable = safeAssignables.find(a => {
+      const aCompositeId = getCompositeId(a);
+      return aCompositeId === compositeId;
+    });
     if (assignable) {
-      if (assignable.type === 'user' && assignable.role && !formData[assignableId]?.role) {
-        handleChange(assignableId, 'role', assignable.role);
-      } else if (assignable.type === 'employee' && assignable.position && !formData[assignableId]?.role) {
-        handleChange(assignableId, 'role', assignable.position);
+      if (assignable.type === 'user' && assignable.role && !formData[compositeId]?.role) {
+        handleChange(compositeId, 'role', assignable.role);
+      } else if (assignable.type === 'employee' && assignable.position && !formData[compositeId]?.role) {
+        handleChange(compositeId, 'role', assignable.position);
       }
     }
   }
@@ -106,8 +116,11 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
     }
     
     // Validate that all selected assignables exist
-    const missingAssignables = selectedAssignables.filter(id => 
-      !safeAssignables.find(a => a && a.id === id)
+    const missingAssignables = selectedAssignables.filter(compositeId => 
+      !safeAssignables.find(a => {
+        const aCompositeId = getCompositeId(a);
+        return aCompositeId === compositeId;
+      })
     )
     if (missingAssignables.length > 0) {
       toast.error("Some selected team members are no longer available. Please refresh and try again.")
@@ -117,17 +130,27 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
 
     // Validate required fields
     const validationErrors = {}
-    for (const assignableId of selectedAssignables) {
-      const assignable = safeAssignables.find(a => a && a.id === assignableId)
+    for (const compositeId of selectedAssignables) {
+      const assignable = safeAssignables.find(a => {
+        const aCompositeId = getCompositeId(a);
+        return aCompositeId === compositeId;
+      });
       const assignableName = assignable?.name || 'Team Member'
-      if (!formData[assignableId]?.role) {
-        validationErrors[`assignable_${assignableId}_role`] = `Please enter a role for ${assignableName}`
+      
+      // Get role from formData or fallback to assignable's role/position
+      const roleValue = formData[compositeId]?.role || 
+                       (assignable?.type === 'user' ? assignable.role : null) ||
+                       (assignable?.type === 'employee' ? assignable.position : null) ||
+                       '';
+      
+      if (!roleValue || roleValue.trim() === '') {
+        validationErrors[`assignable_${compositeId}_role`] = `Role is required for ${assignableName}`
       }
-      if (!formData[assignableId]?.hourly_rate || parseFloat(formData[assignableId]?.hourly_rate) <= 0) {
-        validationErrors[`assignable_${assignableId}_hourly_rate`] = `Please enter a valid hourly rate for ${assignableName}`
+      if (!formData[compositeId]?.hourly_rate || parseFloat(formData[compositeId]?.hourly_rate) <= 0) {
+        validationErrors[`assignable_${compositeId}_hourly_rate`] = `Please enter a valid hourly rate for ${assignableName}`
       }
-      if (!formData[assignableId]?.start_date) {
-        validationErrors[`assignable_${assignableId}_start_date`] = `Please enter a start date for ${assignableName}`
+      if (!formData[compositeId]?.start_date) {
+        validationErrors[`assignable_${compositeId}_start_date`] = `Please enter a start date for ${assignableName}`
       }
     }
 
@@ -139,19 +162,28 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
     }
 
     const assignablesPayload = selectedAssignables
-      .map((assignableId) => {
-        const assignable = safeAssignables.find(a => a && a.id === assignableId)
+      .map((compositeId) => {
+        const assignable = safeAssignables.find(a => {
+          const aCompositeId = getCompositeId(a);
+          return aCompositeId === compositeId;
+        });
         if (!assignable) {
-          console.warn(`Assignable with id ${assignableId} not found`)
+          console.warn(`Assignable with composite id ${compositeId} not found`)
           return null
         }
+        // Get role from formData or fallback to assignable's role/position
+        const roleValue = formData[compositeId]?.role || 
+                         (assignable.type === 'user' ? assignable.role : null) ||
+                         (assignable.type === 'employee' ? assignable.position : null) ||
+                         '';
+        
         return {
-          id: parseInt(assignableId, 10),
+          id: parseInt(assignable.id, 10),
           type: assignable.type || 'user',
-          role: formData[assignableId]?.role,
-          hourly_rate: parseFloat(formData[assignableId]?.hourly_rate) || 0,
-          start_date: formData[assignableId]?.start_date,
-          end_date: formData[assignableId]?.end_date || null,
+          role: roleValue,
+          hourly_rate: parseFloat(formData[compositeId]?.hourly_rate) || 0,
+          start_date: formData[compositeId]?.start_date,
+          end_date: formData[compositeId]?.end_date || null,
         }
       })
       .filter(item => item !== null) // Remove any null entries
@@ -266,7 +298,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                   <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">Name</TableHead>
                   <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[180px]">Email</TableHead>
                   <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[200px]">
-                    Role <span className="text-red-500">*</span>
+                    Role
                   </TableHead>
                   <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">
                     Hourly Rate <span className="text-red-500">*</span>
@@ -279,19 +311,20 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
               </TableHeader>
               <TableBody>
                 {filteredAssignables.map((assignable) => {
-                  const isSelected = selectedAssignables.includes(assignable.id);
+                  const compositeId = getCompositeId(assignable);
+                  const isSelected = selectedAssignables.includes(compositeId);
                   const assignableErrors = {
-                    role: errors[`assignable_${assignable.id}_role`],
-                    hourly_rate: errors[`assignable_${assignable.id}_hourly_rate`],
-                    start_date: errors[`assignable_${assignable.id}_start_date`],
+                    role: errors[`assignable_${compositeId}_role`],
+                    hourly_rate: errors[`assignable_${compositeId}_hourly_rate`],
+                    start_date: errors[`assignable_${compositeId}_start_date`],
                   }
 
                   return (
                     <TableRow
-                      key={assignable.id}
+                      key={compositeId}
                       onClick={(e) => {
                         if (e.target.closest("input")) return;
-                        handleAssignableToggle(assignable.id);
+                        handleAssignableToggle(compositeId);
                       }}
                       className={`cursor-pointer transition ${
                         isSelected ? "bg-blue-50/50" : "hover:bg-gray-50"
@@ -300,7 +333,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                       <TableCell>
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => toggleAssignable(assignable.id)}
+                          onCheckedChange={() => toggleAssignable(compositeId)}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </TableCell>
@@ -319,13 +352,12 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                       <TableCell className="text-gray-700">{assignable.email || '---'}</TableCell>
                       <TableCell className="min-w-[200px]">
                         <Input
-                          placeholder={assignable.role || assignable.position || "Enter role"}
-                          value={formData[assignable.id]?.role || assignable.role || assignable.position || ""}
-                          onChange={(e) => handleChange(assignable.id, "role", e.target.value)}
+                          placeholder={assignable.role || assignable.position || "Role"}
+                          value={formData[compositeId]?.role || assignable.role || assignable.position || ""}
+                          readOnly
                           onClick={(e) => e.stopPropagation()}
-                          className={`${inputClass(assignableErrors.role)} min-w-[180px]`}
-                          required
-                          title={formData[assignable.id]?.role || assignable.role || assignable.position || "Role"}
+                          className="bg-gray-50 border-gray-300 text-gray-700 cursor-not-allowed min-w-[180px]"
+                          title={formData[compositeId]?.role || assignable.role || assignable.position || "Role (from user/employee profile)"}
                         />
                         {assignableErrors.role && (
                           <InputError message={assignableErrors.role} className="mt-1" />
@@ -337,8 +369,8 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          value={formData[assignable.id]?.hourly_rate || ""}
-                          onChange={(e) => handleChange(assignable.id, "hourly_rate", e.target.value)}
+                          value={formData[compositeId]?.hourly_rate || ""}
+                          onChange={(e) => handleChange(compositeId, "hourly_rate", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                           className={inputClass(assignableErrors.hourly_rate)}
                           required
@@ -350,8 +382,8 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                       <TableCell>
                         <Input
                           type="date"
-                          value={formData[assignable.id]?.start_date || ""}
-                          onChange={(e) => handleChange(assignable.id, "start_date", e.target.value)}
+                          value={formData[compositeId]?.start_date || ""}
+                          onChange={(e) => handleChange(compositeId, "start_date", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                           min={project?.start_date || undefined}
                           max={project?.planned_end_date || undefined}
@@ -365,10 +397,10 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                       <TableCell>
                         <Input
                           type="date"
-                          value={formData[assignable.id]?.end_date || ""}
-                          onChange={(e) => handleChange(assignable.id, "end_date", e.target.value)}
+                          value={formData[compositeId]?.end_date || ""}
+                          onChange={(e) => handleChange(compositeId, "end_date", e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          min={formData[assignable.id]?.start_date || project?.start_date || undefined}
+                          min={formData[compositeId]?.start_date || project?.start_date || undefined}
                           max={project?.planned_end_date || undefined}
                           className="w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800"
                         />

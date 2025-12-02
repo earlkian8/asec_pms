@@ -16,6 +16,7 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
 const AddMiscellaneousExpense = ({ setShowAddModal, project }) => {
   const { data, setData, post, errors, processing } = useForm({
@@ -27,6 +28,8 @@ const AddMiscellaneousExpense = ({ setShowAddModal, project }) => {
     notes: "",
     receipt_number: "",
   });
+
+  const [amountDisplay, setAmountDisplay] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -126,12 +129,41 @@ const AddMiscellaneousExpense = ({ setShowAddModal, project }) => {
           <div>
             <Label className="text-zinc-800">Amount <span className="text-red-500">*</span></Label>
             <Input
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
               placeholder="0.00"
-              value={data.amount}
-              onChange={(e) => setData("amount", e.target.value)}
+              value={amountDisplay}
+              onChange={(e) => {
+                let inputValue = e.target.value;
+                
+                // Allow empty string
+                if (inputValue === '') {
+                  setAmountDisplay('');
+                  setData("amount", '');
+                  return;
+                }
+                
+                // Remove all non-numeric characters except decimal point
+                inputValue = inputValue.replace(/[^\d.]/g, '');
+                
+                // Prevent multiple decimal points
+                const parts = inputValue.split('.');
+                if (parts.length > 2) {
+                  inputValue = parts[0] + '.' + parts.slice(1).join('');
+                }
+                
+                // Limit decimal places to 2
+                if (parts.length === 2 && parts[1].length > 2) {
+                  inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                }
+                
+                // Format with commas for display
+                const formattedValue = formatNumberWithCommas(inputValue);
+                setAmountDisplay(formattedValue);
+                
+                // Store numeric value (without commas)
+                const numericValue = parseFormattedNumber(inputValue);
+                setData("amount", numericValue);
+              }}
               className={inputClass(errors.amount)}
             />
             <InputError message={errors.amount} />

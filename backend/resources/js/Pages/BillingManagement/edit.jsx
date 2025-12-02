@@ -1,4 +1,5 @@
 import { useForm } from "@inertiajs/react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -13,6 +14,7 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
 import { Loader2, Save } from "lucide-react";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
 const EditBilling = ({ setShowEditModal, billing }) => {
   const { data, setData, put, errors, processing } = useForm({
@@ -21,6 +23,17 @@ const EditBilling = ({ setShowEditModal, billing }) => {
     due_date: billing.due_date ? new Date(billing.due_date).toISOString().split('T')[0] : "",
     description: billing.description || "",
   });
+
+  const [billingAmountDisplay, setBillingAmountDisplay] = useState('');
+
+  // Initialize display value when data.billing_amount changes
+  useEffect(() => {
+    if (data.billing_amount) {
+      setBillingAmountDisplay(formatNumberWithCommas(data.billing_amount));
+    } else {
+      setBillingAmountDisplay('');
+    }
+  }, [data.billing_amount]);
 
   const inputClass = (error, readOnly = false) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -108,14 +121,41 @@ const EditBilling = ({ setShowEditModal, billing }) => {
           <div className="col-span-2">
             <Label className="text-zinc-800">Billing Amount <span className="text-red-500">*</span></Label>
             <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={data.billing_amount}
+              type="text"
+              value={billingAmountDisplay}
               onChange={(e) => {
                 // Only allow changes for fixed_price type (milestone is read-only)
                 if (billing.billing_type === 'fixed_price') {
-                  setData("billing_amount", e.target.value);
+                  let inputValue = e.target.value;
+                  
+                  // Allow empty string
+                  if (inputValue === '') {
+                    setBillingAmountDisplay('');
+                    setData("billing_amount", '');
+                    return;
+                  }
+                  
+                  // Remove all non-numeric characters except decimal point
+                  inputValue = inputValue.replace(/[^\d.]/g, '');
+                  
+                  // Prevent multiple decimal points
+                  const parts = inputValue.split('.');
+                  if (parts.length > 2) {
+                    inputValue = parts[0] + '.' + parts.slice(1).join('');
+                  }
+                  
+                  // Limit decimal places to 2
+                  if (parts.length === 2 && parts[1].length > 2) {
+                    inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                  }
+                  
+                  // Format with commas for display
+                  const formattedValue = formatNumberWithCommas(inputValue);
+                  setBillingAmountDisplay(formattedValue);
+                  
+                  // Store numeric value (without commas)
+                  const numericValue = parseFormattedNumber(inputValue);
+                  setData("billing_amount", numericValue);
                 }
               }}
               readOnly={billing.billing_type === 'fixed_price' || billing.billing_type === 'milestone'}

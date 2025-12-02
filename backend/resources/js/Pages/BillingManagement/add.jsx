@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import { Loader2, Save } from "lucide-react";
 const AddBilling = ({ setShowAddModal, projects = [] }) => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [milestones, setMilestones] = useState([]);
+  const [billingAmountDisplay, setBillingAmountDisplay] = useState('');
 
   const { data, setData, post, errors, processing } = useForm({
     project_id: "",
@@ -48,12 +50,16 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
         if (project.billing_type !== 'milestone') {
           setData('milestone_id', '');
           setData('billing_amount', '');
+          setBillingAmountDisplay('');
         }
         // For fixed_price billing, auto-fill billing amount with contract amount (fixed)
         if (project.billing_type === 'fixed_price' && project.contract_amount) {
-          setData('billing_amount', parseFloat(project.contract_amount).toFixed(2));
+          const amount = parseFloat(project.contract_amount).toFixed(2);
+          setData('billing_amount', amount);
+          setBillingAmountDisplay(formatNumberWithCommas(amount));
         } else {
           setData('billing_amount', '');
+          setBillingAmountDisplay('');
         }
       }
     } else {
@@ -62,8 +68,18 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
       setData('billing_type', '');
       setData('milestone_id', '');
       setData('billing_amount', '');
+      setBillingAmountDisplay('');
     }
   }, [data.project_id]);
+
+  // Sync display value when billing_amount changes (e.g., from milestone calculation)
+  useEffect(() => {
+    if (data.billing_amount) {
+      setBillingAmountDisplay(formatNumberWithCommas(data.billing_amount));
+    } else {
+      setBillingAmountDisplay('');
+    }
+  }, [data.billing_amount]);
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -189,18 +205,44 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
           <div className="col-span-2">
             <Label className="text-zinc-800">Billing Amount <span className="text-red-500">*</span></Label>
             <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={selectedProject && data.billing_type === 'fixed_price' ? selectedProject.contract_amount : undefined}
-              value={data.billing_amount}
+              type="text"
+              value={billingAmountDisplay}
               onChange={(e) => {
-                // Only allow changes for fixed_price type
-                if (data.billing_type === 'fixed_price') {
-                  setData("billing_amount", e.target.value);
+                // Only allow changes when not read-only
+                if (data.billing_type !== 'milestone' && !(data.billing_type === 'fixed_price' && selectedProject)) {
+                  let inputValue = e.target.value;
+                  
+                  // Allow empty string
+                  if (inputValue === '') {
+                    setBillingAmountDisplay('');
+                    setData("billing_amount", '');
+                    return;
+                  }
+                  
+                  // Remove all non-numeric characters except decimal point
+                  inputValue = inputValue.replace(/[^\d.]/g, '');
+                  
+                  // Prevent multiple decimal points
+                  const parts = inputValue.split('.');
+                  if (parts.length > 2) {
+                    inputValue = parts[0] + '.' + parts.slice(1).join('');
+                  }
+                  
+                  // Limit decimal places to 2
+                  if (parts.length === 2 && parts[1].length > 2) {
+                    inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                  }
+                  
+                  // Format with commas for display
+                  const formattedValue = formatNumberWithCommas(inputValue);
+                  setBillingAmountDisplay(formattedValue);
+                  
+                  // Store numeric value (without commas)
+                  const numericValue = parseFormattedNumber(inputValue);
+                  setData("billing_amount", numericValue);
                 }
               }}
-              readOnly={data.billing_type === 'milestone' || data.billing_type === 'fixed_price'}
+              readOnly={data.billing_type === 'milestone' || (data.billing_type === 'fixed_price' && selectedProject)}
               placeholder={selectedProject && data.billing_type === 'fixed_price' 
                 ? `Max: ₱${parseFloat(selectedProject.contract_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : "0.00"}

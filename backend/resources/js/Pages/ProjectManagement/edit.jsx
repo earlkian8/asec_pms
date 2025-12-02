@@ -1,5 +1,5 @@
 import { useForm } from "@inertiajs/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/Components/ui/textarea";
 import { Loader2, Save } from "lucide-react";
 import AddClient from "../ClientManagement/add";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
 const EditProject = ({ setShowEditModal, clients, project }) => {
   const { data, setData, put, errors, processing } = useForm({
@@ -35,14 +36,63 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
   });
 
   const [showAddClient, setShowAddClient] = useState(false);
+  const [contractAmountDisplay, setContractAmountDisplay] = useState('');
+  const [validationErrors, setValidationErrors] = useState({});
+
+  // Initialize display value when data.contract_amount changes
+  useEffect(() => {
+    if (data.contract_amount) {
+      setContractAmountDisplay(formatNumberWithCommas(data.contract_amount));
+    } else {
+      setContractAmountDisplay('');
+    }
+  }, [data.contract_amount]);
+
+  // Merge validation errors with server errors
+  const allErrors = { ...validationErrors, ...errors };
+
+  // Validate required fields
+  const validateForm = () => {
+    const validationErrors = {};
+    
+    if (!data.project_name || data.project_name.trim() === '') {
+      validationErrors.project_name = 'The project name field is required.';
+    }
+    
+    if (!data.client_id || data.client_id === '') {
+      validationErrors.client_id = 'The client field is required.';
+    }
+    
+    if (!data.project_type || data.project_type === '') {
+      validationErrors.project_type = 'The project type field is required.';
+    }
+    
+    if (!data.contract_amount || data.contract_amount === '' || parseFloat(data.contract_amount) <= 0) {
+      validationErrors.contract_amount = 'The contract amount field is required and must be greater than 0.';
+    }
+    
+    return validationErrors;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Clear previous validation errors
+    setValidationErrors({});
+
+    // Validate required fields before submitting
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error("Please fill in all required fields");
+      return;
+    }
 
     put(route("project-management.update", project.id), {
       preserveScroll: true,
       onSuccess: (page) => {
         setShowEditModal(false);
+        setValidationErrors({});
         const flash = page.props.flash;
         if (flash && flash.error) {
           toast.error(flash.error);
@@ -50,7 +100,8 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
           toast.success("Project updated successfully!");
         }
       },
-      onError: () => {
+      onError: (serverErrors) => {
+        // Server errors will be handled by Inertia's error handling
         toast.error("Please check the form for errors");
       },
     });
@@ -61,6 +112,11 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
     (error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
+
+  // Merge validation errors with server errors for display
+  const getFieldError = (fieldName) => {
+    return validationErrors[fieldName] || errors[fieldName];
+  };
 
   return (
     <>
@@ -84,9 +140,9 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                 value={data.project_name}
                 onChange={(e) => setData("project_name", e.target.value)}
                 placeholder="Enter project name"
-                className={inputClass(errors.project_name)}
-              />
-              <InputError message={errors.project_name} />
+              className={inputClass(getFieldError('project_name'))}
+            />
+            <InputError message={getFieldError('project_name')} />
             </div>
 
             {/* Client */}
@@ -97,7 +153,7 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                   value={data.client_id}
                   onValueChange={(value) => setData("client_id", value)}
                 >
-                  <SelectTrigger className={inputClass(errors.client_id)}>
+                  <SelectTrigger className={inputClass(getFieldError('client_id'))}>
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
@@ -117,7 +173,7 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                   New
                 </Button>
               </div>
-              <InputError message={errors.client_id} />
+              <InputError message={getFieldError('client_id')} />
             </div>
 
             {/* Project Type */}
@@ -127,7 +183,7 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                 value={data.project_type}
                 onValueChange={(value) => setData("project_type", value)}
               >
-                <SelectTrigger className={inputClass(errors.project_type)}>
+                <SelectTrigger className={inputClass(getFieldError('project_type'))}>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,7 +200,7 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                   <SelectItem value="surveying">Surveying</SelectItem>
                 </SelectContent>
               </Select>
-              <InputError message={errors.project_type} />
+              <InputError message={getFieldError('project_type')} />
             </div>
 
             {/* Status */}
@@ -190,14 +246,44 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
             <div>
               <Label className="text-zinc-800">Contract Amount</Label>
               <Input
-                type="number"
-                step="0.01"
-                value={data.contract_amount}
-                onChange={(e) => setData("contract_amount", e.target.value)}
+                type="text"
+                value={contractAmountDisplay}
+                onChange={(e) => {
+                  let inputValue = e.target.value;
+                  
+                  // Allow empty string
+                  if (inputValue === '') {
+                    setContractAmountDisplay('');
+                    setData("contract_amount", '');
+                    return;
+                  }
+                  
+                  // Remove all non-numeric characters except decimal point
+                  inputValue = inputValue.replace(/[^\d.]/g, '');
+                  
+                  // Prevent multiple decimal points
+                  const parts = inputValue.split('.');
+                  if (parts.length > 2) {
+                    inputValue = parts[0] + '.' + parts.slice(1).join('');
+                  }
+                  
+                  // Limit decimal places to 2
+                  if (parts.length === 2 && parts[1].length > 2) {
+                    inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                  }
+                  
+                  // Format with commas for display
+                  const formattedValue = formatNumberWithCommas(inputValue);
+                  setContractAmountDisplay(formattedValue);
+                  
+                  // Store numeric value (without commas)
+                  const numericValue = parseFormattedNumber(inputValue);
+                  setData("contract_amount", numericValue);
+                }}
                 placeholder="Enter amount"
-                className={inputClass(errors.contract_amount)}
+                className={inputClass(getFieldError('contract_amount'))}
               />
-              <InputError message={errors.contract_amount} />
+              <InputError message={getFieldError('contract_amount')} />
             </div>
 
             {/* Dates */}

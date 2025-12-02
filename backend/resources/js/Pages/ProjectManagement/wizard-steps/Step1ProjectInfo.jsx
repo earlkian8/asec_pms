@@ -6,12 +6,23 @@ import { Button } from "@/Components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AddClient from "../../ClientManagement/add";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
 export default function Step1ProjectInfo({ clients, errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
   const [showAddClient, setShowAddClient] = useState(false);
+  const [contractAmountDisplay, setContractAmountDisplay] = useState('');
+
+  // Initialize display value when projectData.contract_amount changes
+  useEffect(() => {
+    if (projectData.contract_amount) {
+      setContractAmountDisplay(formatNumberWithCommas(projectData.contract_amount));
+    } else {
+      setContractAmountDisplay('');
+    }
+  }, [projectData.contract_amount]);
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -140,10 +151,40 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
           <div>
             <Label className="text-zinc-800">Contract Amount <span className="text-red-500">*</span></Label>
             <Input
-              type="number"
-              step="0.01"
-              value={projectData.contract_amount}
-              onChange={(e) => updateProjectData({ contract_amount: e.target.value })}
+              type="text"
+              value={contractAmountDisplay}
+              onChange={(e) => {
+                let inputValue = e.target.value;
+                
+                // Allow empty string
+                if (inputValue === '') {
+                  setContractAmountDisplay('');
+                  updateProjectData({ contract_amount: '' });
+                  return;
+                }
+                
+                // Remove all non-numeric characters except decimal point
+                inputValue = inputValue.replace(/[^\d.]/g, '');
+                
+                // Prevent multiple decimal points
+                const parts = inputValue.split('.');
+                if (parts.length > 2) {
+                  inputValue = parts[0] + '.' + parts.slice(1).join('');
+                }
+                
+                // Limit decimal places to 2
+                if (parts.length === 2 && parts[1].length > 2) {
+                  inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                }
+                
+                // Format with commas for display
+                const formattedValue = formatNumberWithCommas(inputValue);
+                setContractAmountDisplay(formattedValue);
+                
+                // Store numeric value (without commas)
+                const numericValue = parseFormattedNumber(inputValue);
+                updateProjectData({ contract_amount: numericValue });
+              }}
               placeholder="Enter amount"
               className={inputClass(errors.contract_amount)}
             />

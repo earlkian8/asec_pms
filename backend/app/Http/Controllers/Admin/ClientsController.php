@@ -286,6 +286,7 @@ class ClientsController extends Controller
         
         $client->update([
             'password' => Hash::make($defaultPassword),
+            'password_changed_at' => null, // Force password change on next login
         ]);
 
         $this->adminActivityLogs(
@@ -294,6 +295,6 @@ class ClientsController extends Controller
             'Reset password for Client ' . $client->client_name . ' (' . $client->client_code . ')'
         );
 
-        return redirect()->back()->with('success', 'Client password reset successfully.');
+        return redirect()->back()->with('success', 'Client password reset successfully. Client will be required to change password on next login.');
     }
 }

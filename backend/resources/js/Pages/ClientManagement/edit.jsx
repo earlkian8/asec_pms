@@ -31,7 +31,6 @@ const EditClient = ({ client, setShowEditModal }) => {
     client_type: client.client_type || '',
     contact_person: client.contact_person || '',
     email: client.email || '',
-    password: '',
     phone_number: client.phone_number || '',
     address: client.address || '',
     city: client.city || '',
@@ -67,12 +66,6 @@ const EditClient = ({ client, setShowEditModal }) => {
       errors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = 'Please enter a valid email address';
-    }
-    
-    if (!data.password || data.password.trim() === '') {
-      errors.password = 'Password is required';
-    } else if (data.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
     }
     
     setValidationErrors(errors);
@@ -231,27 +224,6 @@ const EditClient = ({ client, setShowEditModal }) => {
             <InputError message={getFieldError('email')} />
           </div>
 
-          {/* Password */}
-          <div>
-            <Label className="text-zinc-800">Password <span className="text-red-500">*</span></Label>
-            <Input
-              type="password"
-              value={data.password}
-              onChange={e => {
-                setData('password', e.target.value);
-                if (validationErrors.password) {
-                  setValidationErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.password;
-                    return newErrors;
-                  });
-                }
-              }}
-              placeholder="Enter password (min 8 characters)"
-              className={inputClass(getFieldError('password'))}
-            />
-            <InputError message={getFieldError('password')} />
-          </div>
 
           {/* Phone */}
           <div>

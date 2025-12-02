@@ -52,4 +52,12 @@ class Client extends Authenticatable
     {
         return $this->hasMany(ClientNotification::class);
     }
+
+    /**
+     * Get the chat for this client
+     */
+    public function chat()
+    {
+        return $this->hasOne(Chat::class);
+    }
 }

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { apiService } from '@/services/api';
+import { initializePusher, disconnectPusher } from '@/services/pusher';
 
 interface User {
   id: number;
@@ -107,6 +108,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_active: response.data.client.is_active,
         });
 
+        if (response.data.token) {
+          apiService.setToken(response.data.token);
+          initializePusher(response.data.token);
+        }
+
         return { success: true };
       } else {
         return {
@@ -135,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       apiService.setToken(null);
       router.replace('/login');
+      disconnectPusher();
     }
   };
 

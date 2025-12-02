@@ -63,4 +63,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class)->where('read', false);
     }
+
+    /**
+     * Get all chats assigned to the user
+     */
+    public function chats()
+    {
+        return $this->hasMany(Chat::class);
+    }
 }

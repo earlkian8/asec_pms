@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Briefcase, User } from 'lucide-react-native';
+import { Home, Briefcase, User, MessageCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -44,6 +44,15 @@ export default function TabLayout() {
           title: 'Projects',
           tabBarIcon: ({ color, size }) => (
             <Briefcase size={size || 24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircle size={size || 24} color={color} />
           ),
         }}
       />

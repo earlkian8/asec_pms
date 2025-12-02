@@ -65,6 +65,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
               type="text"
               value={data.first_name}
               onChange={e => setData('first_name', e.target.value)}
+              placeholder="First name"
               className={inputClass(errors.first_name)}
             />
             <InputError message={errors.first_name} />
@@ -77,6 +78,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
               type="text"
               value={data.last_name}
               onChange={e => setData('last_name', e.target.value)}
+              placeholder="Last name"
               className={inputClass(errors.last_name)}
             />
             <InputError message={errors.last_name} />
@@ -89,6 +91,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
               type="email"
               value={data.email}
               onChange={e => setData('email', e.target.value)}
+              placeholder="Email"
               className={inputClass(errors.email)}
             />
             <InputError message={errors.email} />
@@ -101,6 +104,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
               type="text"
               value={data.phone}
               onChange={e => setData('phone', e.target.value)}
+              placeholder="Phone number"
               className={inputClass(errors.phone)}
             />
             <InputError message={errors.phone} />
@@ -113,6 +117,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
               type="text"
               value={data.position}
               onChange={e => setData('position', e.target.value)}
+              placeholder="Position"
               className={inputClass(errors.position)}
             />
             <InputError message={errors.position} />

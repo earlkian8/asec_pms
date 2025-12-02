@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Models\InventoryItem;
+use App\Models\InventoryTransaction;
 use Illuminate\Database\Seeder;
 
 class InventorySeeder extends Seeder
@@ -16,6 +17,10 @@ class InventorySeeder extends Seeder
         $this->command->info('Creating inventory items...');
         $inventoryItems = $this->createInventoryItems(20);
         $this->command->info("Created {$inventoryItems->count()} inventory items");
+        
+        $this->command->info('Creating initial stock transactions...');
+        $this->createInitialTransactions($inventoryItems);
+        $this->command->info('Initial stock transactions created');
     }
 
     private function createInventoryItems($count)
@@ -92,6 +97,37 @@ class InventorySeeder extends Seeder
         }
 
         return $inventoryItems;
+    }
+
+    private function createInitialTransactions($inventoryItems)
+    {
+        $users = User::all();
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        foreach ($inventoryItems as $item) {
+            // Create a stock_in transaction matching the current_stock value
+            // This ensures the calculated stock matches the seeded current_stock
+            if ($item->current_stock > 0) {
+                InventoryTransaction::create([
+                    'inventory_item_id' => $item->id,
+                    'transaction_type' => 'stock_in',
+                    'quantity' => $item->current_stock,
+                    'unit_price' => $item->unit_price,
+                    'transaction_date' => fake()->dateTimeBetween('-6 months', '-1 day'),
+                    'notes' => 'Initial stock from seeder',
+                    'created_by' => $users->random()->id,
+                ]);
+            }
+        }
+
+        // Recalculate stock for all items to ensure consistency
+        foreach ($inventoryItems as $item) {
+            $item->refresh();
+            $calculatedStock = $item->calculateCurrentStock();
+            $item->update(['current_stock' => $calculatedStock]);
+        }
     }
 }
 

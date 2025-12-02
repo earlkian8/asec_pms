@@ -39,9 +39,20 @@ class BillingsController extends Controller
         }
         
         // Get all projects for filter dropdown
-        $projects = Project::with('milestones:id,project_id,name,billing_percentage')
+        // Exclude projects where all billings are fully paid (done with client payment)
+        // A project is excluded if it has billings AND all of them have status = 'paid'
+        $projects = Project::with(['milestones:id,project_id,name,billing_percentage', 'billings:id,project_id,status'])
             ->orderBy('project_name', 'asc')
             ->get(['id', 'project_code', 'project_name', 'billing_type', 'contract_amount']);
+
+        // Filter out projects where all billings are paid
+        $projects = $projects->filter(function ($project) {
+            $billings = $project->billings;
+            // Include if no billings OR if there's at least one unpaid/partial billing
+            return $billings->isEmpty() || $billings->contains(function ($billing) {
+                return in_array($billing->status, ['unpaid', 'partial']);
+            });
+        })->values();
 
         $data['projects'] = $projects;
         $data['tab'] = $tab;

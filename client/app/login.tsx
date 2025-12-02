@@ -36,7 +36,12 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (result.success) {
-      router.replace('/(tabs)');
+      // Redirect to change password page if password needs to be changed
+      if (result.mustChangePassword) {
+        router.replace('/change-password');
+      } else {
+        router.replace('/(tabs)');
+      }
     } else {
       dialog.showError(result.message || 'Invalid credentials. Please try again.', 'Login Failed');
     }

@@ -141,7 +141,7 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                 onChange={(e) => setData("project_name", e.target.value)}
                 placeholder="Enter project name"
               className={inputClass(getFieldError('project_name'))}
-            />
+              />
             <InputError message={getFieldError('project_name')} />
             </div>
 

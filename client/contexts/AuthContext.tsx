@@ -118,7 +118,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           initializePusher(response.data.token);
         }
 
-        return { success: true };
+        return { 
+          success: true, 
+          mustChangePassword: response.data.must_change_password || false 
+        };
       } else {
         return {
           success: false,

@@ -39,6 +39,9 @@ class ClientAuthController extends Controller
 
         $token = $client->createToken('client-api-token')->plainTextToken;
 
+        // Check if password needs to be changed (password_changed_at is null)
+        $mustChangePassword = is_null($client->password_changed_at);
+
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
@@ -54,6 +57,7 @@ class ClientAuthController extends Controller
                     'is_active' => $client->is_active,
                 ],
                 'token' => $token,
+                'must_change_password' => $mustChangePassword,
             ],
         ]);
     }
@@ -104,6 +108,37 @@ class ClientAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Logged out from all devices successfully',
+        ]);
+    }
+
+    /**
+     * Change password
+     */
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $client = $request->user();
+
+        // Verify current password
+        if (!Hash::check($request->current_password, $client->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+            ], 422);
+        }
+
+        // Update password
+        $client->password = Hash::make($request->new_password);
+        $client->password_changed_at = now();
+        $client->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password changed successfully. Please login again.',
         ]);
     }
 }

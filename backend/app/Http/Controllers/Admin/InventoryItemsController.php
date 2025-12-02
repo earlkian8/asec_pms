@@ -81,7 +81,7 @@ class InventoryItemsController extends Controller
         }
 
         // Get all active projects for stock out dropdown
-        $projects = Project::whereIn('status', ['planning', 'active', 'on_hold'])
+        $projects = Project::whereIn('status', ['active', 'on_hold'])
             ->orderBy('project_name', 'asc')
             ->get(['id', 'project_code', 'project_name']);
 

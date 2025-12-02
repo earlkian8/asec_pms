@@ -110,7 +110,6 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="planning">Planning</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="on_hold">On Hold</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>

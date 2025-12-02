@@ -179,7 +179,6 @@ export default function ProjectsIndex() {
   };
 
   const statusColors = {
-    planning: 'bg-gray-100 text-gray-800 border border-gray-200',
     active: 'bg-blue-100 text-blue-800 border border-blue-200',
     on_hold: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
     completed: 'bg-green-100 text-green-800 border border-green-200',

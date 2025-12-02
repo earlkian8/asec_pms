@@ -78,13 +78,12 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
 
   const getStatusColor = (status) => {
     const colors = {
-      planning: 'bg-gray-100 text-gray-700',
       active: 'bg-green-100 text-green-700',
       on_hold: 'bg-yellow-100 text-yellow-700',
       completed: 'bg-blue-100 text-blue-700',
       cancelled: 'bg-red-100 text-red-700',
     };
-    return colors[status] || colors.planning;
+    return colors[status] || colors.active;
   };
 
   const getBillingStatusColor = (status) => {

@@ -23,7 +23,7 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
     project_name: project.project_name || "",
     client_id: project.client_id?.toString() || "",
     project_type: project.project_type || "",
-    status: project.status || "planning",
+    status: project.status || "active",
     priority: project.priority || "medium",
     contract_amount: project.contract_amount || "",
     start_date: project.start_date || "",
@@ -158,7 +158,6 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="planning">Planning</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="on_hold">On Hold</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>

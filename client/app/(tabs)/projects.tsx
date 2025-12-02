@@ -80,7 +80,7 @@ export default function ProjectsScreen() {
     sortOrder,
   });
 
-  const statusOptions = ['all', 'active', 'on-hold', 'completed', 'pending'];
+  const statusOptions = ['all', 'active', 'on-hold', 'completed'];
 
   const filteredProjects = useMemo(() => {
     return projects;
@@ -167,7 +167,6 @@ export default function ProjectsScreen() {
     active: { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' }, // green-100/green-700
     'on-hold': { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' }, // yellow-100/yellow-700
     completed: { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' }, // blue-100/blue-700
-    pending: { bg: '#F3F4F6', text: '#4B5563', dot: '#6B7280' }, // gray-100/gray-600
   };
 
   const statusCounts = useMemo(() => {
@@ -176,12 +175,11 @@ export default function ProjectsScreen() {
       active: projects.filter((p) => p.status === 'active').length,
       'on-hold': projects.filter((p) => p.status === 'on-hold').length,
       completed: projects.filter((p) => p.status === 'completed').length,
-      pending: projects.filter((p) => p.status === 'pending').length,
     };
   }, [projects]);
 
   const ProjectCard = ({ project, index }: { project: Project; index: number }) => {
-    const status = statusColors[project.status] || statusColors.pending;
+    const status = statusColors[project.status] || statusColors.active;
     const budgetPercent = (project.spent / project.budget) * 100;
 
     return (

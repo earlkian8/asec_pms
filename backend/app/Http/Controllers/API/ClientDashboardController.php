@@ -116,7 +116,6 @@ class ClientDashboardController extends Controller
                 'active' => 'active',
                 'on-hold' => 'on_hold',
                 'completed' => 'completed',
-                'pending' => 'planning',
             ];
             $backendStatus = $statusMap[$status] ?? $status;
             $query->where('status', $backendStatus);
@@ -194,7 +193,6 @@ class ClientDashboardController extends Controller
                 'active' => 'active',
                 'on_hold' => 'on-hold',
                 'completed' => 'completed',
-                'planning' => 'pending',
                 'cancelled' => 'on-hold',
             ];
             
@@ -202,7 +200,7 @@ class ClientDashboardController extends Controller
                 'id' => (string) $project->id,
                 'name' => $project->project_name,
                 'description' => $project->description ?? '',
-                'status' => $statusMap[$project->status] ?? 'pending',
+                'status' => $statusMap[$project->status] ?? 'active',
                 'progress' => $progress,
                 'startDate' => $project->start_date,
                 'expectedCompletion' => $project->planned_end_date,
@@ -290,13 +288,12 @@ class ClientDashboardController extends Controller
                 'active' => 'Active',
                 'on_hold' => 'On Hold',
                 'completed' => 'Completed',
-                'planning' => 'Pending',
                 'cancelled' => 'On Hold',
             ];
             
             return [
                 'Project Name' => $project->project_name,
-                'Status' => $statusMap[$project->status] ?? 'Pending',
+                'Status' => $statusMap[$project->status] ?? 'Active',
                 'Progress (%)' => $progress,
                 'Location' => $project->location ?? '',
                 'Project Manager' => $projectManagerName,
@@ -474,7 +471,6 @@ class ClientDashboardController extends Controller
             'active' => 'active',
             'on_hold' => 'on-hold',
             'completed' => 'completed',
-            'planning' => 'pending',
             'cancelled' => 'on-hold',
         ];
 

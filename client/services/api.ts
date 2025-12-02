@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.14.31:8000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.108:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;

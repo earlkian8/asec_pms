@@ -644,7 +644,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     };
     const config = statusConfig[status] || statusConfig.pending;
     return (
-      <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${config.bg} ${config.text}`}>
+      <span className={`px-3 py-1 rounded-md text-sm font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     );
@@ -659,7 +659,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     };
     const config = statusConfig[status] || statusConfig.open;
     return (
-      <span className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${config.bg} ${config.text}`}>
+      <span className={`px-2 py-1 rounded-md text-sm font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     );
@@ -674,7 +674,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     };
     const config = priorityConfig[priority] || priorityConfig.medium;
     return (
-      <span className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${config.bg} ${config.text}`}>
+      <span className={`px-2 py-1 rounded-md text-sm font-medium ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     );
@@ -709,13 +709,13 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
           <DialogHeader className="px-4 py-3 border-b bg-card">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <DialogTitle className="text-lg font-semibold text-foreground">{currentTask.title}</DialogTitle>
+                <DialogTitle className="text-2xl font-semibold text-foreground">{currentTask.title}</DialogTitle>
                 {currentTask.description && (
-                  <p className="text-xs text-muted-foreground leading-snug line-clamp-1 mt-0.5">{currentTask.description}</p>
+                  <p className="text-base text-muted-foreground leading-snug line-clamp-1 mt-0.5">{currentTask.description}</p>
                 )}
-              </div>
-              <div className="flex-shrink-0">
-                {getStatusBadge(currentTask.status)}
+                <div className="mt-2">
+                  {getStatusBadge(currentTask.status)}
+                </div>
               </div>
             </div>
           </DialogHeader>
@@ -724,38 +724,38 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
             <div className="p-4 space-y-3">
               {/* Task Info */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded border">
-                  <Calendar size={14} className="text-muted-foreground flex-shrink-0" />
+                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
+                  <Calendar size={18} className="text-muted-foreground flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Due Date</p>
-                    <p className="text-xs font-semibold text-foreground truncate">{formatDate(currentTask.due_date)}</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Due Date</p>
+                    <p className="text-base font-semibold text-foreground truncate">{formatDate(currentTask.due_date)}</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded border">
-                  <User size={14} className="text-muted-foreground flex-shrink-0" />
+                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
+                  <User size={18} className="text-muted-foreground flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Assigned</p>
-                    <p className="text-xs font-semibold text-foreground truncate">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned</p>
+                    <p className="text-base font-semibold text-foreground truncate">
                       {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded border">
-                  <Flag size={14} className="text-muted-foreground flex-shrink-0" />
+                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
+                  <Flag size={18} className="text-muted-foreground flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Milestone</p>
-                    <p className="text-xs font-semibold text-foreground truncate">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Milestone</p>
+                    <p className="text-base font-semibold text-foreground truncate">
                       {currentTask.milestone?.name || 'N/A'}
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded border">
+                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
                   <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Status</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</p>
                     <div>
                       {getStatusBadge(currentTask.status)}
                     </div>
@@ -765,22 +765,22 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
               {/* Progress Updates Section */}
               <div>
-                <div className="flex items-center justify-between mb-3">
+                {/* <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold text-foreground">Progress Updates ({progressUpdates.length})</h3>
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold text-foreground">Progress Updates ({progressUpdates.length})</h3>
                   </div>
                   {has('progress-updates.create') && (
                     <Button
                       onClick={() => setShowAddProgressModal(true)}
-                      size="sm"
-                      className="h-7 text-xs px-2"
+                      size="default"
+                      className="h-10 text-sm px-4"
                     >
-                      <Plus size={12} className="mr-1" />
+                      <Plus size={16} className="mr-2" />
                       Add
                     </Button>
                   )}
-                </div>
+                </div> */}
                 <div className="max-h-[500px] overflow-y-auto">
                   {progressUpdates.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -797,27 +797,27 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                   {(update.createdBy?.name || update.created_by_name || 'U').charAt(0).toUpperCase()}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-medium text-foreground truncate">
+                                  <p className="text-sm font-medium text-foreground truncate">
                                     {update.createdBy?.name || update.created_by_name || 'Unknown'}
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                    <Calendar size={9} />
+                                  <p className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                    <Calendar size={11} />
                                     {formatDate(update.created_at)}
                                   </p>
                                 </div>
                               </div>
                               
                               {/* Action buttons */}
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                                 {update.file_path && getDownloadUrl(update) && has('progress-updates.view') && (
                                   <a
                                     href={getDownloadUrl(update)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Download"
                                   >
-                                    <Download size={12} />
+                                    <Download size={16} />
                                   </a>
                                 )}
                                 {has('progress-updates.update') && (
@@ -829,10 +829,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       });
                                       setShowEditProgressModal(true);
                                     }}
-                                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Edit"
                                   >
-                                    <SquarePen size={12} />
+                                    <SquarePen size={16} />
                                   </button>
                                 )}
                                 {has('progress-updates.delete') && (
@@ -844,10 +844,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       });
                                       setShowDeleteProgressModal(true);
                                     }}
-                                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    className="p-2 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     title="Delete"
                                   >
-                                    <Trash2 size={12} />
+                                    <Trash2 size={16} />
                                   </button>
                                 )}
                               </div>
@@ -858,7 +858,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                           <div className="p-2.5 space-y-2">
                             {/* Description */}
                             {update.description && (
-                              <p className="text-xs text-foreground leading-relaxed line-clamp-3 whitespace-pre-wrap">
+                              <p className="text-sm text-foreground leading-relaxed line-clamp-3 whitespace-pre-wrap">
                                 {update.description}
                               </p>
                             )}
@@ -873,16 +873,16 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 {/* File download link */}
                                 <a
                                   href={getDownloadUrl(update)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-accent hover:bg-accent/80 text-accent-foreground rounded text-[10px] font-medium group/link w-full"
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-accent hover:bg-accent/80 text-accent-foreground rounded text-xs font-medium group/link w-full"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
                                   {getFileIcon(update)}
                                   <span className="truncate flex-1 text-left">{update.original_name || 'Download'}</span>
                                   {update.file_size && (
-                                    <span className="text-muted-foreground text-[10px]">({formatFileSize(update.file_size)})</span>
+                                    <span className="text-muted-foreground text-xs">({formatFileSize(update.file_size)})</span>
                                   )}
-                                  <Download size={10} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                                  <Download size={12} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
                                 </a>
                               </div>
                             )}
@@ -895,8 +895,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                       <div className="flex flex-col items-center gap-1.5">
                         <FileText className="w-8 h-8 text-muted-foreground" />
                         <div>
-                          <p className="text-xs font-medium text-foreground">No progress updates</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Add your first update</p>
+                          <p className="text-sm font-medium text-foreground">No progress updates</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Add your first update</p>
                         </div>
                       </div>
                     </div>
@@ -907,8 +907,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               {/* Issues Section */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-4 h-4 text-destructive" />
-                  <h3 className="text-sm font-semibold text-foreground">Issues ({issues.length})</h3>
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  <h3 className="text-lg font-semibold text-foreground">Issues ({issues.length})</h3>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   {issues.length > 0 ? (
@@ -923,24 +923,24 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                                  <h4 className="text-xs font-semibold text-foreground">{issue.title}</h4>
+                                  <h4 className="text-sm font-semibold text-foreground">{issue.title}</h4>
                                   {getIssueStatusBadge(issue.status)}
                                   {getPriorityBadge(issue.priority)}
                                 </div>
-                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                                   <div className="flex items-center gap-0.5">
-                                    <User size={9} />
+                                    <User size={11} />
                                     <span><span className="text-foreground font-medium">{issue.reportedBy?.name || issue.reported_by_name || 'Unknown'}</span></span>
                                   </div>
                                   {issue.assignedTo?.name || issue.assigned_to_name ? (
                                     <div className="flex items-center gap-0.5">
-                                      <User size={9} />
+                                      <User size={11} />
                                       <span>→ <span className="text-foreground font-medium">{issue.assignedTo?.name || issue.assigned_to_name}</span></span>
                                     </div>
                                   ) : null}
                                   {issue.due_date && (
                                     <div className="flex items-center gap-0.5">
-                                      <Calendar size={9} />
+                                      <Calendar size={11} />
                                       <span>{formatDate(issue.due_date)}</span>
                                     </div>
                                   )}
@@ -948,23 +948,23 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                               </div>
                               
                               {/* Action Buttons */}
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                                 {issue.status !== 'resolved' && issue.status !== 'closed' && has('project-issues.update') && (
                                   <button
                                     onClick={() => handleResolveIssue(issue)}
-                                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Resolve"
                                   >
-                                    <CheckCircle2 size={12} />
+                                    <CheckCircle2 size={16} />
                                   </button>
                                 )}
                                 {issue.status === 'resolved' && has('project-issues.update') && (
                                   <button
                                     onClick={() => handleResolveIssue(issue)}
-                                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Reopen"
                                   >
-                                    <XCircle size={12} />
+                                    <XCircle size={16} />
                                   </button>
                                 )}
                                 {has('project-issues.update') && (
@@ -973,10 +973,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       setEditIssue({ ...issue, task: currentTask });
                                       setShowEditIssueModal(true);
                                     }}
-                                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Edit"
                                   >
-                                    <SquarePen size={12} />
+                                    <SquarePen size={16} />
                                   </button>
                                 )}
                                 {has('project-issues.delete') && (
@@ -985,10 +985,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       setDeleteIssue({ ...issue, task: currentTask });
                                       setShowDeleteIssueModal(true);
                                     }}
-                                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    className="p-2 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     title="Delete"
                                   >
-                                    <Trash2 size={12} />
+                                    <Trash2 size={16} />
                                   </button>
                                 )}
                               </div>
@@ -998,17 +998,17 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                           {/* Issue Content */}
                           <div className="p-2.5">
                             {issue.description ? (
-                              <p className="text-xs text-foreground leading-relaxed line-clamp-3 whitespace-pre-wrap">
+                              <p className="text-sm text-foreground leading-relaxed line-clamp-3 whitespace-pre-wrap">
                                 {issue.description}
                               </p>
                             ) : (
-                              <p className="text-xs text-muted-foreground italic">No description</p>
+                              <p className="text-sm text-muted-foreground italic">No description</p>
                             )}
                             {issue.resolved_at && (
                               <div className="mt-2 pt-2 border-t bg-muted/20 rounded p-1.5">
                                 <div className="flex items-center gap-1">
-                                  <CheckCircle2 size={11} className="text-primary" />
-                                  <p className="text-[10px] font-medium text-foreground">
+                                  <CheckCircle2 size={13} className="text-primary" />
+                                  <p className="text-xs font-medium text-foreground">
                                     Resolved: {formatDate(issue.resolved_at)}
                                   </p>
                                 </div>
@@ -1023,8 +1023,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                       <div className="flex flex-col items-center gap-1.5">
                         <AlertCircle className="w-8 h-8 text-muted-foreground" />
                         <div>
-                          <p className="text-xs font-medium text-foreground">No issues</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">All clear!</p>
+                          <p className="text-sm font-medium text-foreground">No issues</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">All clear!</p>
                         </div>
                       </div>
                     </div>

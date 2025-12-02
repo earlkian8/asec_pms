@@ -122,13 +122,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             icon: TrendingUp,
             type: 'single'
         },
-        {
-            title: 'Chat Management',
-            href: route('chat.index'),
-            routeName: 'chat.*',
-            icon: MessageCircle,
-            type: 'single'
-        },
+        // {
+        //     title: 'Chat Management',
+        //     href: route('chat.index'),
+        //     routeName: 'chat.*',
+        //     icon: MessageCircle,
+        //     type: 'single'
+        // },
         {
             title: 'User Management',
             type: 'collapsible',

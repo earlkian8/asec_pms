@@ -47,7 +47,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="chat"
         options={{
           title: 'Chat',
@@ -55,7 +55,7 @@ export default function TabLayout() {
             <MessageCircle size={size || 24} color={color} />
           ),
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="about"
         options={{

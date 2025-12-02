@@ -66,7 +66,7 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     
     // Notification routes
     Route::get('/notifications', [ClientNotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [ClientNotificationController::class, 'unreadCount']);
+    // Route::get('/notifications/unread-count', [ClientNotificationController::class, 'unreadCount']);
     Route::put('/notifications/{id}/read', [ClientNotificationController::class, 'markAsRead']);
     Route::put('/notifications/read-all', [ClientNotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}', [ClientNotificationController::class, 'destroy']);

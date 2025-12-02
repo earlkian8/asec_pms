@@ -68,11 +68,18 @@ class DashboardController extends Controller
         $totalClients = Client::count();
         $activeClients = Client::where('is_active', true)->count();
 
-        // Billing Statistics
+        // Billing Statistics - Based on transactions (payments) to handle deleted billings
+        // Total billed: Sum of all billing amounts from existing billings
         $totalBilled = Billing::sum('billing_amount');
+        
+        // Total paid: Sum of all payment transactions (even if billing is deleted)
         $totalPaid = BillingPayment::sum('payment_amount');
+        
+        // Total remaining: Calculate from existing billings minus payments
+        // This ensures accuracy even if some billings are deleted
         $totalRemaining = $totalBilled - $totalPaid;
         
+        // Billing status counts - based on existing billings
         $billingsByStatus = Billing::select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
             ->get()

@@ -140,64 +140,64 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
     <AuthenticatedLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
 
-      <div className="w-full sm:px-6 lg:px-8 space-y-6">
+      <div className="w-full sm:px-4 lg:px-6 space-y-4">
         {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Total Projects */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Projects</p>
-                <p className="text-3xl font-bold text-gray-900">{statistics.projects.total}</p>
-                <p className="text-xs text-gray-500 mt-1">{statistics.projects.active} active</p>
+                <p className="text-xs text-gray-600 mb-1">Total Projects</p>
+                <p className="text-2xl font-bold text-gray-900">{statistics.projects.total}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{statistics.projects.active} active</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <FolderOpen className="text-blue-600" size={28} />
+              <div className="p-2.5 bg-blue-100 rounded-full">
+                <FolderOpen className="text-blue-600" size={22} />
               </div>
             </div>
           </div>
 
           {/* Total Clients */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Clients</p>
-                <p className="text-3xl font-bold text-gray-900">{statistics.clients.total}</p>
-                <p className="text-xs text-gray-500 mt-1">{statistics.clients.active} active</p>
+                <p className="text-xs text-gray-600 mb-1">Total Clients</p>
+                <p className="text-2xl font-bold text-gray-900">{statistics.clients.total}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{statistics.clients.active} active</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <Users className="text-purple-600" size={28} />
+              <div className="p-2.5 bg-purple-100 rounded-full">
+                <Users className="text-purple-600" size={22} />
               </div>
             </div>
           </div>
 
           {/* Total Revenue */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-                <p className="text-3xl font-bold text-gray-900">{formatCurrency(statistics.billing.total_paid)}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatCurrency(statistics.billing.total_remaining)} remaining</p>
+                <p className="text-xs text-gray-600 mb-1">Total Revenue</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(statistics.billing.total_paid)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(statistics.billing.total_remaining)} remaining</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <DollarSign className="text-green-600" size={28} />
+              <div className="p-2.5 bg-green-100 rounded-full">
+                <DollarSign className="text-green-600" size={22} />
               </div>
             </div>
           </div>
 
           {/* Total Budget Used */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Budget Used</p>
-                <p className="text-3xl font-bold text-gray-900">{formatCurrency(statistics.budget.total_budget_used)}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 mb-1">Budget Used</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(statistics.budget.total_budget_used)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
                   Labor: {formatCurrency(statistics.budget.total_labor_cost)} | 
                   Materials: {formatCurrency(statistics.budget.total_material_cost)}
                 </p>
               </div>
-              <div className="p-3 bg-orange-100 rounded-full">
-                <TrendingUp className="text-orange-600" size={28} />
+              <div className="p-2.5 bg-orange-100 rounded-full">
+                <TrendingUp className="text-orange-600" size={22} />
               </div>
             </div>
           </div>
@@ -275,14 +275,14 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         )} */}
 
         {/* Charts Row 1: Revenue & Expenses */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Revenue & Expenses Line Chart */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <TrendingUp className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <TrendingUp className="text-gray-600" size={18} />
               Revenue vs Expenses (Last 6 Months)
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={revenueExpenseData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -298,11 +298,11 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 <XAxis 
                   dataKey="month" 
                   stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
                 />
                 <YAxis 
                   stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
                   tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip 
@@ -335,22 +335,22 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
           </div>
 
           {/* Net Profit Chart */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <BarChart3 className="text-gray-600" size={18} />
               Net Profit (Last 6 Months)
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={revenueExpenseData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="month" 
                   stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
                 />
                 <YAxis 
                   stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
                   tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip 
@@ -377,14 +377,14 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         </div>
 
         {/* Charts Row 2: Distribution Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Project Status Pie Chart */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <PieChart className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <PieChart className="text-gray-600" size={18} />
               Project Status Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <RechartsPieChart>
                 <Pie
                   data={projectStatusData}
@@ -407,12 +407,12 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
           </div>
 
           {/* Billing Status Pie Chart */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <DollarSign className="text-gray-600" size={18} />
               Billing Status Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <RechartsPieChart>
                 <Pie
                   data={billingStatusData}
@@ -436,24 +436,24 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         </div>
 
         {/* Charts Row 3: Expense Breakdown & Project Types */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Expense Breakdown */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <BarChart3 className="text-gray-600" size={18} />
               Expense Breakdown (Last 6 Months)
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={revenueExpenseData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="month" 
                   stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
                 />
                 <YAxis 
                   stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
                   tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip 
@@ -472,12 +472,12 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
           </div>
 
           {/* Project Type Distribution */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Activity className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Activity className="text-gray-600" size={18} />
               Project Type Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={projectTypeData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis type="number" stroke="#6b7280" style={{ fontSize: '12px' }} />
@@ -496,38 +496,38 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         </div>
 
         {/* Recent Projects and Billings */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Recent Projects */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FolderOpen className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <FolderOpen className="text-gray-600" size={18} />
                 Recent Projects
               </h3>
               <button
                 onClick={() => router.get(route('project-management.index'))}
-                className="text-sm text-zinc-700 hover:text-zinc-900 flex items-center gap-1 transition"
+                className="text-xs text-zinc-700 hover:text-zinc-900 flex items-center gap-1 transition"
               >
                 View All
-                <ArrowRight size={14} />
+                <ArrowRight size={12} />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentProjects && recentProjects.length > 0 ? (
                 recentProjects.map((project) => (
                   <div
                     key={project.id}
-                    className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition cursor-pointer"
+                    className="border border-gray-200 rounded-lg p-2.5 hover:bg-gray-50 transition cursor-pointer"
                     onClick={() => router.get(route('project-management.view', project.id))}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-900">{project.project_name}</p>
-                        <p className="text-xs text-gray-500 mt-1">{project.project_code}</p>
+                        <p className="text-sm font-semibold text-gray-900">{project.project_name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{project.project_code}</p>
                         <p className="text-xs text-gray-500">{project.client?.client_name}</p>
                       </div>
                       <div className="text-right">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${getStatusColor(project.status)}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${getStatusColor(project.status)}`}>
                           {project.status?.replace('_', ' ')}
                         </span>
                       </div>
@@ -535,44 +535,44 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">No recent projects</p>
+                <p className="text-sm text-gray-500 text-center py-3">No recent projects</p>
               )}
             </div>
           </div>
 
           {/* Recent Billings */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <DollarSign className="text-gray-600" size={20} />
+          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <DollarSign className="text-gray-600" size={18} />
                 Recent Billings
               </h3>
               <button
                 onClick={() => router.get(route('billing-management.index'))}
-                className="text-sm text-zinc-700 hover:text-zinc-900 flex items-center gap-1 transition"
+                className="text-xs text-zinc-700 hover:text-zinc-900 flex items-center gap-1 transition"
               >
                 View All
-                <ArrowRight size={14} />
+                <ArrowRight size={12} />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentBillings && recentBillings.length > 0 ? (
                 recentBillings.map((billing) => (
                   <div
                     key={billing.id}
-                    className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition"
+                    className="border border-gray-200 rounded-lg p-2.5 hover:bg-gray-50 transition"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-900">{billing.billing_code}</p>
-                        <p className="text-xs text-gray-500 mt-1">{billing.project?.project_name}</p>
+                        <p className="text-sm font-semibold text-gray-900">{billing.billing_code}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{billing.project?.project_name}</p>
                         {billing.milestone && (
                           <p className="text-xs text-gray-400">Milestone: {billing.milestone.name}</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">{formatCurrency(billing.billing_amount)}</p>
-                        <span className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${getBillingStatusColor(billing.status)}`}>
+                        <p className="text-sm font-semibold text-gray-900">{formatCurrency(billing.billing_amount)}</p>
+                        <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(billing.status)}`}>
                           {billing.status}
                         </span>
                         </div>
@@ -580,102 +580,102 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">No recent billings</p>
+                <p className="text-sm text-gray-500 text-center py-3">No recent billings</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Additional Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Milestones */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Milestones</p>
-                <p className="text-2xl font-bold text-gray-900">{statistics.milestones.total}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 mb-1">Milestones</p>
+                <p className="text-xl font-bold text-gray-900">{statistics.milestones.total}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
                   {statistics.milestones.completed} completed, {statistics.milestones.in_progress} in progress
                 </p>
               </div>
-              <div className="p-3 bg-indigo-100 rounded-full">
-                <Target className="text-indigo-600" size={24} />
+              <div className="p-2.5 bg-indigo-100 rounded-full">
+                <Target className="text-indigo-600" size={20} />
               </div>
             </div>
           </div>
 
           {/* Tasks */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Tasks</p>
-                <p className="text-2xl font-bold text-gray-900">{statistics.tasks.total}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 mb-1">Tasks</p>
+                <p className="text-xl font-bold text-gray-900">{statistics.tasks.total}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
                   {statistics.tasks.completed} completed, {statistics.tasks.in_progress} in progress
                 </p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <CheckCircle2 className="text-blue-600" size={24} />
+              <div className="p-2.5 bg-blue-100 rounded-full">
+                <CheckCircle2 className="text-blue-600" size={20} />
               </div>
             </div>
           </div>
 
           {/* Team Members */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Active Team</p>
-                <p className="text-2xl font-bold text-gray-900">{statistics.team.total_members}</p>
-                <p className="text-xs text-gray-500 mt-1">members across projects</p>
+                <p className="text-xs text-gray-600 mb-1">Active Team</p>
+                <p className="text-xl font-bold text-gray-900">{statistics.team.total_members}</p>
+                <p className="text-xs text-gray-500 mt-0.5">members across projects</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <Users className="text-purple-600" size={24} />
+              <div className="p-2.5 bg-purple-100 rounded-full">
+                <Users className="text-purple-600" size={20} />
               </div>
             </div>
           </div>
 
           {/* Inventory */}
-          <div className="bg-white rounded-lg border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+          <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow transition">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Inventory Items</p>
-                <p className="text-2xl font-bold text-gray-900">{statistics.inventory.active_items}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 mb-1">Inventory Items</p>
+                <p className="text-xl font-bold text-gray-900">{statistics.inventory.active_items}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
                   {statistics.inventory.low_stock_items} low stock
                 </p>
               </div>
-              <div className="p-3 bg-orange-100 rounded-full">
-                <Package className="text-orange-600" size={24} />
+              <div className="p-2.5 bg-orange-100 rounded-full">
+                <Package className="text-orange-600" size={20} />
               </div>
             </div>
           </div>
         </div>
 
         {/* Billing Summary */}
-        <div className="bg-white rounded-lg border-2 border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <DollarSign className="text-gray-600" size={20} />
+        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <DollarSign className="text-gray-600" size={18} />
             Billing Summary
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Total Billed</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(statistics.billing.total_billed)}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 mb-1">Total Billed</p>
+              <p className="text-xl font-bold text-gray-900">{formatCurrency(statistics.billing.total_billed)}</p>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Total Paid</p>
-              <p className="text-2xl font-bold text-green-700">{formatCurrency(statistics.billing.total_paid)}</p>
+            <div className="bg-green-50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 mb-1">Total Paid</p>
+              <p className="text-xl font-bold text-green-700">{formatCurrency(statistics.billing.total_paid)}</p>
             </div>
-            <div className="bg-orange-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Remaining</p>
-              <p className="text-2xl font-bold text-orange-700">{formatCurrency(statistics.billing.total_remaining)}</p>
+            <div className="bg-orange-50 rounded-lg p-3">
+              <p className="text-xs text-gray-600 mb-1">Remaining</p>
+              <p className="text-xl font-bold text-orange-700">{formatCurrency(statistics.billing.total_remaining)}</p>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex gap-4">
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="flex flex-wrap gap-3">
               {Object.entries(statistics.billing.by_status || {}).map(([status, count]) => (
                 <div key={status} className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${getBillingStatusColor(status)}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(status)}`}>
                     {status}
                   </span>
                   <span className="text-sm text-gray-600">{count}</span>
@@ -683,7 +683,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               ))}
             </div>
           </div>
-                </div>
+        </div>
             </div>
         </AuthenticatedLayout>
     );

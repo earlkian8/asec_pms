@@ -69,12 +69,18 @@ export default function Step2TeamMembers({ users }) {
     if (selectedMemberIds.includes(compositeId)) {
       setSelectedMemberIds(selectedMemberIds.filter((id) => id !== compositeId));
       // Clear form data for deselected member
-      const [type, id] = compositeId.split('-');
-      const memberId = parseInt(id, 10);
       setFormData((prev) => {
         const newData = { ...prev };
         delete newData[compositeId];
         return newData;
+      });
+      // Clear errors for deselected member
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[`${compositeId}_role`];
+        delete newErrors[`${compositeId}_hourly_rate`];
+        delete newErrors[`${compositeId}_start_date`];
+        return newErrors;
       });
     } else {
       setSelectedMemberIds([...selectedMemberIds, compositeId]);
@@ -86,11 +92,29 @@ export default function Step2TeamMembers({ users }) {
       });
       if (member) {
         const currentRole = formData[compositeId]?.role;
+        // Auto-fill role if not already set
         if (!currentRole) {
-          if (member.type === 'user' && member.role) {
-            handleChange(compositeId, 'role', member.role);
-          } else if (member.type === 'employee' && member.position) {
-            handleChange(compositeId, 'role', member.position);
+          const autoRole = (member.type === 'user' && member.role) 
+            ? member.role 
+            : (member.type === 'employee' && member.position) 
+            ? member.position 
+            : null;
+          
+          if (autoRole) {
+            // Set role in formData and clear any existing error
+            setFormData((prev) => ({
+              ...prev,
+              [compositeId]: {
+                ...prev[compositeId],
+                role: autoRole,
+              },
+            }));
+            // Clear error for role if it exists
+            setErrors((prev) => {
+              const newErrors = { ...prev };
+              delete newErrors[`${compositeId}_role`];
+              return newErrors;
+            });
           }
         }
       }
@@ -140,7 +164,13 @@ export default function Step2TeamMembers({ users }) {
       
       const memberName = member.name || 'Team Member';
       
-      if (!formData[compositeId]?.role || formData[compositeId].role.trim() === '') {
+      // Get role from formData or fallback to member's role/position
+      const roleValue = formData[compositeId]?.role || 
+                       (member.type === 'user' ? member.role : null) ||
+                       (member.type === 'employee' ? member.position : null) ||
+                       '';
+      
+      if (!roleValue || roleValue.trim() === '') {
         validationErrors[`${compositeId}_role`] = `Please enter a role for ${memberName}`;
       }
       if (!formData[compositeId]?.hourly_rate || parseFloat(formData[compositeId]?.hourly_rate) <= 0) {
@@ -189,12 +219,18 @@ export default function Step2TeamMembers({ users }) {
       });
 
       if (!isAlreadyAdded) {
+        // Get role from formData or fallback to member's role/position
+        const roleValue = formData[compositeId]?.role || 
+                         (member.type === 'user' ? member.role : null) ||
+                         (member.type === 'employee' ? member.position : null) ||
+                         '';
+        
         addTeamMember({
           id: memberIdInt,
           type: memberType,
           name: member.name || 'Unknown',
           email: member.email || '',
-          role: formData[compositeId]?.role || '',
+          role: roleValue,
           hourly_rate: parseFloat(formData[compositeId]?.hourly_rate) || 0,
           start_date: formData[compositeId]?.start_date || '',
           end_date: formData[compositeId]?.end_date || null,

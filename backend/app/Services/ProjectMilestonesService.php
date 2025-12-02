@@ -96,13 +96,23 @@ class ProjectMilestonesService
         });
 
         // Fetch all active/current users in the project team for task assignment
+        // Users can only be assigned tasks in projects where they are team members
+        // But they can be team members in multiple projects, allowing them to have tasks across projects
         $users = $project->team()
             ->active()
             ->current()
             ->with('user')
             ->get()
             ->pluck('user')
-            ->filter();
+            ->filter()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ];
+            })
+            ->values();
 
         // Fetch all issues for this project
         $issues = ProjectIssue::where('project_id', $project->id)

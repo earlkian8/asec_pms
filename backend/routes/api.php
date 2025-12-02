@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\ClientAuthController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ClientNotificationController;
@@ -19,6 +20,11 @@ Route::prefix('client')->group(function () {
 Route::prefix('task-management')->group(function () {
     Route::post('/login', [TaskManagementAuthController::class, 'login']);
 });
+
+// Broadcasting auth endpoint for API clients
+Route::post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+})->middleware('auth:sanctum');
 
 // Protected routes
 Route::prefix('client')->middleware('auth:sanctum')->group(function () {

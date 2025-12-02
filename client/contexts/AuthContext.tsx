@@ -60,6 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone_number: response.data.phone_number,
           is_active: response.data.is_active,
         });
+        // Initialize Pusher if user is authenticated and we have a token
+        const token = apiService.getToken();
+        if (token) {
+          initializePusher(token);
+        }
       } else {
         setUser(null);
         apiService.setToken(null);

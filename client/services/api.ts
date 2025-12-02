@@ -34,6 +34,10 @@ class ApiService {
     // }
   }
 
+  getToken(): string | null {
+    return this.token;
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit & { responseType?: 'json' | 'blob' | 'text' } = {}

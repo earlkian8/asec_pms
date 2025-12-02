@@ -6,33 +6,11 @@ import { Button } from "@/Components/ui/button";
 import { Send, MessageSquare, User, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
-// import { useEffect } from 'react';
 
 export default function ChatShow() {
   const { chat, messages, allChats } = usePage().props;
   const messagesList = messages?.data || [];
   const paginationLinks = messages?.links || [];
-  useEffect(() => {
-    if (window.Echo && chat) {
-        const channel = window.Echo.private(`chat.${chat.id}`);
-        
-        channel.listen('.message.sent', (data) => {
-            // Add new message to local state
-            setLocalMessages((prev) => {
-                // Check if message already exists
-                const exists = prev.find((msg) => msg.id === data.id);
-                if (exists) return prev;
-                return [...prev, data];
-            });
-            scrollToBottom();
-        });
-
-        return () => {
-            channel.stopListening('.message.sent');
-            window.Echo.leave(`chat.${chat.id}`);
-        };
-    }
-}, [chat]);
 
   const [messageInput, setMessageInput] = useState('');
   const [localMessages, setLocalMessages] = useState(messagesList);
@@ -58,6 +36,45 @@ export default function ChatShow() {
   useEffect(() => {
     scrollToBottom();
   }, [localMessages]);
+
+  // Real-time message updates via Pusher 
+  useEffect(() => {
+    if (window.Echo && chat) {
+      console.log(`Setting up Pusher listener for chat ${chat.id}`);
+      const channel = window.Echo.private(`chat.${chat.id}`);
+      
+      // Monitor subscription events
+      channel.subscribed(() => {
+        console.log(`Subscribed to chat channel: chat.${chat.id}`);
+      });
+
+      channel.error((error) => {
+        console.error('Pusher channel error:', error);
+      });
+      
+      channel.listen('.message.sent', (data) => {
+        console.log('Received message via Pusher:', data);
+        // Add new message to local state
+        setLocalMessages((prev) => {
+          // Check if message already exists
+          const exists = prev.find((msg) => msg.id === data.id);
+          if (exists) return prev;
+          return [...prev, data];
+        });
+        scrollToBottom();
+      });
+
+      return () => {
+        console.log(`Cleaning up Pusher listener for chat ${chat.id}`);
+        channel.stopListening('.message.sent');
+        window.Echo.leave(`chat.${chat.id}`);
+      };
+    } else {
+      if (!window.Echo) {
+        console.warn('Laravel Echo not initialized. Real-time updates will not work.');
+      }
+    }
+  }, [chat]);
 
   const sendMessage = async () => {
     if (!messageInput.trim() || isSending) return;

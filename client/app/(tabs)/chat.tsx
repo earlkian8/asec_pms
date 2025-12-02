@@ -60,7 +60,7 @@ export default function ChatScreen() {
     }
   }, [messages]);
 
-  // Real-time message updates via Pusher (optional - can be enabled later)
+  // Real-time message updates via Pusher
   useEffect(() => {
     if (!chat) return;
 
@@ -74,23 +74,83 @@ export default function ChatScreen() {
         pusher = getPusher();
         
         if (!pusher) {
-          // Pusher not initialized, skip real-time updates
+          console.warn('Pusher not initialized. Real-time updates will not work.');
           return;
         }
 
+        // Monitor connection state
+        pusher.connection.bind('connected', () => {
+          console.log('Pusher connected');
+        });
+
+        pusher.connection.bind('error', (err: any) => {
+          console.error('Pusher connection error:', err);
+        });
+
+        pusher.connection.bind('disconnected', () => {
+          console.warn('Pusher disconnected');
+        });
+
+        // Subscribe to private channel
         channel = pusher.subscribe(`private-chat.${chat.id}`);
 
-        channel.bind('message.sent', (data: Message) => {
+        // Handle subscription events
+        channel.bind('pusher:subscription_succeeded', () => {
+          console.log(`Subscribed to chat channel: private-chat.${chat.id}`);
+        });
+
+        channel.bind('pusher:subscription_error', (status: number) => {
+          console.error(`Failed to subscribe to chat channel: ${status}`);
+        });
+
+        // Listen for new messages - try multiple event name formats
+        const handleMessage = (data: any) => {
+          console.log('Received message via Pusher (raw):', data);
+          
+          // Handle nested data structure (Laravel may wrap the data)
+          const messageData = data.data || data;
+          
+          // Ensure data has the correct structure
+          const message: Message = {
+            id: messageData.id,
+            chat_id: messageData.chat_id,
+            sender_type: messageData.sender_type,
+            sender_id: messageData.sender_id,
+            sender_name: messageData.sender_name,
+            message: messageData.message,
+            read: messageData.read || false,
+            created_at: messageData.created_at,
+          };
+          
+          console.log('Processed message:', message);
+          
           setMessages((prev) => {
-            const exists = prev.find((msg) => msg.id === data.id);
-            if (exists) return prev;
-            return [...prev, data];
+            const exists = prev.find((msg) => msg.id === message.id);
+            if (exists) {
+              console.log('Message already exists, skipping');
+              return prev;
+            }
+            // Add new message at the end (newest messages go to bottom)
+            console.log('Adding new message to state');
+            return [...prev, message];
           });
           scrollToBottom();
-        });
+        };
+
+        // Try the custom event name from broadcastAs() - this is what Laravel broadcasts
+        channel.bind('message.sent', handleMessage);
+        
+        // Also try the full class name format (fallback)
+        channel.bind('App\\Events\\MessageSent', handleMessage);
+        
+        // Debug: listen to all events to see what's being broadcast
+        if (pusher && typeof pusher.bind_all === 'function') {
+          pusher.bind_all((eventName: string, data: any) => {
+            console.log(`Pusher global event: ${eventName}`, data);
+          });
+        }
       } catch (error) {
-        // Silently fail if Pusher is not available
-        console.debug('Pusher not available for real-time updates:', error);
+        console.error('Error setting up Pusher:', error);
       }
     };
 
@@ -101,11 +161,18 @@ export default function ChatScreen() {
       if (channel) {
         try {
           channel.unbind('message.sent');
+          channel.unbind('App\\Events\\MessageSent');
+          channel.unbind('pusher:subscription_succeeded');
+          channel.unbind('pusher:subscription_error');
           if (pusher) {
+            // Unbind global listener if it exists
+            if (typeof pusher.unbind_all === 'function') {
+              pusher.unbind_all();
+            }
             pusher.unsubscribe(`private-chat.${chat.id}`);
           }
         } catch (error) {
-          console.debug('Error cleaning up Pusher channel:', error);
+          console.error('Error cleaning up Pusher channel:', error);
         }
       }
     };
@@ -133,7 +200,9 @@ export default function ChatScreen() {
         pagination: any;
       }>(`/client/chat/${chatId}/messages`);
       if (typeof response === 'object' && 'success' in response && response.success && response.data) {
-        setMessages(response.data.messages.reverse()); // Reverse to show oldest first
+        // Messages come DESC (newest first), reverse to show oldest first (chronological)
+        const sortedMessages = [...response.data.messages].reverse();
+        setMessages(sortedMessages);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -262,8 +331,12 @@ export default function ChatScreen() {
     );
   }
 
-  // Group messages by date
-  const groupedMessages = messages.reduce((groups, message) => {
+  // Sort messages chronologically (oldest to newest) and group by date
+  const sortedMessages = [...messages].sort((a, b) => {
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  const groupedMessages = sortedMessages.reduce((groups, message) => {
     const date = new Date(message.created_at).toDateString();
     if (!groups[date]) {
       groups[date] = [];

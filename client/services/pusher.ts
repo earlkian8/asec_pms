@@ -41,11 +41,12 @@ export const initializePusher = (token: string) => {
   try {
     pusherInstance = new Pusher(PUSHER_KEY, {
       cluster: PUSHER_CLUSTER,
-      authEndpoint: `${process.env.EXPO_PUBLIC_API_URL}/broadcasting/auth`,
+      authEndpoint: `${process.env.EXPO_PUBLIC_API_URL}/api/broadcasting/auth`,
       auth: {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
       },
       enabledTransports: ['ws', 'wss'],

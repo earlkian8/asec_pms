@@ -2,9 +2,11 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\ClientAuthController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ClientNotificationController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\TaskManagementAuthController;
 use App\Http\Controllers\Api\TaskManagementDashboardController;
 use App\Http\Controllers\Api\TaskManagementTaskController;
@@ -18,6 +20,11 @@ Route::prefix('client')->group(function () {
 Route::prefix('task-management')->group(function () {
     Route::post('/login', [TaskManagementAuthController::class, 'login']);
 });
+
+// Broadcasting auth endpoint for API clients
+Route::post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+})->middleware('auth:sanctum');
 
 // Protected routes
 Route::prefix('client')->middleware('auth:sanctum')->group(function () {
@@ -59,11 +66,16 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     
     // Notification routes
     Route::get('/notifications', [ClientNotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [ClientNotificationController::class, 'unreadCount']);
+    // Route::get('/notifications/unread-count', [ClientNotificationController::class, 'unreadCount']);
     Route::put('/notifications/{id}/read', [ClientNotificationController::class, 'markAsRead']);
     Route::put('/notifications/read-all', [ClientNotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}', [ClientNotificationController::class, 'destroy']);
     Route::delete('/notifications', [ClientNotificationController::class, 'clearAll']);
+    
+    // Chat routes
+    Route::get('/chat', [ChatController::class, 'getChat']);
+    Route::get('/chat/{chatId}/messages', [ChatController::class, 'getMessages']);
+    Route::post('/chat/{chatId}/messages', [ChatController::class, 'sendMessage']);
 });
 
 // Task Management Protected routes

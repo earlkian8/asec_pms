@@ -18,7 +18,8 @@ import {
     FileText,
     ChevronRight,
     ChevronDown,
-    X
+    X,
+    MessageCircle
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -121,6 +122,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             icon: TrendingUp,
             type: 'single'
         },
+        // {
+        //     title: 'Chat Management',
+        //     href: route('chat.index'),
+        //     routeName: 'chat.*',
+        //     icon: MessageCircle,
+        //     type: 'single'
+        // },
         {
             title: 'User Management',
             type: 'collapsible',
@@ -193,6 +201,10 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 return hasModuleAccess([
                     'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget'
                 ]) ? module : null;
+            }
+            if (module.title === 'Chat Management') {
+                // Chat is available to all authenticated users (no specific permission check needed)
+                return module;
             }
             if (module.title === 'User Management') {
                 // For collapsible items, check if user has access to any sub-item

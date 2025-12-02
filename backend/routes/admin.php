@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\ChatController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
 use Illuminate\Foundation\Application;
@@ -194,5 +195,13 @@ Route::middleware('auth')->group(function () {
         Route::put('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
         Route::put('/mark-by-type-read', [NotificationController::class, 'markByTypeAsRead'])->name('mark-by-type-read');
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+    });
+
+    // Chat Management
+    Route::prefix('chat')->name('chat.')->group(function(){
+        Route::get('/', [ChatController::class, 'index'])->name('index');
+        Route::get('/{chatId}', [ChatController::class, 'show'])->name('show');
+        Route::get('/{chatId}/messages', [ChatController::class, 'getMessages'])->name('messages');
+        Route::post('/{chatId}/messages', [ChatController::class, 'sendMessage'])->name('send-message');
     });
 });

@@ -8,8 +8,9 @@ import {
   Dimensions,
   RefreshControl,
   Share,
-  Linking,
+  Platform,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
@@ -117,12 +118,20 @@ export default function HomeScreen() {
 
   const handleContact = async (project: DashboardProject, method: 'call' | 'email') => {
     if (method === 'call') {
-      const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
+      // Clean phone number: remove spaces, dashes, and ensure proper format
+      const cleanPhone = FIRM_CONTACT.phone.replace(/[\s\-\(\)]/g, '');
+      const phoneUrl = `tel:${cleanPhone}`;
       
       dialog.showConfirm(
         `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
         async () => {
           try {
+            // On web, tel: links don't work, so show a message
+            if (Platform.OS === 'web') {
+              dialog.showError('Phone calls are not supported on web. Please use a mobile device.');
+              return;
+            }
+            
             const canOpen = await Linking.canOpenURL(phoneUrl);
             if (canOpen) {
               await Linking.openURL(phoneUrl);

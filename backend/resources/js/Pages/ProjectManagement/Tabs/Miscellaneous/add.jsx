@@ -26,7 +26,6 @@ const AddMiscellaneousExpense = ({ setShowAddModal, project }) => {
     amount: "",
     description: "",
     notes: "",
-    receipt_number: "",
   });
 
   const [amountDisplay, setAmountDisplay] = useState('');
@@ -167,19 +166,6 @@ const AddMiscellaneousExpense = ({ setShowAddModal, project }) => {
               className={inputClass(errors.amount)}
             />
             <InputError message={errors.amount} />
-          </div>
-
-          {/* Receipt Number */}
-          <div>
-            <Label className="text-zinc-800">Receipt/Invoice Number</Label>
-            <Input
-              type="text"
-              placeholder="Enter receipt or invoice number (optional)"
-              value={data.receipt_number}
-              onChange={(e) => setData("receipt_number", e.target.value)}
-              className={inputClass(errors.receipt_number)}
-            />
-            <InputError message={errors.receipt_number} />
           </div>
 
           {/* Description */}

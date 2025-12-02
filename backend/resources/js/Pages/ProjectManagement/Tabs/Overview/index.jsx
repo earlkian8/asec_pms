@@ -635,7 +635,13 @@ export default function OverviewTab({ project, overviewData }) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {team.members.slice(0, 8).map((member) => (
               <div key={member.id} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-2.5 border border-gray-200 hover:shadow-md transition-all">
-                <p className="text-sm font-bold text-gray-900">{member.user?.name || member.employee?.first_name + ' ' + member.employee?.last_name || 'Unknown'}</p>
+                <p className="text-sm font-bold text-gray-900">
+                  {member.assignable_name || 
+                   member.user?.name || 
+                   (member.employee?.first_name && member.employee?.last_name 
+                     ? `${member.employee.first_name} ${member.employee.last_name}` 
+                     : 'Unknown')}
+                </p>
                 <p className="text-xs text-gray-600 mt-0.5 font-medium">{member.role || '---'}</p>
                 <span className={`inline-block mt-1.5 px-1.5 py-0.5 rounded text-xs font-bold ${
                   member.status === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-700 border border-gray-200'

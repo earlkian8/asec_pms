@@ -77,15 +77,6 @@ const ViewMiscellaneousExpense = ({ setShowViewModal, project, expense }) => {
                 <span className="text-sm font-medium text-gray-700">Amount:</span>
                 <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(expense.amount)}</p>
               </div>
-              {expense.receipt_number && (
-                <div>
-                  <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <Receipt size={14} />
-                    Receipt/Invoice Number:
-                  </span>
-                  <p className="text-sm text-gray-900 mt-1">{expense.receipt_number}</p>
-                </div>
-              )}
               {expense.description && (
                 <div className="md:col-span-2">
                   <span className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-1">

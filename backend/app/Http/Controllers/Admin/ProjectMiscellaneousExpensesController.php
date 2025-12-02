@@ -24,7 +24,6 @@ class ProjectMiscellaneousExpensesController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01'],
             'description' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
-            'receipt_number' => ['nullable', 'string', 'max:100'],
         ]);
 
         $data['project_id'] = $project->id;
@@ -60,7 +59,6 @@ class ProjectMiscellaneousExpensesController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01'],
             'description' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string'],
-            'receipt_number' => ['nullable', 'string', 'max:100'],
         ]);
 
         $expense->update($data);

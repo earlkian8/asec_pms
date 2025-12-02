@@ -91,12 +91,6 @@ const DeleteMiscellaneousExpense = ({ setShowDeleteModal, project, expense }) =>
                   <span className="font-medium text-gray-700">Amount:</span>{" "}
                   <span className="text-gray-900 font-semibold">{formatCurrency(expense.amount)}</span>
                 </div>
-                {expense.receipt_number && (
-                  <div>
-                    <span className="font-medium text-gray-700">Receipt Number:</span>{" "}
-                    <span className="text-gray-900">{expense.receipt_number}</span>
-                  </div>
-                )}
               </div>
             </div>
             <span className="text-xs text-gray-500 mt-2 block">

@@ -348,9 +348,8 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
     { header: 'Type', width: '15%' },
     { header: 'Date', width: '12%' },
     { header: 'Amount', width: '15%' },
-    { header: 'Receipt #', width: '12%' },
-    { header: 'Description', width: '16%' },
-    { header: 'Actions', width: '10%' },
+    { header: 'Description', width: '24%' },
+    { header: 'Actions', width: '14%' },
   ];
 
   return (
@@ -400,7 +399,7 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Search expenses by name, type, description, or receipt number..."
+              placeholder="Search expenses by name, type, description, or notes..."
               value={searchInput}
               onChange={handleSearch}
               className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
@@ -694,9 +693,6 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
                     <span className="font-bold text-gray-900">
                       {formatCurrency(expense.amount)}
                     </span>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-600">
-                    {expense.receipt_number || '---'}
                   </TableCell>
                   <TableCell className="px-4 py-3 text-gray-600">
                     <div className="max-w-[200px] truncate" title={expense.description || '---'}>

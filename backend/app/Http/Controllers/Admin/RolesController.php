@@ -161,6 +161,13 @@ class RolesController extends Controller
      */
     public function destroy(Role $role)
     {
+        // Check if role has users assigned
+        $usersCount = $role->users()->count();
+        
+        if ($usersCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete role '{$role->name}' because it has {$usersCount} user(s) assigned to it. Please reassign users to other roles first.");
+        }
+
         $roleName = $role->name;
 
         $this->adminActivityLogs(
@@ -179,5 +186,7 @@ class RolesController extends Controller
             null,
             route('user-management.roles-and-permissions.index')
         );
+
+        return back()->with('success', 'Role deleted successfully.');
     }
 }

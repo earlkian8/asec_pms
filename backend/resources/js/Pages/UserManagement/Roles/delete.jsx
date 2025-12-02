@@ -24,20 +24,22 @@ const DeleteRole = ({ setShowDeleteModal, role }) => {
       {
         preserveScroll: true,
         onSuccess: (page) => {
-          setShowDeleteModal(false);
           setProcessing(false);
           const flash = page.props.flash;
           if (flash && flash.error) {
             toast.error(flash.error);
+            // Don't close modal if there's an error
           } else {
+            setShowDeleteModal(false);
             toast.success(`Role "${role.name}" deleted successfully`);
           }
         },
         onError: (errors) => {
-          setShowDeleteModal(false);
           setProcessing(false);
-          if (errors.message) {
-            toast.error(errors.message);
+          // Don't close modal if there's an error
+          const errorMessage = errors?.error?.[0] || errors?.error || errors?.message || (typeof errors === 'string' ? errors : null);
+          if (errorMessage) {
+            toast.error(errorMessage);
           } else {
             toast.error('Failed to delete role. Please try again.');
           }

@@ -1,5 +1,4 @@
-import { router } from '@inertiajs/react';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from "sonner";
 import { AlertTriangle, User, Shield, Loader2, Trash2 } from 'lucide-react';
@@ -15,7 +14,8 @@ import { Button } from '@/Components/ui/button';
 
 const DeleteUser = ({ setShowDeleteModal, user }) => {
   const [processing, setProcessing] = useState(false);
-  const currentUserId = usePage().props.auth?.user?.id;
+  const { props } = usePage();
+  const currentUserId = props.auth?.user?.id;
   const isSelfDelete = user.id === currentUserId;
 
   const handleDelete = (e) => {
@@ -27,20 +27,22 @@ const DeleteUser = ({ setShowDeleteModal, user }) => {
       {
         preserveScroll: true,
         onSuccess: (page) => {
-          setShowDeleteModal(false);
           setProcessing(false);
           const flash = page.props.flash;
           if (flash && flash.error) {
             toast.error(flash.error);
+            // Don't close modal if there's an error
           } else {
+            setShowDeleteModal(false);
             toast.success(`User "${user.name}" deleted successfully`);
           }
         },
         onError: (errors) => {
-          setShowDeleteModal(false);
           setProcessing(false);
-          if (errors.message) {
-            toast.error(errors.message);
+          // Don't close modal if there's an error
+          const errorMessage = errors?.error?.[0] || errors?.error || errors?.message || (typeof errors === 'string' ? errors : null);
+          if (errorMessage) {
+            toast.error(errorMessage);
           } else {
             toast.error('Failed to delete user. Please try again.');
           }

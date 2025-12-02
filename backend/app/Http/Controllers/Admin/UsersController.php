@@ -195,7 +195,13 @@ class UsersController extends Controller
     {
         // Prevent deletion of the current user
         if ($user->id === Auth::id()) {
-            return back()->withErrors(['error' => 'You cannot delete your own account.']);
+            return redirect()->back()->with('error', 'You cannot delete your own account.');
+        }
+
+        // Prevent deletion if there's only 1 user in the system
+        $totalUsers = User::count();
+        if ($totalUsers <= 1) {
+            return redirect()->back()->with('error', 'Cannot delete user. There must be at least one user in the system.');
         }
 
         $userName = $user->name;
@@ -217,5 +223,7 @@ class UsersController extends Controller
             null,
             route('user-management.users.index')
         );
+
+        return back()->with('success', 'User deleted successfully.');
     }
 }

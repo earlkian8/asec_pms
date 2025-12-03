@@ -1,4 +1,5 @@
 import { useForm } from "@inertiajs/react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
 import {
@@ -15,6 +16,7 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
 const EditMiscellaneousExpense = ({ setShowEditModal, project, expense }) => {
   const { data, setData, put, errors, processing } = useForm({
@@ -26,8 +28,18 @@ const EditMiscellaneousExpense = ({ setShowEditModal, project, expense }) => {
     amount: expense.amount || "",
     description: expense.description || "",
     notes: expense.notes || "",
-    receipt_number: expense.receipt_number || "",
   });
+
+  const [amountDisplay, setAmountDisplay] = useState('');
+
+  // Initialize display value when data.amount changes
+  useEffect(() => {
+    if (data.amount) {
+      setAmountDisplay(formatNumberWithCommas(data.amount));
+    } else {
+      setAmountDisplay('');
+    }
+  }, [data.amount]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -127,28 +139,44 @@ const EditMiscellaneousExpense = ({ setShowEditModal, project, expense }) => {
           <div>
             <Label className="text-zinc-800">Amount <span className="text-red-500">*</span></Label>
             <Input
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
               placeholder="0.00"
-              value={data.amount}
-              onChange={(e) => setData("amount", e.target.value)}
+              value={amountDisplay}
+              onChange={(e) => {
+                let inputValue = e.target.value;
+                
+                // Allow empty string
+                if (inputValue === '') {
+                  setAmountDisplay('');
+                  setData("amount", '');
+                  return;
+                }
+                
+                // Remove all non-numeric characters except decimal point
+                inputValue = inputValue.replace(/[^\d.]/g, '');
+                
+                // Prevent multiple decimal points
+                const parts = inputValue.split('.');
+                if (parts.length > 2) {
+                  inputValue = parts[0] + '.' + parts.slice(1).join('');
+                }
+                
+                // Limit decimal places to 2
+                if (parts.length === 2 && parts[1].length > 2) {
+                  inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                }
+                
+                // Format with commas for display
+                const formattedValue = formatNumberWithCommas(inputValue);
+                setAmountDisplay(formattedValue);
+                
+                // Store numeric value (without commas)
+                const numericValue = parseFormattedNumber(inputValue);
+                setData("amount", numericValue);
+              }}
               className={inputClass(errors.amount)}
             />
             <InputError message={errors.amount} />
-          </div>
-
-          {/* Receipt Number */}
-          <div>
-            <Label className="text-zinc-800">Receipt/Invoice Number</Label>
-            <Input
-              type="text"
-              placeholder="Enter receipt or invoice number (optional)"
-              value={data.receipt_number}
-              onChange={(e) => setData("receipt_number", e.target.value)}
-              className={inputClass(errors.receipt_number)}
-            />
-            <InputError message={errors.receipt_number} />
           </div>
 
           {/* Description */}

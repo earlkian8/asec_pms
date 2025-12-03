@@ -8,13 +8,15 @@ import {
   Dimensions,
   RefreshControl,
   Share,
-  Linking,
+  Platform,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { useDashboard, DashboardProject } from '@/hooks/useDashboard';
+import { useBillings, Billing } from '@/hooks/useBillings';
 import { FIRM_CONTACT } from '@/constants/contact';
 import {
   Briefcase,
@@ -25,10 +27,12 @@ import {
   Coins,
   TrendingUp,
   Share2,
-  Phone,
   Mail,
   Bell,
   Star,
+  Receipt,
+  AlertCircle,
+  CreditCard,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +48,10 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { favorites, toggleFavorite, unreadCount, refreshNotifications } = useApp();
   const { statistics, projects, loading, refresh } = useDashboard();
+  const { billings, loading: billingsLoading, refresh: refreshBillings } = useBillings({
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+  });
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
@@ -54,12 +62,48 @@ export default function HomeScreen() {
 
   const activeProjects = projects.filter((p) => p.status === 'active');
   const recentProjects = activeProjects.slice(0, 3);
+  const recentBillings = billings.slice(0, 5);
+
+  // Calculate billing statistics
+  const billingStats = React.useMemo(() => {
+    const unpaid = billings.filter((b) => b.status === 'unpaid').length;
+    const partial = billings.filter((b) => b.status === 'partial').length;
+    const paid = billings.filter((b) => b.status === 'paid').length;
+    const totalUnpaid = billings
+      .filter((b) => b.status === 'unpaid' || b.status === 'partial')
+      .reduce((sum, b) => sum + b.remaining_amount, 0);
+    const overdue = billings.filter((b) => {
+      if (!b.due_date) return false;
+      const dueDate = new Date(b.due_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return (b.status === 'unpaid' || b.status === 'partial') && dueDate < today;
+    }).length;
+
+    return { unpaid, partial, paid, totalUnpaid, overdue };
+  }, [billings]);
+
+  // Get payment status for a project
+  const getProjectPaymentStatus = (projectId: string) => {
+    const projectBillings = billings.filter((b) => b.project.id.toString() === projectId.toString());
+    if (projectBillings.length === 0) return null;
+    
+    const hasUnpaid = projectBillings.some((b) => b.status === 'unpaid');
+    const hasPartial = projectBillings.some((b) => b.status === 'partial');
+    const totalUnpaid = projectBillings
+      .filter((b) => b.status === 'unpaid' || b.status === 'partial')
+      .reduce((sum, b) => sum + b.remaining_amount, 0);
+
+    if (hasUnpaid) return { status: 'unpaid' as const, amount: totalUnpaid };
+    if (hasPartial) return { status: 'partial' as const, amount: totalUnpaid };
+    return { status: 'paid' as const, amount: 0 };
+  };
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refresh(), refreshNotifications()]);
+    await Promise.all([refresh(), refreshBillings(), refreshNotifications()]);
     setRefreshing(false);
-  }, [refresh, refreshNotifications]);
+  }, [refresh, refreshBillings, refreshNotifications]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
@@ -115,52 +159,28 @@ export default function HomeScreen() {
     }
   };
 
-  const handleContact = async (project: DashboardProject, method: 'call' | 'email') => {
-    if (method === 'call') {
-      const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
-      
-      dialog.showConfirm(
-        `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        async () => {
-          try {
-            const canOpen = await Linking.canOpenURL(phoneUrl);
-            if (canOpen) {
-              await Linking.openURL(phoneUrl);
-            } else {
-              dialog.showError('Unable to open phone dialer');
-            }
-          } catch (error) {
-            dialog.showError('Failed to open phone dialer');
-            console.error('Error opening phone:', error);
+  const handleContact = async (project: DashboardProject) => {
+    const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
+    
+    dialog.showConfirm(
+      `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
+      async () => {
+        try {
+          const canOpen = await Linking.canOpenURL(emailUrl);
+          if (canOpen) {
+            await Linking.openURL(emailUrl);
+          } else {
+            dialog.showError('Unable to open email client');
           }
-        },
-        'Contact Project Manager',
-        'Call',
-        'Cancel'
-      );
-    } else {
-      const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-      
-      dialog.showConfirm(
-        `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        async () => {
-          try {
-            const canOpen = await Linking.canOpenURL(emailUrl);
-            if (canOpen) {
-              await Linking.openURL(emailUrl);
-            } else {
-              dialog.showError('Unable to open email client');
-            }
-          } catch (error) {
-            dialog.showError('Failed to open email client');
-            console.error('Error opening email:', error);
-          }
-        },
-        'Contact Project Manager',
-        'Email',
-        'Cancel'
-      );
-    }
+        } catch (error) {
+          dialog.showError('Failed to open email client');
+          console.error('Error opening email:', error);
+        }
+      },
+      'Contact Project Manager',
+      'Email',
+      'Cancel'
+    );
   };
 
   const handleRequestUpdate = (project: DashboardProject) => {
@@ -176,8 +196,16 @@ export default function HomeScreen() {
       pending: { bg: '#F3F4F6', text: '#4B5563' }, // gray-100/gray-600
     };
 
+    const paymentStatusColors: Record<string, { bg: string; text: string }> = {
+      unpaid: { bg: '#FEE2E2', text: '#991B1B' },
+      partial: { bg: '#FEF3C7', text: '#92400E' },
+      paid: { bg: '#D1FAE5', text: '#065F46' },
+    };
+
     const status = statusColors[project.status] || statusColors.pending;
     const isFavorite = favorites.has(project.id);
+    const paymentStatus = getProjectPaymentStatus(project.id);
+    const paymentColor = paymentStatus ? paymentStatusColors[paymentStatus.status] : null;
 
     return (
       <AnimatedCard
@@ -192,27 +220,25 @@ export default function HomeScreen() {
                 <Text style={[styles.projectName, { color: textColor }]} numberOfLines={1}>
                   {project.name}
                 </Text>
-                {/* <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(project.id);
-                  }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Star
-                    size={20}
-                    color={isFavorite ? '#F59E0B' : textSecondary}
-                    fill={isFavorite ? '#F59E0B' : 'none'}
-                  />
-                </TouchableOpacity> */}
               </View>
               <Text style={[styles.projectLocation, { color: textSecondary }]} numberOfLines={1}>
                 {project.location || 'No location specified'}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-              <Text style={[styles.statusText, { color: status.text }]}>
-                {project.status.replace('-', ' ').toUpperCase()}
-              </Text>
+            <View style={styles.badgeContainer}>
+              <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+                <Text style={[styles.statusText, { color: status.text }]}>
+                  {project.status.replace('-', ' ').toUpperCase()}
+                </Text>
+              </View>
+              {paymentStatus && paymentStatus.status !== 'paid' && paymentColor && (
+                <View style={[styles.paymentBadge, { backgroundColor: paymentColor.bg }]}>
+                  <CreditCard size={10} color={paymentColor.text} />
+                  <Text style={[styles.paymentBadgeText, { color: paymentColor.text }]}>
+                    {paymentStatus.status === 'unpaid' ? 'UNPAID' : 'PARTIAL'}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -238,6 +264,14 @@ export default function HomeScreen() {
                 Due: {new Date(project.expectedCompletion).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </Text>
             </View>
+            {paymentStatus && paymentStatus.status !== 'paid' && (
+              <View style={styles.paymentInfo}>
+                <AlertCircle size={14} color={paymentStatus.status === 'unpaid' ? '#EF4444' : '#F59E0B'} />
+                <Text style={[styles.paymentInfoText, { color: paymentStatus.status === 'unpaid' ? '#EF4444' : '#F59E0B' }]}>
+                  {formatCurrency(paymentStatus.amount)} {paymentStatus.status === 'unpaid' ? 'unpaid' : 'remaining'}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Budget Section */}
@@ -283,19 +317,9 @@ export default function HomeScreen() {
         <View style={styles.projectActions}>
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => handleContact(project, 'call')}>
-            <Phone size={16} color="#3B82F6" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => handleContact(project, 'email')}>
+            onPress={() => handleContact(project)}>
             <Mail size={16} color="#3B82F6" />
           </TouchableOpacity>
-          {/* <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => handleShare(project)}>
-            <Share2 size={16} color={textSecondary} />
-          </TouchableOpacity> */}
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonText]}
             onPress={() => handleRequestUpdate(project)}>
@@ -424,6 +448,48 @@ export default function HomeScreen() {
               </Text>
             </View>
             </AnimatedView>
+
+            {/* Billing Summary */}
+            <AnimatedView delay={250}>
+              <View style={[styles.billingSummaryCard, { backgroundColor: cardBg, borderColor }]}>
+                <View style={styles.billingSummaryHeader}>
+                  <Receipt size={20} color={textColor} />
+                  <Text style={[styles.sectionTitle, { color: textColor, marginLeft: 8 }]}>Billing Summary</Text>
+                </View>
+                <View style={styles.billingStatsGrid}>
+                  <View style={styles.billingStatItem}>
+                    <View style={[styles.billingStatDot, { backgroundColor: '#EF4444' }]} />
+                    <Text style={[styles.billingStatValue, { color: textColor }]}>{billingStats.unpaid}</Text>
+                    <Text style={[styles.billingStatLabel, { color: textSecondary }]}>Unpaid</Text>
+                  </View>
+                  <View style={styles.billingStatItem}>
+                    <View style={[styles.billingStatDot, { backgroundColor: '#F59E0B' }]} />
+                    <Text style={[styles.billingStatValue, { color: textColor }]}>{billingStats.partial}</Text>
+                    <Text style={[styles.billingStatLabel, { color: textSecondary }]}>Partial</Text>
+                  </View>
+                  <View style={styles.billingStatItem}>
+                    <View style={[styles.billingStatDot, { backgroundColor: '#10B981' }]} />
+                    <Text style={[styles.billingStatValue, { color: textColor }]}>{billingStats.paid}</Text>
+                    <Text style={[styles.billingStatLabel, { color: textSecondary }]}>Paid</Text>
+                  </View>
+                  {billingStats.overdue > 0 && (
+                    <View style={styles.billingStatItem}>
+                      <AlertCircle size={16} color="#EF4444" />
+                      <Text style={[styles.billingStatValue, { color: '#EF4444' }]}>{billingStats.overdue}</Text>
+                      <Text style={[styles.billingStatLabel, { color: textSecondary }]}>Overdue</Text>
+                    </View>
+                  )}
+                </View>
+                {billingStats.totalUnpaid > 0 && (
+                  <View style={styles.totalUnpaidSection}>
+                    <Text style={[styles.totalUnpaidLabel, { color: textSecondary }]}>Total Outstanding</Text>
+                    <Text style={[styles.totalUnpaidValue, { color: '#EF4444' }]}>
+                      {formatCurrency(billingStats.totalUnpaid)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </AnimatedView>
           </>
         )}
 
@@ -433,8 +499,107 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Recent Projects */}
+        {/* Recent Billings */}
         <AnimatedView delay={300}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>Recent Billings</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/billings')}>
+                <Text style={[styles.seeAll, { color: '#3B82F6' }]}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {billingsLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={[styles.loadingText, { color: textSecondary }]}>Loading billings...</Text>
+              </View>
+            ) : recentBillings.length > 0 ? (
+              recentBillings.map((billing, index) => {
+                const billingStatusColors: Record<string, { bg: string; text: string }> = {
+                  unpaid: { bg: '#FEE2E2', text: '#991B1B' },
+                  partial: { bg: '#FEF3C7', text: '#92400E' },
+                  paid: { bg: '#D1FAE5', text: '#065F46' },
+                };
+                const billingStatus = billingStatusColors[billing.status] || billingStatusColors.unpaid;
+                const isOverdue = billing.due_date && 
+                  new Date(billing.due_date) < new Date() && 
+                  (billing.status === 'unpaid' || billing.status === 'partial');
+
+                return (
+                  <AnimatedCard
+                    key={billing.id}
+                    index={index}
+                    delay={350 + index * 50}
+                    onPress={() => router.push(`/billing-detail?id=${billing.id}`)}
+                    style={[styles.billingCard, { backgroundColor: cardBg, borderColor }]}>
+                    <View style={styles.billingCardHeader}>
+                      <View style={styles.billingCardTitleContainer}>
+                        <View style={styles.billingTitleRow}>
+                          <View style={[styles.billingStatusDot, { backgroundColor: billingStatus.text }]} />
+                          <Text style={[styles.billingCode, { color: textColor }]} numberOfLines={1}>
+                            {billing.billing_code}
+                          </Text>
+                        </View>
+                        <Text style={[styles.billingProject, { color: textSecondary }]} numberOfLines={1}>
+                          {billing.project.project_name}
+                        </Text>
+                      </View>
+                      <View style={[styles.billingStatusBadge, { backgroundColor: billingStatus.bg }]}>
+                        <Text style={[styles.billingStatusText, { color: billingStatus.text }]}>
+                          {billing.status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.billingCardBody}>
+                      <View style={styles.billingAmountRow}>
+                        <Text style={[styles.billingAmountLabel, { color: textSecondary }]}>Amount</Text>
+                        <Text style={[styles.billingAmountValue, { color: textColor }]}>
+                          {formatCurrency(billing.billing_amount)}
+                        </Text>
+                      </View>
+                      <View style={styles.billingAmountRow}>
+                        <Text style={[styles.billingAmountLabel, { color: textSecondary }]}>Paid</Text>
+                        <Text style={[styles.billingAmountValue, { color: '#10B981' }]}>
+                          {formatCurrency(billing.total_paid)}
+                        </Text>
+                      </View>
+                      {billing.remaining_amount > 0 && (
+                        <View style={styles.billingAmountRow}>
+                          <Text style={[styles.billingAmountLabel, { color: textSecondary }]}>Remaining</Text>
+                          <Text style={[styles.billingAmountValue, { color: '#EF4444' }]}>
+                            {formatCurrency(billing.remaining_amount)}
+                          </Text>
+                        </View>
+                      )}
+                      {billing.due_date && (
+                        <View style={styles.billingDueDateRow}>
+                          <Calendar size={12} color={isOverdue ? '#EF4444' : textSecondary} />
+                          <Text style={[
+                            styles.billingDueDate, 
+                            { color: isOverdue ? '#EF4444' : textSecondary }
+                          ]}>
+                            Due: {new Date(billing.due_date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
+                            {isOverdue && ' (Overdue)'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </AnimatedCard>
+                );
+              })
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyStateText, { color: textSecondary }]}>No recent billings</Text>
+              </View>
+            )}
+          </View>
+        </AnimatedView>
+
+        {/* Recent Projects */}
+        <AnimatedView delay={400}>
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: textColor }]}>Active Projects</Text>
@@ -809,6 +974,160 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  paymentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  paymentBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  paymentInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+  },
+  paymentInfoText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  billingSummaryCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  billingSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  billingStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  billingStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  billingStatDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  billingStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  billingStatLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  totalUnpaidSection: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalUnpaidLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  totalUnpaidValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  billingCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  billingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  billingCardTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  billingTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  billingStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  billingCode: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  billingProject: {
+    fontSize: 12,
+    fontWeight: '400',
+    marginLeft: 16,
+  },
+  billingStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  billingStatusText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  billingCardBody: {
+    gap: 8,
+  },
+  billingAmountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  billingAmountLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  billingAmountValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  billingDueDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  billingDueDate: {
+    fontSize: 12,
     fontWeight: '500',
   },
 });

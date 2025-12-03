@@ -232,7 +232,11 @@ export default function EmployeesIndex() {
     });
     setSortBy('created_at');
     setSortOrder('desc');
-    router.get(route('employee-management.index'), { search: searchInput }, {
+    const params = {};
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
+    router.get(route('employee-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -253,9 +257,13 @@ export default function EmployeesIndex() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = {};
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('employee-management.index'),
-        { search: searchInput },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -266,13 +274,15 @@ export default function EmployeesIndex() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       ...(localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null && { is_active: localFilters.is_active === true || localFilters.is_active === 'true' || localFilters.is_active === 1 || localFilters.is_active === '1' ? 1 : 0 }),
       ...(localFilters.position && { position: localFilters.position }),
       sort_by: sortBy,
       sort_order: sortOrder,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('employee-management.index'),

@@ -261,7 +261,11 @@ export default function InventoryManagement() {
     });
     setSortBy('created_at');
     setSortOrder('desc');
-    router.get(route('inventory-management.index'), { search: searchInput }, {
+    const params = {};
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
+    router.get(route('inventory-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -282,9 +286,13 @@ export default function InventoryManagement() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = {};
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('inventory-management.index'),
-        { search: searchInput },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -295,7 +303,6 @@ export default function InventoryManagement() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       ...(localFilters.category && { category: localFilters.category }),
       ...(localFilters.is_active !== '' && { is_active: localFilters.is_active }),
@@ -303,6 +310,9 @@ export default function InventoryManagement() {
       sort_by: sortBy,
       sort_order: sortOrder,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('inventory-management.index'),
@@ -338,6 +348,8 @@ export default function InventoryManagement() {
       is_active: newStatus,
     }, {
       preserveScroll: true,
+      preserveState: true,
+      only: ['items'],
       onSuccess: () => toast.success('Item status updated successfully!'),
       onError: () => toast.error('Failed to update status.'),
     });

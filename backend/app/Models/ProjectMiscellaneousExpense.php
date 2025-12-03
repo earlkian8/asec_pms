@@ -14,7 +14,6 @@ class ProjectMiscellaneousExpense extends Model
         'amount',
         'description',
         'notes',
-        'receipt_number',
         'created_by',
     ];
 

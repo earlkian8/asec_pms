@@ -26,8 +26,22 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
     return date.toISOString().split('T')[0];
   };
 
+  // Get role from user/employee profile (not from projectTeam.role which might be outdated)
+  const getRoleFromProfile = () => {
+    if (projectTeam?.assignable_type === 'employee' && projectTeam?.employee?.position) {
+      return projectTeam.employee.position;
+    }
+    if (projectTeam?.assignable_type === 'user' && projectTeam?.user?.roles?.[0]?.name) {
+      return projectTeam.user.roles[0].name;
+    }
+    // Fallback to stored role if profile role is not available
+    return projectTeam?.role || "";
+  };
+
+  const roleFromProfile = getRoleFromProfile();
+
   const { data, setData, put, errors, processing, transform } = useForm({
-    role: projectTeam?.role || "",
+    role: roleFromProfile,
     hourly_rate: projectTeam?.hourly_rate ? parseFloat(projectTeam.hourly_rate) : 0,
     start_date: formatDateForInput(projectTeam?.start_date),
     end_date: formatDateForInput(projectTeam?.end_date),
@@ -43,8 +57,26 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
     is_active: Boolean(data.is_active),
   }))
 
+  const [validationErrors, setValidationErrors] = useState({});
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    setValidationErrors({})
+
+    // Client-side validation
+    const errors = {};
+    if (!data.hourly_rate || parseFloat(data.hourly_rate) <= 0) {
+      errors.hourly_rate = "Please enter a valid hourly rate";
+    }
+    if (!data.start_date) {
+      errors.start_date = "Please enter a start date";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error("Please check the form for errors");
+      return;
+    }
 
     put(
       route("project-management.project-teams.update", [project.id, projectTeam.id]),
@@ -52,6 +84,7 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
         preserveScroll: true,
         onSuccess: (page) => {
           setShowEditModal(false)
+          setValidationErrors({})
           const flash = page.props.flash
           if (flash && flash.error) {
             toast.error(flash.error)
@@ -61,6 +94,7 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
         },
         onError: (errors) => {
           console.error('Update errors:', errors)
+          setValidationErrors(errors)
           if (errors && Object.keys(errors).length > 0) {
             const firstError = Object.values(errors)[0]
             toast.error(Array.isArray(firstError) ? firstError[0] : firstError)
@@ -71,6 +105,10 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
       }
     )
   }
+
+  const getFieldError = (field) => {
+    return validationErrors[field] || errors[field];
+  };
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -95,26 +133,37 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
             <Input
               type="text"
               value={data.role}
-              onChange={(e) => setData("role", e.target.value)}
-              placeholder="e.g. Developer, Designer"
-              className={inputClass(errors.role)}
+              readOnly
+              placeholder="Role from user/employee profile"
+              className="bg-gray-50 border-gray-300 text-gray-700 cursor-not-allowed"
+              title="Role is automatically set from user/employee profile and cannot be modified"
             />
-            <InputError message={errors.role} />
+            <p className="text-xs text-gray-500 mt-1">Role is automatically set from user/employee profile</p>
           </div>
 
           {/* Hourly Rate */}
           <div>
-            <Label className="text-zinc-800">Hourly Rate</Label>
+            <Label className="text-zinc-800">Hourly Rate <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               step="0.01"
               min="0"
               value={data.hourly_rate}
-              onChange={(e) => setData("hourly_rate", parseFloat(e.target.value) || 0)}
+              onChange={(e) => {
+                setData("hourly_rate", parseFloat(e.target.value) || 0);
+                if (validationErrors.hourly_rate) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.hourly_rate;
+                    return newErrors;
+                  });
+                }
+              }}
               placeholder="Enter hourly rate"
-              className={inputClass(errors.hourly_rate)}
+              className={inputClass(getFieldError("hourly_rate"))}
+              required
             />
-            <InputError message={errors.hourly_rate} />
+            <InputError message={getFieldError("hourly_rate")} />
           </div>
 
           {/* Status */}
@@ -137,16 +186,26 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
 
           {/* Start Date */}
           <div>
-            <Label className="text-zinc-800">Start Date</Label>
+            <Label className="text-zinc-800">Start Date <span className="text-red-500">*</span></Label>
             <Input
               type="date"
               value={data.start_date || ""}
-              onChange={(e) => setData("start_date", e.target.value)}
+              onChange={(e) => {
+                setData("start_date", e.target.value);
+                if (validationErrors.start_date) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.start_date;
+                    return newErrors;
+                  });
+                }
+              }}
               min={project?.start_date || undefined}
               max={project?.planned_end_date || undefined}
-              className={inputClass(errors.start_date)}
+              className={inputClass(getFieldError("start_date"))}
+              required
             />
-            <InputError message={errors.start_date} />
+            <InputError message={getFieldError("start_date")} />
           </div>
 
           {/* End Date */}

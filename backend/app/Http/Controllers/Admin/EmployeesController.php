@@ -48,8 +48,11 @@ class EmployeesController extends Controller
                 $query->where('position', 'ilike', "%{$position}%");
             })
             ->orderBy($sortBy, $sortOrder)
-            ->paginate(10)
-            ->withQueryString();
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         // Get unique values for filter options
         $positions = Employee::distinct()->whereNotNull('position')->pluck('position')->sort()->values();
@@ -127,7 +130,7 @@ class EmployeesController extends Controller
             route('employee-management.index')
         );
 
-        return redirect()->back()->with('success', 'Employee updated successfully.');
+        return back()->with('success', 'Employee updated successfully.');
     }
 
     public function destroy(Employee $employee)
@@ -195,6 +198,6 @@ class EmployeesController extends Controller
             route('employee-management.index')
         );
 
-        return redirect()->back()->with('success', 'Status updated successfully.');
+        return back()->with('success', 'Status updated successfully.');
     }
 }

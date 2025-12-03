@@ -98,7 +98,7 @@ class ClientDashboardController extends Controller
         $sortOrder = $request->query('sort_order', 'asc'); // Sort direction
         
         $query = Project::where('client_id', $client->id)
-            ->with(['team.user', 'milestones.tasks']);
+            ->with(['team.user', 'team.employee', 'milestones.tasks']);
         
         // Search filter
         if ($search) {
@@ -116,7 +116,6 @@ class ClientDashboardController extends Controller
                 'active' => 'active',
                 'on-hold' => 'on_hold',
                 'completed' => 'completed',
-                'pending' => 'planning',
             ];
             $backendStatus = $statusMap[$status] ?? $status;
             $query->where('status', $backendStatus);
@@ -180,14 +179,20 @@ class ClientDashboardController extends Controller
                 ->where('role', 'Project Manager')
                 ->where('is_active', true)
                 ->first();
-            $projectManagerName = $projectManager ? $projectManager->user->name : 'N/A';
+            $projectManagerName = 'N/A';
+            if ($projectManager) {
+                if ($projectManager->user) {
+                    $projectManagerName = $projectManager->user->name;
+                } elseif ($projectManager->employee) {
+                    $projectManagerName = $projectManager->employee->full_name;
+                }
+            }
             
             // Map backend status to frontend status
             $statusMap = [
                 'active' => 'active',
                 'on_hold' => 'on-hold',
                 'completed' => 'completed',
-                'planning' => 'pending',
                 'cancelled' => 'on-hold',
             ];
             
@@ -195,7 +200,7 @@ class ClientDashboardController extends Controller
                 'id' => (string) $project->id,
                 'name' => $project->project_name,
                 'description' => $project->description ?? '',
-                'status' => $statusMap[$project->status] ?? 'pending',
+                'status' => $statusMap[$project->status] ?? 'active',
                 'progress' => $progress,
                 'startDate' => $project->start_date,
                 'expectedCompletion' => $project->planned_end_date,
@@ -228,7 +233,7 @@ class ClientDashboardController extends Controller
         
         // Get all projects (same logic as projects method but without pagination)
         $query = Project::where('client_id', $client->id)
-            ->with(['team.user', 'milestones.tasks']);
+            ->with(['team.user', 'team.employee', 'milestones.tasks']);
         
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
@@ -270,19 +275,25 @@ class ClientDashboardController extends Controller
                 ->where('role', 'Project Manager')
                 ->where('is_active', true)
                 ->first();
-            $projectManagerName = $projectManager ? $projectManager->user->name : 'N/A';
+            $projectManagerName = 'N/A';
+            if ($projectManager) {
+                if ($projectManager->user) {
+                    $projectManagerName = $projectManager->user->name;
+                } elseif ($projectManager->employee) {
+                    $projectManagerName = $projectManager->employee->full_name;
+                }
+            }
             
             $statusMap = [
                 'active' => 'Active',
                 'on_hold' => 'On Hold',
                 'completed' => 'Completed',
-                'planning' => 'Pending',
                 'cancelled' => 'On Hold',
             ];
             
             return [
                 'Project Name' => $project->project_name,
-                'Status' => $statusMap[$project->status] ?? 'Pending',
+                'Status' => $statusMap[$project->status] ?? 'Active',
                 'Progress (%)' => $progress,
                 'Location' => $project->location ?? '',
                 'Project Manager' => $projectManagerName,
@@ -400,6 +411,7 @@ class ClientDashboardController extends Controller
             ->where('client_id', $client->id)
             ->with([
                 'team.user',
+                'team.employee',
                 'milestones.tasks.assignedUser',
                 'milestones.tasks.progressUpdates.createdBy',
             ])
@@ -445,14 +457,20 @@ class ClientDashboardController extends Controller
             ->where('role', 'Project Manager')
             ->where('is_active', true)
             ->first();
-        $projectManagerName = $projectManager ? $projectManager->user->name : 'N/A';
+        $projectManagerName = 'N/A';
+        if ($projectManager) {
+            if ($projectManager->user) {
+                $projectManagerName = $projectManager->user->name;
+            } elseif ($projectManager->employee) {
+                $projectManagerName = $projectManager->employee->full_name;
+            }
+        }
 
         // Map backend status to frontend status
         $statusMap = [
             'active' => 'active',
             'on_hold' => 'on-hold',
             'completed' => 'completed',
-            'planning' => 'pending',
             'cancelled' => 'on-hold',
         ];
 
@@ -512,9 +530,17 @@ class ClientDashboardController extends Controller
         $teamMembers = $project->team
             ->where('is_active', true)
             ->map(function ($teamMember) {
+                // Get name from user or employee (they can be mixed in team members)
+                $name = 'Unknown';
+                if ($teamMember->user) {
+                    $name = $teamMember->user->name;
+                } elseif ($teamMember->employee) {
+                    $name = $teamMember->employee->full_name;
+                }
+                
                 return [
                     'id' => (string) $teamMember->id,
-                    'name' => $teamMember->user->name,
+                    'name' => $name,
                     'role' => $teamMember->role,
                 ];
             });

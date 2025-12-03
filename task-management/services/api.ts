@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.14.31:8000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.108:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -118,7 +118,7 @@ class ApiService {
 
   async post<T>(endpoint: string, body?: any, isFormData?: boolean): Promise<ApiResponse<T>> {
     if (isFormData && body instanceof FormData) {
-      // For file uploads, don't stringify and don't set Content-Type (browser will set it with boundary)
+      // For file uploads, don't stringify and don't set Content-Type (browser/RN will set it with boundary)
       const headers: HeadersInit = {
         'Accept': 'application/json',
       };
@@ -134,7 +134,15 @@ class ApiService {
         body: body,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        return {
+          success: false,
+          message: 'Invalid response from server',
+        };
+      }
 
       if (!response.ok) {
         return {
@@ -158,7 +166,7 @@ class ApiService {
 
   async put<T>(endpoint: string, body?: any, isFormData?: boolean): Promise<ApiResponse<T>> {
     if (isFormData && body instanceof FormData) {
-      // For file uploads, don't stringify and don't set Content-Type (browser will set it with boundary)
+      // For file uploads, don't stringify and don't set Content-Type (browser/RN will set it with boundary)
       const headers: HeadersInit = {
         'Accept': 'application/json',
       };
@@ -174,7 +182,15 @@ class ApiService {
         body: body,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        return {
+          success: false,
+          message: 'Invalid response from server',
+        };
+      }
 
       if (!response.ok) {
         return {

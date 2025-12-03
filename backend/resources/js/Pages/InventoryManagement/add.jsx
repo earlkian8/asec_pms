@@ -14,9 +14,49 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
 import { Switch } from "@/Components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
 import { Loader2, Package } from "lucide-react";
 
 const AddInventoryItem = ({ setShowAddModal }) => {
+  const categories = [
+    "Construction Materials",
+    "Electrical",
+    "Plumbing",
+    "Tools & Equipment",
+    "Safety Equipment",
+    "Office Supplies",
+  ];
+
+  const units = [
+    "pieces",
+    "kg",
+    "meters",
+    "liters",
+    "boxes",
+    "rolls",
+    "units",
+    "packs",
+    "sets",
+    "tons",
+    "gallons",
+    "square meters",
+    "cubic meters",
+    "feet",
+    "yards",
+    "pounds",
+    "bags",
+    "cartons",
+    "bundles",
+    "sheets",
+    "pallets",
+  ];
+
   const { data, setData, post, errors, processing } = useForm({
     item_name: "",
     description: "",
@@ -97,13 +137,28 @@ const AddInventoryItem = ({ setShowAddModal }) => {
           {/* Category */}
           <div>
             <Label className="text-zinc-800">Category</Label>
-            <Input
-              type="text"
+            <Select
               value={data.category}
-              onChange={(e) => setData("category", e.target.value)}
-              placeholder="e.g., Construction Materials, Tools"
-              className={inputClass(errors.category)}
-            />
+              onValueChange={(value) => setData("category", value)}
+            >
+              <SelectTrigger
+                className={
+                  "w-full text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
+                  (errors.category
+                    ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
+                    : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800")
+                }
+              >
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <InputError message={errors.category} />
           </div>
 
@@ -112,13 +167,28 @@ const AddInventoryItem = ({ setShowAddModal }) => {
             <Label className="text-zinc-800">
               Unit of Measure <span className="text-red-500">*</span>
             </Label>
-            <Input
-              type="text"
+            <Select
               value={data.unit_of_measure}
-              onChange={(e) => setData("unit_of_measure", e.target.value)}
-              placeholder="e.g., pieces, kg, meters, liters"
-              className={inputClass(errors.unit_of_measure)}
-            />
+              onValueChange={(value) => setData("unit_of_measure", value)}
+            >
+              <SelectTrigger
+                className={
+                  "w-full text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
+                  (errors.unit_of_measure
+                    ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
+                    : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800")
+                }
+              >
+                <SelectValue placeholder="Select unit of measure" />
+              </SelectTrigger>
+              <SelectContent>
+                {units.map((unit) => (
+                  <SelectItem key={unit} value={unit}>
+                    {unit}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <InputError message={errors.unit_of_measure} />
           </div>
 

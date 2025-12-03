@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { X, Upload, FileText, Send, CheckCircle2, AlertCircle } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { AppColors } from '@/utils/colors';
 import { useDialog } from '@/contexts/DialogContext';
 
@@ -74,28 +75,57 @@ export default function ProgressUpdateModal({
     }
   };
 
-  const handleFileSelect = () => {
-    // For web, use input element
-    if (typeof document !== 'undefined') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '*/*';
-      input.onchange = (e: any) => {
-        const file = e.target.files?.[0];
-        if (file) {
+  const handleFileSelect = async () => {
+    try {
+      // For web, use input element
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*/*';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            // Check file size (20MB max)
+            if (file.size > 20 * 1024 * 1024) {
+              dialog.showError('File size must be less than 20MB', 'File Too Large');
+              return;
+            }
+            setSelectedFile(file);
+            setValidationError(null);
+          }
+        };
+        input.click();
+      } else {
+        // For mobile/Expo, use expo-document-picker
+        const result = await DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          copyToCacheDirectory: true,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const file = result.assets[0];
+          
           // Check file size (20MB max)
-          if (file.size > 20 * 1024 * 1024) {
+          if (file.size && file.size > 20 * 1024 * 1024) {
             dialog.showError('File size must be less than 20MB', 'File Too Large');
             return;
           }
-          setSelectedFile(file);
+          
+          // Create a file-like object for consistency
+          const fileObject = {
+            name: file.name,
+            size: file.size || 0,
+            uri: file.uri,
+            mimeType: file.mimeType,
+          };
+          
+          setSelectedFile(fileObject);
           setValidationError(null);
         }
-      };
-      input.click();
-    } else {
-      // For mobile, would use expo-document-picker
-      dialog.showInfo('File picker would open here. In production, use expo-document-picker.', 'File Upload');
+      }
+    } catch (error) {
+      console.error('Error selecting file:', error);
+      dialog.showError('Failed to select file. Please try again.', 'File Selection Error');
     }
   };
 

@@ -39,8 +39,11 @@ class RolesController extends Controller
 
         $roles = $query->withCount('users') // counts assigned users
                     ->orderBy($sortBy, $sortOrder)
-                    ->paginate(10)
-                    ->withQueryString();
+                    ->when($sortBy !== 'created_at', function ($query) {
+                        // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                        $query->orderBy('created_at', 'desc');
+                    })
+                    ->paginate(10);
 
         return Inertia::render('UserManagement/Roles/index', [
             'roles' => $roles,
@@ -158,6 +161,13 @@ class RolesController extends Controller
      */
     public function destroy(Role $role)
     {
+        // Check if role has users assigned
+        $usersCount = $role->users()->count();
+        
+        if ($usersCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete role '{$role->name}' because it has {$usersCount} user(s) assigned to it. Please reassign users to other roles first.");
+        }
+
         $roleName = $role->name;
 
         $this->adminActivityLogs(
@@ -176,5 +186,7 @@ class RolesController extends Controller
             null,
             route('user-management.roles-and-permissions.index')
         );
+
+        return back()->with('success', 'Role deleted successfully.');
     }
 }

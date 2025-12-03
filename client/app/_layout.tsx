@@ -24,11 +24,20 @@ function RootLayoutNav() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(tabs)';
+    const isChangePasswordPage = segments[0] === 'change-password';
+    const isLoginPage = segments[0] === 'login';
+
+    // Allow change-password page only if authenticated
+    if (isChangePasswordPage && !isAuthenticated) {
+      router.replace('/login');
+      return;
+    }
 
     if (!isAuthenticated && inAuthGroup) {
       router.replace('/login');
-    } else if (isAuthenticated && segments[0] === 'login') {
-      router.replace('/(tabs)');
+    } else if (isAuthenticated && isLoginPage) {
+      // Don't redirect from login if user needs to change password
+      // The login handler will handle the redirect
     }
   }, [isAuthenticated, isLoading, segments]);
 
@@ -44,8 +53,10 @@ function RootLayoutNav() {
   return (
     <Stack>
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="change-password" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="project/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="billing-detail" options={{ headerShown: false }} />
       <Stack.Screen name="help-center" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
     </Stack>

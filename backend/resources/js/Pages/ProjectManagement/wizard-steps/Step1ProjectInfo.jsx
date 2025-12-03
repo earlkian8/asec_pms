@@ -6,12 +6,26 @@ import { Button } from "@/Components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { router } from "@inertiajs/react";
 import AddClient from "../../ClientManagement/add";
+import AddProjectType from "../../ProjectTypeManagement/add";
+import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
-export default function Step1ProjectInfo({ clients, errors = {} }) {
+export default function Step1ProjectInfo({ clients, projectTypes = [], errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
   const [showAddClient, setShowAddClient] = useState(false);
+  const [showAddProjectType, setShowAddProjectType] = useState(false);
+  const [contractAmountDisplay, setContractAmountDisplay] = useState('');
+
+  // Initialize display value when projectData.contract_amount changes
+  useEffect(() => {
+    if (projectData.contract_amount) {
+      setContractAmountDisplay(formatNumberWithCommas(projectData.contract_amount));
+    } else {
+      setContractAmountDisplay('');
+    }
+  }, [projectData.contract_amount]);
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -19,10 +33,22 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
 
+  const handleProjectTypeAdded = () => {
+    setShowAddProjectType(false);
+    // Reload only the projectTypes data to refresh the list
+    router.reload({ only: ['projectTypes'], preserveState: true });
+  };
+
   return (
     <>
       {showAddClient && (
         <AddClient setShowAddModal={setShowAddClient} />
+      )}
+      {showAddProjectType && (
+        <AddProjectType 
+          setShowAddModal={setShowAddProjectType} 
+          onSuccess={handleProjectTypeAdded}
+        />
       )}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Basic Information</h3>
@@ -75,28 +101,36 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
           {/* Project Type */}
           <div>
             <Label className="text-zinc-800">Project Type <span className="text-red-500">*</span></Label>
-            <Select
-              value={projectData.project_type}
-              onValueChange={(value) => updateProjectData({ project_type: value })}
-            >
-              <SelectTrigger className={inputClass(errors.project_type)}>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="design">Design</SelectItem>
-                <SelectItem value="construction">Construction</SelectItem>
-                <SelectItem value="consultancy">Consultancy</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="commissioning">Commissioning</SelectItem>
-                <SelectItem value="inspection">Inspection</SelectItem>
-                <SelectItem value="renovation">Renovation</SelectItem>
-                <SelectItem value="site_layout">Site Layout</SelectItem>
-                <SelectItem value="relocation">Relocation</SelectItem>
-                <SelectItem value="excavation">Excavation</SelectItem>
-                <SelectItem value="surveying">Surveying</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.project_type} />
+            <div className="flex gap-2 items-center">
+              <Select
+                value={projectData.project_type_id}
+                onValueChange={(value) => updateProjectData({ project_type_id: value })}
+              >
+                <SelectTrigger className={inputClass(errors.project_type_id)}>
+                  <SelectValue placeholder="Project Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectTypes && projectTypes.length > 0 ? (
+                    projectTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>No project types available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="whitespace-nowrap"
+                onClick={() => setShowAddProjectType(true)}
+              >
+                New
+              </Button>
+            </div>
+            <InputError message={errors.project_type_id} />
           </div>
 
           {/* Status */}
@@ -110,7 +144,6 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="planning">Planning</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="on_hold">On Hold</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
@@ -141,10 +174,40 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
           <div>
             <Label className="text-zinc-800">Contract Amount <span className="text-red-500">*</span></Label>
             <Input
-              type="number"
-              step="0.01"
-              value={projectData.contract_amount}
-              onChange={(e) => updateProjectData({ contract_amount: e.target.value })}
+              type="text"
+              value={contractAmountDisplay}
+              onChange={(e) => {
+                let inputValue = e.target.value;
+                
+                // Allow empty string
+                if (inputValue === '') {
+                  setContractAmountDisplay('');
+                  updateProjectData({ contract_amount: '' });
+                  return;
+                }
+                
+                // Remove all non-numeric characters except decimal point
+                inputValue = inputValue.replace(/[^\d.]/g, '');
+                
+                // Prevent multiple decimal points
+                const parts = inputValue.split('.');
+                if (parts.length > 2) {
+                  inputValue = parts[0] + '.' + parts.slice(1).join('');
+                }
+                
+                // Limit decimal places to 2
+                if (parts.length === 2 && parts[1].length > 2) {
+                  inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                }
+                
+                // Format with commas for display
+                const formattedValue = formatNumberWithCommas(inputValue);
+                setContractAmountDisplay(formattedValue);
+                
+                // Store numeric value (without commas)
+                const numericValue = parseFormattedNumber(inputValue);
+                updateProjectData({ contract_amount: numericValue });
+              }}
               placeholder="Enter amount"
               className={inputClass(errors.contract_amount)}
             />

@@ -38,7 +38,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: 'What do the project statuses mean?',
-    answer: 'Projects can have different statuses: Planning (initial phase), In Progress (active work), On Hold (temporarily paused), Completed (finished), or Cancelled. The status is shown with a colored badge on each project card.',
+    answer: 'Projects can have different statuses: Active (in progress), On Hold (temporarily paused), Completed (finished), or Cancelled. The status is shown with a colored badge on each project card.',
   },
   {
     question: 'How do I view notifications?',

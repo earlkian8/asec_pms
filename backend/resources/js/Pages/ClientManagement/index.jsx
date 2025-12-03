@@ -248,7 +248,11 @@ export default function ClientsIndex() {
     });
     setSortBy('created_at');
     setSortOrder('desc');
-    router.get(route('client-management.index'), { search: searchInput }, {
+    const params = {};
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
+    router.get(route('client-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -269,9 +273,13 @@ export default function ClientsIndex() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
+      const params = {};
+      if (searchInput && searchInput.trim()) {
+        params.search = searchInput;
+      }
       router.get(
         route('client-management.index'),
-        { search: searchInput },
+        params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
     }, 300);
@@ -282,7 +290,6 @@ export default function ClientsIndex() {
   // Pagination
   const handlePageChange = ({ page }) => {
     const params = {
-      search: searchInput,
       page,
       ...(localFilters.client_type && { client_type: localFilters.client_type }),
       ...(localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null && { is_active: localFilters.is_active === true || localFilters.is_active === 'true' || localFilters.is_active === 1 || localFilters.is_active === '1' ? 1 : 0 }),
@@ -291,6 +298,9 @@ export default function ClientsIndex() {
       sort_by: sortBy,
       sort_order: sortOrder,
     };
+    if (searchInput && searchInput.trim()) {
+      params.search = searchInput;
+    }
     
     router.get(
       route('client-management.index'),

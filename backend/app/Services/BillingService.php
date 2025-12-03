@@ -147,17 +147,49 @@ class BillingService
 
     public function getTransactionsData()
     {
-        $search = request('search');
-        $projectId = request('transaction_project_id');
-        $paymentMethod = request('transaction_payment_method');
+        try {
+            // Get and sanitize input parameters
+            $search = request('search');
+            $projectId = request('transaction_project_id');
+            $paymentMethod = request('transaction_payment_method');
 
-        $transactions = BillingPayment::with([
-            'billing:id,billing_code,project_id',
-            'billing.project:id,project_code,project_name',
-            'createdBy:id,name'
-        ])
-            // Include all transactions, including those with null billing_id (orphaned transactions)
-            ->when($search, function ($query, $search) {
+            // Sanitize search input
+            if ($search) {
+                $search = trim($search);
+                if (empty($search)) {
+                    $search = null;
+                }
+            }
+
+            // Validate project_id if provided
+            if ($projectId && !is_numeric($projectId)) {
+                $projectId = null;
+            }
+
+            // Validate payment_method if provided
+            $allowedPaymentMethods = ['cash', 'check', 'bank_transfer', 'credit_card', 'paymongo', 'other'];
+            if ($paymentMethod && !in_array($paymentMethod, $allowedPaymentMethods)) {
+                $paymentMethod = null;
+            }
+
+            // Build the base query
+            $query = BillingPayment::query();
+
+            // Eager load relationships with specific columns to optimize query
+            $query->with([
+                'billing' => function ($q) {
+                    $q->select('id', 'billing_code', 'project_id');
+                },
+                'billing.project' => function ($q) {
+                    $q->select('id', 'project_code', 'project_name');
+                },
+                'createdBy' => function ($q) {
+                    $q->select('id', 'name');
+                },
+            ]);
+
+            // Apply search filter if provided
+            if ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('payment_code', 'ilike', "%{$search}%")
                       ->orWhere('reference_number', 'ilike', "%{$search}%")
@@ -165,28 +197,108 @@ class BillingService
                           $billingQuery->where('billing_code', 'ilike', "%{$search}%");
                       });
                 });
-            })
-            ->when($projectId, function ($query, $projectId) {
-                // When filtering by project, only show transactions with billing matching project_id
-                // (exclude orphaned transactions since we can't determine their project)
+            }
+
+            // Apply project filter if provided
+            if ($projectId) {
                 $query->whereHas('billing', function ($billingQuery) use ($projectId) {
                     $billingQuery->where('project_id', $projectId);
                 });
-            })
-            ->when($paymentMethod, function ($query, $paymentMethod) {
-                $query->where('payment_method', $paymentMethod);
-            })
-            ->orderBy('payment_date', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->paginate(15)
-            ->withQueryString();
+            }
 
-        return [
-            'transactions' => $transactions,
-            'search' => $search,
-            'project_id' => $projectId,
-            'payment_method' => $paymentMethod,
-        ];
+            // Apply payment method filter if provided
+            if ($paymentMethod) {
+                $query->where('payment_method', $paymentMethod);
+            }
+
+            // Apply sorting - primary by payment_date, secondary by created_at
+            $query->orderBy('payment_date', 'desc');
+            $query->orderBy('created_at', 'desc');
+            $query->orderBy('id', 'desc'); // Tertiary sort for consistency
+
+            // Paginate results
+            $perPage = min((int)request('per_page', 15), 100); // Max 100 per page
+            $transactions = $query->paginate($perPage)->withQueryString();
+            
+            // Transform results to ensure safe data access
+            $transactions->getCollection()->transform(function ($transaction) {
+                // Ensure billing relationship exists
+                if (!$transaction->billing) {
+                    $transaction->billing = (object)[
+                        'id' => null,
+                        'billing_code' => 'N/A',
+                        'project' => (object)[
+                            'id' => null,
+                            'project_code' => 'N/A',
+                            'project_name' => 'N/A',
+                        ],
+                    ];
+                } elseif (!$transaction->billing->project) {
+                    // Billing exists but project doesn't
+                    $transaction->billing->project = (object)[
+                        'id' => null,
+                        'project_code' => 'N/A',
+                        'project_name' => 'N/A',
+                    ];
+                }
+
+                // Ensure createdBy relationship exists
+                if (!$transaction->createdBy) {
+                    $transaction->createdBy = (object)[
+                        'id' => null,
+                        'name' => 'System',
+                    ];
+                }
+                
+                return $transaction;
+            });
+
+            return [
+                'transactions' => $transactions,
+                'search' => $search,
+                'project_id' => $projectId,
+                'payment_method' => $paymentMethod,
+            ];
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Illuminate\Support\Facades\Log::error('Get Transactions Data Database Error', [
+                'error' => $e->getMessage(),
+                'sql' => $e->getSql() ?? 'N/A',
+                'bindings' => $e->getBindings() ?? [],
+            ]);
+
+            // Return empty result on database error
+            return [
+                'transactions' => new \Illuminate\Pagination\LengthAwarePaginator(
+                    collect([]),
+                    0,
+                    15,
+                    1
+                ),
+                'search' => $search ?? null,
+                'project_id' => $projectId ?? null,
+                'payment_method' => $paymentMethod ?? null,
+            ];
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Get Transactions Data Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Return empty result on error
+            return [
+                'transactions' => new \Illuminate\Pagination\LengthAwarePaginator(
+                    collect([]),
+                    0,
+                    15,
+                    1
+                ),
+                'search' => $search ?? null,
+                'project_id' => $projectId ?? null,
+                'payment_method' => $paymentMethod ?? null,
+            ];
+        }
     }
 }
 

@@ -18,6 +18,7 @@ class Client extends Authenticatable
         'contact_person',
         'email',
         'password',
+        'password_changed_at',
         'phone_number',
         'address',
         'city',
@@ -40,6 +41,7 @@ class Client extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'password_changed_at' => 'datetime',
         'is_active' => 'boolean',
     ];
 
@@ -51,5 +53,13 @@ class Client extends Authenticatable
     public function notifications()
     {
         return $this->hasMany(ClientNotification::class);
+    }
+
+    /**
+     * Get the chat for this client
+     */
+    public function chat()
+    {
+        return $this->hasOne(Chat::class);
     }
 }

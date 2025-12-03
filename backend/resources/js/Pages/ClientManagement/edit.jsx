@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { toast } from "sonner";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +31,6 @@ const EditClient = ({ client, setShowEditModal }) => {
     client_type: client.client_type || '',
     contact_person: client.contact_person || '',
     email: client.email || '',
-    password: '',
     phone_number: client.phone_number || '',
     address: client.address || '',
     city: client.city || '',
@@ -45,12 +45,52 @@ const EditClient = ({ client, setShowEditModal }) => {
     notes: client.notes || '',
   });
 
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!data.client_name || data.client_name.trim() === '') {
+      errors.client_name = 'Client name is required';
+    }
+    
+    if (!data.client_type || data.client_type.trim() === '') {
+      errors.client_type = 'Client type is required';
+    }
+    
+    if (!data.contact_person || data.contact_person.trim() === '') {
+      errors.contact_person = 'Contact person is required';
+    }
+    
+    if (!data.email || data.email.trim() === '') {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const getFieldError = (field) => {
+    return validationErrors[field] || errors[field];
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Please fill in all required fields correctly');
+      return;
+    }
 
     put(route('client-management.update', client.id), {
+      preserveScroll: true,
+      preserveState: true,
+      only: ['clients'],
       onSuccess: () => {
         setShowEditModal(false);
+        setValidationErrors({});
         toast.success('Client Updated Successfully!');
       }
     });
@@ -63,6 +103,11 @@ const EditClient = ({ client, setShowEditModal }) => {
       : error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
+  
+  const selectClass = (error) =>
+    error
+      ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
+      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800";
 
   return (
     <Dialog open onOpenChange={setShowEditModal}>
@@ -89,25 +134,44 @@ const EditClient = ({ client, setShowEditModal }) => {
 
           {/* Client Name */}
           <div>
-            <Label className="text-zinc-800">Client Name</Label>
+            <Label className="text-zinc-800">Client Name <span className="text-red-500">*</span></Label>
             <Input
               type="text"
               value={data.client_name}
-              onChange={e => setData('client_name', e.target.value)}
-              className={inputClass(errors.client_name)}
+              onChange={e => {
+                setData('client_name', e.target.value);
+                if (validationErrors.client_name) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.client_name;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Client Name"
+              className={inputClass(getFieldError('client_name'))}
             />
-            <InputError message={errors.client_name} />
+            <InputError message={getFieldError('client_name')} />
           </div>
 
           {/* Client Type */}
           <div>
-            <Label className="text-zinc-800">Client Type</Label>
+            <Label className="text-zinc-800">Client Type <span className="text-red-500">*</span></Label>
             <Select
               value={data.client_type}
-              onValueChange={(value) => setData("client_type", value)}
+              onValueChange={(value) => {
+                setData("client_type", value);
+                if (validationErrors.client_type) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.client_type;
+                    return newErrors;
+                  });
+                }
+              }}
             >
-              <SelectTrigger className={inputClass(errors.client_type)}>
-                <SelectValue placeholder="-- Select Client Type --" />
+              <SelectTrigger className={selectClass(getFieldError('client_type'))}>
+                <SelectValue placeholder="Client Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="individual">Individual</SelectItem>
@@ -116,45 +180,53 @@ const EditClient = ({ client, setShowEditModal }) => {
                 <SelectItem value="ngo">NGO</SelectItem>
               </SelectContent>
             </Select>
-            <InputError message={errors.client_type} />
+            <InputError message={getFieldError('client_type')} />
           </div>
 
           {/* Contact Person */}
           <div>
-            <Label className="text-zinc-800">Contact Person</Label>
+            <Label className="text-zinc-800">Contact Person <span className="text-red-500">*</span></Label>
             <Input
               type="text"
               value={data.contact_person}
-              onChange={e => setData('contact_person', e.target.value)}
-              className={inputClass(errors.contact_person)}
+              onChange={e => {
+                setData('contact_person', e.target.value);
+                if (validationErrors.contact_person) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.contact_person;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Contact Person"
+              className={inputClass(getFieldError('contact_person'))}
             />
-            <InputError message={errors.contact_person} />
+            <InputError message={getFieldError('contact_person')} />
           </div>
 
           {/* Email */}
           <div>
-            <Label className="text-zinc-800">Email</Label>
+            <Label className="text-zinc-800">Email <span className="text-red-500">*</span></Label>
             <Input
               type="email"
               value={data.email}
-              onChange={e => setData('email', e.target.value)}
-              className={inputClass(errors.email)}
+              onChange={e => {
+                setData('email', e.target.value);
+                if (validationErrors.email) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.email;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Email"
+              className={inputClass(getFieldError('email'))}
             />
-            <InputError message={errors.email} />
+            <InputError message={getFieldError('email')} />
           </div>
 
-          {/* Password */}
-          <div>
-            <Label className="text-zinc-800">Password</Label>
-            <Input
-              type="password"
-              value={data.password}
-              onChange={e => setData('password', e.target.value)}
-              placeholder="Leave blank to keep current password"
-              className={inputClass(errors.password)}
-            />
-            <InputError message={errors.password} />
-          </div>
 
           {/* Phone */}
           <div>
@@ -163,6 +235,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.phone_number}
               onChange={e => setData('phone_number', e.target.value)}
+              placeholder="Phone Number"
               className={inputClass(errors.phone_number)}
             />
             <InputError message={errors.phone_number} />
@@ -175,6 +248,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.address}
               onChange={e => setData('address', e.target.value)}
+              placeholder="Address"
               className={inputClass(errors.address)}
             />
             <InputError message={errors.address} />
@@ -187,6 +261,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.city}
               onChange={e => setData('city', e.target.value)}
+              placeholder="City"
               className={inputClass(errors.city)}
             />
             <InputError message={errors.city} />
@@ -199,6 +274,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.province}
               onChange={e => setData('province', e.target.value)}
+              placeholder="Province"
               className={inputClass(errors.province)}
             />
             <InputError message={errors.province} />
@@ -211,6 +287,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.postal_code}
               onChange={e => setData('postal_code', e.target.value)}
+              placeholder="Postal Code"
               className={inputClass(errors.postal_code)}
             />
             <InputError message={errors.postal_code} />
@@ -223,6 +300,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.country}
               onChange={e => setData('country', e.target.value)}
+              placeholder="Country"
               className={inputClass(errors.country)}
             />
             <InputError message={errors.country} />
@@ -235,6 +313,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.tax_id}
               onChange={e => setData('tax_id', e.target.value)}
+              placeholder="Tax ID"
               className={inputClass(errors.tax_id)}
             />
             <InputError message={errors.tax_id} />
@@ -247,6 +326,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.business_permit}
               onChange={e => setData('business_permit', e.target.value)}
+              placeholder="Business Permit"
               className={inputClass(errors.business_permit)}
             />
             <InputError message={errors.business_permit} />
@@ -259,6 +339,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="number"
               value={data.credit_limit}
               onChange={e => setData('credit_limit', e.target.value)}
+              placeholder="Credit Limit"
               className={inputClass(errors.credit_limit)}
             />
             <InputError message={errors.credit_limit} />
@@ -271,6 +352,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.payment_terms}
               onChange={e => setData('payment_terms', e.target.value)}
+              placeholder="Payment Terms"
               className={inputClass(errors.payment_terms)}
             />
             <InputError message={errors.payment_terms} />
@@ -282,6 +364,7 @@ const EditClient = ({ client, setShowEditModal }) => {
             <Textarea
               value={data.notes}
               onChange={e => setData('notes', e.target.value)}
+              placeholder="Notes"
               rows={3}
               className={inputClass(errors.notes)}
             />

@@ -16,9 +16,9 @@ import {
     TrendingUp,
     User,
     FileText,
-    ChevronRight,
-    ChevronDown,
-    X
+    X,
+    MessageCircle,
+    ChevronDown 
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -28,11 +28,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/Components/ui/collapsible';
 import { Toaster } from '@/Components/ui/sonner';
 import NotificationIcon from '@/Components/NotificationIcon';
 export default function AuthenticatedLayout({ header, children, breadcrumbs = [] }) {
@@ -42,13 +37,6 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     
-    // Only keep states needed for the navigation collapsibles
-    const [projectModulesOpen, setProjectModulesOpen] = useState(false);
-    const [clientVendorOpen, setClientVendorOpen] = useState(false);
-    const [inventoryOpen, setInventoryOpen] = useState(false);
-    const [billingOpen, setBillingOpen] = useState(false);
-    const [reportsOpen, setReportsOpen] = useState(false);
-    const [userManagementOpen, setUserManagementOpen] = useState(false);
     
     // Close sidebar when clicking outside on mobile
     useEffect(() => {
@@ -80,25 +68,34 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Project Management',
-            href: route('project-management.index'),
-            routeName: 'project-management.*',
-            icon: FolderOpen,
-            type: 'single'
+            title: 'Project Platform',
+            type: 'section',
+            items: [
+                {
+                    title: 'Project Management',
+                    href: route('project-management.index'),
+                    routeName: 'project-management.*',
+                    icon: FolderOpen
+                },
+                {
+                    title: 'Project Type',
+                    href: route('project-type-management.index'),
+                    routeName: 'project-type-management.*',
+                    icon: FolderOpen
+                }
+            ]
         },
         {
-            title: 'Client Management',
-            href: route('client-management.index'),
-            routeName: 'client-management.*',
-            icon: Users,
-            type: 'single'
-        },
-        {
-            title: 'Employee Management',
-            href: route('employee-management.index'),
-            routeName: 'employee-management.*',
-            icon: UserCheck,
-            type: 'single'
+            title: 'Client Platform',
+            type: 'section',
+            items: [
+                {
+                    title: 'Client Management',
+                    href: route('client-management.index'),
+                    routeName: 'client-management.*',
+                    icon: Users
+                }
+            ]
         },
         {
             title: 'Inventory Management',
@@ -115,6 +112,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
+            title: 'Employee Management',
+            href: route('employee-management.index'),
+            routeName: 'employee-management.*',
+            icon: UserCheck,
+            type: 'single'
+        },
+        {
             title: 'Reports & Analytics',
             href: route('reports.index'),
             routeName: 'reports.*',
@@ -123,10 +127,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         },
         {
             title: 'User Management',
-            type: 'collapsible',
-            icon: Users,
-            isOpen: userManagementOpen,
-            setIsOpen: setUserManagementOpen,
+            type: 'section',
             items: [
                 {
                     title: 'Roles & Permissions',
@@ -156,23 +157,50 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             if (module.title === 'Dashboard') {
                 return has('dashboard.view') ? module : null;
             }
-            if (module.title === 'Project Management') {
-                return hasModuleAccess([
-                    'projects.view', 'projects.create', 'projects.update', 'projects.delete',
-                    'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
-                    'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
-                    'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
-                    'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
-                    'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
-                    'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
-                    'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
-                    'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
-                ]) ? module : null;
+            if (module.title === 'Project Platform') {
+                // Filter items within the collapsible
+                if (module.items) {
+                    const filteredItems = module.items.filter(item => {
+                        if (item.title === 'Project Management') {
+                            return hasModuleAccess([
+                                'projects.view', 'projects.create', 'projects.update', 'projects.delete',
+                                'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
+                                'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
+                                'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+                                'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
+                                'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
+                                'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
+                                'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
+                                'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
+                            ]);
+                        }
+                        if (item.title === 'Project Type') {
+                            return hasModuleAccess([
+                                'projects.view', 'projects.create', 'projects.update', 'projects.delete'
+                            ]);
+                        }
+                        return true;
+                    });
+                    // Only show the collapsible if it has at least one item
+                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
+                }
+                return module;
             }
-            if (module.title === 'Client Management') {
-                return hasModuleAccess([
-                    'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
-                ]) ? module : null;
+            if (module.title === 'Client Platform') {
+                // Filter items within the collapsible
+                if (module.items) {
+                    const filteredItems = module.items.filter(item => {
+                        if (item.title === 'Client Management') {
+                            return hasModuleAccess([
+                                'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
+                            ]);
+                        }
+                        return true;
+                    });
+                    // Only show the collapsible if it has at least one item
+                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
+                }
+                return module;
             }
             if (module.title === 'Employee Management') {
                 return hasModuleAccess([
@@ -193,6 +221,10 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 return hasModuleAccess([
                     'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget'
                 ]) ? module : null;
+            }
+            if (module.title === 'Chat Management') {
+                // Chat is available to all authenticated users (no specific permission check needed)
+                return module;
             }
             if (module.title === 'User Management') {
                 // For collapsible items, check if user has access to any sub-item
@@ -250,75 +282,43 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
         );
     }
 
-    if (item.type === 'collapsible') {
-        const Icon = item.icon;
-        const hasActiveChild = item.items.some(subItem => {
-            if (Array.isArray(subItem.routeName)) {
-                return subItem.routeName.some(routeName => route().current(routeName));
-            } else {
-                return route().current(subItem.routeName);
-            }
-        });
-        
+    if (item.type === 'section') {
         return (
-            <Collapsible
-                key={item.title}
-                open={item.isOpen}
-                onOpenChange={item.setIsOpen}
-                className="group/collapsible"
-            >
-                <CollapsibleTrigger asChild>
-                    <button 
-                        className={`
-                            group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative
-                            ${hasActiveChild
-                                ? 'bg-black/70 text-white' 
-                                : 'text-black hover:text-white hover:bg-black/70'
-                            }
-                            ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}
-                        `}
-                        title={sidebarCollapsed ? item.title : undefined}
-                    >
-                        <Icon className={`flex-shrink-0 h-5 w-5 ${sidebarCollapsed ? 'lg:mr-0' : 'mr-3'}`} />
-                        <span className={`truncate transition-opacity duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-                            {item.title}
-                        </span>
-                        {!sidebarCollapsed && (
-                            <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                        )}
-                    </button>
-                </CollapsibleTrigger>
+            <div key={item.title} className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                {/* Section Header */}
+                <div className="px-3 py-2 mt-2 mb-1">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {item.title}
+                    </span>
+                </div>
                 
-                {!sidebarCollapsed && (
-                    <CollapsibleContent className="space-y-1">
-                        <div className="ml-6 mt-1 space-y-1 border-l border-zinc-600/50 pl-4">
-                            {item.items.map((subItem) => {
-                                const isActive = Array.isArray(subItem.routeName) 
-                                    ? subItem.routeName.some(routeName => route().current(routeName))
-                                    : route().current(subItem.routeName);
-                                const SubIcon = subItem.icon;
-                                
-                                return (
-                                    <Link
-                                        key={subItem.title}
-                                        href={subItem.href}
-                                        className={`
-                                            group flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 relative
-                                            ${isActive
-                                                ? 'bg-black/70 text-white shadow-sm'
-                                                : 'text-black hover:text-white hover:bg-black/70'
-                                            }
-                                        `}
-                                    >
-                                        <SubIcon className="flex-shrink-0 h-4 w-4 mr-2" />
-                                        <span className="truncate flex-1">{subItem.title}</span>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </CollapsibleContent>
-                )}
-            </Collapsible>
+                {/* Section Items */}
+                <div className="space-y-1">
+                    {item.items.map((subItem) => {
+                        const isActive = Array.isArray(subItem.routeName) 
+                            ? subItem.routeName.some(routeName => route().current(routeName))
+                            : route().current(subItem.routeName);
+                        const SubIcon = subItem.icon;
+                        
+                        return (
+                            <Link
+                                key={subItem.title}
+                                href={subItem.href}
+                                className={`
+                                    group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative
+                                    ${isActive
+                                        ? 'bg-black/70 text-white shadow-lg'
+                                        : 'text-black hover:text-white hover:bg-black/70'
+                                    }
+                                `}
+                            >
+                                <SubIcon className="flex-shrink-0 h-5 w-5 mr-3" />
+                                <span className="truncate">{subItem.title}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </div>
         );
     }
 };

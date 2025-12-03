@@ -752,7 +752,11 @@ export default function TeamTab({ project, teamData }) {
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm">
                     <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                      {capitalizeText(team.role)}
+                      {capitalizeText(
+                        team.assignable_type === 'employee' 
+                          ? (team.employee?.position || team.role || '---')
+                          : (team.user?.roles?.[0]?.name || team.role || '---')
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm font-bold text-gray-900">

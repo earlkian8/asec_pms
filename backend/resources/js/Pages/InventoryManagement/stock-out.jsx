@@ -22,7 +22,6 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
     quantity: "",
     stock_out_type: "",
     project_id: "",
-    unit_price: "",
     transaction_date: new Date().toISOString().split('T')[0],
     notes: "",
   });
@@ -169,22 +168,6 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               <p className="text-xs text-gray-500 mt-1">Select the project this stock is allocated to</p>
             </div>
           )}
-
-          {/* Unit Price */}
-          <div>
-            <Label className="text-zinc-800">Unit Price (Optional)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={data.unit_price}
-              onChange={(e) => setData("unit_price", e.target.value)}
-              placeholder="0.00"
-              className={inputClass(errors.unit_price)}
-            />
-            <InputError message={errors.unit_price} />
-            <p className="text-xs text-gray-500 mt-1">Price per unit for this stock out transaction</p>
-          </div>
 
           {/* Transaction Date */}
           <div>

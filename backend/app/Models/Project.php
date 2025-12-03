@@ -10,7 +10,7 @@ class Project extends Model
         'project_code',
         'project_name',
         'client_id',
-        'project_type',
+        'project_type_id',
         'status',
         'priority',
         'contract_amount',
@@ -24,6 +24,10 @@ class Project extends Model
 
     public function client(){
         return $this->belongsTo(Client::class, 'client_id', 'id');
+    }
+
+    public function projectType(){
+        return $this->belongsTo(ProjectType::class, 'project_type_id', 'id');
     }
 
     public function milestones()

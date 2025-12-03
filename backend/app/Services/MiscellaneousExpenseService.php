@@ -29,8 +29,7 @@ class MiscellaneousExpenseService
                     $q->where('expense_name', 'ilike', "%{$search}%")
                       ->orWhere('expense_type', 'ilike', "%{$search}%")
                       ->orWhere('description', 'ilike', "%{$search}%")
-                      ->orWhere('notes', 'ilike', "%{$search}%")
-                      ->orWhere('receipt_number', 'ilike', "%{$search}%");
+                      ->orWhere('notes', 'ilike', "%{$search}%");
                 });
             })
             ->when($expenseType, function ($query, $expenseType) {

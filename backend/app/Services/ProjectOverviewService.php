@@ -76,7 +76,7 @@ class ProjectOverviewService
         $teamMembers = ProjectTeam::where('project_id', $project->id)
             ->active()
             ->current()
-            ->with('user')
+            ->with(['user', 'employee'])
             ->get();
         
         $totalTeamMembers = $teamMembers->count();
@@ -199,10 +199,18 @@ class ProjectOverviewService
                 'members' => $teamMembers->map(function ($member) {
                     return [
                         'id' => $member->id,
+                        'assignable_name' => $member->assignable_name,
+                        'assignable_type' => $member->assignable_type,
                         'user' => $member->user ? [
                             'id' => $member->user->id,
                             'name' => $member->user->name,
                             'email' => $member->user->email,
+                        ] : null,
+                        'employee' => $member->employee ? [
+                            'id' => $member->employee->id,
+                            'first_name' => $member->employee->first_name,
+                            'last_name' => $member->employee->last_name,
+                            'email' => $member->employee->email,
                         ] : null,
                         'role' => $member->role,
                         'status' => $member->is_active ? 'active' : 'inactive',

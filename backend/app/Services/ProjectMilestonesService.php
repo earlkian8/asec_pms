@@ -7,6 +7,7 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
+use Illuminate\Support\Facades\Storage;
 
 class ProjectMilestonesService
 {
@@ -57,12 +58,36 @@ class ProjectMilestonesService
                         $q->with('createdBy')->orderBy('created_at', 'desc');
                     }]);
                 }
+                
+                // Add file_url and ensure createdBy is accessible for each progress update
+                $task->progressUpdates->each(function ($update) {
+                    if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
+                        $update->file_url = Storage::disk('public')->url($update->file_path);
+                    }
+                    // Ensure createdBy relationship is accessible
+                    if (!$update->relationLoaded('createdBy') && $update->created_by) {
+                        $update->load('createdBy');
+                    }
+                });
+                
                 // Ensure issues is loaded
                 if (!$task->relationLoaded('issues')) {
                     $task->load(['issues' => function ($q) {
                         $q->with(['reportedBy', 'assignedTo'])->orderBy('created_at', 'desc');
                     }]);
                 }
+                
+                // Ensure reportedBy and assignedTo relationships are accessible for each issue
+                $task->issues->each(function ($issue) {
+                    // Ensure reportedBy relationship is accessible
+                    if (!$issue->relationLoaded('reportedBy') && $issue->reported_by) {
+                        $issue->load('reportedBy');
+                    }
+                    // Ensure assignedTo relationship is accessible
+                    if (!$issue->relationLoaded('assignedTo') && $issue->assigned_to) {
+                        $issue->load('assignedTo');
+                    }
+                });
                 // Ensure assignedUser is loaded
                 if (!$task->relationLoaded('assignedUser')) {
                     $task->load('assignedUser');
@@ -71,13 +96,23 @@ class ProjectMilestonesService
         });
 
         // Fetch all active/current users in the project team for task assignment
+        // Users can only be assigned tasks in projects where they are team members
+        // But they can be team members in multiple projects, allowing them to have tasks across projects
         $users = $project->team()
             ->active()
             ->current()
             ->with('user')
             ->get()
             ->pluck('user')
-            ->filter();
+            ->filter()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ];
+            })
+            ->values();
 
         // Fetch all issues for this project
         $issues = ProjectIssue::where('project_id', $project->id)

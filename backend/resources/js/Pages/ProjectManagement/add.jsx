@@ -17,8 +17,8 @@ import Step3Milestones from "./wizard-steps/Step3Milestones";
 import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
-const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) => {
-  const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep, goToStep } = useProjectWizard();
+const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems, projectTypes }) => {
+  const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep, goToStep, projectData } = useProjectWizard();
   const [processing, setProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
@@ -29,7 +29,55 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
     "Material Allocation"
   ];
 
+  // Validate Step 1 required fields
+  const validateStep1 = () => {
+    const errors = {};
+    
+    if (!projectData.project_name || projectData.project_name.trim() === '') {
+      errors.project_name = 'The project name field is required.';
+    }
+    
+    if (!projectData.client_id || projectData.client_id === '') {
+      errors.client_id = 'The client field is required.';
+    }
+    
+    if (!projectData.project_type_id || projectData.project_type_id === '') {
+      errors.project_type_id = 'The project type field is required.';
+    }
+    
+    if (!projectData.contract_amount || projectData.contract_amount === '' || parseFloat(projectData.contract_amount) <= 0) {
+      errors.contract_amount = 'The contract amount field is required and must be greater than 0.';
+    }
+    
+    return errors;
+  };
+
+  const handleNext = () => {
+    // Validate Step 1 before proceeding
+    if (currentStep === 1) {
+      const stepErrors = validateStep1();
+      if (Object.keys(stepErrors).length > 0) {
+        setFormErrors(stepErrors);
+        toast.error("Please fill in all required fields");
+        return;
+      }
+    }
+    
+    // Clear errors if validation passes
+    setFormErrors({});
+    nextStep();
+  };
+
   const handleSubmit = () => {
+    // Validate Step 1 before final submit
+    const stepErrors = validateStep1();
+    if (Object.keys(stepErrors).length > 0) {
+      setFormErrors(stepErrors);
+      goToStep(1);
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
     const allData = getAllData();
     setProcessing(true);
     setFormErrors({});
@@ -59,7 +107,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
         setFormErrors(errors);
         // Navigate to step 1 if there are project data errors
         const projectFieldErrors = Object.keys(errors).filter(key => 
-          ['project_name', 'client_id', 'project_type', 'contract_amount'].includes(key)
+          ['project_name', 'client_id', 'project_type_id', 'contract_amount'].includes(key)
         );
         if (projectFieldErrors.length > 0) {
           goToStep(1);
@@ -73,7 +121,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
     const errors = formErrors;
     switch (currentStep) {
       case 1:
-        return <Step1ProjectInfo clients={clients} errors={errors} />;
+        return <Step1ProjectInfo clients={clients} projectTypes={projectTypes} errors={errors} />;
       case 2:
         return <Step2TeamMembers users={users} errors={errors} />;
       case 3:
@@ -164,7 +212,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
             {currentStep < totalSteps ? (
               <Button
                 type="button"
-                onClick={nextStep}
+                onClick={handleNext}
                 disabled={processing}
                 className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white flex items-center gap-2 shadow-md transition-all duration-200"
               >
@@ -198,7 +246,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems }) =
   );
 };
 
-const AddProject = ({ setShowAddModal, clients, users, inventoryItems }) => {
+const AddProject = ({ setShowAddModal, clients, users, inventoryItems, projectTypes }) => {
   return (
     <ProjectWizardProvider>
       <AddProjectWizard
@@ -206,6 +254,7 @@ const AddProject = ({ setShowAddModal, clients, users, inventoryItems }) => {
         clients={clients}
         users={users}
         inventoryItems={inventoryItems}
+        projectTypes={projectTypes}
       />
     </ProjectWizardProvider>
   );

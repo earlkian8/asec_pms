@@ -216,7 +216,7 @@ class ProjectDataSeeder extends Seeder
     private function createProjects($clients, $users, $inventoryItems, $count)
     {
         $projectTypes = ['design', 'construction', 'consultancy', 'maintenance', 'structural', 'civil', 'mechanical', 'electrical', 'environmental', 'geotechnical', 'surveying'];
-        $statuses = ['planning', 'active', 'on_hold', 'completed', 'cancelled'];
+        $statuses = ['active', 'on_hold', 'completed', 'cancelled'];
         $priorities = ['low', 'medium', 'high'];
         $billingTypes = ['fixed_price', 'milestone'];
         $locations = [

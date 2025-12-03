@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { toast } from "sonner";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -44,12 +45,55 @@ const AddClient = ({ setShowAddModal }) => {
     notes: '',
   });
 
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!data.client_name || data.client_name.trim() === '') {
+      errors.client_name = 'Client name is required';
+    }
+    
+    if (!data.client_type || data.client_type.trim() === '') {
+      errors.client_type = 'Client type is required';
+    }
+    
+    if (!data.contact_person || data.contact_person.trim() === '') {
+      errors.contact_person = 'Contact person is required';
+    }
+    
+    if (!data.email || data.email.trim() === '') {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (!data.password || data.password.trim() === '') {
+      errors.password = 'Password is required';
+    } else if (data.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const getFieldError = (field) => {
+    return validationErrors[field] || errors[field];
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Please fill in all required fields correctly');
+      return;
+    }
 
     post(route('client-management.store'), {
       onSuccess: () => {
         setShowAddModal(false);
+        setValidationErrors({});
         toast.success('Client Created Successfully!');
       }
     });
@@ -63,6 +107,11 @@ const AddClient = ({ setShowAddModal }) => {
       : error
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
+  
+  const selectClass = (error) =>
+    error
+      ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
+      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800";
 
   return (
     <Dialog open onOpenChange={setShowAddModal}>
@@ -77,26 +126,44 @@ const AddClient = ({ setShowAddModal }) => {
 
           {/* Client Name */}
           <div>
-            <Label className="text-zinc-800">Client Name</Label>
+            <Label className="text-zinc-800">Client Name <span className="text-red-500">*</span></Label>
             <Input
               type="text"
               value={data.client_name}
-              onChange={e => setData('client_name', e.target.value)}
-              placeholder="ABC Corporation"
-              className={inputClass(errors.client_name)}
+              onChange={e => {
+                setData('client_name', e.target.value);
+                if (validationErrors.client_name) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.client_name;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Client Name"
+              className={inputClass(getFieldError('client_name'))}
             />
-            <InputError message={errors.client_name} />
+            <InputError message={getFieldError('client_name')} />
           </div>
 
           {/* Client Type */}
           <div>
-            <Label className="text-zinc-800">Client Type</Label>
+            <Label className="text-zinc-800">Client Type <span className="text-red-500">*</span></Label>
             <Select
                 value={data.client_type}
-                onValueChange={(value) => setData("client_type", value)}
+                onValueChange={(value) => {
+                  setData("client_type", value);
+                  if (validationErrors.client_type) {
+                    setValidationErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.client_type;
+                      return newErrors;
+                    });
+                  }
+                }}
             >
-                <SelectTrigger className={inputClass(errors.client_type)}>
-                <SelectValue placeholder="-- Select Client Type --" />
+                <SelectTrigger className={selectClass(getFieldError('client_type'))}>
+                <SelectValue placeholder="Client Type" />
                 </SelectTrigger>
                 <SelectContent>
                 <SelectItem value="individual">Individual</SelectItem>
@@ -105,46 +172,73 @@ const AddClient = ({ setShowAddModal }) => {
                 <SelectItem value="ngo">NGO</SelectItem>
                 </SelectContent>
             </Select>
-            <InputError message={errors.client_type} />
+            <InputError message={getFieldError('client_type')} />
             </div>
 
           {/* Contact Person */}
           <div>
-            <Label className="text-zinc-800">Contact Person</Label>
+            <Label className="text-zinc-800">Contact Person <span className="text-red-500">*</span></Label>
             <Input
               type="text"
               value={data.contact_person}
-              onChange={e => setData('contact_person', e.target.value)}
-              placeholder="John Doe"
-              className={inputClass(errors.contact_person)}
+              onChange={e => {
+                setData('contact_person', e.target.value);
+                if (validationErrors.contact_person) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.contact_person;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Contact Person"
+              className={inputClass(getFieldError('contact_person'))}
             />
-            <InputError message={errors.contact_person} />
+            <InputError message={getFieldError('contact_person')} />
           </div>
 
           {/* Email */}
           <div>
-            <Label className="text-zinc-800">Email</Label>
+            <Label className="text-zinc-800">Email <span className="text-red-500">*</span></Label>
             <Input
               type="email"
               value={data.email}
-              onChange={e => setData('email', e.target.value)}
-              placeholder="client@example.com"
-              className={inputClass(errors.email)}
+              onChange={e => {
+                setData('email', e.target.value);
+                if (validationErrors.email) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.email;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Email"
+              className={inputClass(getFieldError('email'))}
             />
-            <InputError message={errors.email} />
+            <InputError message={getFieldError('email')} />
           </div>
 
           {/* Password */}
           <div>
-            <Label className="text-zinc-800">Password</Label>
+            <Label className="text-zinc-800">Password <span className="text-red-500">*</span></Label>
             <Input
               type="password"
               value={data.password}
-              onChange={e => setData('password', e.target.value)}
-              placeholder="Enter password (min 8 characters)"
-              className={inputClass(errors.password)}
+              onChange={e => {
+                setData('password', e.target.value);
+                if (validationErrors.password) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.password;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="Password"
+              className={inputClass(getFieldError('password'))}
             />
-            <InputError message={errors.password} />
+            <InputError message={getFieldError('password')} />
           </div>
 
           {/* Phone */}
@@ -154,7 +248,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.phone_number}
               onChange={e => setData('phone_number', e.target.value)}
-              placeholder="+63 123 456 7890"
+              placeholder="Phone Number"
               className={inputClass(errors.phone_number)}
             />
             <InputError message={errors.phone_number} />
@@ -167,7 +261,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.address}
               onChange={e => setData('address', e.target.value)}
-              placeholder="123 Main St, Barangay Example"
+              placeholder="Address"
               className={inputClass(errors.address)}
             />
             <InputError message={errors.address} />
@@ -180,7 +274,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.city}
               onChange={e => setData('city', e.target.value)}
-              placeholder="Quezon City"
+              placeholder="City"
               className={inputClass(errors.city)}
             />
             <InputError message={errors.city} />
@@ -193,7 +287,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.province}
               onChange={e => setData('province', e.target.value)}
-              placeholder="Metro Manila"
+              placeholder="Province"
               className={inputClass(errors.province)}
             />
             <InputError message={errors.province} />
@@ -206,7 +300,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.postal_code}
               onChange={e => setData('postal_code', e.target.value)}
-              placeholder="1100"
+              placeholder="Postal Code"
               className={inputClass(errors.postal_code)}
             />
             <InputError message={errors.postal_code} />
@@ -219,7 +313,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.country}
               onChange={e => setData('country', e.target.value)}
-              placeholder="Philippines"
+              placeholder="Country"
               className={inputClass(errors.country)}
             />
             <InputError message={errors.country} />
@@ -232,7 +326,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.tax_id}
               onChange={e => setData('tax_id', e.target.value)}
-              placeholder="TIN-123456789"
+              placeholder="Tax ID"
               className={inputClass(errors.tax_id)}
             />
             <InputError message={errors.tax_id} />
@@ -245,7 +339,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.business_permit}
               onChange={e => setData('business_permit', e.target.value)}
-              placeholder="BP-987654321"
+              placeholder="Business Permit"
               className={inputClass(errors.business_permit)}
             />
             <InputError message={errors.business_permit} />
@@ -258,7 +352,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="number"
               value={data.credit_limit}
               onChange={e => setData('credit_limit', e.target.value)}
-              placeholder="100000"
+              placeholder="Credit Limit"
               className={inputClass(errors.credit_limit)}
             />
             <InputError message={errors.credit_limit} />
@@ -271,7 +365,7 @@ const AddClient = ({ setShowAddModal }) => {
               type="text"
               value={data.payment_terms}
               onChange={e => setData('payment_terms', e.target.value)}
-              placeholder="30 days"
+              placeholder="Payment Terms"
               className={inputClass(errors.payment_terms)}
             />
             <InputError message={errors.payment_terms} />
@@ -283,7 +377,7 @@ const AddClient = ({ setShowAddModal }) => {
             <Textarea
               value={data.notes}
               onChange={e => setData('notes', e.target.value)}
-              placeholder="Additional notes about the client..."
+              placeholder="Notes"
               rows={3}
               className={inputClass(errors.notes)}
             />

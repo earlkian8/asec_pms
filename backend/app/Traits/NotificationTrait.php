@@ -43,10 +43,19 @@ trait NotificationTrait
     {
         $users = User::all();
         $notifications = [];
+        $authId = auth()->id();
+        
+        // If no users exist, return empty array
+        if ($users->isEmpty()) {
+            return $notifications;
+        }
         
         foreach ($users as $user) {
             // Skip the user who triggered the notification to avoid self-notification
-            if ($user->id !== auth()->id()) {
+            if ($authId && $user->id !== $authId) {
+                $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
+            } elseif (!$authId) {
+                // If no authenticated user, notify all users
                 $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
             }
         }

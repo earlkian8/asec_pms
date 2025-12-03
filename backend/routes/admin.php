@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
 use App\Http\Controllers\Admin\ProjectTeamsController;
+use App\Http\Controllers\Admin\ProjectTypesController;
 use App\Http\Controllers\Admin\ProgressUpdatesController;
 use App\Http\Controllers\Admin\ProjectIssuesController;
 use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\ChatController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
 use Illuminate\Foundation\Application;
@@ -124,6 +126,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/delete/{employee}', [EmployeesController::class, 'destroy'])->middleware('permission:employees.delete')->name('destroy');
         Route::put('/update-status/{employee}', [EmployeesController::class, 'handleStatus'])->middleware('permission:employees.update-status')->name('update-status');
     });
+    // Project Type Management
+    Route::prefix('project-type-management')->name('project-type-management.')->group(function(){
+        Route::get('/', [ProjectTypesController::class, 'index'])->middleware('permission:projects.view')->name('index');
+        Route::post('/store', [ProjectTypesController::class, 'store'])->middleware('permission:projects.create')->name('store');
+        Route::put('/update/{projectType}', [ProjectTypesController::class, 'update'])->middleware('permission:projects.update')->name('update');
+        Route::delete('/delete/{projectType}', [ProjectTypesController::class, 'destroy'])->middleware('permission:projects.delete')->name('destroy');
+        Route::put('/update-status/{projectType}', [ProjectTypesController::class, 'handleStatus'])->middleware('permission:projects.update')->name('update-status');
+    });
+
     // Client Management
     Route::prefix('client-management')->name('client-management.')->group(function(){
         Route::get('/', [ClientsController::class, 'index'])->middleware('permission:clients.view')->name('index');
@@ -194,5 +205,13 @@ Route::middleware('auth')->group(function () {
         Route::put('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
         Route::put('/mark-by-type-read', [NotificationController::class, 'markByTypeAsRead'])->name('mark-by-type-read');
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+    });
+
+    // Chat Management
+    Route::prefix('chat')->name('chat.')->group(function(){
+        Route::get('/', [ChatController::class, 'index'])->name('index');
+        Route::get('/{chatId}', [ChatController::class, 'show'])->name('show');
+        Route::get('/{chatId}/messages', [ChatController::class, 'getMessages'])->name('messages');
+        Route::post('/{chatId}/messages', [ChatController::class, 'sendMessage'])->name('send-message');
     });
 });

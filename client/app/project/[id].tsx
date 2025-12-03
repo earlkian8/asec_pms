@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FIRM_CONTACT } from '@/constants/contact';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Phone, Mail } from 'lucide-react-native';
+import { Mail } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
 import { useProjectDetail, ProjectDetail, ProgressUpdate } from '@/hooks/useProjectDetail';
 import AnimatedCard from '@/components/AnimatedCard';
@@ -247,54 +247,30 @@ export default function ProjectDetailScreen() {
     );
   }
 
-  const handleContact = async (method: 'call' | 'email') => {
+  const handleContact = async () => {
     if (!project) return;
     
-    if (method === 'call') {
-      const phoneUrl = `tel:${FIRM_CONTACT.phone}`;
-      
-      dialog.showConfirm(
-        `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        async () => {
-          try {
-            const canOpen = await Linking.canOpenURL(phoneUrl);
-            if (canOpen) {
-              await Linking.openURL(phoneUrl);
-            } else {
-              dialog.showError('Unable to open phone dialer');
-            }
-          } catch (error) {
-            dialog.showError('Failed to open phone dialer');
-            console.error('Error opening phone:', error);
+    const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
+    
+    dialog.showConfirm(
+      `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
+      async () => {
+        try {
+          const canOpen = await Linking.canOpenURL(emailUrl);
+          if (canOpen) {
+            await Linking.openURL(emailUrl);
+          } else {
+            dialog.showError('Unable to open email client');
           }
-        },
-        'Contact Project Manager',
-        'Call',
-        'Cancel'
-      );
-    } else {
-      const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-      
-      dialog.showConfirm(
-        `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        async () => {
-          try {
-            const canOpen = await Linking.canOpenURL(emailUrl);
-            if (canOpen) {
-              await Linking.openURL(emailUrl);
-            } else {
-              dialog.showError('Unable to open email client');
-            }
-          } catch (error) {
-            dialog.showError('Failed to open email client');
-            console.error('Error opening email:', error);
-          }
-        },
-        'Contact Project Manager',
-        'Email',
-        'Cancel'
-      );
-    }
+        } catch (error) {
+          dialog.showError('Failed to open email client');
+          console.error('Error opening email:', error);
+        }
+      },
+      'Contact Project Manager',
+      'Email',
+      'Cancel'
+    );
   };
 
   // Final safety check - should never reach here if project is null, but just in case
@@ -325,13 +301,7 @@ export default function ProjectDetailScreen() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerActionButton}
-            onPress={() => handleContact('call')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Phone size={20} color={textColor} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={() => handleContact('email')}
+            onPress={() => handleContact()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Mail size={20} color={textColor} />
           </TouchableOpacity>
@@ -428,12 +398,6 @@ export default function ProjectDetailScreen() {
                 <Ionicons name="location-outline" size={20} color={textSecondary} />
                 <Text style={[styles.detailText, { color: textColor }, !project.location && styles.placeholderText]}>
                   {project.location || 'No location specified'}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="person-outline" size={20} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }, !project.projectManager && styles.placeholderText]}>
-                  Project Manager: {project.projectManager || 'No project manager assigned'}
                 </Text>
               </View>
               <View style={styles.detailRow}>

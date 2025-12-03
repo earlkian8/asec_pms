@@ -18,7 +18,6 @@ import { Loader2, ArrowDownToLine } from "lucide-react";
 const StockIn = ({ setShowStockInModal, item }) => {
   const { data, setData, post, errors, processing } = useForm({
     quantity: "",
-    unit_price: "",
     transaction_date: new Date().toISOString().split('T')[0],
     notes: "",
   });
@@ -92,22 +91,6 @@ const StockIn = ({ setShowStockInModal, item }) => {
             />
             <InputError message={errors.quantity} />
             <p className="text-xs text-gray-500 mt-1">Unit: {item.unit_of_measure}</p>
-          </div>
-
-          {/* Unit Price */}
-          <div>
-            <Label className="text-zinc-800">Unit Price (Optional)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={data.unit_price}
-              onChange={(e) => setData("unit_price", e.target.value)}
-              placeholder="0.00"
-              className={inputClass(errors.unit_price)}
-            />
-            <InputError message={errors.unit_price} />
-            <p className="text-xs text-gray-500 mt-1">Price per unit for this stock in transaction</p>
           </div>
 
           {/* Transaction Date */}

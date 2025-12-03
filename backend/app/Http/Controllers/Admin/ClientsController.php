@@ -7,8 +7,10 @@ use App\Models\Client;
 use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
+use App\Mail\ClientCredentialsMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -59,8 +61,11 @@ class ClientsController extends Controller
                 $query->where('province', 'like', "%{$province}%");
             })
             ->orderBy($sortBy, $sortOrder)
-            ->paginate(10)
-            ->withQueryString();
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         // Get unique values for filter options
         $clientTypes = Client::distinct()->whereNotNull('client_type')->pluck('client_type')->sort()->values();
@@ -91,9 +96,9 @@ class ClientsController extends Controller
         $validated = $request->validate([
             'client_name'     => ['required', 'max:255'],
             'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
-            'contact_person'  => ['nullable', 'max:255'],
-            'email'           => ['nullable', 'email', 'max:100'],
-            'password'        => ['nullable', 'string', 'min:8'],
+            'contact_person'  => ['required', 'max:255'],
+            'email'           => ['required', 'email', 'max:100'],
+            'password'        => ['required', 'string', 'min:8'],
             'phone_number'    => ['nullable', 'max:20'],
             'address'         => ['nullable', 'max:255'],
             'city'            => ['nullable', 'max:100'],
@@ -116,6 +121,9 @@ class ClientsController extends Controller
             unset($validated['payment_terms']);
         }
 
+        // Store plain password before hashing (for email)
+        $plainPassword = $validated['password'] ?? null;
+
         // Hash password if provided
         if (!empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
@@ -130,8 +138,25 @@ class ClientsController extends Controller
         } while (Client::where('client_code', $clientCode)->exists());
 
         $validated['client_code'] = $clientCode;
+        // Set password_changed_at to null so client must change password on first login
+        $validated['password_changed_at'] = null;
 
         $client = Client::create($validated);
+
+        // Send credentials email to client
+        if ($client->email && $plainPassword) {
+            try {
+                $loginUrl = config('app.client_portal_url', url('/client/login'));
+                
+                // Send email using Resend mailer
+                Mail::mailer('resend')
+                    ->to($client->email)
+                    ->send(new ClientCredentialsMail($client, $plainPassword, $loginUrl));
+            } catch (\Exception $e) {
+                // Re-throw the exception so user knows email failed
+                throw new \Exception('Client created but failed to send credentials email: ' . $e->getMessage());
+            }
+        }
 
         $this->adminActivityLogs('Client', 'Add', 'Added Client ' . $client->client_name);
 
@@ -153,9 +178,8 @@ class ClientsController extends Controller
             'client_code'     => ['required', 'max:20', Rule::unique('clients', 'client_code')->ignore($client->id)],
             'client_name'     => ['required', 'max:255'],
             'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
-            'contact_person'  => ['nullable', 'max:255'],
-            'email'           => ['nullable', 'email', 'max:100'],
-            'password'        => ['nullable', 'string', 'min:8'],
+            'contact_person'  => ['required', 'max:255'],
+            'email'           => ['required', 'email', 'max:100'],
             'phone_number'    => ['nullable', 'max:20'],
             'address'         => ['nullable', 'max:255'],
             'city'            => ['nullable', 'max:100'],
@@ -177,13 +201,6 @@ class ClientsController extends Controller
             unset($validated['payment_terms']);
         }
 
-        // Hash password if provided
-        if (!empty($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
-        }
-
         $oldName = $client->client_name;
 
         $client->update($validated);
@@ -199,7 +216,7 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return redirect()->back()->with('success', 'Client updated successfully.');
+        return back()->withQueryString()->with('success', 'Client updated successfully.');
     }
 
     public function destroy(Client $client)
@@ -252,7 +269,7 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return back()->with('success', 'Client status updated successfully.');
+        return back()->withQueryString()->with('success', 'Client status updated successfully.');
     }
 
     public function resetPassword(Client $client)
@@ -261,6 +278,7 @@ class ClientsController extends Controller
         
         $client->update([
             'password' => Hash::make($defaultPassword),
+            'password_changed_at' => null, // Force password change on next login
         ]);
 
         $this->adminActivityLogs(
@@ -269,6 +287,6 @@ class ClientsController extends Controller
             'Reset password for Client ' . $client->client_name . ' (' . $client->client_code . ')'
         );
 
-        return redirect()->back()->with('success', 'Client password reset successfully.');
+        return redirect()->back()->with('success', 'Client password reset successfully. Client will be required to change password on next login.');
     }
 }

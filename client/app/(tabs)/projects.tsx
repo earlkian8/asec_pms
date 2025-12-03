@@ -24,7 +24,6 @@ import {
   Search,
   Filter,
   ArrowUpDown,
-  Phone,
   Mail,
   X,
   Check,
@@ -92,60 +91,28 @@ export default function ProjectsScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  const handleContact = async (project: Project, method: 'call' | 'email') => {
-    if (method === 'call') {
-      // Clean phone number: remove spaces, dashes, and ensure proper format
-      const cleanPhone = FIRM_CONTACT.phone.replace(/[\s\-\(\)]/g, '');
-      const phoneUrl = `tel:${cleanPhone}`;
-      
-      dialog.showConfirm(
-        `Would you like to call ${project.projectManager}?\n\nPhone: ${FIRM_CONTACT.phone}`,
-        async () => {
-          try {
-            // On web, tel: links don't work, so show a message
-            if (Platform.OS === 'web') {
-              dialog.showError('Phone calls are not supported on web. Please use a mobile device.');
-              return;
-            }
-            
-            const canOpen = await Linking.canOpenURL(phoneUrl);
-            if (canOpen) {
-              await Linking.openURL(phoneUrl);
-            } else {
-              dialog.showError('Unable to open phone dialer');
-            }
-          } catch (error) {
-            dialog.showError('Failed to open phone dialer');
-            console.error('Error opening phone:', error);
+  const handleContact = async (project: Project) => {
+    const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
+    
+    dialog.showConfirm(
+      `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
+      async () => {
+        try {
+          const canOpen = await Linking.canOpenURL(emailUrl);
+          if (canOpen) {
+            await Linking.openURL(emailUrl);
+          } else {
+            dialog.showError('Unable to open email client');
           }
-        },
-        'Contact Project Manager',
-        'Call',
-        'Cancel'
-      );
-    } else {
-      const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-      
-      dialog.showConfirm(
-        `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-        async () => {
-          try {
-            const canOpen = await Linking.canOpenURL(emailUrl);
-            if (canOpen) {
-              await Linking.openURL(emailUrl);
-            } else {
-              dialog.showError('Unable to open email client');
-            }
-          } catch (error) {
-            dialog.showError('Failed to open email client');
-            console.error('Error opening email:', error);
-          }
-        },
-        'Contact Project Manager',
-        'Email',
-        'Cancel'
-      );
-    }
+        } catch (error) {
+          dialog.showError('Failed to open email client');
+          console.error('Error opening email:', error);
+        }
+      },
+      'Contact Project Manager',
+      'Email',
+      'Cancel'
+    );
   };
 
 
@@ -305,12 +272,7 @@ export default function ProjectsScreen() {
         <View style={styles.projectActions}>
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => handleContact(project, 'call')}>
-            <Phone size={16} color="#3B82F6" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => handleContact(project, 'email')}>
+            onPress={() => handleContact(project)}>
             <Mail size={16} color="#3B82F6" />
           </TouchableOpacity>
           <TouchableOpacity

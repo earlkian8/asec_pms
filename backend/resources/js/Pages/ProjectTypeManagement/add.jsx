@@ -17,7 +17,7 @@ import { Switch } from '@/Components/ui/switch';
 import { Textarea } from '@/Components/ui/textarea';
 import { Loader2, Save } from 'lucide-react';
 
-const AddProjectType = ({ setShowAddModal }) => {
+const AddProjectType = ({ setShowAddModal, onSuccess }) => {
   const { data, setData, post, errors, processing } = useForm({
     name: '',
     description: '',
@@ -54,6 +54,10 @@ const AddProjectType = ({ setShowAddModal }) => {
         setShowAddModal(false);
         setValidationErrors({});
         toast.success('Project type created successfully!');
+        // Call optional onSuccess callback if provided
+        if (onSuccess && typeof onSuccess === 'function') {
+          onSuccess();
+        }
       }
     });
   };

@@ -7,12 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/Components/ui/textarea";
 import { Checkbox } from "@/Components/ui/checkbox";
 import { useState, useEffect } from "react";
+import { router } from "@inertiajs/react";
 import AddClient from "../../ClientManagement/add";
+import AddProjectType from "../../ProjectTypeManagement/add";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
 export default function Step1ProjectInfo({ clients, projectTypes = [], errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
   const [showAddClient, setShowAddClient] = useState(false);
+  const [showAddProjectType, setShowAddProjectType] = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
 
   // Initialize display value when projectData.contract_amount changes
@@ -30,10 +33,22 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], errors = 
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
 
+  const handleProjectTypeAdded = () => {
+    setShowAddProjectType(false);
+    // Reload only the projectTypes data to refresh the list
+    router.reload({ only: ['projectTypes'], preserveState: true });
+  };
+
   return (
     <>
       {showAddClient && (
         <AddClient setShowAddModal={setShowAddClient} />
+      )}
+      {showAddProjectType && (
+        <AddProjectType 
+          setShowAddModal={setShowAddProjectType} 
+          onSuccess={handleProjectTypeAdded}
+        />
       )}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Basic Information</h3>
@@ -86,25 +101,35 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], errors = 
           {/* Project Type */}
           <div>
             <Label className="text-zinc-800">Project Type <span className="text-red-500">*</span></Label>
-            <Select
-              value={projectData.project_type_id}
-              onValueChange={(value) => updateProjectData({ project_type_id: value })}
-            >
-              <SelectTrigger className={inputClass(errors.project_type_id)}>
-                <SelectValue placeholder="Project Type" />
-              </SelectTrigger>
-              <SelectContent>
-                {projectTypes && projectTypes.length > 0 ? (
-                  projectTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="" disabled>No project types available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2 items-center">
+              <Select
+                value={projectData.project_type_id}
+                onValueChange={(value) => updateProjectData({ project_type_id: value })}
+              >
+                <SelectTrigger className={inputClass(errors.project_type_id)}>
+                  <SelectValue placeholder="Project Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectTypes && projectTypes.length > 0 ? (
+                    projectTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>No project types available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="whitespace-nowrap"
+                onClick={() => setShowAddProjectType(true)}
+              >
+                New
+              </Button>
+            </div>
             <InputError message={errors.project_type_id} />
           </div>
 

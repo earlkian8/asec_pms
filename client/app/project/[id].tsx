@@ -401,12 +401,6 @@ export default function ProjectDetailScreen() {
                 </Text>
               </View>
               <View style={styles.detailRow}>
-                <Ionicons name="person-outline" size={20} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }, !project.projectManager && styles.placeholderText]}>
-                  Project Manager: {project.projectManager || 'No project manager assigned'}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
                 <Ionicons name="document-text-outline" size={20} color={textSecondary} />
                 <Text style={[styles.detailText, { color: textColor }, !project.description && styles.placeholderText]}>
                   {project.description || 'No description provided for this project.'}

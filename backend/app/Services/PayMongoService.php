@@ -208,14 +208,16 @@ class PayMongoService
     public function createSource(float $amount, string $currency = 'PHP', string $type = 'gcash', array $metadata = [], ?string $successUrl = null, ?string $failedUrl = null)
     {
         try {
-            // PayMongo maximum is 999,999,999 cents (9,999,999.99 PHP)
-            $maxAmountInCents = 999999999;
+            // GCash maximum is 100,000 PHP per transaction
+            // PayMaya and other sources may have different limits
+            $maxAmount = 100000.00; // 100,000 PHP for GCash
+            $maxAmountInCents = (int)($maxAmount * 100); // 10,000,000 cents
             $amountInCents = (int)($amount * 100);
             
-            if ($amountInCents > $maxAmountInCents) {
+            if ($amount > $maxAmount) {
                 return [
                     'success' => false,
-                    'error' => 'Amount exceeds PayMongo maximum limit of ₱9,999,999.99',
+                    'error' => 'Amount exceeds GCash maximum limit of ₱' . number_format($maxAmount, 2) . '. Please split your payment into multiple transactions or contact support for assistance.',
                 ];
             }
 
@@ -283,6 +285,104 @@ class PayMongoService
             return [
                 'success' => false,
                 'error' => 'An unexpected error occurred while creating payment source: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get source status from PayMongo
+     */
+    public function getSource(string $sourceId)
+    {
+        try {
+            $response = $this->request('GET', "sources/{$sourceId}");
+
+            if (isset($response['data'])) {
+                return [
+                    'success' => true,
+                    'source' => $response['data'],
+                    'status' => $response['data']['attributes']['status'] ?? 'unknown',
+                    'amount' => ($response['data']['attributes']['amount'] ?? 0) / 100, // Convert from cents
+                ];
+            }
+
+            $errorMessage = $response['errors'][0]['detail'] ?? 'Unknown error';
+            Log::error('PayMongo Source Retrieval Failed', [
+                'error' => $errorMessage,
+                'response' => $response,
+                'source_id' => $sourceId,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PayMongo Service Error', [
+                'error' => $e->getMessage(),
+                'source_id' => $sourceId,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'An unexpected error occurred while retrieving source',
+            ];
+        }
+    }
+
+    /**
+     * Create a payment from a chargeable source
+     */
+    public function createPaymentFromSource(string $sourceId, float $amount, string $currency = 'PHP', array $metadata = [])
+    {
+        try {
+            $amountInCents = (int)($amount * 100);
+            
+            $response = $this->request('POST', 'payments', [
+                'data' => [
+                    'attributes' => [
+                        'amount' => $amountInCents,
+                        'currency' => $currency,
+                        'source' => [
+                            'id' => $sourceId,
+                            'type' => 'source',
+                        ],
+                        'metadata' => $this->flattenMetadata($metadata),
+                    ],
+                ],
+            ]);
+
+            if (isset($response['data'])) {
+                return [
+                    'success' => true,
+                    'payment_id' => $response['data']['id'],
+                    'status' => $response['data']['attributes']['status'] ?? 'unknown',
+                    'amount' => ($response['data']['attributes']['amount'] ?? 0) / 100, // Convert from cents
+                    'data' => $response['data'],
+                ];
+            }
+
+            $errorMessage = $response['errors'][0]['detail'] ?? ($response['errors'][0]['title'] ?? 'Unknown error');
+            Log::error('PayMongo Payment Creation from Source Failed', [
+                'error' => $errorMessage,
+                'response' => $response,
+                'source_id' => $sourceId,
+                'amount' => $amount,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PayMongo Service Error', [
+                'error' => $e->getMessage(),
+                'source_id' => $sourceId,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'An unexpected error occurred while creating payment from source',
             ];
         }
     }

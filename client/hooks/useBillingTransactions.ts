@@ -39,11 +39,19 @@ export function useBillingTransactions(options: UseBillingTransactionsOptions = 
       
       if (typeof response === 'object' && 'success' in response) {
         if (response.success && response.data) {
-          setTransactions(response.data.data || []);
-          setPagination(response.data);
+          // Handle paginated response - data can be either an array or paginated object
+          const transactionsData = Array.isArray(response.data) 
+            ? response.data 
+            : (response.data.data || []);
+          setTransactions(transactionsData);
+          setPagination(Array.isArray(response.data) ? null : response.data);
         } else {
           setError(response.message || 'Failed to fetch transactions');
+          setTransactions([]);
         }
+      } else {
+        setError('Invalid response format');
+        setTransactions([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

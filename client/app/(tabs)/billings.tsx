@@ -48,6 +48,13 @@ type SortOption = 'created_at' | 'billing_code' | 'billing_date' | 'due_date' | 
 
 export default function BillingsScreen() {
   const [activeTab, setActiveTab] = useState<'billings' | 'transactions'>('billings');
+
+  // Refresh transactions when switching to transactions tab
+  useEffect(() => {
+    if (activeTab === 'transactions') {
+      refreshTransactions();
+    }
+  }, [activeTab]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('created_at');
@@ -124,83 +131,140 @@ export default function BillingsScreen() {
   const BillingCard = ({ billing, index }: { billing: Billing; index: number }) => {
     const status = statusColors[billing.status] || statusColors.unpaid;
     const paymentPercent = billing.payment_percentage || 0;
+    const isOverdue = billing.due_date && 
+      new Date(billing.due_date) < new Date() && 
+      (billing.status === 'unpaid' || billing.status === 'partial');
 
     return (
       <AnimatedCard
         index={index}
         delay={100}
         onPress={() => router.push(`/billing-detail?id=${billing.id}`)}
-        style={StyleSheet.flatten([styles.card, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardTitleContainer}>
-            <View style={styles.titleRow}>
-              <View style={[styles.statusDot, { backgroundColor: status.dot }]} />
-              <Text style={[styles.cardName, { color: AppColors.text }]} numberOfLines={2}>
+        style={StyleSheet.flatten([styles.billingCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
+        {/* Invoice Header */}
+        <View style={styles.billingInvoiceHeader}>
+          <View style={styles.billingInvoiceHeaderLeft}>
+            <View style={styles.billingInvoiceCodeRow}>
+              <Receipt size={20} color={AppColors.primary} />
+              <Text style={[styles.billingInvoiceCode, { color: AppColors.text }]}>
                 {billing.billing_code}
               </Text>
             </View>
-            <Text style={[styles.cardProject, { color: AppColors.textSecondary }]} numberOfLines={1}>
-              <Ionicons name="briefcase-outline" size={12} color={AppColors.textSecondary} /> {billing.project.project_name}
+            <Text style={[styles.billingInvoiceProject, { color: AppColors.textSecondary }]} numberOfLines={1}>
+              {billing.project.project_name}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.text }]}>
+          <View style={[styles.billingInvoiceStatusBadge, { backgroundColor: status.bg }]}>
+            <View style={[styles.billingStatusIndicator, { backgroundColor: status.dot }]} />
+            <Text style={[styles.billingInvoiceStatusText, { color: status.text }]}>
               {billing.status.toUpperCase()}
             </Text>
           </View>
         </View>
 
-        <Text style={[styles.cardDescription, { color: AppColors.textSecondary }, !billing.description && styles.placeholderText]} numberOfLines={2}>
-          {billing.description || 'No description provided'}
-        </Text>
-
-        <View style={styles.cardStats}>
-          <View style={styles.statItem}>
-            <Ionicons name="cash-outline" size={16} color={AppColors.textSecondary} />
-            <Text style={[styles.statValue, { color: AppColors.text }]}>{formatCurrency(billing.billing_amount)}</Text>
-            <Text style={[styles.statLabel, { color: AppColors.textSecondary }]}>Total</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Ionicons name="checkmark-circle-outline" size={16} color={AppColors.textSecondary} />
-            <Text style={[styles.statValue, { color: AppColors.text }]}>{formatCurrency(billing.total_paid)}</Text>
-            <Text style={[styles.statLabel, { color: AppColors.textSecondary }]}>Paid</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={16} color={AppColors.textSecondary} />
-            <Text style={[styles.statValue, { color: AppColors.text }]}>
-              {billing.due_date ? new Date(billing.due_date).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              }) : 'N/A'}
-            </Text>
-            <Text style={[styles.statLabel, { color: AppColors.textSecondary }]}>Due Date</Text>
-          </View>
+        {/* Invoice Amount - Prominent */}
+        <View style={styles.billingInvoiceAmountSection}>
+          <Text style={[styles.billingInvoiceAmountLabel, { color: AppColors.textSecondary }]}>
+            Invoice Amount
+          </Text>
+          <Text style={[styles.billingInvoiceAmountValue, { color: AppColors.text }]}>
+            {formatCurrency(billing.billing_amount)}
+          </Text>
         </View>
 
-        <View style={styles.paymentSection}>
-          <View style={styles.paymentHeader}>
-            <Text style={[styles.paymentLabel, { color: AppColors.textSecondary }]}>Payment Progress</Text>
-            <Text style={[styles.paymentPercent, { color: AppColors.text }]}>{Math.round(paymentPercent)}%</Text>
-          </View>
-          <View style={[styles.progressBar, { backgroundColor: AppColors.border }]}>
-            <LinearGradient
-              colors={['#3B82F6', '#2563EB']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.progressFill, { width: `${Math.min(paymentPercent, 100)}%` }]}
-            />
-          </View>
-        </View>
-
-        <View style={styles.amountSection}>
-          <View style={styles.amountRow}>
-            <Text style={[styles.amountLabel, { color: AppColors.textSecondary }]}>Remaining Amount</Text>
-            <Text style={[styles.amountValue, { color: billing.remaining_amount > 0 ? AppColors.error : AppColors.success }]}>
-              {formatCurrency(billing.remaining_amount)}
+        {/* Payment Summary */}
+        <View style={styles.billingInvoiceSummary}>
+          <View style={styles.billingInvoiceSummaryRow}>
+            <View style={styles.billingInvoiceSummaryLeft}>
+              <Ionicons name="checkmark-circle" size={16} color={AppColors.success} />
+              <Text style={[styles.billingInvoiceSummaryLabel, { color: AppColors.textSecondary }]}>
+                Amount Paid
+              </Text>
+            </View>
+            <Text style={[styles.billingInvoiceSummaryValue, { color: AppColors.success }]}>
+              {formatCurrency(billing.total_paid)}
             </Text>
           </View>
+          {billing.remaining_amount > 0 && (
+            <View style={styles.billingInvoiceSummaryRow}>
+              <View style={styles.billingInvoiceSummaryLeft}>
+                <Ionicons name="alert-circle" size={16} color={AppColors.error} />
+                <Text style={[styles.billingInvoiceSummaryLabel, { color: AppColors.textSecondary }]}>
+                  Amount Due
+                </Text>
+              </View>
+              <Text style={[styles.billingInvoiceSummaryValue, { color: AppColors.error }]}>
+                {formatCurrency(billing.remaining_amount)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Payment Progress - Only show if not fully paid */}
+        {billing.status !== 'paid' && (
+          <View style={styles.billingInvoiceProgress}>
+            <View style={styles.billingInvoiceProgressHeader}>
+              <Text style={[styles.billingInvoiceProgressLabel, { color: AppColors.textSecondary }]}>
+                Payment Progress
+              </Text>
+              <Text style={[styles.billingInvoiceProgressPercent, { color: AppColors.text }]}>
+                {Math.round(paymentPercent)}%
+              </Text>
+            </View>
+            <View style={[styles.billingInvoiceProgressBar, { backgroundColor: AppColors.border }]}>
+              <LinearGradient
+                colors={paymentPercent === 100 ? ['#10B981', '#059669'] : ['#3B82F6', '#2563EB']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.billingInvoiceProgressFill, { width: `${Math.min(paymentPercent, 100)}%` }]}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Invoice Details */}
+        <View style={styles.billingInvoiceDetails}>
+          {billing.billing_date && (
+            <View style={styles.billingInvoiceDetailRow}>
+              <Ionicons name="calendar-outline" size={14} color={AppColors.textSecondary} />
+              <Text style={[styles.billingInvoiceDetailLabel, { color: AppColors.textSecondary }]}>
+                Invoice Date:
+              </Text>
+              <Text style={[styles.billingInvoiceDetailValue, { color: AppColors.text }]}>
+                {new Date(billing.billing_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </Text>
+            </View>
+          )}
+          {billing.due_date && (
+            <View style={[styles.billingInvoiceDetailRow, isOverdue && styles.billingInvoiceDetailRowOverdue]}>
+              <Ionicons 
+                name={isOverdue ? "alert-circle" : "time-outline"} 
+                size={14} 
+                color={isOverdue ? AppColors.error : AppColors.textSecondary} 
+              />
+              <Text style={[
+                styles.billingInvoiceDetailLabel, 
+                { color: isOverdue ? AppColors.error : AppColors.textSecondary }
+              ]}>
+                Due Date:
+              </Text>
+              <Text style={[
+                styles.billingInvoiceDetailValue, 
+                { color: isOverdue ? AppColors.error : AppColors.text }
+              ]}>
+                {new Date(billing.due_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+                {isOverdue && ' (Overdue)'}
+              </Text>
+            </View>
+          )}
         </View>
       </AnimatedCard>
     );
@@ -213,56 +277,75 @@ export default function BillingsScreen() {
       failed: { bg: '#FEE2E2', text: '#991B1B' },
       cancelled: { bg: '#E5E7EB', text: '#4B5563' },
     };
-    const status = paymentStatusColors[transaction.payment_status] || paymentStatusColors.pending;
+    const paymentStatus = transaction.payment_status || 'pending';
+    const status = paymentStatusColors[paymentStatus] || paymentStatusColors.pending;
+    const paymentMethod = transaction.payment_method || 'unknown';
 
     return (
       <AnimatedCard
         index={index}
         delay={100}
-        style={StyleSheet.flatten([styles.card, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardTitleContainer}>
-            <Text style={[styles.cardName, { color: AppColors.text }]} numberOfLines={1}>
-              {transaction.payment_code}
-            </Text>
-            <Text style={[styles.cardProject, { color: AppColors.textSecondary }]} numberOfLines={1}>
+        style={StyleSheet.flatten([styles.transactionCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
+        <View style={styles.transactionCardHeader}>
+          <View style={styles.transactionCardTitleContainer}>
+            <View style={styles.transactionTitleRow}>
+              <CreditCard size={18} color={AppColors.primary} />
+              <Text style={[styles.transactionCardCode, { color: AppColors.text }]} numberOfLines={1}>
+                {transaction.payment_code || 'N/A'}
+              </Text>
+            </View>
+            <Text style={[styles.transactionCardBilling, { color: AppColors.textSecondary }]} numberOfLines={1}>
               {transaction.billing?.billing_code || 'N/A'} - {transaction.billing?.project?.project_name || 'N/A'}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.text }]}>
-              {transaction.payment_status.toUpperCase()}
+          <View style={[styles.transactionStatusBadge, { backgroundColor: status.bg }]}>
+            <Text style={[styles.transactionStatusText, { color: status.text }]}>
+              {paymentStatus.toUpperCase()}
             </Text>
           </View>
         </View>
 
-        <View style={styles.transactionDetails}>
-          <View style={styles.transactionRow}>
-            <Text style={[styles.transactionLabel, { color: AppColors.textSecondary }]}>Amount</Text>
-            <Text style={[styles.transactionValue, { color: AppColors.text }]}>
-              {formatCurrency(transaction.payment_amount)}
+        <View style={styles.transactionCardAmountSection}>
+          <Text style={[styles.transactionCardAmountLabel, { color: AppColors.textSecondary }]}>
+            Payment Amount
+          </Text>
+          <Text style={[styles.transactionCardAmountValue, { color: AppColors.text }]}>
+            {formatCurrency(transaction.payment_amount || 0)}
+          </Text>
+        </View>
+
+        <View style={styles.transactionCardDetails}>
+          <View style={styles.transactionCardDetailRow}>
+            <Ionicons name="calendar-outline" size={14} color={AppColors.textSecondary} />
+            <Text style={[styles.transactionCardDetailLabel, { color: AppColors.textSecondary }]}>
+              Payment Date:
+            </Text>
+            <Text style={[styles.transactionCardDetailValue, { color: AppColors.text }]}>
+              {transaction.payment_date 
+                ? new Date(transaction.payment_date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })
+                : 'N/A'}
             </Text>
           </View>
-          <View style={styles.transactionRow}>
-            <Text style={[styles.transactionLabel, { color: AppColors.textSecondary }]}>Date</Text>
-            <Text style={[styles.transactionValue, { color: AppColors.text }]}>
-              {new Date(transaction.payment_date).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-              })}
+          <View style={styles.transactionCardDetailRow}>
+            <Ionicons name="card-outline" size={14} color={AppColors.textSecondary} />
+            <Text style={[styles.transactionCardDetailLabel, { color: AppColors.textSecondary }]}>
+              Payment Method:
             </Text>
-          </View>
-          <View style={styles.transactionRow}>
-            <Text style={[styles.transactionLabel, { color: AppColors.textSecondary }]}>Method</Text>
-            <Text style={[styles.transactionValue, { color: AppColors.text }]}>
-              {transaction.payment_method === 'paymongo' ? 'PayMongo' : transaction.payment_method.replace('_', ' ').toUpperCase()}
+            <Text style={[styles.transactionCardDetailValue, { color: AppColors.text }]}>
+              {paymentMethod === 'paymongo' ? 'PayMongo' : paymentMethod.replace('_', ' ').toUpperCase()}
             </Text>
           </View>
           {transaction.reference_number && (
-            <View style={styles.transactionRow}>
-              <Text style={[styles.transactionLabel, { color: AppColors.textSecondary }]}>Reference</Text>
-              <Text style={[styles.transactionValue, { color: AppColors.text }]} numberOfLines={1}>
+            <View style={styles.transactionCardDetailRow}>
+              <Ionicons name="receipt-outline" size={14} color={AppColors.textSecondary} />
+              <Text style={[styles.transactionCardDetailLabel, { color: AppColors.textSecondary }]}>
+                Reference:
+              </Text>
+              <Text style={[styles.transactionCardDetailValue, { color: AppColors.text }]} numberOfLines={1}>
                 {transaction.reference_number}
               </Text>
             </View>
@@ -346,6 +429,21 @@ export default function BillingsScreen() {
       {(activeTab === 'billings' ? loading : transactionsLoading) ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={AppColors.primary} />
+        </View>
+      ) : (activeTab === 'transactions' && transactionsError) ? (
+        <View style={styles.emptyContainer}>
+          <AlertCircle size={48} color={AppColors.error} />
+          <Text style={[styles.emptyText, { color: AppColors.error }]}>
+            Error Loading Transactions
+          </Text>
+          <Text style={[styles.emptySubtext, { color: AppColors.textSecondary }]}>
+            {transactionsError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: AppColors.primary, marginTop: 16 }]}
+            onPress={refreshTransactions}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -637,6 +735,156 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  billingCard: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  billingInvoiceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+  },
+  billingInvoiceHeaderLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  billingInvoiceCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  billingInvoiceCode: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  billingInvoiceProject: {
+    fontSize: 13,
+    fontWeight: '400',
+    marginLeft: 28,
+    marginTop: 2,
+  },
+  billingInvoiceStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  billingStatusIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  billingInvoiceStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  billingInvoiceAmountSection: {
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+    alignItems: 'center',
+  },
+  billingInvoiceAmountLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  billingInvoiceAmountValue: {
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  billingInvoiceSummary: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  billingInvoiceSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  billingInvoiceSummaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  billingInvoiceSummaryLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  billingInvoiceSummaryValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  billingInvoiceProgress: {
+    marginBottom: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.border,
+  },
+  billingInvoiceProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  billingInvoiceProgressLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  billingInvoiceProgressPercent: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  billingInvoiceProgressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  billingInvoiceProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  billingInvoiceDetails: {
+    gap: 10,
+  },
+  billingInvoiceDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  billingInvoiceDetailRowOverdue: {
+    paddingTop: 4,
+  },
+  billingInvoiceDetailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 2,
+  },
+  billingInvoiceDetailValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  // Keep old card styles for transaction cards
   card: {
     borderRadius: 20,
     padding: 20,
@@ -807,6 +1055,107 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 64,
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // New transaction card styles
+  transactionCard: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  transactionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+  },
+  transactionCardTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  transactionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  transactionCardCode: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  transactionCardBilling: {
+    fontSize: 13,
+    fontWeight: '400',
+    marginLeft: 26,
+    marginTop: 2,
+  },
+  transactionStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  transactionStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  transactionCardAmountSection: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+    alignItems: 'center',
+  },
+  transactionCardAmountLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  transactionCardAmountValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  transactionCardDetails: {
+    gap: 10,
+  },
+  transactionCardDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  transactionCardDetailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 2,
+  },
+  transactionCardDetailValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+    flex: 1,
   },
 });
 

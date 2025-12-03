@@ -110,7 +110,7 @@ export default function ChangePasswordScreen() {
               </View>
               <Text style={[styles.title, { color: textColor }]}>Change Password</Text>
               <Text style={[styles.subtitle, { color: '#6B7280' }]}>
-                For security reasons, you must change your password before accessing the portal
+                For security reasons, we recommend changing your password. You can skip this step for now.
               </Text>
             </View>
 
@@ -208,6 +208,13 @@ export default function ChangePasswordScreen() {
                 ) : (
                   <Text style={styles.changePasswordButtonText}>Change Password</Text>
                 )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={() => router.replace('/(tabs)')}
+                disabled={loading}>
+                <Text style={styles.skipButtonText}>Skip for Now</Text>
               </TouchableOpacity>
 
               <View style={styles.infoBox}>
@@ -340,6 +347,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     lineHeight: 20,
+  },
+  skipButton: {
+    marginTop: 12,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  skipButtonText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

@@ -259,14 +259,6 @@ export default function ProjectsScreen() {
             </View>
           </View>
 
-          <View style={styles.projectCardFooter}>
-            <View style={styles.footerItem}>
-              <Ionicons name="person-outline" size={14} color={AppColors.textSecondary} />
-              <Text style={[styles.footerText, { color: AppColors.textSecondary }, !project.projectManager && styles.placeholderText]}>
-                {project.projectManager || 'No project manager assigned'}
-              </Text>
-            </View>
-          </View>
 
         {/* Action Buttons */}
         <View style={styles.projectActions}>
@@ -772,22 +764,6 @@ const styles = StyleSheet.create({
   budgetBarFill: {
     height: '100%',
     borderRadius: 4,
-  },
-  projectCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: AppColors.border,
-  },
-  footerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  footerText: {
-    fontSize: 12,
-    fontWeight: '500',
   },
   placeholderText: {
     fontStyle: 'italic',

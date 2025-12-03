@@ -80,11 +80,12 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::post('/chat/{chatId}/messages', [ChatController::class, 'sendMessage']);
     
     // Billing routes
+    // IMPORTANT: Specific routes must come BEFORE parameterized routes
+    Route::get('/billings/transactions', [ClientBillingController::class, 'transactions']);
     Route::get('/billings', [ClientBillingController::class, 'index']);
     Route::get('/billings/{id}', [ClientBillingController::class, 'show']);
     Route::post('/billings/{id}/pay', [ClientBillingController::class, 'initiatePayment']);
     Route::get('/billings/{id}/payment-status', [ClientBillingController::class, 'checkPaymentStatus']);
-    Route::get('/billings/transactions', [ClientBillingController::class, 'transactions']);
 });
 
 // Payment redirect handlers (public routes for PayMongo redirects)

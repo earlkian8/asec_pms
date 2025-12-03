@@ -18,7 +18,7 @@ export const ProjectWizardProvider = ({ children }) => {
   const [projectData, setProjectData] = useState({
     project_name: '',
     client_id: '',
-    project_type: '',
+    project_type_id: '',
     status: 'active',
     priority: 'medium',
     contract_amount: '',
@@ -117,7 +117,7 @@ export const ProjectWizardProvider = ({ children }) => {
     setProjectData({
       project_name: '',
       client_id: '',
-      project_type: '',
+      project_type_id: '',
       status: 'active',
       priority: 'medium',
       contract_amount: '',

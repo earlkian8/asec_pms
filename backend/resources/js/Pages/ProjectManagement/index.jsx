@@ -48,6 +48,7 @@ export default function ProjectsIndex() {
   const clients = usePage().props.clients || [];
   const users = usePage().props.users || [];
   const inventoryItems = usePage().props.inventoryItems || [];
+  const projectTypes = usePage().props.projectTypes || [];
   const filters = usePage().props.filters || {};
   const filterOptions = usePage().props.filterOptions || {};
   const initialSearch = usePage().props.search || '';
@@ -74,7 +75,7 @@ export default function ProjectsIndex() {
       client_id: filterProps?.client_id || '',
       status: filterProps?.status || '',
       priority: filterProps?.priority || '',
-      project_type: filterProps?.project_type || '',
+      project_type_id: filterProps?.project_type_id || '',
       start_date: filterProps?.start_date || '',
       end_date: filterProps?.end_date || '',
     };
@@ -91,7 +92,7 @@ export default function ProjectsIndex() {
     const newFilters = initializeFilters(filters);
     setLocalFilters(newFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.client_id, filters.status, filters.priority, filters.project_type, filters.start_date, filters.end_date]);
+  }, [filters.client_id, filters.status, filters.priority, filters.project_type_id, filters.start_date, filters.end_date]);
 
   // Sync sort when props change
   useEffect(() => {
@@ -206,7 +207,7 @@ export default function ProjectsIndex() {
     if (localFilters.client_id) count++;
     if (localFilters.status) count++;
     if (localFilters.priority) count++;
-    if (localFilters.project_type) count++;
+    if (localFilters.project_type_id) count++;
     if (localFilters.start_date) count++;
     if (localFilters.end_date) count++;
     return count;
@@ -233,7 +234,7 @@ export default function ProjectsIndex() {
         ...(localFilters.client_id && { client_id: localFilters.client_id }),
         ...(localFilters.status && { status: localFilters.status }),
         ...(localFilters.priority && { priority: localFilters.priority }),
-        ...(localFilters.project_type && { project_type: localFilters.project_type }),
+        ...(localFilters.project_type_id && { project_type_id: localFilters.project_type_id }),
         ...(localFilters.start_date && { start_date: localFilters.start_date }),
         ...(localFilters.end_date && { end_date: localFilters.end_date }),
         sort_by: sortBy,
@@ -288,7 +289,7 @@ export default function ProjectsIndex() {
       client_id: '',
       status: '',
       priority: '',
-      project_type: '',
+      project_type_id: '',
       start_date: '',
       end_date: '',
     });
@@ -386,10 +387,11 @@ export default function ProjectsIndex() {
           clients={clients}
           users={users}
           inventoryItems={inventoryItems}
+          projectTypes={projectTypes}
         />
       )}
       {showEditModal && (
-        <EditProject setShowEditModal={setShowEditModal} project={editProject} clients={clients} />
+        <EditProject setShowEditModal={setShowEditModal} project={editProject} clients={clients} projectTypes={projectTypes} />
       )}
       {showDeleteModal && (
         <DeleteProject setShowDeleteModal={setShowDeleteModal} project={deleteProject} />
@@ -596,8 +598,8 @@ export default function ProjectsIndex() {
                         <div className="mb-4">
                           <Label className="text-xs font-semibold text-gray-700 mb-2 block">Project Type</Label>
                           <Select
-                            value={localFilters.project_type || 'all'}
-                            onValueChange={(value) => handleFilterChange('project_type', value)}
+                            value={localFilters.project_type_id || 'all'}
+                            onValueChange={(value) => handleFilterChange('project_type_id', value)}
                           >
                             <SelectTrigger className="w-full h-9">
                               <SelectValue placeholder="All Types" />
@@ -605,8 +607,8 @@ export default function ProjectsIndex() {
                             <SelectContent>
                               <SelectItem value="all">All Types</SelectItem>
                               {filterOptions.projectTypes.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                <SelectItem key={type.id} value={type.id.toString()}>
+                                  {type.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -825,8 +827,8 @@ export default function ProjectsIndex() {
                           )}
                         </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${typeColors[project.project_type] || 'bg-gray-100 text-gray-800 border border-gray-200'}`}>
-                            {capitalizeText(project.project_type)}
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${typeColors[project.project_type?.name] || 'bg-gray-100 text-gray-800 border border-gray-200'}`}>
+                            {project.project_type?.name || '---'}
                           </span>
                         </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Project;
+use App\Models\ProjectType;
 use App\Models\ProjectTask;
 use App\Models\ProjectTeam;
 use App\Models\ProjectMilestone;
@@ -61,7 +62,7 @@ class ProjectsController extends Controller
         $clientId = $request->input('client_id');
         $status = $request->input('status');
         $priority = $request->input('priority');
-        $projectType = $request->input('project_type');
+        $projectType = $request->input('project_type_id');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $sortBy = $request->input('sort_by', 'created_at');
@@ -76,7 +77,7 @@ class ProjectsController extends Controller
         // Validate sort order
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
-        $projects = Project::with(['client', 'milestones.tasks'])
+        $projects = Project::with(['client', 'projectType:id,name', 'milestones.tasks'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('project_code', 'like', "%{$search}%")
@@ -95,7 +96,7 @@ class ProjectsController extends Controller
                 $query->where('priority', $priority);
             })
             ->when($projectType, function ($query, $projectType) {
-                $query->where('project_type', $projectType);
+                $query->where('project_type_id', $projectType);
             })
             ->when($startDate, function ($query, $startDate) {
                 $query->whereDate('start_date', '>=', $startDate);
@@ -157,8 +158,8 @@ class ProjectsController extends Controller
             ->orderBy('item_name')
             ->get(['id', 'item_code', 'item_name']); // 'unit_of_measure', 'unit_price', 'current_stock'
 
-        // Get unique project types and statuses for filters
-        $projectTypes = Project::distinct()->whereNotNull('project_type')->pluck('project_type')->sort()->values();
+        // Get project types from database
+        $projectTypes = ProjectType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $statuses = Project::distinct()->whereNotNull('status')->pluck('status')->sort()->values();
         $priorities = Project::distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
 
@@ -168,11 +169,12 @@ class ProjectsController extends Controller
             'clients'    => $clients,
             'users'      => $allAssignables, // Combined users and employees
             'inventoryItems' => $inventoryItems,
+            'projectTypes' => $projectTypes,
             'filters' => [
                 'client_id' => $clientId,
                 'status' => $status,
                 'priority' => $priority,
-                'project_type' => $projectType,
+                'project_type_id' => $projectType,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ],
@@ -192,7 +194,7 @@ class ProjectsController extends Controller
             // Project data
             'project_name'          => ['required', 'max:255'],
             'client_id'             => ['required', 'exists:clients,id'],
-            'project_type'          => ['required', 'in:design,construction,consultancy,maintenance,structural,civil,mechanical,electrical,environmental,geotechnical,surveying'],
+            'project_type_id'      => ['required', 'exists:project_types,id'],
             'status'                => ['nullable', 'in:active,on_hold,completed,cancelled'],
             'priority'              => ['nullable', 'in:low,medium,high'],
             'contract_amount'       => ['required', 'numeric'],
@@ -376,7 +378,7 @@ class ProjectsController extends Controller
         $validated = $request->validate([
             'project_name'          => ['required', 'max:255'],
             'client_id'             => ['required', 'exists:clients,id'],
-            'project_type'          => ['required', 'in:design,construction,consultancy,maintenance,commissioning,inspection,renovation,site_layout,surveying,relocation,excavation'],
+            'project_type_id'      => ['required', 'exists:project_types,id'],
             'status'                => ['nullable', 'in:active,on_hold,completed,cancelled'],
             'priority'              => ['nullable', 'in:low,medium,high'],
             'contract_amount'       => ['required', 'numeric'],

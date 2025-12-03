@@ -149,7 +149,7 @@ export default function OverviewTab({ project, overviewData }) {
             </div>
             <div>
               <p className="text-xs text-gray-500 font-medium">Type</p>
-              <p className="text-sm font-bold text-gray-900 capitalize">{project.project_type || '---'}</p>
+              <p className="text-sm font-bold text-gray-900">{project.project_type?.name || '---'}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

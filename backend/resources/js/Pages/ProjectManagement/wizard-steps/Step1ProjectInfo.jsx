@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import AddClient from "../../ClientManagement/add";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
-export default function Step1ProjectInfo({ clients, errors = {} }) {
+export default function Step1ProjectInfo({ clients, projectTypes = [], errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
   const [showAddClient, setShowAddClient] = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
@@ -87,27 +87,25 @@ export default function Step1ProjectInfo({ clients, errors = {} }) {
           <div>
             <Label className="text-zinc-800">Project Type <span className="text-red-500">*</span></Label>
             <Select
-              value={projectData.project_type}
-              onValueChange={(value) => updateProjectData({ project_type: value })}
+              value={projectData.project_type_id}
+              onValueChange={(value) => updateProjectData({ project_type_id: value })}
             >
-              <SelectTrigger className={inputClass(errors.project_type)}>
-                <SelectValue placeholder="Select type" />
+              <SelectTrigger className={inputClass(errors.project_type_id)}>
+                <SelectValue placeholder="Project Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="design">Design</SelectItem>
-                <SelectItem value="construction">Construction</SelectItem>
-                <SelectItem value="consultancy">Consultancy</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="commissioning">Commissioning</SelectItem>
-                <SelectItem value="inspection">Inspection</SelectItem>
-                <SelectItem value="renovation">Renovation</SelectItem>
-                <SelectItem value="site_layout">Site Layout</SelectItem>
-                <SelectItem value="relocation">Relocation</SelectItem>
-                <SelectItem value="excavation">Excavation</SelectItem>
-                <SelectItem value="surveying">Surveying</SelectItem>
+                {projectTypes && projectTypes.length > 0 ? (
+                  projectTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id.toString()}>
+                      {type.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>No project types available</SelectItem>
+                )}
               </SelectContent>
             </Select>
-            <InputError message={errors.project_type} />
+            <InputError message={errors.project_type_id} />
           </div>
 
           {/* Status */}

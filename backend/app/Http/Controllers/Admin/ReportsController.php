@@ -134,7 +134,9 @@ class ReportsController extends Controller
         $totalContractValue = $projects->sum('contract_amount');
 
         // Projects by type
-        $byType = $projects->groupBy('project_type')->map(function ($group) {
+        $byType = $projects->load('projectType')->groupBy(function ($project) {
+            return $project->projectType ? $project->projectType->name : 'Unknown';
+        })->map(function ($group) {
             return $group->count();
         });
 

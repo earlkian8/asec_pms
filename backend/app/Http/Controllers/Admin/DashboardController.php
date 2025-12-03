@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\ProjectType;
 use App\Models\Client;
 use App\Models\Billing;
 use App\Models\BillingPayment;
@@ -30,10 +31,15 @@ class DashboardController extends Controller
             ->get()
             ->pluck('count', 'status');
         
-        $projectsByType = Project::select('project_type', DB::raw('count(*) as count'))
-            ->groupBy('project_type')
+        $projectsByType = Project::with('projectType')
+            ->select('project_type_id', DB::raw('count(*) as count'))
+            ->whereNotNull('project_type_id')
+            ->groupBy('project_type_id')
             ->get()
-            ->pluck('count', 'project_type');
+            ->mapWithKeys(function ($item) {
+                $typeName = $item->projectType ? $item->projectType->name : 'Unknown';
+                return [$typeName => $item->count];
+            });
 
         $totalContractAmount = Project::sum('contract_amount');
         
@@ -50,7 +56,7 @@ class DashboardController extends Controller
         $averageCompletion = $completionPercentages->avg() ?? 0;
 
         // Recent Projects (last 5)
-        $recentProjects = Project::with(['client:id,client_name', 'milestones'])
+        $recentProjects = Project::with(['client:id,client_name', 'projectType:id,name', 'milestones'])
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get()
@@ -61,7 +67,7 @@ class DashboardController extends Controller
                 $project->milestones_completion_percentage = $totalMilestones > 0 
                     ? round(($completedMilestones / $totalMilestones) * 100, 2) 
                     : 0;
-                return $project->only(['id', 'project_code', 'project_name', 'status', 'milestones_completion_percentage', 'client_id', 'created_at']);
+                return $project->only(['id', 'project_code', 'project_name', 'status', 'milestones_completion_percentage', 'client_id', 'project_type_id', 'created_at']);
             });
 
         // Client Statistics

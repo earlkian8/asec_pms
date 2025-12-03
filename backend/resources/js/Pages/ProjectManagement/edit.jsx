@@ -19,11 +19,11 @@ import { Loader2, Save } from "lucide-react";
 import AddClient from "../ClientManagement/add";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
-const EditProject = ({ setShowEditModal, clients, project }) => {
+const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
   const { data, setData, put, errors, processing } = useForm({
     project_name: project.project_name || "",
     client_id: project.client_id?.toString() || "",
-    project_type: project.project_type || "",
+    project_type_id: project.project_type_id?.toString() || "",
     status: project.status || "active",
     priority: project.priority || "medium",
     contract_amount: project.contract_amount || "",
@@ -63,8 +63,8 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
       validationErrors.client_id = 'The client field is required.';
     }
     
-    if (!data.project_type || data.project_type === '') {
-      validationErrors.project_type = 'The project type field is required.';
+    if (!data.project_type_id || data.project_type_id === '') {
+      validationErrors.project_type_id = 'The project type field is required.';
     }
     
     if (!data.contract_amount || data.contract_amount === '' || parseFloat(data.contract_amount) <= 0) {
@@ -180,27 +180,25 @@ const EditProject = ({ setShowEditModal, clients, project }) => {
             <div>
               <Label className="text-zinc-800">Project Type</Label>
               <Select
-                value={data.project_type}
-                onValueChange={(value) => setData("project_type", value)}
+                value={data.project_type_id}
+                onValueChange={(value) => setData("project_type_id", value)}
               >
-                <SelectTrigger className={inputClass(getFieldError('project_type'))}>
-                  <SelectValue placeholder="Select type" />
+                <SelectTrigger className={inputClass(getFieldError('project_type_id'))}>
+                  <SelectValue placeholder="Project Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="design">Design</SelectItem>
-                  <SelectItem value="construction">Construction</SelectItem>
-                  <SelectItem value="consultancy">Consultancy</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="commissioning">Commissioning</SelectItem>
-                  <SelectItem value="inspection">Inspection</SelectItem>
-                  <SelectItem value="renovation">Renovation</SelectItem>
-                  <SelectItem value="site_layout">Site Layout</SelectItem>
-                  <SelectItem value="relocation">Relocation</SelectItem>
-                  <SelectItem value="excavation">Excavation</SelectItem>
-                  <SelectItem value="surveying">Surveying</SelectItem>
+                  {projectTypes && projectTypes.length > 0 ? (
+                    projectTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>No project types available</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
-              <InputError message={getFieldError('project_type')} />
+              <InputError message={getFieldError('project_type_id')} />
             </div>
 
             {/* Status */}

@@ -18,11 +18,19 @@ class BillingPayment extends Model
         'reference_number',
         'notes',
         'created_by',
+        'paymongo_payment_intent_id',
+        'paymongo_payment_method_id',
+        'payment_status',
+        'paymongo_source_id',
+        'paymongo_metadata',
+        'paid_by_client',
     ];
 
     protected $casts = [
         'payment_amount' => 'decimal:2',
         'payment_date' => 'date',
+        'paymongo_metadata' => 'array',
+        'paid_by_client' => 'boolean',
     ];
 
     // Relationships

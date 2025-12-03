@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.14.31:8000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.110.254:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -126,6 +126,29 @@ class ApiService {
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  // Billing methods
+  async getBillings(params?: Record<string, any>): Promise<ApiResponse<any>> {
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    return this.get(`/client/billings${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getBilling(id: number): Promise<ApiResponse<any>> {
+    return this.get(`/client/billings/${id}`);
+  }
+
+  async initiatePayment(billingId: number, data: { amount?: number; payment_method_type?: string }): Promise<ApiResponse<any>> {
+    return this.post(`/client/billings/${billingId}/pay`, data);
+  }
+
+  async checkPaymentStatus(billingId: number): Promise<ApiResponse<any>> {
+    return this.get(`/client/billings/${billingId}/payment-status`);
+  }
+
+  async getBillingTransactions(params?: Record<string, any>): Promise<ApiResponse<any>> {
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    return this.get(`/client/billings/transactions${queryString ? `?${queryString}` : ''}`);
   }
 }
 

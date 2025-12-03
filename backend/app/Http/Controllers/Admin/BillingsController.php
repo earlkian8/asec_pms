@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\User;
 use App\Services\BillingService;
+use App\Services\PayMongoService;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -20,10 +21,12 @@ class BillingsController extends Controller
     use ActivityLogsTrait, NotificationTrait;
 
     protected $billingService;
+    protected $payMongoService;
 
-    public function __construct(BillingService $billingService)
+    public function __construct(BillingService $billingService, PayMongoService $payMongoService)
     {
         $this->billingService = $billingService;
+        $this->payMongoService = $payMongoService;
     }
 
     public function index(Request $request)
@@ -246,9 +249,10 @@ class BillingsController extends Controller
         $validated = $request->validate([
             'payment_amount' => ['required', 'numeric', 'min:0.01'],
             'payment_date' => ['required', 'date'],
-            'payment_method' => ['required', 'in:cash,check,bank_transfer,credit_card,other'],
+            'payment_method' => ['required', 'in:cash,check,bank_transfer,credit_card,paymongo,other'],
             'reference_number' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'use_paymongo' => ['nullable', 'boolean'],
         ]);
 
         // Check if payment amount exceeds remaining amount
@@ -260,6 +264,35 @@ class BillingsController extends Controller
         $validated['billing_id'] = $billing->id;
         $validated['payment_code'] = $this->billingService->generatePaymentCode();
         $validated['created_by'] = auth()->id();
+        $validated['paid_by_client'] = false;
+
+        // Handle PayMongo payment
+        if ($request->boolean('use_paymongo') && $validated['payment_method'] === 'paymongo') {
+            $payMongoResult = $this->payMongoService->createPaymentIntent(
+                (float)$validated['payment_amount'],
+                'PHP',
+                [
+                    'billing_id' => $billing->id,
+                    'billing_code' => $billing->billing_code,
+                    'payment_code' => $validated['payment_code'],
+                    'admin_id' => auth()->id(),
+                ]
+            );
+
+            if (!$payMongoResult['success']) {
+                return back()->with('error', 'Failed to create PayMongo payment: ' . ($payMongoResult['error'] ?? 'Unknown error'));
+            }
+
+            $validated['paymongo_payment_intent_id'] = $payMongoResult['payment_intent_id'];
+            $validated['payment_status'] = 'pending';
+            $validated['paymongo_metadata'] = [
+                'client_key' => $payMongoResult['client_key'] ?? null,
+                'created_at' => now()->toIso8601String(),
+            ];
+        } else {
+            // Manual payment - mark as paid immediately
+            $validated['payment_status'] = 'paid';
+        }
 
         $payment = BillingPayment::create($validated);
 

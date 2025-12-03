@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\ClientAuthController;
 use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\ClientNotificationController;
+use App\Http\Controllers\Api\ClientBillingController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\TaskManagementAuthController;
 use App\Http\Controllers\Api\TaskManagementDashboardController;
@@ -77,6 +78,19 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::get('/chat', [ChatController::class, 'getChat']);
     Route::get('/chat/{chatId}/messages', [ChatController::class, 'getMessages']);
     Route::post('/chat/{chatId}/messages', [ChatController::class, 'sendMessage']);
+    
+    // Billing routes
+    Route::get('/billings', [ClientBillingController::class, 'index']);
+    Route::get('/billings/{id}', [ClientBillingController::class, 'show']);
+    Route::post('/billings/{id}/pay', [ClientBillingController::class, 'initiatePayment']);
+    Route::get('/billings/{id}/payment-status', [ClientBillingController::class, 'checkPaymentStatus']);
+    Route::get('/billings/transactions', [ClientBillingController::class, 'transactions']);
+});
+
+// Payment redirect handlers (public routes for PayMongo redirects)
+Route::prefix('client')->group(function () {
+    Route::get('/payment/success', [ClientBillingController::class, 'paymentSuccess']);
+    Route::get('/payment/failed', [ClientBillingController::class, 'paymentFailed']);
 });
 
 // Task Management Protected routes

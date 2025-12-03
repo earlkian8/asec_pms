@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a74162f0da3d970e1de17e1c23c69864",
+    "content-hash": "f4794fb0eae9d2ee21c3d0237237631a",
     "packages": [
         {
             "name": "brick/math",
@@ -2744,6 +2744,52 @@
                 "source": "https://github.com/paragonie/sodium_compat/tree/v2.4.0"
             },
             "time": "2025-10-06T08:47:40+00:00"
+        },
+        {
+            "name": "paymongo/paymongo-php",
+            "version": "v0.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/paymongo/paymongo-php.git",
+                "reference": "48ce4f38b366d8ca73f426cd3b04fe1d7d59f5bd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/paymongo/paymongo-php/zipball/48ce4f38b366d8ca73f426cd3b04fe1d7d59f5bd",
+                "reference": "48ce4f38b366d8ca73f426cd3b04fe1d7d59f5bd",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "php": ">=5.6.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Paymongo\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "PayMongo PHP Library",
+            "homepage": "https://paymongo.com/",
+            "keywords": [
+                "api",
+                "payment processing",
+                "paymongo"
+            ],
+            "support": {
+                "issues": "https://github.com/paymongo/paymongo-php/issues",
+                "source": "https://github.com/paymongo/paymongo-php/tree/v0.0.0"
+            },
+            "time": "2022-11-21T06:10:32+00:00"
         },
         {
             "name": "phpoption/phpoption",

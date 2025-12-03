@@ -216,19 +216,24 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return back()->withQueryString()->with('success', 'Client updated successfully.');
+        return redirect()->route('client-management.index')->with('success', 'Client updated successfully.');
     }
 
     public function destroy(Client $client)
     {
         $name = $client->client_name;
 
-        // Example rule: prevent deletion if client has related bookings/invoices
-        // if ($client->bookings()->exists()) {
-        //     return back()->withErrors([
-        //         'message' => 'This client has existing records and cannot be deleted.',
-        //     ]);
-        // }
+        // Prevent deletion if client has active projects
+        $activeProjects = $client->projects()
+            ->whereIn('status', ['active', 'on_hold'])
+            ->count();
+
+        if ($activeProjects > 0) {
+            return redirect()->route('client-management.index')
+                ->withErrors([
+                    'message' => "Cannot delete client '{$name}'. This client has {$activeProjects} active project(s). Please complete or cancel all active projects before deleting the client.",
+                ]);
+        }
 
         $client->delete();
         $this->adminActivityLogs('Client', 'Delete', 'Deleted Client ' . $name);
@@ -241,6 +246,8 @@ class ClientsController extends Controller
             null,
             route('client-management.index')
         );
+
+        return redirect()->route('client-management.index')->with('success', 'Client deleted successfully.');
     }
 
     public function handleStatus(Request $request, Client $client)
@@ -269,7 +276,7 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return back()->withQueryString()->with('success', 'Client status updated successfully.');
+        return redirect()->route('client-management.index')->with('success', 'Client status updated successfully.');
     }
 
     public function resetPassword(Client $client)

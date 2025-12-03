@@ -450,11 +450,11 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     // Image preview
     if (isImage(fileType) || isImage(fileName)) {
       return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded overflow-hidden">
+        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded overflow-hidden p-1">
           <img
             src={fileUrl}
             alt={update.original_name || 'Preview'}
-            className="w-full h-full object-cover"
+            className="max-w-full max-h-full w-auto h-auto object-contain"
             loading="lazy"
             onError={(e) => {
               e.target.style.display = 'none';

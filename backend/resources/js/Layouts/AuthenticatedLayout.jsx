@@ -82,6 +82,12 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     href: route('project-type-management.index'),
                     routeName: 'project-type-management.*',
                     icon: FolderOpen
+                },
+                {
+                    title: 'Employee Management',
+                    href: route('employee-management.index'),
+                    routeName: 'employee-management.*',
+                    icon: UserCheck
                 }
             ]
         },
@@ -98,25 +104,28 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             ]
         },
         {
-            title: 'Inventory Management',
-            href: route('inventory-management.index'),
-            routeName: 'inventory-management.*',
-            icon: Boxes,
-            type: 'single'
+            title: 'Inventory Platform',
+            type: 'section',
+            items: [
+                {
+                    title: 'Inventory Management',
+                    href: route('inventory-management.index'),
+                    routeName: 'inventory-management.*',
+                    icon: Boxes
+                }
+            ]
         },
         {
-            title: 'Billing Management',
-            href: route('billing-management.index'),
-            routeName: 'billing-management.*',
-            icon: BadgeDollarSign,
-            type: 'single'
-        },
-        {
-            title: 'Employee Management',
-            href: route('employee-management.index'),
-            routeName: 'employee-management.*',
-            icon: UserCheck,
-            type: 'single'
+            title: 'Billing Platform',
+            type: 'section',
+            items: [
+                {
+                    title: 'Billing Management',
+                    href: route('billing-management.index'),
+                    routeName: 'billing-management.*',
+                    icon: BadgeDollarSign
+                }
+            ]
         },
         {
             title: 'Reports & Analytics',
@@ -179,6 +188,11 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                                 'projects.view', 'projects.create', 'projects.update', 'projects.delete'
                             ]);
                         }
+                        if (item.title === 'Employee Management') {
+                            return hasModuleAccess([
+                                'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status'
+                            ]);
+                        }
                         return true;
                     });
                     // Only show the collapsible if it has at least one item
@@ -202,20 +216,37 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                 }
                 return module;
             }
-            if (module.title === 'Employee Management') {
-                return hasModuleAccess([
-                    'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status'
-                ]) ? module : null;
+            if (module.title === 'Inventory Platform') {
+                // Filter items within the collapsible
+                if (module.items) {
+                    const filteredItems = module.items.filter(item => {
+                        if (item.title === 'Inventory Management') {
+                            return hasModuleAccess([
+                                'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
+                            ]);
+                        }
+                        return true;
+                    });
+                    // Only show the collapsible if it has at least one item
+                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
+                }
+                return module;
             }
-            if (module.title === 'Inventory Management') {
-                return hasModuleAccess([
-                    'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
-                ]) ? module : null;
-            }
-            if (module.title === 'Billing Management') {
-                return hasModuleAccess([
-                    'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments'
-                ]) ? module : null;
+            if (module.title === 'Billing Platform') {
+                // Filter items within the collapsible
+                if (module.items) {
+                    const filteredItems = module.items.filter(item => {
+                        if (item.title === 'Billing Management') {
+                            return hasModuleAccess([
+                                'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments'
+                            ]);
+                        }
+                        return true;
+                    });
+                    // Only show the collapsible if it has at least one item
+                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
+                }
+                return module;
             }
             if (module.title === 'Reports & Analytics') {
                 return hasModuleAccess([

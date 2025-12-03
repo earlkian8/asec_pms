@@ -148,6 +148,7 @@ const EditClient = ({ client, setShowEditModal }) => {
                   });
                 }
               }}
+              placeholder="Client Name"
               className={inputClass(getFieldError('client_name'))}
             />
             <InputError message={getFieldError('client_name')} />
@@ -170,7 +171,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               }}
             >
               <SelectTrigger className={selectClass(getFieldError('client_type'))}>
-                <SelectValue placeholder="-- Select Client Type --" />
+                <SelectValue placeholder="Client Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="individual">Individual</SelectItem>
@@ -198,6 +199,7 @@ const EditClient = ({ client, setShowEditModal }) => {
                   });
                 }
               }}
+              placeholder="Contact Person"
               className={inputClass(getFieldError('contact_person'))}
             />
             <InputError message={getFieldError('contact_person')} />
@@ -219,6 +221,7 @@ const EditClient = ({ client, setShowEditModal }) => {
                   });
                 }
               }}
+              placeholder="Email"
               className={inputClass(getFieldError('email'))}
             />
             <InputError message={getFieldError('email')} />
@@ -232,6 +235,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.phone_number}
               onChange={e => setData('phone_number', e.target.value)}
+              placeholder="Phone Number"
               className={inputClass(errors.phone_number)}
             />
             <InputError message={errors.phone_number} />
@@ -244,6 +248,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.address}
               onChange={e => setData('address', e.target.value)}
+              placeholder="Address"
               className={inputClass(errors.address)}
             />
             <InputError message={errors.address} />
@@ -256,6 +261,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.city}
               onChange={e => setData('city', e.target.value)}
+              placeholder="City"
               className={inputClass(errors.city)}
             />
             <InputError message={errors.city} />
@@ -268,6 +274,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.province}
               onChange={e => setData('province', e.target.value)}
+              placeholder="Province"
               className={inputClass(errors.province)}
             />
             <InputError message={errors.province} />
@@ -280,6 +287,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.postal_code}
               onChange={e => setData('postal_code', e.target.value)}
+              placeholder="Postal Code"
               className={inputClass(errors.postal_code)}
             />
             <InputError message={errors.postal_code} />
@@ -292,6 +300,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.country}
               onChange={e => setData('country', e.target.value)}
+              placeholder="Country"
               className={inputClass(errors.country)}
             />
             <InputError message={errors.country} />
@@ -304,6 +313,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.tax_id}
               onChange={e => setData('tax_id', e.target.value)}
+              placeholder="Tax ID"
               className={inputClass(errors.tax_id)}
             />
             <InputError message={errors.tax_id} />
@@ -316,6 +326,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.business_permit}
               onChange={e => setData('business_permit', e.target.value)}
+              placeholder="Business Permit"
               className={inputClass(errors.business_permit)}
             />
             <InputError message={errors.business_permit} />
@@ -328,6 +339,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="number"
               value={data.credit_limit}
               onChange={e => setData('credit_limit', e.target.value)}
+              placeholder="Credit Limit"
               className={inputClass(errors.credit_limit)}
             />
             <InputError message={errors.credit_limit} />
@@ -340,6 +352,7 @@ const EditClient = ({ client, setShowEditModal }) => {
               type="text"
               value={data.payment_terms}
               onChange={e => setData('payment_terms', e.target.value)}
+              placeholder="Payment Terms"
               className={inputClass(errors.payment_terms)}
             />
             <InputError message={errors.payment_terms} />
@@ -351,6 +364,7 @@ const EditClient = ({ client, setShowEditModal }) => {
             <Textarea
               value={data.notes}
               onChange={e => setData('notes', e.target.value)}
+              placeholder="Notes"
               rows={3}
               className={inputClass(errors.notes)}
             />

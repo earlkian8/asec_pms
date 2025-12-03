@@ -96,38 +96,46 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
   };
 
   // Prepare chart data
-  const revenueExpenseData = monthlyData.map(month => ({
-    month: month.month,
-    revenue: month.revenue,
-    expenses: month.labor_cost + month.material_cost,
-    labor: month.labor_cost,
-    materials: month.material_cost,
-    net: month.revenue - (month.labor_cost + month.material_cost)
-  }));
+  const revenueExpenseData = (monthlyData && Array.isArray(monthlyData) && monthlyData.length > 0) 
+    ? monthlyData.map(month => ({
+        month: month.month,
+        revenue: month.revenue || 0,
+        expenses: (month.labor_cost || 0) + (month.material_cost || 0),
+        labor: month.labor_cost || 0,
+        materials: month.material_cost || 0,
+        net: (month.revenue || 0) - ((month.labor_cost || 0) + (month.material_cost || 0))
+      }))
+    : [];
 
   // Project status pie chart data
-  const projectStatusData = Object.entries(statistics.projects.by_status || {}).map(([name, value]) => ({
-    name: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    value: value,
-    color: name === 'active' ? '#10b981' : 
-           name === 'completed' ? '#3b82f6' : 
-           name === 'on_hold' ? '#f59e0b' : 
-           name === 'cancelled' ? '#ef4444' : '#6b7280'
-  }));
+  const projectStatusData = statistics?.projects?.by_status && Object.keys(statistics.projects.by_status).length > 0
+    ? Object.entries(statistics.projects.by_status).map(([name, value]) => ({
+        name: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value: value,
+        color: name === 'active' ? '#10b981' : 
+               name === 'completed' ? '#3b82f6' : 
+               name === 'on_hold' ? '#f59e0b' : 
+               name === 'cancelled' ? '#ef4444' : '#6b7280'
+      }))
+    : [];
 
   // Billing status pie chart data
-  const billingStatusData = Object.entries(statistics.billing.by_status || {}).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value: value,
-    color: name === 'paid' ? '#10b981' : 
-           name === 'partial' ? '#f59e0b' : '#ef4444'
-  }));
+  const billingStatusData = statistics?.billing?.by_status && Object.keys(statistics.billing.by_status).length > 0
+    ? Object.entries(statistics.billing.by_status).map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: value,
+        color: name === 'paid' ? '#10b981' : 
+               name === 'partial' ? '#f59e0b' : '#ef4444'
+      }))
+    : [];
 
   // Project type distribution
-  const projectTypeData = Object.entries(statistics.projects.by_type || {}).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value: value
-  }));
+  const projectTypeData = statistics?.projects?.by_type && Object.keys(statistics.projects.by_type).length > 0
+    ? Object.entries(statistics.projects.by_type).map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: value
+      }))
+    : [];
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -282,56 +290,64 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               <TrendingUp className="text-gray-600" size={18} />
               Revenue vs Expenses (Last 6 Months)
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={revenueExpenseData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#6b7280"
-                  style={{ fontSize: '11px' }}
-                />
-                <YAxis 
-                  stroke="#6b7280"
-                  style={{ fontSize: '11px' }}
-                  tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip 
-                  formatter={(value) => formatCurrency(value)}
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px'
-                  }}
-                />
-                <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#10b981" 
-                  fillOpacity={1} 
-                  fill="url(#colorRevenue)"
-                  name="Revenue"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="expenses" 
-                  stroke="#ef4444" 
-                  fillOpacity={1} 
-                  fill="url(#colorExpenses)"
-                  name="Expenses"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {revenueExpenseData && revenueExpenseData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={revenueExpenseData}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#6b7280"
+                    style={{ fontSize: '11px' }}
+                  />
+                  <YAxis 
+                    stroke="#6b7280"
+                    style={{ fontSize: '11px' }}
+                    tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    formatter={(value) => formatCurrency(value)}
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Legend />
+                  <Area 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#10b981" 
+                    fillOpacity={1} 
+                    fill="url(#colorRevenue)"
+                    name="Revenue"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="expenses" 
+                    stroke="#ef4444" 
+                    fillOpacity={1} 
+                    fill="url(#colorExpenses)"
+                    name="Expenses"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
+                <BarChart3 className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm font-medium text-gray-500">No data available</p>
+                <p className="text-xs text-gray-400 mt-1">No projects found to display revenue and expenses</p>
+              </div>
+            )}
           </div>
 
           {/* Net Profit Chart */}
@@ -340,39 +356,47 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               <BarChart3 className="text-gray-600" size={18} />
               Net Profit (Last 6 Months)
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={revenueExpenseData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#6b7280"
-                  style={{ fontSize: '11px' }}
-                />
-                <YAxis 
-                  stroke="#6b7280"
-                  style={{ fontSize: '11px' }}
-                  tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip 
-                  formatter={(value) => formatCurrency(value)}
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px'
-                  }}
-                />
-                <Bar 
-                  dataKey="net" 
-                  fill="#3b82f6"
-                  radius={[8, 8, 0, 0]}
-                  name="Net Profit"
-                >
-                  {revenueExpenseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.net >= 0 ? '#10b981' : '#ef4444'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {revenueExpenseData && revenueExpenseData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={revenueExpenseData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#6b7280"
+                    style={{ fontSize: '11px' }}
+                  />
+                  <YAxis 
+                    stroke="#6b7280"
+                    style={{ fontSize: '11px' }}
+                    tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    formatter={(value) => formatCurrency(value)}
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="net" 
+                    fill="#3b82f6"
+                    radius={[8, 8, 0, 0]}
+                    name="Net Profit"
+                  >
+                    {revenueExpenseData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.net >= 0 ? '#10b981' : '#ef4444'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
+                <BarChart3 className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm font-medium text-gray-500">No data available</p>
+                <p className="text-xs text-gray-400 mt-1">No projects found to display net profit</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -384,26 +408,34 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               <PieChart className="text-gray-600" size={18} />
               Project Status Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <RechartsPieChart>
-                <Pie
-                  data={projectStatusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {projectStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </RechartsPieChart>
-            </ResponsiveContainer>
+            {projectStatusData && projectStatusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <RechartsPieChart>
+                  <Pie
+                    data={projectStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {projectStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
+                <FolderOpen className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm font-medium text-gray-500">No projects found</p>
+                <p className="text-xs text-gray-400 mt-1">Create a project to see status distribution</p>
+              </div>
+            )}
           </div>
 
           {/* Billing Status Pie Chart */}
@@ -412,26 +444,34 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               <DollarSign className="text-gray-600" size={18} />
               Billing Status Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <RechartsPieChart>
-                <Pie
-                  data={billingStatusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {billingStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </RechartsPieChart>
-            </ResponsiveContainer>
+            {billingStatusData && billingStatusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <RechartsPieChart>
+                  <Pie
+                    data={billingStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {billingStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
+                <DollarSign className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm font-medium text-gray-500">No billing data available</p>
+                <p className="text-xs text-gray-400 mt-1">No billings found to display status distribution</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -443,32 +483,40 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               <BarChart3 className="text-gray-600" size={18} />
               Expense Breakdown (Last 6 Months)
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={revenueExpenseData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#6b7280"
-                  style={{ fontSize: '11px' }}
-                />
-                <YAxis 
-                  stroke="#6b7280"
-                  style={{ fontSize: '11px' }}
-                  tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip 
-                  formatter={(value) => formatCurrency(value)}
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px'
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="labor" stackId="a" fill="#3b82f6" name="Labor Cost" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="materials" stackId="a" fill="#f59e0b" name="Material Cost" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {revenueExpenseData && revenueExpenseData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={revenueExpenseData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#6b7280"
+                    style={{ fontSize: '11px' }}
+                  />
+                  <YAxis 
+                    stroke="#6b7280"
+                    style={{ fontSize: '11px' }}
+                    tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    formatter={(value) => formatCurrency(value)}
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px'
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="labor" stackId="a" fill="#3b82f6" name="Labor Cost" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="materials" stackId="a" fill="#f59e0b" name="Material Cost" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
+                <BarChart3 className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm font-medium text-gray-500">No expense data available</p>
+                <p className="text-xs text-gray-400 mt-1">No projects found to display expense breakdown</p>
+              </div>
+            )}
           </div>
 
           {/* Project Type Distribution */}
@@ -477,21 +525,29 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               <Activity className="text-gray-600" size={18} />
               Project Type Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={projectTypeData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis type="number" stroke="#6b7280" style={{ fontSize: '12px' }} />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
-                  width={100}
-                />
-                <Tooltip />
-                <Bar dataKey="value" fill="#8b5cf6" radius={[0, 8, 8, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {projectTypeData && projectTypeData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={projectTypeData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis type="number" stroke="#6b7280" style={{ fontSize: '12px' }} />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    stroke="#6b7280"
+                    style={{ fontSize: '12px' }}
+                    width={100}
+                  />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8b5cf6" radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
+                <FolderOpen className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm font-medium text-gray-500">No projects found</p>
+                <p className="text-xs text-gray-400 mt-1">Create a project to see type distribution</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -535,7 +591,11 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-3">No recent projects</p>
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <FolderOpen className="w-10 h-10 mb-2 opacity-50" />
+                  <p className="text-sm font-medium text-gray-500">No projects found</p>
+                  <p className="text-xs text-gray-400 mt-1">Create a project to get started</p>
+                </div>
               )}
             </div>
           </div>
@@ -580,7 +640,11 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-3">No recent billings</p>
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <DollarSign className="w-10 h-10 mb-2 opacity-50" />
+                  <p className="text-sm font-medium text-gray-500">No billings found</p>
+                  <p className="text-xs text-gray-400 mt-1">No billing records available</p>
+                </div>
               )}
             </div>
           </div>

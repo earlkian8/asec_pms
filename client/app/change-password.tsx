@@ -16,7 +16,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Lock, Eye, EyeOff, Shield } from 'lucide-react-native';
 import Logo from '@/components/Logo';
-import { apiService } from '@/services/apiService';
+import { apiService } from '@/services/api';
 
 export default function ChangePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState('');

@@ -21,13 +21,26 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { login } = useAuth();
   const dialog = useDialog();
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      dialog.showError('Please enter both email and password');
+    // Clear previous errors
+    setErrors({});
+    
+    // Validate inputs
+    const newErrors: { email?: string; password?: string } = {};
+    if (!email || !email.trim()) {
+      newErrors.email = 'Email is required';
+    }
+    if (!password || !password.trim()) {
+      newErrors.password = 'Password is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -36,6 +49,8 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (result.success) {
+      // Clear errors on success
+      setErrors({});
       // Redirect to change password page if password needs to be changed
       if (result.mustChangePassword) {
         router.replace('/change-password');
@@ -43,7 +58,27 @@ export default function LoginScreen() {
         router.replace('/(tabs)');
       }
     } else {
-      dialog.showError(result.message || 'Invalid credentials. Please try again.', 'Login Failed');
+      // Show validation errors on input fields
+      setErrors({
+        email: result.message || 'Invalid credentials. Please try again.',
+        password: result.message || 'Invalid credentials. Please try again.',
+      });
+    }
+  };
+
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    // Clear error when user starts typing
+    if (errors.email) {
+      setErrors(prev => ({ ...prev, email: undefined }));
+    }
+  };
+
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    // Clear error when user starts typing
+    if (errors.password) {
+      setErrors(prev => ({ ...prev, password: undefined }));
     }
   };
 
@@ -51,6 +86,7 @@ export default function LoginScreen() {
   const textColor = '#111827'; // gray-900
   const inputBg = '#FFFFFF'; // white
   const borderColor = '#E5E7EB'; // gray-200
+  const errorBorderColor = '#EF4444'; // red-500
 
   return (
     <KeyboardAvoidingView
@@ -71,50 +107,82 @@ export default function LoginScreen() {
           </View>
 
           <View style={[styles.form, { backgroundColor: '#FFFFFF' }]}>
-            <View style={styles.inputContainer}>
-              <Mail
-                size={20}
-                color="#6B7280"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, { color: textColor, backgroundColor: inputBg, borderColor }]}
-                placeholder="Email address"
-                placeholderTextColor="#9CA3AF"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
+            <View style={styles.inputWrapper}>
+              {errors.email && (
+                <View style={styles.errorRing} />
+              )}
+              <View style={styles.inputContainer}>
+                <Mail
+                  size={20}
+                  color={errors.email ? errorBorderColor : '#6B7280'}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: textColor,
+                      backgroundColor: inputBg,
+                      borderColor: errors.email ? errorBorderColor : borderColor,
+                    },
+                    errors.email && styles.inputError,
+                  ]}
+                  placeholder="Email address"
+                  placeholderTextColor="#9CA3AF"
+                  value={email}
+                  onChangeText={handleEmailChange}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                />
+              </View>
             </View>
+            {errors.email && (
+              <Text style={styles.errorText}>{errors.email}</Text>
+            )}
 
-            <View style={styles.inputContainer}>
-              <Lock
-                size={20}
-                color="#6B7280"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, { color: textColor, backgroundColor: inputBg, borderColor }]}
-                placeholder="Password"
-                placeholderTextColor="#9CA3AF"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoComplete="password"
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}>
-                {showPassword ? (
-                  <EyeOff size={20} color="#6B7280" />
-                ) : (
-                  <Eye size={20} color="#6B7280" />
-                )}
-              </TouchableOpacity>
+            <View style={styles.inputWrapper}>
+              {errors.password && (
+                <View style={styles.errorRing} />
+              )}
+              <View style={styles.inputContainer}>
+                <Lock
+                  size={20}
+                  color={errors.password ? errorBorderColor : '#6B7280'}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: textColor,
+                      backgroundColor: inputBg,
+                      borderColor: errors.password ? errorBorderColor : borderColor,
+                    },
+                    errors.password && styles.inputError,
+                  ]}
+                  placeholder="Password"
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={handlePasswordChange}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete="password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}>
+                  {showPassword ? (
+                    <EyeOff size={20} color={errors.password ? errorBorderColor : '#6B7280'} />
+                  ) : (
+                    <Eye size={20} color={errors.password ? errorBorderColor : '#6B7280'} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
+            {errors.password && (
+              <Text style={styles.errorText}>{errors.password}</Text>
+            )}
 
             <TouchableOpacity
               style={[styles.loginButton, loading && styles.loginButtonDisabled]}
@@ -173,10 +241,13 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
   },
+  inputWrapper: {
+    marginBottom: 16,
+    position: 'relative',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
     position: 'relative',
   },
   inputIcon: {
@@ -192,6 +263,33 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     fontSize: 16,
     borderWidth: 1,
+  },
+  inputError: {
+    borderWidth: 2,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  errorRing: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#FCA5A5',
+    pointerEvents: 'none',
+    zIndex: 0,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   eyeIcon: {
     position: 'absolute',

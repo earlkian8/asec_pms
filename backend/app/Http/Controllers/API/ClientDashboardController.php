@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
+use App\Models\ProjectMiscellaneousExpense;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
@@ -36,7 +37,7 @@ class ClientDashboardController extends Controller
         $completedProjects = $projects->where('status', 'completed')->count();
         $totalBudget = $projects->sum('contract_amount');
         
-        // Calculate total spent (material costs + labor costs) - optimized
+        // Calculate total spent (material costs + labor costs + miscellaneous expenses) - optimized
         // Material costs: join with inventory items - only count received materials
         $materialCosts = DB::table('project_material_allocations')
             ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
@@ -48,7 +49,11 @@ class ClientDashboardController extends Controller
         $laborCosts = ProjectLaborCost::whereIn('project_id', $projectIds)
             ->sum(DB::raw('hours_worked * hourly_rate'));
         
-        $totalSpent = (float) $materialCosts + (float) $laborCosts;
+        // Miscellaneous expenses
+        $miscellaneousExpenses = ProjectMiscellaneousExpense::whereIn('project_id', $projectIds)
+            ->sum('amount');
+        
+        $totalSpent = (float) $materialCosts + (float) $laborCosts + (float) $miscellaneousExpenses;
         
         // Calculate on-time projects (completed on or before planned end date)
         $onTimeProjects = $projects->filter(function ($project) {
@@ -151,7 +156,13 @@ class ClientDashboardController extends Controller
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
         
-        $mappedProjects = $projects->map(function ($project) use ($materialCostsByProject, $laborCostsByProject) {
+        // Pre-calculate all miscellaneous expenses
+        $miscellaneousExpensesByProject = ProjectMiscellaneousExpense::whereIn('project_id', $projectIds)
+            ->select('project_id', DB::raw('SUM(amount) as total'))
+            ->groupBy('project_id')
+            ->pluck('total', 'project_id');
+        
+        $mappedProjects = $projects->map(function ($project) use ($materialCostsByProject, $laborCostsByProject, $miscellaneousExpensesByProject) {
             // Calculate progress from milestones
             $milestones = $project->milestones;
             $progress = 0;
@@ -172,7 +183,8 @@ class ClientDashboardController extends Controller
             // Get spent from pre-calculated values
             $materialCost = (float) ($materialCostsByProject[$project->id] ?? 0);
             $laborCost = (float) ($laborCostsByProject[$project->id] ?? 0);
-            $spent = $materialCost + $laborCost;
+            $miscellaneousExpense = (float) ($miscellaneousExpensesByProject[$project->id] ?? 0);
+            $spent = $materialCost + $laborCost + $miscellaneousExpense;
             
             // Get project manager
             $projectManager = $project->team
@@ -252,7 +264,13 @@ class ClientDashboardController extends Controller
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
         
-        $exportData = $projects->map(function ($project) use ($materialCostsByProject, $laborCostsByProject) {
+        // Pre-calculate all miscellaneous expenses
+        $miscellaneousExpensesByProject = ProjectMiscellaneousExpense::whereIn('project_id', $projectIds)
+            ->select('project_id', DB::raw('SUM(amount) as total'))
+            ->groupBy('project_id')
+            ->pluck('total', 'project_id');
+        
+        $exportData = $projects->map(function ($project) use ($materialCostsByProject, $laborCostsByProject, $miscellaneousExpensesByProject) {
             $milestones = $project->milestones;
             $progress = 0;
             if ($milestones->count() > 0) {
@@ -269,7 +287,8 @@ class ClientDashboardController extends Controller
             
             $materialCost = (float) ($materialCostsByProject[$project->id] ?? 0);
             $laborCost = (float) ($laborCostsByProject[$project->id] ?? 0);
-            $spent = $materialCost + $laborCost;
+            $miscellaneousExpense = (float) ($miscellaneousExpensesByProject[$project->id] ?? 0);
+            $spent = $materialCost + $laborCost + $miscellaneousExpense;
             
             $projectManager = $project->team
                 ->where('role', 'Project Manager')
@@ -450,7 +469,10 @@ class ClientDashboardController extends Controller
         $laborCosts = ProjectLaborCost::where('project_id', $projectId)
             ->sum(DB::raw('hours_worked * hourly_rate'));
         
-        $spent = (float) $materialCosts + (float) $laborCosts;
+        $miscellaneousExpenses = ProjectMiscellaneousExpense::where('project_id', $projectId)
+            ->sum('amount');
+        
+        $spent = (float) $materialCosts + (float) $laborCosts + (float) $miscellaneousExpenses;
 
         // Get project manager
         $projectManager = $project->team

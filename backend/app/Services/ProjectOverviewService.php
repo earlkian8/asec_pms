@@ -17,7 +17,7 @@ class ProjectOverviewService
     public function getProjectOverviewData(Project $project)
     {
         // Load project with relationships
-        $project->load(['client']);
+        $project->load(['client', 'projectType']);
 
         // Calculate Labor Costs
         $laborCosts = ProjectLaborCost::where('project_id', $project->id)->get();

@@ -434,7 +434,7 @@ class ProjectsController extends Controller
     public function show(Project $project, Request $request)
 {
     // Load project relationships
-    $project->load(['client']);
+    $project->load(['client', 'projectType']);
 
     // Get project team data
     $teamData = $this->projectTeamService->getProjectTeamData($project);

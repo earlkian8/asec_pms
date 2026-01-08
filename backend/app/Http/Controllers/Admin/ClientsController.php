@@ -98,7 +98,6 @@ class ClientsController extends Controller
             'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
             'contact_person'  => ['required', 'max:255'],
             'email'           => ['required', 'email', 'max:100'],
-            'password'        => ['required', 'string', 'min:8'],
             'phone_number'    => ['nullable', 'max:20'],
             'address'         => ['nullable', 'max:255'],
             'city'            => ['nullable', 'max:100'],
@@ -121,15 +120,11 @@ class ClientsController extends Controller
             unset($validated['payment_terms']);
         }
 
-        // Store plain password before hashing (for email)
-        $plainPassword = $validated['password'] ?? null;
+        // Auto-generate a secure random password
+        $plainPassword = bin2hex(random_bytes(6)); // Generates a 12-character random password
 
-        // Hash password if provided
-        if (!empty($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
-        }
+        // Hash the auto-generated password
+        $validated['password'] = Hash::make($plainPassword);
 
         // Generate unique client code
         do {

@@ -148,9 +148,8 @@ class ClientsController extends Controller
             try {
                 $loginUrl = config('app.client_portal_url', url('/client/login'));
                 
-                // Send email using Resend mailer
-                Mail::mailer('resend')
-                    ->to($client->email)
+                // Send email using Brevo SMTP
+                Mail::to($client->email)
                     ->send(new ClientCredentialsMail($client, $plainPassword, $loginUrl));
             } catch (\Exception $e) {
                 // Re-throw the exception so user knows email failed

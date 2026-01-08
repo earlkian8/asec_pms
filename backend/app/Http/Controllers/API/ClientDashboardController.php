@@ -9,6 +9,7 @@ use App\Models\ProjectLaborCost;
 use App\Models\ProjectMiscellaneousExpense;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
+use App\Models\ProjectIssue;
 use App\Models\ProgressUpdate;
 use App\Models\InventoryItem;
 use App\Models\ClientUpdateRequest;
@@ -433,6 +434,15 @@ class ClientDashboardController extends Controller
                 'team.employee',
                 'milestones.tasks.assignedUser',
                 'milestones.tasks.progressUpdates.createdBy',
+                'materialAllocations.inventoryItem',
+                'materialAllocations.allocatedBy',
+                'laborCosts.user',
+                'laborCosts.employee',
+                'miscellaneousExpenses.createdBy',
+                'issues.reportedBy',
+                'issues.assignedTo',
+                'issues.milestone',
+                'issues.task',
             ])
             ->first();
 
@@ -548,6 +558,132 @@ class ClientDashboardController extends Controller
                 ];
             });
 
+        // Get progress updates from all tasks
+        $allProgressUpdates = collect();
+        foreach ($project->milestones as $milestone) {
+            foreach ($milestone->tasks as $task) {
+                foreach ($task->progressUpdates as $update) {
+                    $allProgressUpdates->push([
+                        'id' => (string) $update->id,
+                        'title' => 'Progress Update - ' . $task->title,
+                        'description' => $update->description,
+                        'type' => 'progress',
+                        'author' => $update->createdBy ? $update->createdBy->name : 'Unknown',
+                        'date' => $update->created_at->toISOString(),
+                        'taskId' => (string) $task->id,
+                        'taskName' => $task->title,
+                        'milestoneId' => (string) $milestone->id,
+                        'milestoneName' => $milestone->name,
+                    ]);
+                }
+            }
+        }
+        $allProgressUpdates = $allProgressUpdates->sortByDesc('date')->values();
+
+        // Format issues
+        $formattedIssues = $project->issues->map(function ($issue) {
+            $reportedByName = 'Unknown';
+            if ($issue->reportedBy) {
+                $reportedByName = $issue->reportedBy->name;
+            }
+            
+            $assignedToName = 'Unassigned';
+            if ($issue->assignedTo) {
+                $assignedToName = $issue->assignedTo->name;
+            }
+            
+            $milestoneName = null;
+            if ($issue->milestone) {
+                $milestoneName = $issue->milestone->name;
+            }
+            
+            $taskName = null;
+            if ($issue->task) {
+                $taskName = $issue->task->title;
+            }
+            
+            return [
+                'id' => (string) $issue->id,
+                'title' => $issue->title,
+                'description' => $issue->description ?? '',
+                'priority' => $issue->priority ?? 'medium',
+                'status' => $issue->status ?? 'open',
+                'reportedBy' => $reportedByName,
+                'assignedTo' => $assignedToName,
+                'dueDate' => $issue->due_date ? $issue->due_date->toDateString() : null,
+                'resolvedAt' => $issue->resolved_at ? $issue->resolved_at->toDateString() : null,
+                'milestoneId' => $issue->project_milestone_id ? (string) $issue->project_milestone_id : null,
+                'milestoneName' => $milestoneName,
+                'taskId' => $issue->project_task_id ? (string) $issue->project_task_id : null,
+                'taskName' => $taskName,
+                'createdAt' => $issue->created_at->toISOString(),
+            ];
+        })->sortByDesc('createdAt')->values();
+
+        // Format material allocations
+        $formattedMaterialAllocations = $project->materialAllocations->map(function ($allocation) {
+            $item = $allocation->inventoryItem;
+            $allocatedByName = 'Unknown';
+            if ($allocation->allocatedBy) {
+                $allocatedByName = $allocation->allocatedBy->name;
+            }
+            
+            $unitPrice = $item ? (float) $item->unit_price : 0;
+            $totalCost = (float) ($allocation->quantity_received * $unitPrice);
+            
+            return [
+                'id' => (string) $allocation->id,
+                'itemName' => $item ? $item->item_name : 'Unknown Item',
+                'itemCode' => $item ? $item->item_code : 'N/A',
+                'unit' => $item ? $item->unit : 'N/A',
+                'quantityAllocated' => (float) $allocation->quantity_allocated,
+                'quantityReceived' => (float) $allocation->quantity_received,
+                'quantityRemaining' => (float) $allocation->quantity_remaining,
+                'status' => $allocation->status,
+                'unitPrice' => $unitPrice,
+                'totalCost' => $totalCost,
+                'allocatedBy' => $allocatedByName,
+                'allocatedAt' => $allocation->allocated_at ? $allocation->allocated_at->toISOString() : null,
+                'notes' => $allocation->notes ?? '',
+            ];
+        })->sortByDesc('allocatedAt')->values();
+
+        // Format labor costs
+        $formattedLaborCosts = $project->laborCosts->map(function ($laborCost) {
+            $assignableName = $laborCost->assignable_name;
+            
+            return [
+                'id' => (string) $laborCost->id,
+                'assignableName' => $assignableName,
+                'workDate' => $laborCost->work_date ? $laborCost->work_date->toDateString() : null,
+                'hoursWorked' => (float) $laborCost->hours_worked,
+                'hourlyRate' => (float) $laborCost->hourly_rate,
+                'totalCost' => (float) ($laborCost->hours_worked * $laborCost->hourly_rate),
+                'description' => $laborCost->description ?? '',
+                'notes' => $laborCost->notes ?? '',
+            ];
+        })->sortByDesc('workDate')->values();
+
+        // Format miscellaneous expenses
+        $formattedMiscellaneousExpenses = $project->miscellaneousExpenses->map(function ($expense) {
+            $createdByName = 'Unknown';
+            if ($expense->createdBy) {
+                $createdByName = $expense->createdBy->name;
+            }
+            
+            return [
+                'id' => (string) $expense->id,
+                'expenseType' => $expense->expense_type,
+                'expenseName' => $expense->expense_name,
+                'expenseDate' => $expense->expense_date ? $expense->expense_date->toDateString() : null,
+                'amount' => (float) $expense->amount,
+                'description' => $expense->description ?? '',
+                'notes' => $expense->notes ?? '',
+                'createdBy' => $createdByName,
+                'createdAt' => $expense->created_at->toISOString(),
+            ];
+        })->sortByDesc('expenseDate')->values();
+
         // Format team members
         $teamMembers = $project->team
             ->where('is_active', true)
@@ -567,6 +703,9 @@ class ClientDashboardController extends Controller
                 ];
             });
 
+        // Combine all updates (request updates + progress updates)
+        $allUpdates = $requestUpdates->concat($allProgressUpdates)->sortByDesc('date')->values();
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -579,10 +718,20 @@ class ClientDashboardController extends Controller
                 'expectedCompletion' => $project->planned_end_date,
                 'budget' => (float) $project->contract_amount,
                 'spent' => $spent,
+                'budgetBreakdown' => [
+                    'materialCosts' => (float) $materialCosts,
+                    'laborCosts' => (float) $laborCosts,
+                    'miscellaneousExpenses' => (float) $miscellaneousExpenses,
+                    'total' => $spent,
+                ],
                 'location' => $project->location ?? '',
                 'projectManager' => $projectManagerName,
                 'milestones' => $formattedMilestones,
-                'recentUpdates' => $requestUpdates->all(), // Client's request updates
+                'recentUpdates' => $allUpdates->all(),
+                'issues' => $formattedIssues->all(),
+                'materialAllocations' => $formattedMaterialAllocations->all(),
+                'laborCosts' => $formattedLaborCosts->all(),
+                'miscellaneousExpenses' => $formattedMiscellaneousExpenses->all(),
                 'teamMembers' => $teamMembers,
             ],
         ]);

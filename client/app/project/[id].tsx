@@ -31,7 +31,7 @@ export default function ProjectDetailScreen() {
   const [showRequestUpdate, setShowRequestUpdate] = useState(false);
 
   const { project, loading, error, refresh } = useProjectDetail(id as string);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'milestones' | 'updates'>('overview');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'milestones' | 'updates' | 'issues' | 'materials' | 'budget'>('overview');
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -132,7 +132,7 @@ export default function ProjectDetailScreen() {
 
         <View style={styles.milestoneInfo}>
           <View style={styles.milestoneInfoItem}>
-            <Ionicons name="calendar-outline" size={14} color={textSecondary} />
+            <Ionicons name="calendar-outline" size={13} color={textSecondary} />
             <Text style={[styles.milestoneInfoText, { color: textSecondary }]}>
               Due: {new Date(milestone.dueDate).toLocaleDateString('en-US', {
                 month: 'short',
@@ -143,7 +143,7 @@ export default function ProjectDetailScreen() {
           </View>
           {milestone.completedDate && (
             <View style={styles.milestoneInfoItem}>
-              <Ionicons name="checkmark-circle-outline" size={14} color="#10B981" />
+              <Ionicons name="checkmark-circle-outline" size={13} color="#10B981" />
               <Text style={[styles.milestoneInfoText, { color: '#10B981' }]}>
                 Completed: {new Date(milestone.completedDate).toLocaleDateString('en-US', {
                   month: 'short',
@@ -168,7 +168,7 @@ export default function ProjectDetailScreen() {
 
               return (
                 <View key={task.id} style={styles.taskItem}>
-                  <Ionicons name={taskStatus.icon as any} size={16} color={taskStatus.color} />
+                  <Ionicons name={taskStatus.icon as any} size={14} color={taskStatus.color} />
                   <Text style={[styles.taskName, { color: textColor }]}>{task.name || 'Unnamed Task'}</Text>
                   <Text style={[styles.taskAssignee, { color: textSecondary }, !task.assignedTo && styles.placeholderText]}>
                     {task.assignedTo || 'Unassigned'}
@@ -213,6 +213,26 @@ export default function ProjectDetailScreen() {
                 year: 'numeric',
               })} • {update.author || 'Unknown Author'}
             </Text>
+            {(update.taskName || update.milestoneName) && (
+              <View style={styles.updateContext}>
+                {update.milestoneName && (
+                  <View style={styles.updateContextItem}>
+                    <Ionicons name="flag-outline" size={12} color={textSecondary} />
+                    <Text style={[styles.updateContextText, { color: textSecondary }]}>
+                      {update.milestoneName}
+                    </Text>
+                  </View>
+                )}
+                {update.taskName && (
+                  <View style={styles.updateContextItem}>
+                    <Ionicons name="list-outline" size={12} color={textSecondary} />
+                    <Text style={[styles.updateContextText, { color: textSecondary }]}>
+                      {update.taskName}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         </View>
         <Text style={[styles.updateDescription, { color: textSecondary }, !update.description && styles.placeholderText]}>
@@ -309,25 +329,30 @@ export default function ProjectDetailScreen() {
       </View>
 
       {/* Tabs */}
-      <View style={[styles.tabs, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
-        {(['overview', 'milestones', 'updates'] as const).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => setSelectedTab(tab)}
-            style={[
-              styles.tab,
-              selectedTab === tab && styles.tabActive,
-              selectedTab === tab && { borderBottomColor: '#3B82F6' },
-            ]}>
-            <Text
+      <View style={[styles.tabsContainer, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}>
+          {(['overview', 'milestones', 'updates', 'issues', 'materials', 'budget'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setSelectedTab(tab)}
               style={[
-                styles.tabText,
-                { color: selectedTab === tab ? '#3B82F6' : textSecondary },
+                styles.tab,
+                selectedTab === tab && styles.tabActive,
+                selectedTab === tab && { borderBottomColor: '#3B82F6' },
               ]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: selectedTab === tab ? '#3B82F6' : textSecondary },
+                ]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <ScrollView
@@ -395,13 +420,13 @@ export default function ProjectDetailScreen() {
             <View style={[styles.detailsCard, { backgroundColor: cardBg, borderColor }]}>
               <Text style={[styles.sectionTitle, { color: textColor }]}>Project Details</Text>
               <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={20} color={textSecondary} />
+                <Ionicons name="location-outline" size={18} color={textSecondary} />
                 <Text style={[styles.detailText, { color: textColor }, !project.location && styles.placeholderText]}>
                   {project.location || 'No location specified'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
-                <Ionicons name="document-text-outline" size={20} color={textSecondary} />
+                <Ionicons name="document-text-outline" size={18} color={textSecondary} />
                 <Text style={[styles.detailText, { color: textColor }, !project.description && styles.placeholderText]}>
                   {project.description || 'No description provided for this project.'}
                 </Text>
@@ -442,6 +467,28 @@ export default function ProjectDetailScreen() {
                   ]}
                 />
               </View>
+              {project.budgetBreakdown && (
+                <View style={styles.budgetBreakdown}>
+                  <View style={styles.budgetBreakdownItem}>
+                    <Text style={[styles.budgetBreakdownLabel, { color: textSecondary }]}>Materials</Text>
+                    <Text style={[styles.budgetBreakdownValue, { color: textColor }]}>
+                      {formatCurrency(project.budgetBreakdown.materialCosts)}
+                    </Text>
+                  </View>
+                  <View style={styles.budgetBreakdownItem}>
+                    <Text style={[styles.budgetBreakdownLabel, { color: textSecondary }]}>Labor</Text>
+                    <Text style={[styles.budgetBreakdownValue, { color: textColor }]}>
+                      {formatCurrency(project.budgetBreakdown.laborCosts)}
+                    </Text>
+                  </View>
+                  <View style={styles.budgetBreakdownItem}>
+                    <Text style={[styles.budgetBreakdownLabel, { color: textSecondary }]}>Miscellaneous</Text>
+                    <Text style={[styles.budgetBreakdownValue, { color: textColor }]}>
+                      {formatCurrency(project.budgetBreakdown.miscellaneousExpenses)}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Team Members */}
@@ -471,7 +518,7 @@ export default function ProjectDetailScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: '#FEF3C7', borderColor }]}
                 onPress={() => setShowRequestUpdate(true)}>
-                <Ionicons name="chatbubble-outline" size={20} color="#F59E0B" />
+                <Ionicons name="chatbubble-outline" size={18} color="#F59E0B" />
                 <Text style={[styles.actionButtonText, { color: '#F59E0B' }]}>Request Update</Text>
               </TouchableOpacity>
             </View>
@@ -493,12 +540,293 @@ export default function ProjectDetailScreen() {
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="chatbubble-ellipses-outline" size={64} color={textSecondary} />
-                <Text style={[styles.emptyStateText, { color: textColor }]}>No request updates yet</Text>
+                <Text style={[styles.emptyStateText, { color: textColor }]}>No updates yet</Text>
                 <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
-                  Submit a request update to see it here
+                  Updates and progress reports will appear here
                 </Text>
               </View>
             )}
+          </View>
+        )}
+
+        {selectedTab === 'issues' && (
+          <View style={styles.issuesList}>
+            {project.issues && project.issues.length > 0 ? (
+              project.issues.map((issue, index) => {
+                const priorityColors: Record<string, { bg: string; text: string }> = {
+                  high: { bg: '#FEE2E2', text: '#DC2626' },
+                  medium: { bg: '#FEF3C7', text: '#D97706' },
+                  low: { bg: '#DBEAFE', text: '#2563EB' },
+                };
+                const statusColors: Record<string, { bg: string; text: string }> = {
+                  open: { bg: '#FEE2E2', text: '#DC2626' },
+                  'in-progress': { bg: '#DBEAFE', text: '#2563EB' },
+                  resolved: { bg: '#D1FAE5', text: '#059669' },
+                  closed: { bg: '#E5E7EB', text: '#6B7280' },
+                };
+                const priority = priorityColors[issue.priority] || priorityColors.medium;
+                const status = statusColors[issue.status] || statusColors.open;
+
+                return (
+                  <AnimatedCard
+                    key={issue.id}
+                    index={index}
+                    delay={100}
+                    style={[styles.issueCard, { backgroundColor: cardBg, borderColor }]}>
+                    <View style={styles.issueHeader}>
+                      <View style={styles.issueTitleRow}>
+                        <Text style={[styles.issueTitle, { color: textColor }]}>{issue.title}</Text>
+                        <View style={[styles.issueBadge, { backgroundColor: priority.bg }]}>
+                          <Text style={[styles.issueBadgeText, { color: priority.text }]}>
+                            {issue.priority.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.issueStatusRow}>
+                        <View style={[styles.issueStatusBadge, { backgroundColor: status.bg }]}>
+                          <Text style={[styles.issueStatusText, { color: status.text }]}>
+                            {issue.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={[styles.issueDescription, { color: textSecondary }]}>
+                      {issue.description || 'No description provided'}
+                    </Text>
+                    <View style={styles.issueInfo}>
+                      <View style={styles.issueInfoItem}>
+                        <Ionicons name="person-outline" size={13} color={textSecondary} />
+                        <Text style={[styles.issueInfoText, { color: textSecondary }]}>
+                          Reported by: {issue.reportedBy}
+                        </Text>
+                      </View>
+                      {issue.assignedTo && issue.assignedTo !== 'Unassigned' && (
+                        <View style={styles.issueInfoItem}>
+                          <Ionicons name="person-add-outline" size={13} color={textSecondary} />
+                          <Text style={[styles.issueInfoText, { color: textSecondary }]}>
+                            Assigned to: {issue.assignedTo}
+                          </Text>
+                        </View>
+                      )}
+                      {issue.dueDate && (
+                        <View style={styles.issueInfoItem}>
+                          <Ionicons name="calendar-outline" size={13} color={textSecondary} />
+                          <Text style={[styles.issueInfoText, { color: textSecondary }]}>
+                            Due: {new Date(issue.dueDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                      {issue.resolvedAt && (
+                        <View style={styles.issueInfoItem}>
+                          <Ionicons name="checkmark-circle-outline" size={13} color="#10B981" />
+                          <Text style={[styles.issueInfoText, { color: '#10B981' }]}>
+                            Resolved: {new Date(issue.resolvedAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </AnimatedCard>
+                );
+              })
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-circle-outline" size={64} color={textSecondary} />
+                <Text style={[styles.emptyStateText, { color: textColor }]}>No issues reported</Text>
+                <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
+                  All issues have been resolved
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {selectedTab === 'materials' && (
+          <View style={styles.materialsList}>
+            {project.materialAllocations && project.materialAllocations.length > 0 ? (
+              project.materialAllocations.map((allocation, index) => {
+                const statusColors: Record<string, { bg: string; text: string }> = {
+                  received: { bg: '#D1FAE5', text: '#059669' },
+                  partial: { bg: '#FEF3C7', text: '#D97706' },
+                  pending: { bg: '#E5E7EB', text: '#6B7280' },
+                };
+                const status = statusColors[allocation.status] || statusColors.pending;
+
+                return (
+                  <AnimatedCard
+                    key={allocation.id}
+                    index={index}
+                    delay={100}
+                    style={[styles.materialCard, { backgroundColor: cardBg, borderColor }]}>
+                    <View style={styles.materialHeader}>
+                      <View style={styles.materialTitleRow}>
+                        <Text style={[styles.materialTitle, { color: textColor }]}>
+                          {allocation.itemName}
+                        </Text>
+                        <View style={[styles.materialStatusBadge, { backgroundColor: status.bg }]}>
+                          <Text style={[styles.materialStatusText, { color: status.text }]}>
+                            {allocation.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.materialCode, { color: textSecondary }]}>
+                        Code: {allocation.itemCode}
+                      </Text>
+                    </View>
+                    <View style={styles.materialDetails}>
+                      <View style={styles.materialDetailRow}>
+                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Allocated</Text>
+                        <Text style={[styles.materialDetailValue, { color: textColor }]}>
+                          {allocation.quantityAllocated} {allocation.unit}
+                        </Text>
+                      </View>
+                      <View style={styles.materialDetailRow}>
+                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Received</Text>
+                        <Text style={[styles.materialDetailValue, { color: '#10B981' }]}>
+                          {allocation.quantityReceived} {allocation.unit}
+                        </Text>
+                      </View>
+                      <View style={styles.materialDetailRow}>
+                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Remaining</Text>
+                        <Text style={[styles.materialDetailValue, { color: textColor }]}>
+                          {allocation.quantityRemaining} {allocation.unit}
+                        </Text>
+                      </View>
+                      <View style={styles.materialDetailRow}>
+                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Unit Price</Text>
+                        <Text style={[styles.materialDetailValue, { color: textColor }]}>
+                          {formatCurrency(allocation.unitPrice)}
+                        </Text>
+                      </View>
+                      <View style={styles.materialDetailRow}>
+                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Total Cost</Text>
+                        <Text style={[styles.materialDetailValue, { color: '#3B82F6', fontWeight: '700' }]}>
+                          {formatCurrency(allocation.totalCost)}
+                        </Text>
+                      </View>
+                    </View>
+                    {allocation.notes && (
+                      <View style={styles.materialNotes}>
+                        <Text style={[styles.materialNotesLabel, { color: textSecondary }]}>Notes:</Text>
+                        <Text style={[styles.materialNotesText, { color: textSecondary }]}>
+                          {allocation.notes}
+                        </Text>
+                      </View>
+                    )}
+                  </AnimatedCard>
+                );
+              })
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="cube-outline" size={64} color={textSecondary} />
+                <Text style={[styles.emptyStateText, { color: textColor }]}>No material allocations</Text>
+                <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
+                  Material allocations will appear here when added
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {selectedTab === 'budget' && (
+          <View style={styles.budgetDetailList}>
+            {/* Labor Costs */}
+            <View style={[styles.budgetSectionCard, { backgroundColor: cardBg, borderColor }]}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>Labor Costs</Text>
+              {project.laborCosts && project.laborCosts.length > 0 ? (
+                project.laborCosts.map((laborCost, index) => (
+                  <View key={laborCost.id} style={styles.budgetItemRow}>
+                    <View style={styles.budgetItemInfo}>
+                      <Text style={[styles.budgetItemName, { color: textColor }]}>
+                        {laborCost.assignableName}
+                      </Text>
+                      <Text style={[styles.budgetItemMeta, { color: textSecondary }]}>
+                        {laborCost.workDate
+                          ? new Date(laborCost.workDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : 'N/A'}{' '}
+                        • {laborCost.hoursWorked} hrs @ {formatCurrency(laborCost.hourlyRate)}/hr
+                      </Text>
+                      {laborCost.description && (
+                        <Text style={[styles.budgetItemDescription, { color: textSecondary }]}>
+                          {laborCost.description}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.budgetItemAmount, { color: textColor }]}>
+                      {formatCurrency(laborCost.totalCost)}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.emptyText, { color: textSecondary }]}>No labor costs recorded</Text>
+              )}
+              {project.budgetBreakdown && (
+                <View style={styles.budgetSectionTotal}>
+                  <Text style={[styles.budgetSectionTotalLabel, { color: textColor }]}>Total Labor Costs</Text>
+                  <Text style={[styles.budgetSectionTotalValue, { color: '#3B82F6' }]}>
+                    {formatCurrency(project.budgetBreakdown.laborCosts)}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Miscellaneous Expenses */}
+            <View style={[styles.budgetSectionCard, { backgroundColor: cardBg, borderColor }]}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>Miscellaneous Expenses</Text>
+              {project.miscellaneousExpenses && project.miscellaneousExpenses.length > 0 ? (
+                project.miscellaneousExpenses.map((expense, index) => (
+                  <View key={expense.id} style={styles.budgetItemRow}>
+                    <View style={styles.budgetItemInfo}>
+                      <Text style={[styles.budgetItemName, { color: textColor }]}>
+                        {expense.expenseName}
+                      </Text>
+                      <Text style={[styles.budgetItemMeta, { color: textSecondary }]}>
+                        {expense.expenseType}{' '}
+                        {expense.expenseDate
+                          ? '• ' +
+                            new Date(expense.expenseDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : ''}
+                      </Text>
+                      {expense.description && (
+                        <Text style={[styles.budgetItemDescription, { color: textSecondary }]}>
+                          {expense.description}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.budgetItemAmount, { color: textColor }]}>
+                      {formatCurrency(expense.amount)}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.emptyText, { color: textSecondary }]}>No miscellaneous expenses recorded</Text>
+              )}
+              {project.budgetBreakdown && (
+                <View style={styles.budgetSectionTotal}>
+                  <Text style={[styles.budgetSectionTotalLabel, { color: textColor }]}>
+                    Total Miscellaneous Expenses
+                  </Text>
+                  <Text style={[styles.budgetSectionTotalValue, { color: '#3B82F6' }]}>
+                    {formatCurrency(project.budgetBreakdown.miscellaneousExpenses)}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -570,14 +898,14 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
   },
   tab: {
-    flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
+    minWidth: 70,
   },
   tabActive: {
     borderBottomColor: '#3B82F6',
@@ -591,33 +919,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 16,
+    paddingBottom: 32,
   },
   progressCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 16,
-    letterSpacing: 0.3,
+    marginBottom: 12,
+    letterSpacing: 0.2,
   },
   progressOverview: {
     alignItems: 'center',
   },
   progressPercent: {
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   progressBar: {
     width: '100%',
-    height: 12,
-    borderRadius: 6,
+    height: 10,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   progressFill: {
@@ -627,78 +955,78 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 12,
   },
   statBox: {
-    width: (width - 52) / 2,
-    padding: 16,
-    borderRadius: 12,
+    width: (width - 42) / 2,
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
   },
   detailsCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 12,
+    gap: 10,
   },
   detailText: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
   budgetCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   budgetRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   budgetItem: {
     flex: 1,
     alignItems: 'center',
   },
   budgetLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     marginBottom: 4,
   },
   budgetValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
   budgetBar: {
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   budgetFill: {
@@ -706,46 +1034,47 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   teamCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   teamMember: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   teamAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   teamInfo: {
     flex: 1,
   },
   teamName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 2,
   },
   teamRole: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '400',
   },
   milestonesList: {
-    gap: 16,
+    gap: 12,
   },
   milestoneCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 12,
   },
   milestoneHeader: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   milestoneTitleRow: {
     marginBottom: 8,
@@ -765,16 +1094,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   milestoneName: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   milestoneDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
   milestoneProgress: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   milestoneProgressHeader: {
     flexDirection: 'row',
@@ -799,8 +1128,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   milestoneInfo: {
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 12,
   },
   milestoneInfoItem: {
     flexDirection: 'row',
@@ -808,71 +1137,86 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   milestoneInfoText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   tasksContainer: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
   tasksTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   taskItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
+    marginBottom: 10,
+    gap: 10,
   },
   taskName: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   taskAssignee: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '400',
   },
   updatesList: {
-    gap: 16,
+    gap: 12,
   },
   updateCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 12,
   },
   updateHeader: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   updateIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   updateContent: {
     flex: 1,
   },
   updateTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   updateDate: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '400',
   },
   updateDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  updateContext: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  updateContextItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  updateContextText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   fileContainer: {
     flexDirection: 'row',
@@ -903,39 +1247,262 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    marginTop: 16,
+    marginTop: 12,
   },
   emptyStateSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '400',
-    marginTop: 8,
+    marginTop: 6,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   actionButtonsContainer: {
-    gap: 12,
-    marginTop: 20,
+    gap: 10,
+    marginTop: 12,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
     gap: 8,
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   placeholderText: {
     fontStyle: 'italic',
     opacity: 0.7,
+  },
+  tabsContainer: {
+    borderBottomWidth: 1,
+    width: '100%',
+  },
+  budgetBreakdown: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    gap: 10,
+  },
+  budgetBreakdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  budgetBreakdownLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  budgetBreakdownValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  issuesList: {
+    gap: 12,
+  },
+  issueCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  issueHeader: {
+    marginBottom: 12,
+  },
+  issueTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    gap: 8,
+  },
+  issueStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  issueTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
+  },
+  issueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  issueBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  issueStatusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  issueStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  issueDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  issueInfo: {
+    gap: 6,
+  },
+  issueInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  issueInfoText: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  materialsList: {
+    gap: 12,
+  },
+  materialCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  materialHeader: {
+    marginBottom: 12,
+  },
+  materialTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+    gap: 8,
+  },
+  materialTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  materialStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  materialStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  materialCode: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  materialDetails: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  materialDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  materialDetailLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  materialDetailValue: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  materialNotes: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  materialNotesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  materialNotesText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  budgetDetailList: {
+    gap: 12,
+  },
+  budgetSectionCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  budgetItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  budgetItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  budgetItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  budgetItemMeta: {
+    fontSize: 11,
+    fontWeight: '400',
+    marginBottom: 3,
+  },
+  budgetItemDescription: {
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 3,
+  },
+  budgetItemAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  budgetSectionTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 2,
+    borderTopColor: '#3B82F6',
+  },
+  budgetSectionTotalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  budgetSectionTotalValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });
 

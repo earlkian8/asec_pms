@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('client_code', 20)->unique();
             $table->string('client_name', 255);
-            $table->enum('client_type', ['individual', 'corporation', 'government', 'ngo'])->default('individual');
+            $table->foreignId('client_type_id')->nullable()->constrained('client_types')->onDelete('restrict');
             $table->string('contact_person', 100)->nullable();
             $table->string('email', 100)->nullable();
             $table->string('phone_number', 20)->nullable();

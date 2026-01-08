@@ -100,6 +100,12 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     href: route('client-management.index'),
                     routeName: 'client-management.*',
                     icon: Users
+                },
+                {
+                    title: 'Client Type',
+                    href: route('client-type-management.index'),
+                    routeName: 'client-type-management.*',
+                    icon: FolderOpen
                 }
             ]
         },
@@ -207,6 +213,11 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                         if (item.title === 'Client Management') {
                             return hasModuleAccess([
                                 'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
+                            ]);
+                        }
+                        if (item.title === 'Client Type') {
+                            return hasModuleAccess([
+                                'clients.view', 'clients.create', 'clients.update', 'clients.delete'
                             ]);
                         }
                         return true;

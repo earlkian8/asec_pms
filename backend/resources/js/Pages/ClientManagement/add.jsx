@@ -24,10 +24,10 @@ import {
   SelectValue,
 } from "@/Components/ui/select"
 
-const AddClient = ({ setShowAddModal }) => {
+const AddClient = ({ setShowAddModal, clientTypes }) => {
   const { data, setData, post, errors, processing } = useForm({
     client_name: '',
-    client_type: '',
+    client_type_id: '',
     contact_person: '',
     email: '',
     phone_number: '',
@@ -53,8 +53,8 @@ const AddClient = ({ setShowAddModal }) => {
       errors.client_name = 'Client name is required';
     }
     
-    if (!data.client_type || data.client_type.trim() === '') {
-      errors.client_type = 'Client type is required';
+    if (!data.client_type_id || data.client_type_id === '') {
+      errors.client_type_id = 'Client type is required';
     }
     
     if (!data.contact_person || data.contact_person.trim() === '') {
@@ -143,29 +143,34 @@ const AddClient = ({ setShowAddModal }) => {
           <div>
             <Label className="text-zinc-800">Client Type <span className="text-red-500">*</span></Label>
             <Select
-                value={data.client_type}
+                value={data.client_type_id ? String(data.client_type_id) : ''}
                 onValueChange={(value) => {
-                  setData("client_type", value);
-                  if (validationErrors.client_type) {
+                  setData("client_type_id", value);
+                  if (validationErrors.client_type_id) {
                     setValidationErrors(prev => {
                       const newErrors = { ...prev };
-                      delete newErrors.client_type;
+                      delete newErrors.client_type_id;
                       return newErrors;
                     });
                   }
                 }}
             >
-                <SelectTrigger className={selectClass(getFieldError('client_type'))}>
-                <SelectValue placeholder="Client Type" />
+                <SelectTrigger className={selectClass(getFieldError('client_type_id'))}>
+                <SelectValue placeholder="Select Client Type" />
                 </SelectTrigger>
                 <SelectContent>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="corporation">Corporation</SelectItem>
-                <SelectItem value="government">Government</SelectItem>
-                <SelectItem value="ngo">NGO</SelectItem>
+                {clientTypes && clientTypes.length > 0 ? (
+                  clientTypes.map(type => (
+                    <SelectItem key={type.id} value={String(type.id)}>
+                      {type.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>No client types available</SelectItem>
+                )}
                 </SelectContent>
             </Select>
-            <InputError message={getFieldError('client_type')} />
+            <InputError message={getFieldError('client_type_id')} />
             </div>
 
           {/* Contact Person */}

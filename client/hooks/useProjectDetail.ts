@@ -38,12 +38,79 @@ export interface ProgressUpdate {
   author: string;
   date: string;
   file?: ProgressUpdateFile | null; // Optional - files are not displayed in client app
+  taskId?: string;
+  taskName?: string;
+  milestoneId?: string;
+  milestoneName?: string;
 }
 
 export interface TeamMember {
   id: string;
   name: string;
   role: string;
+}
+
+export interface ProjectIssue {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  status: string;
+  reportedBy: string;
+  assignedTo: string;
+  dueDate: string | null;
+  resolvedAt: string | null;
+  milestoneId: string | null;
+  milestoneName: string | null;
+  taskId: string | null;
+  taskName: string | null;
+  createdAt: string;
+}
+
+export interface MaterialAllocation {
+  id: string;
+  itemName: string;
+  itemCode: string;
+  unit: string;
+  quantityAllocated: number;
+  quantityReceived: number;
+  quantityRemaining: number;
+  status: string;
+  unitPrice: number;
+  totalCost: number;
+  allocatedBy: string;
+  allocatedAt: string | null;
+  notes: string;
+}
+
+export interface LaborCost {
+  id: string;
+  assignableName: string;
+  workDate: string | null;
+  hoursWorked: number;
+  hourlyRate: number;
+  totalCost: number;
+  description: string;
+  notes: string;
+}
+
+export interface MiscellaneousExpense {
+  id: string;
+  expenseType: string;
+  expenseName: string;
+  expenseDate: string | null;
+  amount: number;
+  description: string;
+  notes: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface BudgetBreakdown {
+  materialCosts: number;
+  laborCosts: number;
+  miscellaneousExpenses: number;
+  total: number;
 }
 
 export interface ProjectDetail {
@@ -56,10 +123,15 @@ export interface ProjectDetail {
   expectedCompletion: string;
   budget: number;
   spent: number;
+  budgetBreakdown: BudgetBreakdown;
   location: string;
   projectManager: string;
   milestones: ProjectDetailMilestone[];
   recentUpdates: ProgressUpdate[];
+  issues: ProjectIssue[];
+  materialAllocations: MaterialAllocation[];
+  laborCosts: LaborCost[];
+  miscellaneousExpenses: MiscellaneousExpense[];
   teamMembers: TeamMember[];
 }
 

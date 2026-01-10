@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, usePage, router, Link } from '@inertiajs/react';
+import { Head, usePage, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { 
   Table,
@@ -12,55 +12,44 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
-import { Trash2, SquarePen, Eye, Filter, X, Search, Calendar, TrendingUp, Users, Building2, ArrowUpDown, KeyRound, AlertCircle } from 'lucide-react';
+import { Trash2, SquarePen, Filter, X, Search, ArrowUpDown, AlertCircle, FolderOpen, Plus, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Switch } from "@/Components/ui/switch";
 import { usePermission } from '@/utils/permissions';
 import { toast } from 'sonner';
 
-import AddClient from './add';
-import EditClient from './edit';
-import DeleteClient from './delete';
-import ResetPassword from './reset';
+import AddClientType from './add';
+import EditClientType from './edit';
+import DeleteClientType from './delete';
 
-export default function ClientsIndex() {
+export default function ClientTypesIndex() {
   const { has } = usePermission();
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Client Management", href: route('client-management.index') },
-    { title: "Clients" },
+    { title: "Client Type Management", href: route('client-type-management.index') },
+    { title: "Client Types" },
   ];
 
   const columns = [
-    { header: 'Code', width: '10%' },
-    { header: 'Name', width: '15%' },
-    { header: 'Type', width: '10%' },
-    { header: 'Contact Person', width: '15%' },
-    { header: 'Email', width: '15%' },
-    { header: 'Phone/Mobile', width: '10%' },
-    { header: 'City / Province', width: '15%' },
-    { header: 'Status', width: '10%' },
-    { header: 'Actions', width: '10%' },
+    { header: 'Name', width: '25%' },
+    { header: 'Description', width: '45%' },
+    { header: 'Status', width: '15%' },
+    { header: 'Actions', width: '15%' },
   ];
 
-  // Data from backend
-  const pagination = usePage().props.clients;
-  const clients = pagination?.data || [];
+  const pagination = usePage().props.clientTypes;
+  const clientTypes = pagination?.data || [];
   const paginationLinks = pagination?.links || [];
   const filters = usePage().props.filters || {};
-  const filterOptions = usePage().props.filterOptions || {};
   const initialSearch = usePage().props.search || '';
 
-  // States
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editClient, setEditClient] = useState(null);
+  const [editClientType, setEditClientType] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteClient, setDeleteClient] = useState(null);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetClient, setResetClient] = useState(null);
+  const [deleteClientType, setDeleteClientType] = useState(null);
   const [showFilterCard, setShowFilterCard] = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
   const filterCardRef = useRef(null);
@@ -70,13 +59,9 @@ export default function ClientsIndex() {
   const [filterPosition, setFilterPosition] = useState({ top: 0, right: 0 });
   const [sortPosition, setSortPosition] = useState({ top: 0, right: 0 });
   
-  // Initialize filters from props
   const initializeFilters = (filterProps) => {
     return {
-      client_type_id: filterProps?.client_type_id || '',
       is_active: filterProps?.is_active !== undefined && filterProps?.is_active !== '' ? filterProps.is_active : '',
-      city: filterProps?.city || '',
-      province: filterProps?.province || '',
     };
   };
   
@@ -86,24 +71,20 @@ export default function ClientsIndex() {
   const [sortOrder, setSortOrder] = useState(pageProps.sort_order || 'desc');
   const debounceTimer = useRef(null);
 
-  // Sync filters when props change
   useEffect(() => {
     const newFilters = initializeFilters(filters);
     setLocalFilters(newFilters);
-  }, [filters.client_type_id, filters.is_active, filters.city, filters.province]);
+  }, [filters.is_active]);
 
-  // Sync sort when props change
   useEffect(() => {
     if (pageProps.sort_by) setSortBy(pageProps.sort_by);
     if (pageProps.sort_order) setSortOrder(pageProps.sort_order);
   }, [pageProps.sort_by, pageProps.sort_order]);
 
-  // Close filter/sort cards when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       const target = event.target;
       
-      // Check if click is on a Radix Select component
       let isSelectClick = false;
       
       if (target.closest) {
@@ -148,29 +129,14 @@ export default function ClientsIndex() {
 
     if (showFilterCard || showSortCard) {
       document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
   }, [showFilterCard, showSortCard]);
-
-  // Helper function to capitalize text properly
-  const capitalizeText = (text) => {
-    if (!text) return '';
-    return text
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
-  };
 
   // Count active filters
   const activeFiltersCount = () => {
     let count = 0;
-    if (localFilters.client_type_id && localFilters.client_type_id !== 'all') count++;
-    if (localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null) count++;
-    if (localFilters.city && localFilters.city !== 'all') count++;
-    if (localFilters.province && localFilters.province !== 'all') count++;
+    if (localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined) count++;
     return count;
   };
 
@@ -192,15 +158,12 @@ export default function ClientsIndex() {
     try {
       const params = {
         ...(searchInput && { search: searchInput }),
-        ...(localFilters.client_type_id && { client_type_id: localFilters.client_type_id }),
-        ...(localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null && { is_active: localFilters.is_active === true || localFilters.is_active === 'true' || localFilters.is_active === 1 || localFilters.is_active === '1' ? 1 : 0 }),
-        ...(localFilters.city && { city: localFilters.city }),
-        ...(localFilters.province && { province: localFilters.province }),
+        ...(localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined && { is_active: localFilters.is_active }),
         sort_by: sortBy,
         sort_order: sortOrder,
       };
       
-      router.get(route('client-management.index'), params, {
+      router.get(route('client-type-management.index'), params, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -220,15 +183,12 @@ export default function ClientsIndex() {
   const applySort = () => {
     const params = {
       ...(searchInput && { search: searchInput }),
-      ...(localFilters.client_type_id && { client_type_id: localFilters.client_type_id }),
-      ...(localFilters.is_active !== '' && localFilters.is_active !== undefined && { is_active: localFilters.is_active }),
-      ...(localFilters.city && { city: localFilters.city }),
-      ...(localFilters.province && { province: localFilters.province }),
+      ...(localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined && { is_active: localFilters.is_active }),
       sort_by: sortBy,
       sort_order: sortOrder,
     };
     
-    router.get(route('client-management.index'), params, {
+    router.get(route('client-type-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -240,19 +200,14 @@ export default function ClientsIndex() {
 
   // Reset/Clear all filters
   const resetFilters = () => {
-    setLocalFilters({
-      client_type_id: '',
-      is_active: '',
-      city: '',
-      province: '',
-    });
+    setLocalFilters({ is_active: '' });
     setSortBy('created_at');
     setSortOrder('desc');
     const params = {};
     if (searchInput && searchInput.trim()) {
       params.search = searchInput;
     }
-    router.get(route('client-management.index'), params, {
+    router.get(route('client-type-management.index'), params, {
       preserveState: true,
       preserveScroll: true,
       replace: true,
@@ -278,7 +233,7 @@ export default function ClientsIndex() {
         params.search = searchInput;
       }
       router.get(
-        route('client-management.index'),
+        route('client-type-management.index'),
         params,
         { preserveState: true, preserveScroll: true, replace: true }
       );
@@ -291,10 +246,7 @@ export default function ClientsIndex() {
   const handlePageChange = ({ page }) => {
     const params = {
       page,
-      ...(localFilters.client_type_id && { client_type_id: localFilters.client_type_id }),
-      ...(localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null && { is_active: localFilters.is_active === true || localFilters.is_active === 'true' || localFilters.is_active === 1 || localFilters.is_active === '1' ? 1 : 0 }),
-      ...(localFilters.city && { city: localFilters.city }),
-      ...(localFilters.province && { province: localFilters.province }),
+      ...(localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined && { is_active: localFilters.is_active }),
       sort_by: sortBy,
       sort_order: sortOrder,
     };
@@ -303,7 +255,7 @@ export default function ClientsIndex() {
     }
     
     router.get(
-      route('client-management.index'),
+      route('client-type-management.index'),
       params,
       { preserveState: true, preserveScroll: true, replace: true }
     );
@@ -331,37 +283,32 @@ export default function ClientsIndex() {
   const showPagination = pageLinks.length > 0 || prevLink?.url || nextLink?.url;
 
   // Handle Status Toggle
-  const handleStatusChange = (client, newStatus) => {
-    router.put(route('client-management.update-status', client.id), {
+  const handleStatusChange = (clientType, newStatus) => {
+    router.put(route('client-type-management.update-status', clientType.id), {
       is_active: newStatus,
     }, {
       preserveScroll: true,
       preserveState: true,
-      only: ['clients'],
+      only: ['clientTypes'],
       onSuccess: () => {
-        toast.success('Client status updated successfully!');
+        toast.success('Client type status updated successfully!');
       },
-      onError: () => {
-        toast.error('Failed to update status.');
+      onError: (errors) => {
+        console.error('Status update error:', errors);
+        const errorMessage = errors.message || 'Failed to update status.';
+        toast.error(errorMessage);
       },
     });
   };
 
-  // Handle Reset Password
-  const handleResetPassword = (client) => {
-    setResetClient(client);
-    setShowResetModal(true);
-  };
-
-  // Check if user has permission to view clients
   if (!has('clients.view')) {
     return (
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
-        <Head title="Clients" />
+        <Head title="Client Types" />
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">You don't have permission to view clients.</p>
+            <p className="text-gray-500">You don't have permission to view client types.</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -370,14 +317,12 @@ export default function ClientsIndex() {
 
   return (
     <>
-      {/* Modals */}
-      {showAddModal && <AddClient setShowAddModal={setShowAddModal} clientTypes={filterOptions.clientTypes} />}
-      {showEditModal && <EditClient setShowEditModal={setShowEditModal} client={editClient} clientTypes={filterOptions.clientTypes} />}
-      {showDeleteModal && <DeleteClient setShowDeleteModal={setShowDeleteModal} client={deleteClient} />}
-      {showResetModal && <ResetPassword setShowResetModal={setShowResetModal} client={resetClient} />}
+      {showAddModal && <AddClientType setShowAddModal={setShowAddModal} />}
+      {showEditModal && editClientType && <EditClientType setShowEditModal={setShowEditModal} clientType={editClientType} />}
+      {showDeleteModal && deleteClientType && <DeleteClientType setShowDeleteModal={setShowDeleteModal} clientType={deleteClientType} />}
 
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
-        <Head title="Clients" />
+        <Head title="Client Types" />
 
         <div className="w-full sm:px-6 lg:px-8">
           <div className="overflow-hidden bg-white shadow-lg sm:rounded-lg p-6 mt-2 border border-gray-100">
@@ -388,11 +333,11 @@ export default function ClientsIndex() {
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Clients</p>
-                      <p className="text-2xl font-bold text-blue-900 mt-1">{clients.length}</p>
+                      <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Types</p>
+                      <p className="text-2xl font-bold text-blue-900 mt-1">{clientTypes.length}</p>
                     </div>
                     <div className="bg-blue-200 rounded-full p-3">
-                      <Building2 className="h-5 w-5 text-blue-700" />
+                      <FolderOpen className="h-5 w-5 text-blue-700" />
                     </div>
                   </div>
                 </div>
@@ -401,11 +346,11 @@ export default function ClientsIndex() {
                     <div>
                       <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Active</p>
                       <p className="text-2xl font-bold text-green-900 mt-1">
-                        {clients.filter(c => c.is_active).length}
+                        {clientTypes.filter(ct => ct.is_active).length}
                       </p>
                     </div>
                     <div className="bg-green-200 rounded-full p-3">
-                      <Users className="h-5 w-5 text-green-700" />
+                      <CheckCircle2 className="h-5 w-5 text-green-700" />
                     </div>
                   </div>
                 </div>
@@ -414,20 +359,20 @@ export default function ClientsIndex() {
                     <div>
                       <p className="text-xs font-medium text-red-700 uppercase tracking-wide">Inactive</p>
                       <p className="text-2xl font-bold text-red-900 mt-1">
-                        {clients.filter(c => !c.is_active).length}
+                        {clientTypes.filter(ct => !ct.is_active).length}
                       </p>
                     </div>
                     <div className="bg-red-200 rounded-full p-3">
-                      <AlertCircle className="h-5 w-5 text-red-700" />
+                      <XCircle className="h-5 w-5 text-red-700" />
                     </div>
                   </div>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Corporations</p>
+                      <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Total Clients</p>
                       <p className="text-2xl font-bold text-purple-900 mt-1">
-                        {clients.filter(c => c.client_type === 'corporation').length}
+                        {clientTypes.reduce((sum, ct) => sum + (ct.clients_count || 0), 0)}
                       </p>
                     </div>
                     <div className="bg-purple-200 rounded-full p-3">
@@ -444,7 +389,7 @@ export default function ClientsIndex() {
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    placeholder="Search clients by code, name, email, phone, or location..."
+                    placeholder="Search client types by name or description..."
                     value={searchInput}
                     onChange={handleSearch}
                     className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
@@ -485,7 +430,7 @@ export default function ClientsIndex() {
                     {showFilterCard && (
                       <div 
                         ref={filterCardRef} 
-                        className="fixed w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[500px]"
+                        className="fixed w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[400px]"
                         style={{
                           top: `${filterPosition.top}px`,
                           right: `${filterPosition.right}px`,
@@ -494,7 +439,7 @@ export default function ClientsIndex() {
                         <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">
                             <Filter className="h-4 w-4 text-white" />
-                            <h3 className="text-base font-semibold text-white">Filter Clients</h3>
+                            <h3 className="text-base font-semibold text-white">Filter Client Types</h3>
                           </div>
                           <button
                             onClick={() => setShowFilterCard(false)}
@@ -505,101 +450,23 @@ export default function ClientsIndex() {
                         </div>
 
                         <div className="p-4 overflow-y-auto flex-1">
-                          {/* Client Type Filter */}
-                          {filterOptions.clientTypes && filterOptions.clientTypes.length > 0 && (
-                            <div className="mb-4">
-                              <Label className="text-xs font-semibold text-gray-700 mb-2 block">Client Type</Label>
-                              <Select
-                                value={localFilters.client_type_id ? String(localFilters.client_type_id) : 'all'}
-                                onValueChange={(value) => handleFilterChange('client_type_id', value)}
-                              >
-                                <SelectTrigger className="w-full h-9">
-                                  <SelectValue placeholder="All Types" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">All Types</SelectItem>
-                                  {filterOptions.clientTypes.map((type) => (
-                                    <SelectItem key={type.id} value={String(type.id)}>
-                                      {type.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
                           {/* Status Filter */}
                           <div className="mb-4">
                             <Label className="text-xs font-semibold text-gray-700 mb-2 block">Status</Label>
                             <Select
-                              value={localFilters.is_active === '' || localFilters.is_active === undefined || localFilters.is_active === null ? 'all' : (localFilters.is_active === true || localFilters.is_active === 'true' || localFilters.is_active === 1 || localFilters.is_active === '1' ? 'true' : 'false')}
-                              onValueChange={(value) => {
-                                if (value === 'all') {
-                                  handleFilterChange('is_active', '');
-                                } else {
-                                  setLocalFilters(prev => ({
-                                    ...prev,
-                                    is_active: value === 'true'
-                                  }));
-                                }
-                              }}
+                              value={localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined ? String(localFilters.is_active) : 'all'}
+                              onValueChange={(value) => handleFilterChange('is_active', value)}
                             >
                               <SelectTrigger className="w-full h-9">
-                                <SelectValue placeholder="All Statuses" />
+                                <SelectValue placeholder="All Status" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="true">Active</SelectItem>
                                 <SelectItem value="false">Inactive</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-
-                          {/* City Filter */}
-                          {filterOptions.cities && filterOptions.cities.length > 0 && (
-                            <div className="mb-4">
-                              <Label className="text-xs font-semibold text-gray-700 mb-2 block">City</Label>
-                              <Select
-                                value={localFilters.city || 'all'}
-                                onValueChange={(value) => handleFilterChange('city', value)}
-                              >
-                                <SelectTrigger className="w-full h-9">
-                                  <SelectValue placeholder="All Cities" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">All Cities</SelectItem>
-                                  {filterOptions.cities.map((city) => (
-                                    <SelectItem key={city} value={city}>
-                                      {capitalizeText(city)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          {/* Province Filter */}
-                          {filterOptions.provinces && filterOptions.provinces.length > 0 && (
-                            <div className="mb-4">
-                              <Label className="text-xs font-semibold text-gray-700 mb-2 block">Province</Label>
-                              <Select
-                                value={localFilters.province || 'all'}
-                                onValueChange={(value) => handleFilterChange('province', value)}
-                              >
-                                <SelectTrigger className="w-full h-9">
-                                  <SelectValue placeholder="All Provinces" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">All Provinces</SelectItem>
-                                  {filterOptions.provinces.map((province) => (
-                                    <SelectItem key={province} value={province}>
-                                      {capitalizeText(province)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
                         </div>
 
                         {/* Filter Actions */}
@@ -665,7 +532,7 @@ export default function ClientsIndex() {
                         <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">
                             <ArrowUpDown className="h-4 w-4 text-white" />
-                            <h3 className="text-base font-semibold text-white">Sort Clients</h3>
+                            <h3 className="text-base font-semibold text-white">Sort Client Types</h3>
                           </div>
                           <button
                             onClick={() => setShowSortCard(false)}
@@ -687,13 +554,8 @@ export default function ClientsIndex() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="created_at">Date Created</SelectItem>
-                                <SelectItem value="client_name">Client Name</SelectItem>
-                                <SelectItem value="client_code">Client Code</SelectItem>
-                                <SelectItem value="client_type">Client Type</SelectItem>
+                                <SelectItem value="name">Name</SelectItem>
                                 <SelectItem value="is_active">Status</SelectItem>
-                                <SelectItem value="city">City</SelectItem>
-                                <SelectItem value="province">Province</SelectItem>
-                                <SelectItem value="email">Email</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -736,14 +598,14 @@ export default function ClientsIndex() {
                   className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md hover:shadow-lg transition-all duration-200 px-6 h-11 whitespace-nowrap"
                 >
                   <SquarePen className="mr-2 h-4 w-4" />
-                  Add Client
+                  Add Client Type
                 </Button>
               )}
             </div>
 
             {/* Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white relative z-0">
-              <Table className="min-w-[1200px] w-full">
+              <Table className="min-w-full w-full">
                 <TableHeader>
                   <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                     {columns.map((col, i) => (
@@ -758,109 +620,62 @@ export default function ClientsIndex() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clients.length > 0 ? (
-                    clients.map((client, index) => (
+                  {clientTypes.length > 0 ? (
+                    clientTypes.map((clientType, index) => (
                       <TableRow 
-                        key={client.id}
+                        key={clientType.id}
                         className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150 ${
                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                         }`}
                       >
-                        <TableCell className="text-left px-4 py-4 text-sm font-semibold text-gray-900">
-                          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded border border-gray-200">
-                            {client.client_code || '---'}
-                          </span>
-                        </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm font-medium text-gray-900">
-                          {capitalizeText(client.client_name)}
-                        </TableCell>
-                        <TableCell className="text-left px-4 py-4 text-sm">
-                          <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                            {client.client_type?.name || 'N/A'}
-                          </span>
+                          {clientType.name}
                         </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                          {capitalizeText(client.contact_person || '---')}
-                        </TableCell>
-                        <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                          {client.email || (
-                            <span className="text-gray-400 italic">No email</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                          {client.phone_number || (
-                            <span className="text-gray-400 italic">No phone</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                          {client.city || client.province ? (
-                            <span>
-                              {client.city ? capitalizeText(client.city) : '---'}
-                              {client.city && client.province ? ' / ' : ''}
-                              {client.province ? capitalizeText(client.province) : ''}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 italic">No location</span>
-                          )}
+                          {clientType.description || <span className="text-gray-400 italic">No description</span>}
                         </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm">
                           <div className="flex items-center gap-2">
-                            {has('clients.update-status') ? (
-                              <>
-                                <Switch
-                                  checked={client.is_active}
-                                  onCheckedChange={(checked) => handleStatusChange(client, checked)}
-                                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
-                                />
-                                <span
-                                  className={`text-xs font-medium ${client.is_active ? 'text-green-600' : 'text-red-600'}`}
-                                >
-                                  {client.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                              </>
-                            ) : (
-                              <span
-                                className={`text-xs font-medium px-2 py-1 rounded ${client.is_active ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}
-                              >
-                                {client.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            )}
+                            <Switch
+                              checked={clientType.is_active}
+                              onCheckedChange={(checked) => handleStatusChange(clientType, checked)}
+                              disabled={!has('clients.update')}
+                              className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+                            />
+                            <span className={`text-xs font-medium ${
+                              clientType.is_active ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {clientType.is_active ? 'Active' : 'Inactive'}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm">
-                          <div className="flex gap-1.5">
+                          <div className="flex items-center gap-2">
                             {has('clients.update') && (
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
-                                  setEditClient(client);
+                                  setEditClientType(clientType);
                                   setShowEditModal(true);
                                 }}
-                                className="p-2 rounded-lg hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-all duration-200 hover:scale-110 border border-indigo-200 hover:border-indigo-300"
-                                title="Edit"
+                                className="h-8 w-8 p-0 hover:bg-blue-50"
                               >
-                                <SquarePen size={16} />
-                              </button>
-                            )}
-                            {has('clients.update') && (
-                              <button
-                                onClick={() => handleResetPassword(client)}
-                                className="p-2 rounded-lg hover:bg-yellow-100 text-yellow-600 hover:text-yellow-700 transition-all duration-200 hover:scale-110 border border-yellow-200 hover:border-yellow-300"
-                                title="Reset Password"
-                              >
-                                <KeyRound size={16} />
-                              </button>
+                                <SquarePen className="h-4 w-4 text-blue-600" />
+                              </Button>
                             )}
                             {has('clients.delete') && (
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => {
-                                  setDeleteClient(client);
+                                  setDeleteClientType(clientType);
                                   setShowDeleteModal(true);
                                 }}
-                                className="p-2 rounded-lg hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-110 border border-red-200 hover:border-red-300"
-                                title="Delete"
+                                className="h-8 w-8 p-0 hover:bg-red-50"
                               >
-                                <Trash2 size={16} />
-                              </button>
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
                             )}
                           </div>
                         </TableCell>
@@ -868,13 +683,11 @@ export default function ClientsIndex() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={columns.length} className="text-center py-12">
+                      <TableCell colSpan={columns.length} className="text-center py-12 text-gray-500">
                         <div className="flex flex-col items-center justify-center">
-                          <div className="bg-gray-100 rounded-full p-4 mb-3">
-                            <Search className="h-8 w-8 text-gray-400" />
-                          </div>
-                          <p className="text-gray-500 font-medium text-base">No clients found</p>
-                          <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filters</p>
+                          <FolderOpen className="h-12 w-12 text-gray-400 mb-3 opacity-50" />
+                          <p className="text-sm font-medium text-gray-500">No client types found</p>
+                          <p className="text-xs text-gray-400 mt-1">Create a client type to get started</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -885,50 +698,69 @@ export default function ClientsIndex() {
 
             {/* Pagination */}
             {showPagination && (
-              <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200">
                 <div className="text-sm text-gray-600">
-                  Showing <span className="font-semibold text-gray-900">{clients.length}</span> of{' '}
-                  <span className="font-semibold text-gray-900">{pagination?.total || 0}</span> clients
+                  Showing <span className="font-semibold">{pagination?.from || 0}</span> to <span className="font-semibold">{pagination?.to || 0}</span> of <span className="font-semibold">{pagination?.total || 0}</span> results
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    disabled={!prevLink?.url}
-                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
-                      !prevLink?.url
-                        ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm hover:shadow'
-                    }`}
-                    onClick={() => handlePageClick(prevLink?.url)}
-                  >
-                    Previous
-                  </button>
-
-                  {pageLinks.map((link, idx) => (
-                    <button
-                      key={idx}
-                      disabled={!link?.url}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 min-w-[40px] ${
-                        link?.active
-                          ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white hover:from-zinc-800 hover:to-zinc-900 shadow-md'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm hover:shadow'
-                      } ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
-                      onClick={() => handlePageClick(link?.url)}
+                <div className="flex items-center gap-2">
+                  {prevLink?.url ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageClick(prevLink.url)}
+                      className="h-9 px-4 border-gray-300 hover:bg-gray-50"
                     >
-                      {link?.label || ''}
-                    </button>
-                  ))}
-
-                  <button
-                    disabled={!nextLink?.url}
-                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
-                      !nextLink?.url
-                        ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm hover:shadow'
-                    }`}
-                    onClick={() => handlePageClick(nextLink?.url)}
-                  >
-                    Next
-                  </button>
+                      Previous
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="h-9 px-4 border-gray-300"
+                    >
+                      Previous
+                    </Button>
+                  )}
+                  
+                  <div className="flex items-center gap-1">
+                    {pageLinks.map((link, idx) => (
+                      <Button
+                        key={idx}
+                        variant={link.active ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageClick(link.url)}
+                        disabled={!link.url}
+                        className={`h-9 min-w-[36px] ${
+                          link.active 
+                            ? 'bg-zinc-700 text-white hover:bg-zinc-800' 
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {link.label}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  {nextLink?.url ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageClick(nextLink.url)}
+                      className="h-9 px-4 border-gray-300 hover:bg-gray-50"
+                    >
+                      Next
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="h-9 px-4 border-gray-300"
+                    >
+                      Next
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -938,3 +770,4 @@ export default function ClientsIndex() {
     </>
   );
 }
+

@@ -614,7 +614,7 @@ export default function TaskDetailScreen() {
                 <AnimatedCard index={index} delay={150 + index * 50} style={styles.issueCard}>
                   <View style={styles.issueHeader}>
                     <View style={styles.issueTitleContainer}>
-                      <Text style={styles.issueTitle}>{issue.title}</Text>
+                      <Text style={styles.issueTitle} numberOfLines={2}>{issue.title}</Text>
                       <View
                         style={[
                           styles.issueStatusBadge,
@@ -641,17 +641,21 @@ export default function TaskDetailScreen() {
                         </Text>
                       </View>
                     </View>
-                    {issue.reported_by === user?.id && (
+                    {issue.reported_by && user?.id && Number(issue.reported_by) === Number(user.id) && (
                       <View style={styles.issueActions}>
                         <TouchableOpacity
                           onPress={() => handleEditIssue(issue)}
                           style={styles.actionButton}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
                           <Edit size={18} color={AppColors.primary} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => handleDeleteIssue(issue)}
                           style={styles.actionButton}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
                           <Trash2 size={18} color={AppColors.error} />
                         </TouchableOpacity>
@@ -1176,6 +1180,10 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: AppColors.background,
+    minWidth: 36,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatar: {
     width: 44,
@@ -1289,17 +1297,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flexWrap: 'wrap',
+    minWidth: 0, // Allow shrinking
   },
   issueTitle: {
-    flex: 1,
+    flexShrink: 1,
     fontSize: 17,
     fontWeight: '700',
     color: AppColors.text,
     lineHeight: 24,
+    minWidth: 0, // Allow shrinking
   },
   issueActions: {
     flexDirection: 'row',
     gap: 4,
+    flexShrink: 0, // Prevent shrinking
+    zIndex: 10, // Ensure buttons are on top
   },
   issueStatusBadge: {
     flexDirection: 'row',

@@ -86,7 +86,10 @@ export default function IssueReportModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: textColor }]}>Issue Type *</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: textColor }]}>Issue Type</Text>
+                <Text style={styles.requiredAsterisk}> *</Text>
+              </View>
               <View style={styles.optionsContainer}>
                 {issueTypes.map((type) => (
                   <TouchableOpacity
@@ -142,7 +145,10 @@ export default function IssueReportModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: textColor }]}>Title *</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: textColor }]}>Title</Text>
+                <Text style={styles.requiredAsterisk}> *</Text>
+              </View>
               <TextInput
                 style={[styles.input, { backgroundColor: '#F9FAFB', borderColor, color: textColor }]}
                 placeholder="Brief description of the issue"
@@ -153,7 +159,10 @@ export default function IssueReportModal({
             </View>
 
             <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: textColor }]}>Description *</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.inputLabel, { color: textColor }]}>Description</Text>
+                <Text style={styles.requiredAsterisk}> *</Text>
+              </View>
               <TextInput
                 style={[
                   styles.textArea,
@@ -240,10 +249,18 @@ const styles = StyleSheet.create({
   inputSection: {
     marginBottom: 20,
   },
+  labelRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+  },
+  requiredAsterisk: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   input: {
     borderWidth: 1,

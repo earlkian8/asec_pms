@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ActivityLogsController;
 use App\Http\Controllers\Admin\ClientsController;
+use App\Http\Controllers\Admin\ClientTypesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
@@ -133,6 +134,15 @@ Route::middleware('auth')->group(function () {
         Route::put('/update/{projectType}', [ProjectTypesController::class, 'update'])->middleware('permission:projects.update')->name('update');
         Route::delete('/delete/{projectType}', [ProjectTypesController::class, 'destroy'])->middleware('permission:projects.delete')->name('destroy');
         Route::put('/update-status/{projectType}', [ProjectTypesController::class, 'handleStatus'])->middleware('permission:projects.update')->name('update-status');
+    });
+
+    // Client Type Management
+    Route::prefix('client-type-management')->name('client-type-management.')->group(function(){
+        Route::get('/', [ClientTypesController::class, 'index'])->middleware('permission:clients.view')->name('index');
+        Route::post('/store', [ClientTypesController::class, 'store'])->middleware('permission:clients.create')->name('store');
+        Route::put('/update/{clientType}', [ClientTypesController::class, 'update'])->middleware('permission:clients.update')->name('update');
+        Route::delete('/delete/{clientType}', [ClientTypesController::class, 'destroy'])->middleware('permission:clients.delete')->name('destroy');
+        Route::put('/update-status/{clientType}', [ClientTypesController::class, 'handleStatus'])->middleware('permission:clients.update')->name('update-status');
     });
 
     // Client Management

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientType;
 use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
@@ -21,7 +22,7 @@ class ClientsController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $clientType = $request->input('client_type');
+        $clientTypeId = $request->input('client_type_id');
         $isActive = $request->input('is_active');
         $city = $request->input('city');
         $province = $request->input('province');
@@ -29,7 +30,7 @@ class ClientsController extends Controller
         $sortOrder = $request->input('sort_order', 'desc');
 
         // Validate sort column
-        $allowedSortColumns = ['created_at', 'client_name', 'client_code', 'client_type', 'is_active', 'city', 'province', 'email'];
+        $allowedSortColumns = ['created_at', 'client_name', 'client_code', 'is_active', 'city', 'province', 'email'];
         if (!in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
@@ -37,7 +38,8 @@ class ClientsController extends Controller
         // Validate sort order
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
-        $clients = Client::when($search, function ($query, $search) {
+        $clients = Client::with('clientType')
+            ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('client_code', 'like', "%{$search}%")
                       ->orWhere('client_name', 'like', "%{$search}%")
@@ -48,8 +50,8 @@ class ClientsController extends Controller
                       ->orWhere('province', 'like', "%{$search}%");
                 });
             })
-            ->when($clientType, function ($query, $clientType) {
-                $query->where('client_type', $clientType);
+            ->when($clientTypeId, function ($query, $clientTypeId) {
+                $query->where('client_type_id', $clientTypeId);
             })
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
                 $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
@@ -68,7 +70,7 @@ class ClientsController extends Controller
             ->paginate(10);
 
         // Get unique values for filter options
-        $clientTypes = Client::distinct()->whereNotNull('client_type')->pluck('client_type')->sort()->values();
+        $clientTypes = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $cities = Client::distinct()->whereNotNull('city')->pluck('city')->sort()->values();
         $provinces = Client::distinct()->whereNotNull('province')->pluck('province')->sort()->values();
 
@@ -76,7 +78,7 @@ class ClientsController extends Controller
             'clients' => $clients,
             'search' => $search,
             'filters' => [
-                'client_type' => $clientType,
+                'client_type_id' => $clientTypeId,
                 'is_active' => $isActive,
                 'city' => $city,
                 'province' => $province,
@@ -95,10 +97,9 @@ class ClientsController extends Controller
     {
         $validated = $request->validate([
             'client_name'     => ['required', 'max:255'],
-            'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
+            'client_type_id'  => ['required', 'exists:client_types,id'],
             'contact_person'  => ['required', 'max:255'],
             'email'           => ['required', 'email', 'max:100'],
-            'password'        => ['required', 'string', 'min:8'],
             'phone_number'    => ['nullable', 'max:20'],
             'address'         => ['nullable', 'max:255'],
             'city'            => ['nullable', 'max:100'],
@@ -121,15 +122,11 @@ class ClientsController extends Controller
             unset($validated['payment_terms']);
         }
 
-        // Store plain password before hashing (for email)
-        $plainPassword = $validated['password'] ?? null;
+        // Auto-generate a secure random password
+        $plainPassword = bin2hex(random_bytes(6)); // Generates a 12-character random password
 
-        // Hash password if provided
-        if (!empty($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
-        }
+        // Hash the auto-generated password
+        $validated['password'] = Hash::make($plainPassword);
 
         // Generate unique client code
         do {
@@ -148,9 +145,8 @@ class ClientsController extends Controller
             try {
                 $loginUrl = config('app.client_portal_url', url('/client/login'));
                 
-                // Send email using Resend mailer
-                Mail::mailer('resend')
-                    ->to($client->email)
+                // Send email using Brevo SMTP
+                Mail::to($client->email)
                     ->send(new ClientCredentialsMail($client, $plainPassword, $loginUrl));
             } catch (\Exception $e) {
                 // Re-throw the exception so user knows email failed
@@ -177,7 +173,7 @@ class ClientsController extends Controller
         $validated = $request->validate([
             'client_code'     => ['required', 'max:20', Rule::unique('clients', 'client_code')->ignore($client->id)],
             'client_name'     => ['required', 'max:255'],
-            'client_type'     => ['required', Rule::in(['individual', 'corporation', 'government', 'ngo'])],
+            'client_type_id'  => ['required', 'exists:client_types,id'],
             'contact_person'  => ['required', 'max:255'],
             'email'           => ['required', 'email', 'max:100'],
             'phone_number'    => ['nullable', 'max:20'],
@@ -216,19 +212,24 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return back()->withQueryString()->with('success', 'Client updated successfully.');
+        return redirect()->route('client-management.index')->with('success', 'Client updated successfully.');
     }
 
     public function destroy(Client $client)
     {
         $name = $client->client_name;
 
-        // Example rule: prevent deletion if client has related bookings/invoices
-        // if ($client->bookings()->exists()) {
-        //     return back()->withErrors([
-        //         'message' => 'This client has existing records and cannot be deleted.',
-        //     ]);
-        // }
+        // Prevent deletion if client has active projects
+        $activeProjects = $client->projects()
+            ->whereIn('status', ['active', 'on_hold'])
+            ->count();
+
+        if ($activeProjects > 0) {
+            return redirect()->route('client-management.index')
+                ->withErrors([
+                    'message' => "Cannot delete client '{$name}'. This client has {$activeProjects} active project(s). Please complete or cancel all active projects before deleting the client.",
+                ]);
+        }
 
         $client->delete();
         $this->adminActivityLogs('Client', 'Delete', 'Deleted Client ' . $name);
@@ -241,6 +242,8 @@ class ClientsController extends Controller
             null,
             route('client-management.index')
         );
+
+        return redirect()->route('client-management.index')->with('success', 'Client deleted successfully.');
     }
 
     public function handleStatus(Request $request, Client $client)
@@ -269,7 +272,7 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return back()->withQueryString()->with('success', 'Client status updated successfully.');
+        return redirect()->route('client-management.index')->with('success', 'Client status updated successfully.');
     }
 
     public function resetPassword(Client $client)

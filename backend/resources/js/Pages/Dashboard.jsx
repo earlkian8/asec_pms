@@ -401,8 +401,8 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         </div>
 
         {/* Charts Row 2: Distribution Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Project Status Pie Chart */}
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          Project Status Pie Chart
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <PieChart className="text-gray-600" size={18} />
@@ -437,8 +437,6 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               </div>
             )}
           </div>
-
-          {/* Billing Status Pie Chart */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <DollarSign className="text-gray-600" size={18} />
@@ -473,11 +471,10 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               </div>
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Charts Row 3: Expense Breakdown & Project Types */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Expense Breakdown */}
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <BarChart3 className="text-gray-600" size={18} />
@@ -517,9 +514,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 <p className="text-xs text-gray-400 mt-1">No projects found to display expense breakdown</p>
               </div>
             )}
-          </div>
 
-          {/* Project Type Distribution */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <Activity className="text-gray-600" size={18} />
@@ -549,7 +544,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               </div>
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Recent Projects and Billings */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -736,7 +731,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-gray-200">
-            <div className="flex flex-wrap gap-3">
+            {/* <div className="flex flex-wrap gap-3">
               {Object.entries(statistics.billing.by_status || {}).map(([status, count]) => (
                 <div key={status} className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(status)}`}>
@@ -745,7 +740,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                   <span className="text-sm text-gray-600">{count}</span>
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
             </div>

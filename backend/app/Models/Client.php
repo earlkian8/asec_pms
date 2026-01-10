@@ -14,7 +14,7 @@ class Client extends Authenticatable
     protected $fillable = [
         'client_code',
         'client_name',
-        'client_type',
+        'client_type_id',
         'contact_person',
         'email',
         'password',
@@ -44,6 +44,11 @@ class Client extends Authenticatable
         'password_changed_at' => 'datetime',
         'is_active' => 'boolean',
     ];
+
+    public function clientType()
+    {
+        return $this->belongsTo(ClientType::class, 'client_type_id');
+    }
 
     public function projects()
     {

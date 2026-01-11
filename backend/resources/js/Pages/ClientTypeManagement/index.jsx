@@ -652,30 +652,29 @@ export default function ClientTypesIndex() {
                         <TableCell className="text-left px-4 py-4 text-sm">
                           <div className="flex items-center gap-2">
                             {has('clients.update') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              <button
+
                                 onClick={() => {
                                   setEditClientType(clientType);
                                   setShowEditModal(true);
                                 }}
-                                className="h-8 w-8 p-0 hover:bg-blue-50"
+                                className="p-2 rounded-lg hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-all duration-200 hover:scale-110 border border-indigo-200 hover:border-indigo-300"
+                                title="Edit"
                               >
-                                <SquarePen className="h-4 w-4 text-blue-600" />
-                              </Button>
+                                <SquarePen size={16} />
+                              </button>
                             )}
                             {has('clients.delete') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                              <button
                                 onClick={() => {
                                   setDeleteClientType(clientType);
                                   setShowDeleteModal(true);
                                 }}
-                                className="h-8 w-8 p-0 hover:bg-red-50"
+                                className="p-2 rounded-lg hover:bg-red-100 text-red-600 hover:text-red-700 transition-all duration-200 hover:scale-110 border border-red-200 hover:border-red-300"
+                                title="Delete"
                               >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
+                                <Trash2 size={16} />
+                              </button>
                             )}
                           </div>
                         </TableCell>

@@ -68,6 +68,9 @@ class ProjectMilestonesService
                     if (!$update->relationLoaded('createdBy') && $update->created_by) {
                         $update->load('createdBy');
                     }
+                    // Add created_by_name attribute for JSON serialization
+                    // This ensures the name is available even if the relationship isn't serialized
+                    $update->created_by_name = $update->createdBy ? $update->createdBy->name : null;
                 });
                 
                 // Ensure issues is loaded

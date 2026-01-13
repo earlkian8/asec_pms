@@ -638,13 +638,28 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Pending' },
-      in_progress: { bg: 'bg-primary/10', text: 'text-primary', label: 'In Progress' },
-      completed: { bg: 'bg-primary/10', text: 'text-primary', label: 'Completed' },
+      pending: { 
+        bg: 'bg-amber-50 dark:bg-amber-950/30', 
+        text: 'text-amber-700 dark:text-amber-400', 
+        border: 'border-amber-200 dark:border-amber-800',
+        label: 'Pending' 
+      },
+      in_progress: { 
+        bg: 'bg-blue-50 dark:bg-blue-950/30', 
+        text: 'text-blue-700 dark:text-blue-400', 
+        border: 'border-blue-200 dark:border-blue-800',
+        label: 'In Progress' 
+      },
+      completed: { 
+        bg: 'bg-green-50 dark:bg-green-950/30', 
+        text: 'text-green-700 dark:text-green-400', 
+        border: 'border-green-200 dark:border-green-800',
+        label: 'Completed' 
+      },
     };
     const config = statusConfig[status] || statusConfig.pending;
     return (
-      <span className={`px-3 py-1 rounded-md text-sm font-medium ${config.bg} ${config.text}`}>
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
         {config.label}
       </span>
     );
@@ -652,14 +667,34 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
   const getIssueStatusBadge = (status) => {
     const statusConfig = {
-      open: { bg: 'bg-destructive/10', text: 'text-destructive', label: 'Open' },
-      in_progress: { bg: 'bg-primary/10', text: 'text-primary', label: 'In Progress' },
-      resolved: { bg: 'bg-primary/10', text: 'text-primary', label: 'Resolved' },
-      closed: { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Closed' },
+      open: { 
+        bg: 'bg-red-50 dark:bg-red-950/30', 
+        text: 'text-red-700 dark:text-red-400', 
+        border: 'border-red-200 dark:border-red-800',
+        label: 'Open' 
+      },
+      in_progress: { 
+        bg: 'bg-blue-50 dark:bg-blue-950/30', 
+        text: 'text-blue-700 dark:text-blue-400', 
+        border: 'border-blue-200 dark:border-blue-800',
+        label: 'In Progress' 
+      },
+      resolved: { 
+        bg: 'bg-green-50 dark:bg-green-950/30', 
+        text: 'text-green-700 dark:text-green-400', 
+        border: 'border-green-200 dark:border-green-800',
+        label: 'Resolved' 
+      },
+      closed: { 
+        bg: 'bg-gray-50 dark:bg-gray-950/30', 
+        text: 'text-gray-700 dark:text-gray-400', 
+        border: 'border-gray-200 dark:border-gray-800',
+        label: 'Closed' 
+      },
     };
     const config = statusConfig[status] || statusConfig.open;
     return (
-      <span className={`px-2 py-1 rounded-md text-sm font-medium ${config.bg} ${config.text}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
         {config.label}
       </span>
     );
@@ -667,14 +702,34 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
   const getPriorityBadge = (priority) => {
     const priorityConfig = {
-      low: { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Low' },
-      medium: { bg: 'bg-primary/10', text: 'text-primary', label: 'Medium' },
-      high: { bg: 'bg-destructive/10', text: 'text-destructive', label: 'High' },
-      critical: { bg: 'bg-destructive/10', text: 'text-destructive', label: 'Critical' },
+      low: { 
+        bg: 'bg-gray-50 dark:bg-gray-950/30', 
+        text: 'text-gray-700 dark:text-gray-400', 
+        border: 'border-gray-200 dark:border-gray-800',
+        label: 'Low' 
+      },
+      medium: { 
+        bg: 'bg-amber-50 dark:bg-amber-950/30', 
+        text: 'text-amber-700 dark:text-amber-400', 
+        border: 'border-amber-200 dark:border-amber-800',
+        label: 'Medium' 
+      },
+      high: { 
+        bg: 'bg-orange-50 dark:bg-orange-950/30', 
+        text: 'text-orange-700 dark:text-orange-400', 
+        border: 'border-orange-200 dark:border-orange-800',
+        label: 'High' 
+      },
+      critical: { 
+        bg: 'bg-red-50 dark:bg-red-950/30', 
+        text: 'text-red-700 dark:text-red-400', 
+        border: 'border-red-200 dark:border-red-800',
+        label: 'Critical' 
+      },
     };
     const config = priorityConfig[priority] || priorityConfig.medium;
     return (
-      <span className={`px-2 py-1 rounded-md text-sm font-medium ${config.bg} ${config.text}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
         {config.label}
       </span>
     );
@@ -704,59 +759,85 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[95vw] max-w-[900px] max-h-[95vh] overflow-hidden p-0 bg-background">
+        <DialogContent className="w-[95vw] max-w-[1000px] max-h-[95vh] overflow-hidden p-0 bg-background">
           {/* Header */}
-          <DialogHeader className="px-4 py-3 border-b bg-card">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-2xl font-semibold text-foreground">{currentTask.title}</DialogTitle>
-                {currentTask.description && (
-                  <p className="text-base text-muted-foreground leading-snug line-clamp-1 mt-0.5">{currentTask.description}</p>
-                )}
-                <div className="mt-2">
-                  {getStatusBadge(currentTask.status)}
+          <DialogHeader className="px-6 py-5 border-b border-border bg-card/50 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <DialogTitle className="text-2xl font-bold text-foreground leading-tight mb-2">
+                      {currentTask.title}
+                    </DialogTitle>
+                    {currentTask.description && (
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+                        {currentTask.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex-shrink-0 pt-1">
+                    {getStatusBadge(currentTask.status)}
+                  </div>
                 </div>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="overflow-y-auto max-h-[calc(95vh-80px)]">
-            <div className="p-4 space-y-3">
+          <div className="overflow-y-auto max-h-[calc(95vh-120px)]">
+            <div className="p-6 space-y-6">
               {/* Task Info */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
-                  <Calendar size={18} className="text-muted-foreground flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Due Date</p>
-                    <p className="text-base font-semibold text-foreground truncate">{formatDate(currentTask.due_date)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+                    <Calendar size={20} className="text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                      Due Date
+                    </p>
+                    <p className="text-base font-semibold text-foreground">
+                      {formatDate(currentTask.due_date)}
+                    </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
-                  <User size={18} className="text-muted-foreground flex-shrink-0" />
+                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
+                    <User size={20} className="text-purple-600 dark:text-purple-400" />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                      Assigned To
+                    </p>
                     <p className="text-base font-semibold text-foreground truncate">
                       {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
-                  <Flag size={18} className="text-muted-foreground flex-shrink-0" />
+                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+                    <Flag size={20} className="text-amber-600 dark:text-amber-400" />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Milestone</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                      Milestone
+                    </p>
                     <p className="text-base font-semibold text-foreground truncate">
                       {currentTask.milestone?.name || 'N/A'}
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-3 bg-muted/30 rounded border">
-                  <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</p>
-                    <div>
+                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-50 dark:bg-green-950/30 flex items-center justify-center">
+                    <CheckCircle2 size={20} className="text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                      Status
+                    </p>
+                    <div className="mt-0.5">
                       {getStatusBadge(currentTask.status)}
                     </div>
                   </div>
@@ -764,44 +845,49 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               </div>
 
               {/* Progress Updates Section */}
-              <div>
-                {/* <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold text-foreground">Progress Updates ({progressUpdates.length})</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-6 bg-primary rounded-full"></div>
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">Progress Updates</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {progressUpdates.length} {progressUpdates.length === 1 ? 'update' : 'updates'}
+                      </p>
+                    </div>
                   </div>
                   {has('progress-updates.create') && (
                     <Button
                       onClick={() => setShowAddProgressModal(true)}
-                      size="default"
-                      className="h-10 text-sm px-4"
+                      size="sm"
+                      className="h-9 text-sm px-4"
                     >
                       <Plus size={16} className="mr-2" />
-                      Add
+                      Add Update
                     </Button>
                   )}
-                </div> */}
-                <div className="max-h-[500px] overflow-y-auto">
+                </div>
+                <div className="max-h-[500px] overflow-y-auto pr-1">
                   {progressUpdates.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {progressUpdates.map((update) => (
                         <div 
                           key={update.id} 
-                          className="bg-card border rounded-md hover:border-primary/50 transition-all hover:shadow-sm group"
+                          className="bg-card border border-border rounded-lg hover:border-primary/50 hover:shadow-md transition-all group overflow-hidden"
                         >
                           {/* Header */}
-                          <div className="px-2.5 py-2 border-b bg-muted/20">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-[10px] font-semibold flex-shrink-0">
-                                  {(update.createdBy?.name || update.created_by_name || 'U').charAt(0).toUpperCase()}
+                          <div className="px-4 py-3 border-b border-border bg-muted/30">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <User size={14} className="text-primary" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium text-foreground truncate">
-                                    {update.createdBy?.name || update.created_by_name || 'Unknown'}
+                                  <p className="text-sm font-semibold text-foreground truncate">
+                                    {currentTask.assigned_user?.name || 'Unknown'}
                                   </p>
-                                  <p className="text-xs text-muted-foreground flex items-center gap-0.5">
-                                    <Calendar size={11} />
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                    <Calendar size={12} />
                                     {formatDate(update.created_at)}
                                   </p>
                                 </div>
@@ -814,7 +900,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                     href={getDownloadUrl(update)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Download"
                                   >
                                     <Download size={16} />
@@ -829,7 +915,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       });
                                       setShowEditProgressModal(true);
                                     }}
-                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Edit"
                                   >
                                     <SquarePen size={16} />
@@ -844,7 +930,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       });
                                       setShowDeleteProgressModal(true);
                                     }}
-                                    className="p-2 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     title="Delete"
                                   >
                                     <Trash2 size={16} />
@@ -855,34 +941,34 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                           </div>
                           
                           {/* Content */}
-                          <div className="p-2.5 space-y-2">
+                          <div className="p-4 space-y-3">
                             {/* Description */}
                             {update.description && (
-                              <p className="text-sm text-foreground leading-relaxed line-clamp-3 whitespace-pre-wrap">
+                              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
                                 {update.description}
                               </p>
                             )}
                             
                             {/* File Preview */}
                             {update.file_path && getDownloadUrl(update) && (
-                              <div className="space-y-1.5">
-                                <div className="rounded overflow-hidden border bg-muted/20">
+                              <div className="space-y-2">
+                                <div className="rounded-lg overflow-hidden border border-border bg-muted/20">
                                   {getFilePreview(update)}
                                 </div>
                                 
                                 {/* File download link */}
                                 <a
                                   href={getDownloadUrl(update)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-accent hover:bg-accent/80 text-accent-foreground rounded text-xs font-medium group/link w-full"
+                                  className="inline-flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent/80 text-accent-foreground rounded-md text-xs font-medium group/link w-full transition-colors"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
                                   {getFileIcon(update)}
                                   <span className="truncate flex-1 text-left">{update.original_name || 'Download'}</span>
                                   {update.file_size && (
-                                    <span className="text-muted-foreground text-xs">({formatFileSize(update.file_size)})</span>
+                                    <span className="text-muted-foreground text-xs flex-shrink-0">({formatFileSize(update.file_size)})</span>
                                   )}
-                                  <Download size={12} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                                  <Download size={14} className="opacity-0 group-hover/link:opacity-100 transition-opacity flex-shrink-0" />
                                 </a>
                               </div>
                             )}
@@ -891,12 +977,14 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-6 bg-muted/20 rounded-md border border-dashed">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <FileText className="w-8 h-8 text-muted-foreground" />
+                    <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-border">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                          <FileText className="w-6 h-6 text-muted-foreground" />
+                        </div>
                         <div>
-                          <p className="text-sm font-medium text-foreground">No progress updates</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">Add your first update</p>
+                          <p className="text-sm font-semibold text-foreground">No progress updates</p>
+                          <p className="text-xs text-muted-foreground mt-1">Get started by adding your first update</p>
                         </div>
                       </div>
                     </div>
@@ -905,43 +993,64 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               </div>
 
               {/* Issues Section */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-5 h-5 text-destructive" />
-                  <h3 className="text-lg font-semibold text-foreground">Issues ({issues.length})</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-6 bg-destructive rounded-full"></div>
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">Issues</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {issues.length} {issues.length === 1 ? 'issue' : 'issues'} found
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto pr-1">
                   {issues.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {issues.map((issue) => (
                         <div 
                           key={issue.id} 
-                          className="bg-card border rounded-md hover:border-primary/50 transition-all hover:shadow-sm group"
+                          className="bg-card border border-border rounded-lg hover:border-destructive/50 hover:shadow-md transition-all group overflow-hidden"
                         >
                           {/* Issue Header */}
-                          <div className="px-2.5 py-2 border-b bg-muted/20">
-                            <div className="flex items-start justify-between gap-2">
+                          <div className="px-4 py-3 border-b border-border bg-muted/30">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                                  <h4 className="text-sm font-semibold text-foreground">{issue.title}</h4>
-                                  {getIssueStatusBadge(issue.status)}
-                                  {getPriorityBadge(issue.priority)}
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                                  <div className="flex items-center gap-0.5">
-                                    <User size={11} />
-                                    <span><span className="text-foreground font-medium">{issue.reportedBy?.name || issue.reported_by_name || 'Unknown'}</span></span>
+                                <div className="flex items-start gap-2 mb-2">
+                                  <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <AlertCircle size={14} className="text-destructive" />
                                   </div>
-                                  {issue.assignedTo?.name || issue.assigned_to_name ? (
-                                    <div className="flex items-center gap-0.5">
-                                      <User size={11} />
-                                      <span>→ <span className="text-foreground font-medium">{issue.assignedTo?.name || issue.assigned_to_name}</span></span>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-base font-semibold text-foreground mb-2 leading-tight">
+                                      {issue.title}
+                                    </h4>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {getIssueStatusBadge(issue.status)}
+                                      {getPriorityBadge(issue.priority)}
                                     </div>
-                                  ) : null}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap ml-10">
+                                  {issue.assignedTo?.name || issue.assigned_to_name ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <User size={12} />
+                                      <span className="text-foreground font-medium">
+                                        {issue.assignedTo?.name || issue.assigned_to_name}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5">
+                                      <User size={12} />
+                                      <span className="text-foreground font-medium">
+                                        {currentTask.assigned_user?.name || 'Unassigned'}
+                                      </span>
+                                    </div>
+                                  )}
                                   {issue.due_date && (
-                                    <div className="flex items-center gap-0.5">
-                                      <Calendar size={11} />
-                                      <span>{formatDate(issue.due_date)}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar size={12} />
+                                      <span>Due {formatDate(issue.due_date)}</span>
                                     </div>
                                   )}
                                 </div>
@@ -952,7 +1061,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 {issue.status !== 'resolved' && issue.status !== 'closed' && has('project-issues.update') && (
                                   <button
                                     onClick={() => handleResolveIssue(issue)}
-                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-950/30 text-muted-foreground hover:text-green-600 dark:hover:text-green-400 transition-colors"
                                     title="Resolve"
                                   >
                                     <CheckCircle2 size={16} />
@@ -961,7 +1070,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 {issue.status === 'resolved' && has('project-issues.update') && (
                                   <button
                                     onClick={() => handleResolveIssue(issue)}
-                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Reopen"
                                   >
                                     <XCircle size={16} />
@@ -973,7 +1082,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       setEditIssue({ ...issue, task: currentTask });
                                       setShowEditIssueModal(true);
                                     }}
-                                    className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                                     title="Edit"
                                   >
                                     <SquarePen size={16} />
@@ -985,7 +1094,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                       setDeleteIssue({ ...issue, task: currentTask });
                                       setShowDeleteIssueModal(true);
                                     }}
-                                    className="p-2 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     title="Delete"
                                   >
                                     <Trash2 size={16} />
@@ -996,20 +1105,20 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                           </div>
                           
                           {/* Issue Content */}
-                          <div className="p-2.5">
+                          <div className="px-4 py-3">
                             {issue.description ? (
-                              <p className="text-sm text-foreground leading-relaxed line-clamp-3 whitespace-pre-wrap">
+                              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
                                 {issue.description}
                               </p>
                             ) : (
-                              <p className="text-sm text-muted-foreground italic">No description</p>
+                              <p className="text-sm text-muted-foreground italic">No description provided</p>
                             )}
                             {issue.resolved_at && (
-                              <div className="mt-2 pt-2 border-t bg-muted/20 rounded p-1.5">
-                                <div className="flex items-center gap-1">
-                                  <CheckCircle2 size={13} className="text-primary" />
-                                  <p className="text-xs font-medium text-foreground">
-                                    Resolved: {formatDate(issue.resolved_at)}
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <div className="flex items-center gap-2 px-2 py-1.5 bg-green-50 dark:bg-green-950/30 rounded-md">
+                                  <CheckCircle2 size={14} className="text-green-600 dark:text-green-400 flex-shrink-0" />
+                                  <p className="text-xs font-medium text-green-700 dark:text-green-400">
+                                    Resolved on {formatDate(issue.resolved_at)}
                                   </p>
                                 </div>
                               </div>
@@ -1019,12 +1128,14 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-6 bg-muted/20 rounded-md border border-dashed">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <AlertCircle className="w-8 h-8 text-muted-foreground" />
+                    <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-border">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                          <AlertCircle className="w-6 h-6 text-muted-foreground" />
+                        </div>
                         <div>
-                          <p className="text-sm font-medium text-foreground">No issues</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">All clear!</p>
+                          <p className="text-sm font-semibold text-foreground">No issues found</p>
+                          <p className="text-xs text-muted-foreground mt-1">Everything looks good!</p>
                         </div>
                       </div>
                     </div>

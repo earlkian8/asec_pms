@@ -65,10 +65,6 @@ export default function ClientsIndex() {
   const [showSortCard, setShowSortCard] = useState(false);
   const filterCardRef = useRef(null);
   const sortCardRef = useRef(null);
-  const filterButtonRef = useRef(null);
-  const sortButtonRef = useRef(null);
-  const [filterPosition, setFilterPosition] = useState({ top: 0, right: 0 });
-  const [sortPosition, setSortPosition] = useState({ top: 0, right: 0 });
   
   // Initialize filters from props
   const initializeFilters = (filterProps) => {
@@ -439,8 +435,8 @@ export default function ClientsIndex() {
             </div>
 
             {/* Search + Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between relative z-50">
-              <div className="flex flex-col sm:flex-row gap-3 items-center flex-1 relative z-50">
+            <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-3 items-center flex-1">
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
@@ -450,23 +446,15 @@ export default function ClientsIndex() {
                     className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
                   />
                 </div>
-                <div className="flex gap-2 relative z-50">
-                  <div className="relative z-50">
+                <div className="flex gap-2">
+                  <div className="relative">
                     <Button
-                      ref={filterButtonRef}
                       onClick={() => {
-                        if (filterButtonRef.current) {
-                          const rect = filterButtonRef.current.getBoundingClientRect();
-                          setFilterPosition({
-                            top: rect.bottom + window.scrollY + 8,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }
                         setShowFilterCard(!showFilterCard);
                         setShowSortCard(false);
                       }}
                       variant="outline"
-                      className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative z-50 ${
+                      className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center ${
                         activeFiltersCount() > 0
                           ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
                           : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
@@ -475,7 +463,7 @@ export default function ClientsIndex() {
                     >
                       <Filter className="h-4 w-4" />
                       {activeFiltersCount() > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center z-50">
+                        <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
                           {activeFiltersCount()}
                         </span>
                       )}
@@ -485,11 +473,7 @@ export default function ClientsIndex() {
                     {showFilterCard && (
                       <div 
                         ref={filterCardRef} 
-                        className="fixed w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[500px]"
-                        style={{
-                          top: `${filterPosition.top}px`,
-                          right: `${filterPosition.right}px`,
-                        }}
+                        className="absolute top-full right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-50 overflow-hidden flex flex-col max-h-[500px]"
                       >
                         <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">
@@ -631,22 +615,14 @@ export default function ClientsIndex() {
                   </div>
 
                   {/* Sort Button */}
-                  <div className="relative z-50">
+                  <div className="relative">
                     <Button
-                      ref={sortButtonRef}
                       onClick={() => {
-                        if (sortButtonRef.current) {
-                          const rect = sortButtonRef.current.getBoundingClientRect();
-                          setSortPosition({
-                            top: rect.bottom + window.scrollY + 8,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }
                         setShowSortCard(!showSortCard);
                         setShowFilterCard(false);
                       }}
                       variant="outline"
-                      className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative z-50"
+                      className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                       title="Sort"
                     >
                       <ArrowUpDown className="h-4 w-4" />
@@ -656,11 +632,7 @@ export default function ClientsIndex() {
                     {showSortCard && (
                       <div 
                         ref={sortCardRef} 
-                        className="fixed w-80 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[300px]"
-                        style={{
-                          top: `${sortPosition.top}px`,
-                          right: `${sortPosition.right}px`,
-                        }}
+                        className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-50 overflow-hidden flex flex-col max-h-[300px]"
                       >
                         <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">

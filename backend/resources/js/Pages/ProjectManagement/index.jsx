@@ -52,7 +52,7 @@ export default function ProjectsIndex() {
   const filters = usePage().props.filters || {};
   const filterOptions = usePage().props.filterOptions || {};
   const initialSearch = usePage().props.search || '';
-
+  const clientTypes = usePage().props.clientTypes || [];
   // States
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -388,6 +388,7 @@ export default function ProjectsIndex() {
           users={users}
           inventoryItems={inventoryItems}
           projectTypes={projectTypes}
+          clientTypes={clientTypes}
         />
       )}
       {showEditModal && (

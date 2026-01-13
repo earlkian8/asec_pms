@@ -143,7 +143,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
           <div>
             <Label className="text-zinc-800">Client Type <span className="text-red-500">*</span></Label>
             <Select
-                value={data.client_type_id ? String(data.client_type_id) : ''}
+                value={data.client_type_id ? String(data.client_type_id) : undefined}
                 onValueChange={(value) => {
                   setData("client_type_id", value);
                   if (validationErrors.client_type_id) {
@@ -166,7 +166,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="" disabled>No client types available</SelectItem>
+                  <div className="px-2 py-1.5 text-sm text-gray-500">No client types available</div>
                 )}
                 </SelectContent>
             </Select>

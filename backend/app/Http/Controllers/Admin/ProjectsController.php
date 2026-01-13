@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientType;
 use App\Models\Project;
 use App\Models\ProjectType;
 use App\Models\ProjectTask;
@@ -111,13 +112,22 @@ class ProjectsController extends Controller
             })
             ->paginate(10);
 
-        // Calculate progress for each project based on milestones
+        // Calculate progress for each project based on all tasks of milestones
         $projects->getCollection()->transform(function ($project) {
             $milestones = $project->milestones;
-            $totalMilestones = $milestones->count();
-            $completedMilestones = $milestones->where('status', 'completed')->count();
-            $project->progress_percentage = $totalMilestones > 0 
-                ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+            $allTasks = collect();
+            
+            // Collect all tasks from all milestones
+            foreach ($milestones as $milestone) {
+                if ($milestone->tasks) {
+                    $allTasks = $allTasks->merge($milestone->tasks);
+                }
+            }
+            
+            $totalTasks = $allTasks->count();
+            $completedTasks = $allTasks->where('status', 'completed')->count();
+            $project->progress_percentage = $totalTasks > 0 
+                ? round(($completedTasks / $totalTasks) * 100, 2) 
                 : 0;
             return $project;
         });
@@ -160,6 +170,10 @@ class ProjectsController extends Controller
 
         // Get project types from database
         $projectTypes = ProjectType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        
+        // Get client types for AddClient modal
+        $clientTypes = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        
         $statuses = Project::distinct()->whereNotNull('status')->pluck('status')->sort()->values();
         $priorities = Project::distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
 
@@ -170,6 +184,7 @@ class ProjectsController extends Controller
             'users'      => $allAssignables, // Combined users and employees
             'inventoryItems' => $inventoryItems,
             'projectTypes' => $projectTypes,
+            'clientTypes' => $clientTypes,
             'filters' => [
                 'client_id' => $clientId,
                 'status' => $status,

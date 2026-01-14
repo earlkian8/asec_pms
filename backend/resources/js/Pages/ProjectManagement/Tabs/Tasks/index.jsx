@@ -60,6 +60,29 @@ console.log('taskData:', taskData);
 
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
+  const getStatusLabel = (status) => {
+    if (!status) return '---';
+    const statusMap = {
+      'pending': 'Pending',
+      'in_progress': 'In Progress',
+      'completed': 'Completed',
+    };
+    return statusMap[status] || status;
+  };
+
+  const getStatusSelectClassName = (status) => {
+    if (!status) return 'w-[140px] h-8 text-sm border-0 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded';
+    
+    const baseClass = 'w-[140px] h-8 text-sm border-0 rounded font-medium';
+    const statusMap = {
+      'pending': `${baseClass} bg-amber-100 text-amber-700 hover:bg-amber-200`,
+      'in_progress': `${baseClass} bg-blue-100 text-blue-700 hover:bg-blue-200`,
+      'completed': `${baseClass} bg-green-100 text-green-700 hover:bg-green-200`,
+    };
+    
+    return statusMap[status] || `${baseClass} bg-gray-100 text-gray-700 hover:bg-gray-200`;
+  };
+
   // Helper function to get progress updates count from a task
   const getProgressUpdatesCount = (task) => {
     const rawProgressUpdates = task.progressUpdates || task.progress_updates;
@@ -162,8 +185,10 @@ console.log('taskData:', taskData);
                       value={task.status}
                       onValueChange={(value) => handleStatusChange(task, value)}
                     >
-                      <SelectTrigger className="w-[140px] h-8 text-sm">
-                        <SelectValue />
+                      <SelectTrigger className={getStatusSelectClassName(task.status)}>
+                        <SelectValue>
+                          {getStatusLabel(task.status)}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>

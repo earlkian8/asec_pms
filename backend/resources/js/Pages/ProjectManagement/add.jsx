@@ -17,7 +17,7 @@ import Step3Milestones from "./wizard-steps/Step3Milestones";
 import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
-const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems, projectTypes }) => {
+const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems, projectTypes, clientTypes }) => {
   const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep, goToStep, projectData } = useProjectWizard();
   const [processing, setProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -121,7 +121,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems, pro
     const errors = formErrors;
     switch (currentStep) {
       case 1:
-        return <Step1ProjectInfo clients={clients} projectTypes={projectTypes} errors={errors} />;
+        return <Step1ProjectInfo clients={clients} projectTypes={projectTypes} clientTypes={clientTypes} errors={errors} />;
       case 2:
         return <Step2TeamMembers users={users} errors={errors} />;
       case 3:
@@ -246,7 +246,7 @@ const AddProjectWizard = ({ setShowAddModal, clients, users, inventoryItems, pro
   );
 };
 
-const AddProject = ({ setShowAddModal, clients, users, inventoryItems, projectTypes }) => {
+const AddProject = ({ setShowAddModal, clients, users, inventoryItems, projectTypes, clientTypes }) => {
   return (
     <ProjectWizardProvider>
       <AddProjectWizard
@@ -255,6 +255,7 @@ const AddProject = ({ setShowAddModal, clients, users, inventoryItems, projectTy
         users={users}
         inventoryItems={inventoryItems}
         projectTypes={projectTypes}
+        clientTypes={clientTypes}
       />
     </ProjectWizardProvider>
   );

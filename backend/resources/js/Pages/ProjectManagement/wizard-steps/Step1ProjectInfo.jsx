@@ -12,7 +12,7 @@ import AddClient from "../../ClientManagement/add";
 import AddProjectType from "../../ProjectTypeManagement/add";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
 
-export default function Step1ProjectInfo({ clients, projectTypes = [], errors = {} }) {
+export default function Step1ProjectInfo({ clients, projectTypes = [], clientTypes = [], errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
   const [showAddClient, setShowAddClient] = useState(false);
   const [showAddProjectType, setShowAddProjectType] = useState(false);
@@ -42,7 +42,10 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], errors = 
   return (
     <>
       {showAddClient && (
-        <AddClient setShowAddModal={setShowAddClient} />
+        <AddClient 
+          setShowAddModal={setShowAddClient} 
+          clientTypes={clientTypes}
+        />
       )}
       {showAddProjectType && (
         <AddProjectType 

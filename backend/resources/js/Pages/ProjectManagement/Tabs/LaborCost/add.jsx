@@ -30,6 +30,16 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
 
   const [selectedMember, setSelectedMember] = useState(null);
 
+  const handleHoursSuggestion = (period) => {
+    // Standard full-time work hours
+    const hoursMap = {
+      weekly: 40,
+      'bi-weekly': 80,
+      monthly: 160
+    };
+    setData("hours_worked", hoursMap[period].toString());
+  };
+
   const handleMemberChange = (compositeValue) => {
     // Parse composite value: "type-id"
     const [type, id] = compositeValue.split('-');
@@ -156,6 +166,35 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             <p className="text-xs text-gray-500 mt-1">
               Enter the actual hours worked for this work date
             </p>
+            <div className="flex gap-2 mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleHoursSuggestion('weekly')}
+                className="text-xs border-zinc-300 hover:bg-zinc-100 transition-all duration-200"
+              >
+                Weekly (40h)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleHoursSuggestion('bi-weekly')}
+                className="text-xs border-zinc-300 hover:bg-zinc-100 transition-all duration-200"
+              >
+                Bi-weekly (80h)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleHoursSuggestion('monthly')}
+                className="text-xs border-zinc-300 hover:bg-zinc-100 transition-all duration-200"
+              >
+                Monthly (160h)
+              </Button>
+            </div>
             <InputError message={errors.hours_worked} />
           </div>
 

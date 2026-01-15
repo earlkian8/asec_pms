@@ -152,28 +152,27 @@ class ClientBillingController extends Controller
             ], 400);
         }
 
+        // Validate that client has required billing information for PayMongo
+        if (!$client->email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email is required for payment processing. Please update your profile with a valid email address.',
+            ], 400);
+        }
+
         $validated = $request->validate([
             'amount' => ['nullable', 'numeric', 'min:0.01'],
-            'payment_method_type' => ['nullable', 'in:gcash'],
+            'payment_method_type' => ['nullable', 'in:card'],
         ]);
 
         $amount = $validated['amount'] ?? $billing->remaining_amount;
-        $paymentMethodType = $validated['payment_method_type'] ?? 'gcash';
+        $paymentMethodType = $validated['payment_method_type'] ?? 'card';
 
         // Validate amount doesn't exceed remaining
         if ($amount > $billing->remaining_amount) {
             return response()->json([
                 'success' => false,
                 'message' => 'Payment amount cannot exceed remaining amount',
-            ], 400);
-        }
-
-        // GCash maximum amount is 100,000 PHP per transaction
-        $maxGcashAmount = 100000.00;
-        if ($paymentMethodType === 'gcash' && $amount > $maxGcashAmount) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment amount cannot exceed GCash maximum limit of ₱' . number_format($maxGcashAmount, 2) . '. Please split your payment into multiple transactions or contact support for assistance.',
             ], 400);
         }
 
@@ -195,38 +194,29 @@ class ClientBillingController extends Controller
                 ],
             ]);
 
-            // Create PayMongo source for GCash payment
-            // Build redirect URLs - these will redirect back to the app
-            $baseUrl = config('app.url', 'http://localhost');
-            $successUrl = rtrim($baseUrl, '/') . '/api/client/payment/success?payment_code=' . urlencode($payment->payment_code) . '&source_id={source_id}';
-            $failedUrl = rtrim($baseUrl, '/') . '/api/client/payment/failed?payment_code=' . urlencode($payment->payment_code) . '&source_id={source_id}';
-            
-            $payMongoResult = $this->payMongoService->createSource(
+            // Create PayMongo Payment Intent for card payment
+            $payMongoResult = $this->payMongoService->createPaymentIntent(
                 (float)$amount,
                 'PHP',
-                'gcash',
                 [
                     'billing_id' => $billing->id,
                     'billing_code' => $billing->billing_code,
                     'payment_code' => $payment->payment_code,
                     'client_id' => $client->id,
-                ],
-                $successUrl,
-                $failedUrl
+                ]
             );
 
             if (!$payMongoResult['success']) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to create payment source: ' . ($payMongoResult['error'] ?? 'Unknown error'),
+                    'message' => 'Failed to create payment intent: ' . ($payMongoResult['error'] ?? 'Unknown error'),
                 ], 500);
             }
 
-            $payment->paymongo_source_id = $payMongoResult['source_id'];
-            $checkoutUrl = $payMongoResult['checkout_url'] ?? null;
+            $payment->paymongo_payment_intent_id = $payMongoResult['payment_intent_id'];
             $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
-                'checkout_url' => $checkoutUrl,
+                'client_key' => $payMongoResult['client_key'] ?? null,
             ]);
 
             $payment->save();
@@ -242,9 +232,6 @@ class ClientBillingController extends Controller
                 null
             );
 
-            // Get checkout URL from PayMongo result (for GCash source)
-            $checkoutUrl = $payMongoResult['checkout_url'] ?? null;
-
             return response()->json([
                 'success' => true,
                 'message' => 'Payment initiated successfully',
@@ -253,9 +240,7 @@ class ClientBillingController extends Controller
                     'payment_code' => $payment->payment_code,
                     'amount' => $amount,
                     'payment_intent_id' => $payment->paymongo_payment_intent_id,
-                    'source_id' => $payment->paymongo_source_id,
-                    'checkout_url' => $checkoutUrl,
-                    'client_key' => $payment->paymongo_metadata['client_key'] ?? null,
+                    'client_key' => $payMongoResult['client_key'] ?? null,
                     'public_key' => $this->payMongoService->getPublicKey(),
                     'payment_method_type' => $paymentMethodType,
                 ],
@@ -272,6 +257,192 @@ class ClientBillingController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while initiating payment',
+            ], 500);
+        }
+    }
+
+    /**
+     * Create a payment method with card details
+     */
+    public function createPaymentMethod(Request $request, $id)
+    {
+        // Validate ID is numeric to prevent route conflicts
+        if (!is_numeric($id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid billing ID',
+            ], 400);
+        }
+
+        $client = $request->user();
+
+        $billing = Billing::with('project')->findOrFail($id);
+
+        // Verify billing belongs to client
+        if ($billing->project->client_id !== $client->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to this billing',
+            ], 403);
+        }
+
+        // Validate that client has required billing information
+        if (!$client->email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email is required for payment processing. Please update your profile with a valid email address.',
+            ], 400);
+        }
+
+        // Validate card details
+        $validated = $request->validate([
+            'card_number' => ['required', 'string', 'regex:/^[0-9\s-]{13,19}$/'],
+            'exp_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'exp_year' => ['required', 'integer', 'min:2024', 'max:2100'],
+            'cvc' => ['required', 'string', 'regex:/^[0-9]{3,4}$/'],
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'max:20'],
+        ]);
+
+        try {
+            // Format phone number for PayMongo (ensure it starts with + if international format)
+            $phone = $validated['phone'];
+            // Remove any spaces, dashes, or parentheses
+            $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
+            // Add + prefix if it doesn't start with + and is a valid number
+            if ($phone && !str_starts_with($phone, '+')) {
+                // If it starts with 0, replace with country code +63 for Philippines
+                if (str_starts_with($phone, '0')) {
+                    $phone = '+63' . substr($phone, 1);
+                } elseif (str_starts_with($phone, '63')) {
+                    $phone = '+' . $phone;
+                } elseif (strlen($phone) >= 10) {
+                    // Assume Philippines number if no country code
+                    $phone = '+63' . $phone;
+                }
+            }
+
+            // Prepare card details
+            $cardDetails = [
+                'card_number' => $validated['card_number'],
+                'exp_month' => $validated['exp_month'],
+                'exp_year' => $validated['exp_year'],
+                'cvc' => $validated['cvc'],
+            ];
+
+            // Prepare billing details - use name from form input and authenticated user's email
+            $billingDetails = [
+                'name' => $validated['name'],
+                'email' => $client->email,
+                'phone' => $phone,
+            ];
+
+            // Create payment method using PayMongo service
+            $result = $this->payMongoService->createPaymentMethod($cardDetails, $billingDetails);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['error'] ?? 'Failed to create payment method',
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'payment_method_id' => $result['payment_method_id'],
+                    'payment_method' => $result['data'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Payment Method Creation Failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'billing_id' => $billing->id,
+                'client_id' => $client->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while creating payment method',
+            ], 500);
+        }
+    }
+
+    /**
+     * Confirm payment intent (REQUIRED for live keys)
+     */
+    public function confirmPaymentIntent(Request $request, $id)
+    {
+        // Validate ID is numeric to prevent route conflicts
+        if (!is_numeric($id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid billing ID',
+            ], 400);
+        }
+
+        $client = $request->user();
+
+        $billing = Billing::with('project')->findOrFail($id);
+
+        // Verify billing belongs to client
+        if ($billing->project->client_id !== $client->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to this billing',
+            ], 403);
+        }
+
+        // Get payment intent ID from request or from billing payment
+        $validated = $request->validate([
+            'payment_intent_id' => ['required', 'string'],
+            'return_url' => ['nullable', 'url'],
+        ]);
+
+        $paymentIntentId = $validated['payment_intent_id'];
+        $returnUrl = $validated['return_url'] ?? null;
+
+        // If return_url not provided, use configured return URL
+        if (!$returnUrl) {
+            $returnUrl = config('services.paymongo.return_url');
+            if (!$returnUrl) {
+                // Fallback to app URL if not configured
+                $returnUrl = rtrim(config('app.url'), '/') . '/api/client/payment/return';
+            }
+        }
+
+        try {
+            // Confirm payment intent using PayMongo service
+            $result = $this->payMongoService->confirmPaymentIntent($paymentIntentId, $returnUrl);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['error'] ?? 'Failed to confirm payment intent',
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'payment_intent' => $result['data'],
+                    'status' => $result['status'],
+                    'next_action' => $result['next_action'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Payment Intent Confirmation Failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'billing_id' => $billing->id,
+                'client_id' => $client->id,
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while confirming payment intent',
             ], 500);
         }
     }
@@ -325,7 +496,7 @@ class ClientBillingController extends Controller
             if ($payMongoResult['success']) {
                 $payMongoStatus = $payMongoResult['status'];
                 
-                // Update payment status based on PayMongo status
+                // Update payment status based on PayMongo Payment Intent status
                 if ($payMongoStatus === 'succeeded') {
                     $payment->payment_status = 'paid';
                     $payment->save();
@@ -342,12 +513,17 @@ class ClientBillingController extends Controller
                         $billing->project,
                         null
                     );
-                } elseif (in_array($payMongoStatus, ['failed', 'cancelled'])) {
-                    $payment->payment_status = $payMongoStatus;
+                } elseif (in_array($payMongoStatus, ['failed', 'cancel'])) {
+                    $payment->payment_status = $payMongoStatus === 'cancel' ? 'cancelled' : 'failed';
+                    $payment->save();
+                } elseif (in_array($payMongoStatus, ['awaiting_payment_method', 'awaiting_next_action', 'processing'])) {
+                    // Keep as pending for these intermediate states
+                    $payment->payment_status = 'pending';
                     $payment->save();
                 }
             }
         } elseif ($payment->paymongo_source_id) {
+            // Legacy GCash source-based payments (for backward compatibility)
             // Check source status for GCash payments
             $sourceResult = $this->payMongoService->getSource($payment->paymongo_source_id);
             

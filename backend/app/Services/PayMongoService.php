@@ -71,8 +71,11 @@ class PayMongoService
                         'currency' => $currency,
                         'payment_method_allowed' => [
                             'card',
-                            'paymaya',
-                            'gcash',
+                        ],
+                        'payment_method_options' => [
+                            'card' => [
+                                'request_three_d_secure' => 'automatic',
+                            ],
                         ],
                         'metadata' => $this->flattenMetadata($metadata),
                     ],
@@ -155,6 +158,77 @@ class PayMongoService
     }
 
     /**
+     * Create a payment method with card details
+     * Matches the structure from the working PHP example
+     */
+    public function createPaymentMethod(array $cardDetails, array $billingDetails)
+    {
+        try {
+            // Clean card number (remove spaces and dashes)
+            $cardNumber = preg_replace('/[\s\-]/', '', $cardDetails['card_number'] ?? '');
+
+            $response = $this->request('POST', 'payment_methods', [
+                'data' => [
+                    'attributes' => [
+                        'type' => 'card',
+                        'details' => [
+                            'card_number' => $cardNumber,
+                            'exp_month' => (int)($cardDetails['exp_month'] ?? 0),
+                            'exp_year' => (int)($cardDetails['exp_year'] ?? 0),
+                            'cvc' => $cardDetails['cvc'] ?? '',
+                        ],
+                        'billing' => [
+                            'name' => $billingDetails['name'] ?? '',
+                            'email' => $billingDetails['email'] ?? '',
+                            'phone' => $billingDetails['phone'] ?? null,
+                        ],
+                    ],
+                ],
+            ]);
+
+            if (isset($response['data'])) {
+                return [
+                    'success' => true,
+                    'payment_method_id' => $response['data']['id'],
+                    'data' => $response['data'],
+                ];
+            }
+
+            $errorMessage = $response['errors'][0]['detail'] ?? ($response['errors'][0]['title'] ?? 'Unknown error');
+            Log::error('PayMongo Payment Method Creation Failed', [
+                'error' => $errorMessage,
+                'response' => $response,
+                'card_details' => [
+                    'card_number_length' => strlen($cardNumber),
+                    'exp_month' => $cardDetails['exp_month'] ?? null,
+                    'exp_year' => $cardDetails['exp_year'] ?? null,
+                    'has_cvc' => !empty($cardDetails['cvc']),
+                ],
+                'billing_details' => [
+                    'has_name' => !empty($billingDetails['name']),
+                    'has_email' => !empty($billingDetails['email']),
+                    'has_phone' => !empty($billingDetails['phone']),
+                ],
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PayMongo Service Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'An unexpected error occurred while creating payment method',
+            ];
+        }
+    }
+
+    /**
      * Attach payment method to payment intent
      */
     public function attachPaymentMethod(string $paymentIntentId, string $paymentMethodId)
@@ -198,6 +272,63 @@ class PayMongoService
             return [
                 'success' => false,
                 'error' => 'An unexpected error occurred while attaching payment method',
+            ];
+        }
+    }
+
+    /**
+     * Confirm payment intent (REQUIRED for live keys)
+     * This must be called after attaching a payment method
+     */
+    public function confirmPaymentIntent(string $paymentIntentId, ?string $returnUrl = null)
+    {
+        try {
+            $attributes = [];
+            
+            // Include return_url if provided (required for 3D Secure flows)
+            if ($returnUrl) {
+                $attributes['return_url'] = $returnUrl;
+            }
+
+            $requestData = [
+                'data' => [
+                    'attributes' => $attributes,
+                ],
+            ];
+
+            $response = $this->request('POST', "payment_intents/{$paymentIntentId}/confirm", $requestData);
+
+            if (isset($response['data'])) {
+                return [
+                    'success' => true,
+                    'data' => $response['data'],
+                    'status' => $response['data']['attributes']['status'] ?? 'unknown',
+                    'next_action' => $response['data']['attributes']['next_action'] ?? null,
+                ];
+            }
+
+            $errorMessage = $response['errors'][0]['detail'] ?? 'Unknown error';
+            Log::error('PayMongo Payment Intent Confirmation Failed', [
+                'error' => $errorMessage,
+                'response' => $response,
+                'payment_intent_id' => $paymentIntentId,
+                'return_url' => $returnUrl,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PayMongo Service Error', [
+                'error' => $e->getMessage(),
+                'payment_intent_id' => $paymentIntentId,
+                'return_url' => $returnUrl,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'An unexpected error occurred while confirming payment intent',
             ];
         }
     }

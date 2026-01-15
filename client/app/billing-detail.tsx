@@ -11,10 +11,13 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService } from '@/services/api';
+import { paymongoClient } from '@/services/paymongoClient';
 import { Billing } from '@/hooks/useBillings';
+import CardPaymentForm from '@/components/CardPaymentForm';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -26,9 +29,8 @@ import {
   AlertCircle,
   Receipt,
 } from 'lucide-react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { useDialog } from '@/contexts/DialogContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const AppColors = {
   primary: '#3B82F6',
@@ -47,16 +49,21 @@ export default function BillingDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { user } = useAuth();
 
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'gcash'>('gcash');
+  const [show3DSecureModal, setShow3DSecureModal] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'checking'>('idle');
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'checking' | 'processing_card'>('idle');
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [clientKey, setClientKey] = useState<string | null>(null);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [threeDSecureUrl, setThreeDSecureUrl] = useState<string | null>(null);
+  const [cardFormError, setCardFormError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBilling();
@@ -73,44 +80,26 @@ export default function BillingDetailScreen() {
     }
   }, [paymentStatus, id]);
 
-  // Listen for deep links when app comes back from payment
   useEffect(() => {
-    const subscription = Linking.addEventListener('url', async (event) => {
-      const { url } = event;
-      console.log('Deep link received:', url);
-      
-      if (url.includes('payment/success') || url.includes('payment/failed')) {
-        // Close browser if still open
-        try {
-          await WebBrowser.dismissBrowser();
-        } catch (e) {
-          // Browser might already be closed
-        }
-        
-        setPaymentStatus('checking');
-        
-        // Wait a moment for backend to process, then check status
-        setTimeout(async () => {
-          await checkPaymentStatus();
-        }, 2000);
-      }
-    });
-
-    // Also check for initial URL if app was opened via deep link
-    Linking.getInitialURL().then((url) => {
-      if (url && (url.includes('payment/success') || url.includes('payment/failed'))) {
-        console.log('Initial deep link:', url);
-        setPaymentStatus('checking');
-        setTimeout(async () => {
-          await checkPaymentStatus();
-        }, 2000);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [id]);
+    // Reset all payment state when modal closes
+    if (!showPaymentModal) {
+      console.log('Modal closed, resetting payment state');
+      setPaymentIntentId(null);
+      setClientKey(null);
+      setPublicKey(null);
+      setCardFormError(null);
+      setCustomAmount('');
+      setPaymentStatus('idle');
+      setProcessing(false);
+      setThreeDSecureUrl(null);
+    } else {
+      console.log('Modal opened, current state:', {
+        paymentIntentId,
+        paymentStatus,
+        processing,
+      });
+    }
+  }, [showPaymentModal]);
 
   const fetchBilling = async () => {
     try {
@@ -158,82 +147,328 @@ export default function BillingDetailScreen() {
     }
   };
 
-  const handlePay = async () => {
-    if (!billing) return;
+  const handleInitiatePayment = async () => {
+    console.log('handleInitiatePayment called');
+    
+    if (!billing) {
+      console.error('Billing is null, cannot initiate payment');
+      dialog.showError('Billing information not available. Please refresh the page.');
+      return;
+    }
 
     const amount = customAmount ? parseFloat(customAmount) : billing.remaining_amount;
+    console.log('Payment amount:', amount);
 
     if (isNaN(amount) || amount <= 0) {
+      console.error('Invalid amount:', amount);
       dialog.showError('Please enter a valid amount');
       return;
     }
 
     if (amount > billing.remaining_amount) {
+      console.error('Amount exceeds remaining:', amount, '>', billing.remaining_amount);
       dialog.showError(`Amount cannot exceed remaining amount of ${formatCurrency(billing.remaining_amount)}`);
       return;
     }
 
     setProcessing(true);
+    setCardFormError(null);
 
     try {
+      console.log('Creating payment intent for billing:', id, 'amount:', amount);
+      
+      // Step 1: Create Payment Intent on backend
       const response = await apiService.initiatePayment(Number(id), {
         amount,
-        payment_method_type: paymentMethod,
+        payment_method_type: 'card',
       });
 
+      console.log('Payment intent response:', response);
+
       if (response.success && response.data) {
-        const { checkout_url, source_id, client_key, public_key, payment_method_type } = response.data;
+        const { payment_intent_id, client_key, public_key } = response.data;
 
-        // For GCash, we should have a checkout_url
-        if (payment_method_type === 'gcash') {
-          if (checkout_url) {
-            // Open checkout URL in browser
-            setCheckoutUrl(checkout_url);
-            setPaymentStatus('pending');
-            setShowPaymentModal(true); // Keep modal open to show pending status
-            
-            try {
-              // Use openBrowserAsync with proper configuration
-              const result = await WebBrowser.openBrowserAsync(checkout_url, {
-                showTitle: true,
-                enableBarCollapsing: false,
-                presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                createTask: false, // Keep in same task for better redirect handling
-              });
+        console.log('Payment intent created:', {
+          payment_intent_id,
+          has_client_key: !!client_key,
+          has_public_key: !!public_key,
+        });
 
-              // After browser closes, check if user completed payment
-              // The deep link listener will handle the redirect back to app
-              // But we also check here in case the deep link didn't fire
-              if (result.type === 'dismiss') {
-                // User dismissed browser, check payment status
-                setPaymentStatus('checking');
-                setTimeout(async () => {
-                  await checkPaymentStatus();
-                }, 2000);
-              }
-              
-            } catch (browserError) {
-              console.error('Error opening browser:', browserError);
-              dialog.showError('Failed to open payment page. Please try again.');
-              setPaymentStatus('idle');
-              setShowPaymentModal(false);
-            }
-          } else {
-            dialog.showError('Failed to get checkout URL from PayMongo. Please try again.');
-            setPaymentStatus('idle');
-          }
-        } else {
-          dialog.showError('Invalid payment method or missing checkout URL');
-          setPaymentStatus('idle');
+        if (!payment_intent_id || !client_key || !public_key) {
+          console.error('Missing payment intent data:', {
+            payment_intent_id,
+            client_key,
+            public_key,
+          });
+          dialog.showError('Failed to initialize payment. Missing required payment information. Please try again.');
+          setProcessing(false);
+          return;
         }
-      } else {
-        dialog.showError(response.message || 'Failed to initiate payment');
+
+        // Store payment intent details
+        setPaymentIntentId(payment_intent_id);
+        setClientKey(client_key);
+        setPublicKey(public_key);
+        paymongoClient.setPublicKey(public_key);
+
+        console.log('Payment intent initialized successfully, showing card form');
+        
+        // Payment form will be shown in modal, user will enter card details
         setPaymentStatus('idle');
+        setProcessing(false);
+      } else {
+        const errorMessage = response.message || 'Failed to initiate payment';
+        console.error('Payment intent creation failed:', errorMessage, response);
+        dialog.showError(errorMessage);
+        setProcessing(false);
       }
     } catch (err) {
-      dialog.showError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      console.error('Error in handleInitiatePayment:', err);
+      dialog.showError(`Payment initialization failed: ${errorMessage}. Please try again.`);
       setProcessing(false);
+    }
+  };
+
+  const handleCardSubmit = async (cardData: {
+    cardNumber: string;
+    expMonth: number;
+    expYear: number;
+    cvc: string;
+    cardholderName: string;
+    name: string;
+    phone: string;
+  }) => {
+    console.log('handleCardSubmit called');
+    console.log('Card data received (masked):', {
+      cardNumber: `${cardData.cardNumber.slice(0, 4)}****${cardData.cardNumber.slice(-4)}`,
+      expMonth: cardData.expMonth,
+      expYear: cardData.expYear,
+      cvc: '***',
+      cardholderName: cardData.cardholderName,
+    });
+
+    if (!billing || !paymentIntentId || !clientKey || !publicKey) {
+      console.error('handleCardSubmit: Missing required data:', {
+        hasBilling: !!billing,
+        paymentIntentId,
+        clientKey,
+        publicKey,
+      });
+      dialog.showError('Payment not initialized. Please try again.');
+      return;
+    }
+
+    console.log('handleCardSubmit: All required data present, proceeding with payment');
+    setProcessing(true);
+    setCardFormError(null);
+
+    try {
+      // Step 2: Create Payment Method via Backend API
+      console.log('Step 2: Creating payment method via backend...');
+      
+      if (!billing?.id) {
+        console.error('Billing ID not available');
+        setCardFormError('Billing information is missing. Please refresh and try again.');
+        setProcessing(false);
+        return;
+      }
+
+      const paymentMethodResult = await apiService.createPaymentMethod(
+        billing.id,
+        {
+          cardNumber: cardData.cardNumber,
+          expMonth: cardData.expMonth,
+          expYear: cardData.expYear,
+          cvc: cardData.cvc,
+          cardholderName: cardData.cardholderName,
+          name: cardData.name,
+          phone: cardData.phone,
+        }
+      );
+
+      console.log('Payment method creation result:', {
+        success: paymentMethodResult.success,
+        hasData: !!paymentMethodResult.data,
+        error: paymentMethodResult.message,
+        paymentMethodId: paymentMethodResult.data?.payment_method_id,
+      });
+
+      if (!paymentMethodResult.success || !paymentMethodResult.data?.payment_method_id) {
+        const errorMsg = paymentMethodResult.message || 'Failed to process card details';
+        console.error('Payment method creation failed:', errorMsg);
+        setCardFormError(errorMsg);
+        setProcessing(false);
+        return;
+      }
+
+      const paymentMethodId = paymentMethodResult.data.payment_method_id;
+      console.log('Payment method created successfully:', paymentMethodId);
+
+      // Step 3: Attach Payment Method to Payment Intent
+      console.log('Step 3: Attaching payment method to payment intent...');
+      
+      // Generate return URL for 3D Secure redirect
+      // PayMongo requires HTTPS public URL for live keys (not localhost or local IP)
+      // Use environment variable for public HTTPS URL, or fallback to API base URL
+      const PAYMONGO_RETURN_URL = process.env.EXPO_PUBLIC_PAYMONGO_RETURN_URL;
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
+      
+      // Use configured return URL if available, otherwise construct from API base URL
+      const baseReturnUrl = PAYMONGO_RETURN_URL || `${API_BASE_URL}/client/payment/return`;
+      const returnUrl = `${baseReturnUrl}?payment_intent_id=${paymentIntentId}&payment_code=${billing?.payments?.[0]?.payment_code || ''}`;
+      console.log('Return URL generated:', returnUrl);
+      
+      console.log('Attachment details:', {
+        paymentIntentId,
+        paymentMethodId,
+        hasClientKey: !!clientKey,
+        returnUrl,
+      });
+
+      const attachResult = await paymongoClient.attachPaymentMethod(
+        paymentIntentId,
+        paymentMethodId,
+        clientKey,
+        returnUrl
+      );
+
+      console.log('Payment method attachment result:', {
+        success: attachResult.success,
+        hasData: !!attachResult.data,
+        error: attachResult.error,
+        status: attachResult.data?.attributes?.status,
+        hasNextAction: !!attachResult.data?.attributes?.next_action,
+      });
+
+      if (!attachResult.success || !attachResult.data) {
+        const errorMsg = attachResult.error || 'Failed to process payment';
+        console.error('Payment method attachment failed:', errorMsg);
+        setCardFormError(errorMsg);
+        setProcessing(false);
+        return;
+      }
+
+      // Step 4: Confirm Payment Intent (REQUIRED for live keys)
+      console.log('Step 4: Confirming payment intent...');
+      
+      const confirmResult = await apiService.confirmPaymentIntent(
+        billing.id,
+        paymentIntentId,
+        returnUrl
+      );
+
+      console.log('Payment intent confirmation result:', {
+        success: confirmResult.success,
+        hasData: !!confirmResult.data,
+        error: confirmResult.message,
+        status: confirmResult.data?.status,
+        hasNextAction: !!confirmResult.data?.next_action,
+      });
+
+      if (!confirmResult.success || !confirmResult.data) {
+        const errorMsg = confirmResult.message || 'Failed to confirm payment intent';
+        console.error('Payment intent confirmation failed:', errorMsg);
+        setCardFormError(errorMsg);
+        setProcessing(false);
+        return;
+      }
+
+      const confirmedPaymentIntent = confirmResult.data.payment_intent || confirmResult.data;
+      const status = confirmedPaymentIntent.attributes?.status || confirmResult.data.status;
+      const nextAction = confirmedPaymentIntent.attributes?.next_action || confirmResult.data.next_action;
+
+      // Log full nextAction object for debugging
+      console.log('Full nextAction object after confirmation:', JSON.stringify(nextAction, null, 2));
+
+      // Extract redirect URL - only use if next_action.type === 'redirect' AND redirect.url exists
+      const redirectUrl = (nextAction?.type === 'redirect' && nextAction?.redirect?.url) 
+        ? nextAction.redirect.url 
+        : null;
+
+      console.log('Step 5: Handling payment status after confirmation:', {
+        status,
+        hasNextAction: !!nextAction,
+        nextActionType: nextAction?.type,
+        redirectUrl,
+        nextActionKeys: nextAction ? Object.keys(nextAction) : [],
+      });
+
+      // Step 5: Handle payment status after confirmation
+      if (status === 'succeeded') {
+        console.log('Payment succeeded after confirmation');
+        // Payment succeeded
+        setPaymentStatus('checking');
+        setShowPaymentModal(false);
+        setTimeout(async () => {
+          await checkPaymentStatus();
+        }, 1000);
+      } else if (status === 'awaiting_next_action') {
+        // Only redirect if next_action.type === 'redirect' AND redirect.url !== null
+        if (nextAction?.type === 'redirect' && redirectUrl) {
+          console.log('3D Secure required, opening WebView:', redirectUrl);
+          // 3D Secure required - redirect URL is available
+          setThreeDSecureUrl(redirectUrl);
+          setShow3DSecureModal(true);
+          setPaymentStatus('pending');
+        } else {
+          // redirect.url is null or next_action.type is not 'redirect'
+          // This typically means incomplete billing information or payment method issue
+          console.error('awaiting_next_action but redirect.url is null or invalid. PayMongo rejected payment setup.');
+          console.error('nextAction:', JSON.stringify(nextAction, null, 2));
+          
+          const errorMsg = 'Payment setup incomplete. Please ensure all billing information (name, email, phone) is provided and try again.';
+          setCardFormError(errorMsg);
+          dialog.showError(errorMsg, 'Payment Setup Failed');
+          setProcessing(false);
+          
+          // Reset payment intent state to allow retry
+          setPaymentIntentId(null);
+          setClientKey(null);
+          setPublicKey(null);
+        }
+      } else if (status === 'processing') {
+        console.log('Payment is processing after confirmation, will check status');
+        // Payment is processing
+        setPaymentStatus('checking');
+        setShowPaymentModal(false);
+        setTimeout(async () => {
+          await checkPaymentStatus();
+        }, 2000);
+      } else {
+        const errorMsg = `Payment could not be processed. Status: ${status}. Please try again.`;
+        console.error('Unexpected payment status after confirmation:', status);
+        setCardFormError(errorMsg);
+        setProcessing(false);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      console.error('Error in handleCardSubmit:', err);
+      console.error('Error details:', {
+        message: errorMessage,
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      setCardFormError(`Payment processing failed: ${errorMessage}. Please try again.`);
+      dialog.showError(`Payment processing failed: ${errorMessage}`);
+      setProcessing(false);
+    }
+  };
+
+  const handle3DSecureNavigation = (navState: any) => {
+    // Check if we've been redirected back (3D Secure complete)
+    // PayMongo typically redirects to a return URL after authentication
+    const url = navState.url;
+    
+    // Close WebView and check payment status
+    if (url && (url.includes('return_url') || url.includes('success') || url.includes('failed'))) {
+      setShow3DSecureModal(false);
+      setThreeDSecureUrl(null);
+      setPaymentStatus('checking');
+      
+      // Wait a moment for backend to process, then check status
+      setTimeout(async () => {
+        await checkPaymentStatus();
+      }, 2000);
     }
   };
 
@@ -448,8 +683,33 @@ export default function BillingDetailScreen() {
         {/* Pay Button */}
         {billing.remaining_amount > 0 && (
           <TouchableOpacity
-            style={[styles.payButton, { backgroundColor: AppColors.primary }]}
-            onPress={() => setShowPaymentModal(true)}
+            style={[
+              styles.payButton,
+              {
+                backgroundColor: processing || paymentStatus !== 'idle' 
+                  ? AppColors.textSecondary 
+                  : AppColors.primary,
+                opacity: processing || paymentStatus !== 'idle' ? 0.6 : 1,
+              }
+            ]}
+            onPress={() => {
+              console.log('Pay Now button clicked');
+              console.log('Current state:', {
+                processing,
+                paymentStatus,
+                showPaymentModal,
+                billingId: id,
+                remainingAmount: billing.remaining_amount,
+              });
+              
+              if (processing || paymentStatus !== 'idle') {
+                console.warn('Button click ignored - button is disabled');
+                return;
+              }
+              
+              setShowPaymentModal(true);
+              console.log('Modal should now be open');
+            }}
             disabled={processing || paymentStatus !== 'idle'}>
             {processing || paymentStatus !== 'idle' ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -491,21 +751,9 @@ export default function BillingDetailScreen() {
                   Processing Payment...
                 </Text>
                 <Text style={[styles.paymentPendingSubtext, { color: AppColors.textSecondary }]}>
-                  Please complete the payment in the browser window.{'\n'}
-                  After payment, you may see a localhost page - this is normal.{'\n'}
-                  The payment will be verified automatically.
+                  Please wait while we process your payment.
                 </Text>
                 <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
-                <TouchableOpacity
-                  style={[styles.cancelButton, { marginTop: 20 }]}
-                  onPress={() => {
-                    setPaymentStatus('idle');
-                    setShowPaymentModal(false);
-                  }}>
-                  <Text style={[styles.cancelButtonText, { color: AppColors.textSecondary }]}>
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
               </View>
             ) : paymentStatus === 'checking' ? (
               <View style={styles.paymentPendingContainer}>
@@ -518,6 +766,17 @@ export default function BillingDetailScreen() {
                 </Text>
                 <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
               </View>
+            ) : paymentStatus === 'processing_card' ? (
+              <View style={styles.paymentPendingContainer}>
+                <Clock size={48} color={AppColors.primary} />
+                <Text style={[styles.paymentPendingText, { color: AppColors.text }]}>
+                  Processing Card Payment...
+                </Text>
+                <Text style={[styles.paymentPendingSubtext, { color: AppColors.textSecondary }]}>
+                  Please wait while we process your card details.
+                </Text>
+                <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
+              </View>
             ) : (
               <ScrollView style={styles.modalScroll}>
                 <View style={styles.paymentAmountSection}>
@@ -527,38 +786,6 @@ export default function BillingDetailScreen() {
                   <Text style={[styles.paymentAmountValue, { color: AppColors.text }]}>
                     {formatCurrency(billing.remaining_amount)}
                   </Text>
-                </View>
-
-                <View style={styles.paymentMethodSection}>
-                  <Text style={[styles.paymentMethodLabel, { color: AppColors.textSecondary }]}>
-                    Payment Method
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.paymentMethodOption,
-                      styles.paymentMethodOptionActive,
-                      { borderColor: AppColors.primary },
-                    ]}
-                    disabled>
-                    <View style={styles.paymentMethodContent}>
-                      <View style={styles.gcashIconContainer}>
-                        <LinearGradient
-                          colors={['#0070F3', '#0051D5']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.gcashGradient}>
-                          <Text style={styles.gcashIcon}>G</Text>
-                        </LinearGradient>
-                      </View>
-                      <View style={styles.paymentMethodInfo}>
-                        <Text style={[styles.paymentMethodText, { color: AppColors.text }]}>GCash</Text>
-                        <Text style={[styles.paymentMethodSubtext, { color: AppColors.textSecondary }]}>
-                          Secure mobile payment
-                        </Text>
-                      </View>
-                      <Ionicons name="checkmark-circle" size={24} color="#0070F3" />
-                    </View>
-                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.customAmountSection}>
@@ -575,22 +802,102 @@ export default function BillingDetailScreen() {
                     value={customAmount}
                     onChangeText={setCustomAmount}
                     keyboardType="decimal-pad"
+                    editable={!paymentIntentId}
                   />
                 </View>
 
-                <TouchableOpacity
-                  style={[styles.confirmButton, { backgroundColor: AppColors.primary }]}
-                  onPress={handlePay}
-                  disabled={processing}>
-                  {processing ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.confirmButtonText}>Proceed to Payment</Text>
-                  )}
-                </TouchableOpacity>
+                {!paymentIntentId ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.confirmButton,
+                      {
+                        backgroundColor: processing ? AppColors.textSecondary : AppColors.primary,
+                        opacity: processing ? 0.6 : 1,
+                      }
+                    ]}
+                    onPress={() => {
+                      console.log('Continue to Payment button clicked');
+                      console.log('Button state:', { 
+                        processing, 
+                        paymentIntentId,
+                        billing: !!billing,
+                        amount: customAmount || billing?.remaining_amount,
+                      });
+                      
+                      if (processing) {
+                        console.warn('Button click ignored - already processing');
+                        return;
+                      }
+                      
+                      handleInitiatePayment();
+                    }}
+                    disabled={processing}>
+                    {processing ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.confirmButtonText}>Continue to Payment</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <View>
+                    <Text style={[styles.paymentMethodLabel, { color: AppColors.textSecondary, marginBottom: 16 }]}>
+                      Enter Card Details
+                    </Text>
+                    <CardPaymentForm
+                      initialPhone={user?.phone_number || ''}
+                      initialName={user?.name || ''}
+                      onSubmit={handleCardSubmit}
+                      onCancel={() => {
+                        setPaymentIntentId(null);
+                        setClientKey(null);
+                        setPublicKey(null);
+                        setCardFormError(null);
+                      }}
+                      loading={processing}
+                      error={cardFormError || undefined}
+                    />
+                  </View>
+                )}
               </ScrollView>
             )}
           </View>
+        </View>
+      </Modal>
+
+      {/* 3D Secure Modal */}
+      <Modal
+        visible={show3DSecureModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {
+          // Don't allow closing during 3D Secure
+        }}>
+        <View style={styles.webViewContainer}>
+          <View style={styles.webViewHeader}>
+            <Text style={[styles.webViewTitle, { color: AppColors.text }]}>Complete Authentication</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShow3DSecureModal(false);
+                setThreeDSecureUrl(null);
+                setPaymentStatus('idle');
+                dialog.showError('3D Secure authentication was cancelled');
+              }}>
+              <XCircle size={24} color={AppColors.text} />
+            </TouchableOpacity>
+          </View>
+          {threeDSecureUrl && (
+            <WebView
+              source={{ uri: threeDSecureUrl }}
+              onNavigationStateChange={handle3DSecureNavigation}
+              style={styles.webView}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.webViewLoading}>
+                  <ActivityIndicator size="large" color={AppColors.primary} />
+                </View>
+              )}
+            />
+          )}
         </View>
       </Modal>
     </View>
@@ -970,6 +1277,37 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: AppColors.card,
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+    backgroundColor: AppColors.card,
+  },
+  webViewTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  webView: {
+    flex: 1,
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: AppColors.background,
   },
 });
 

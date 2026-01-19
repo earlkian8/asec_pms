@@ -14,6 +14,7 @@ import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import { Trash2, SquarePen, Eye, Filter, X, Search, Calendar, TrendingUp, Users, DollarSign, ArrowUpDown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { usePermission } from '@/utils/permissions';
 
 import AddProject from './add';
@@ -62,12 +63,6 @@ export default function ProjectsIndex() {
   const [deleteProject, setDeleteProject] = useState(null);
   const [showFilterCard, setShowFilterCard] = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
-  const filterCardRef = useRef(null);
-  const sortCardRef = useRef(null);
-  const filterButtonRef = useRef(null);
-  const sortButtonRef = useRef(null);
-  const [filterPosition, setFilterPosition] = useState({ top: 0, right: 0 });
-  const [sortPosition, setSortPosition] = useState({ top: 0, right: 0 });
   
   // Initialize filters from props
   const initializeFilters = (filterProps) => {
@@ -100,69 +95,6 @@ export default function ProjectsIndex() {
     if (pageProps.sort_order) setSortOrder(pageProps.sort_order);
   }, [pageProps.sort_by, pageProps.sort_order]);
 
-  // Close filter/sort cards when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const target = event.target;
-      
-      // Check if click is on a Radix Select component (portal renders outside card)
-      // Radix Select portals render to body, so we need to check for select-related elements
-      let isSelectClick = false;
-      
-      // Check for Radix Select attributes and roles
-      if (target.closest) {
-        isSelectClick = 
-          target.closest('[data-radix-select-content]') ||
-          target.closest('[data-radix-select-viewport]') ||
-          target.closest('[data-radix-select-item]') ||
-          target.closest('[data-radix-select-scroll-up-button]') ||
-          target.closest('[data-radix-select-scroll-down-button]') ||
-          target.closest('[role="listbox"]') ||
-          target.closest('[role="option"]');
-      }
-      
-      // Also check if the element itself has select-related attributes
-      if (!isSelectClick && target.getAttribute) {
-        const role = target.getAttribute('role');
-        const dataAttr = target.getAttribute('data-radix-select-content') || 
-                        target.getAttribute('data-radix-select-viewport') ||
-                        target.getAttribute('data-radix-select-item');
-        isSelectClick = role === 'listbox' || role === 'option' || !!dataAttr;
-      }
-      
-      // Check if target is within a Radix portal container (selects use portals)
-      if (!isSelectClick) {
-        let element = target;
-        while (element && element !== document.body) {
-          if (element.getAttribute && element.getAttribute('data-radix-portal')) {
-            isSelectClick = true;
-            break;
-          }
-          element = element.parentElement;
-        }
-      }
-      
-      // Don't close if clicking on select dropdown
-      if (isSelectClick) {
-        return;
-      }
-
-      if (filterCardRef.current && !filterCardRef.current.contains(target)) {
-        setShowFilterCard(false);
-      }
-      if (sortCardRef.current && !sortCardRef.current.contains(target)) {
-        setShowSortCard(false);
-      }
-    };
-
-    if (showFilterCard || showSortCard) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showFilterCard, showSortCard]);
 
   // Tag color mappings
   const typeColors = {
@@ -473,307 +405,277 @@ export default function ProjectsIndex() {
                 />
               </div>
                 <div className="flex gap-2 relative z-50">
-                  <div className="relative z-50">
-                    <Button
-                      ref={filterButtonRef}
-                      onClick={() => {
-                        if (filterButtonRef.current) {
-                          const rect = filterButtonRef.current.getBoundingClientRect();
-                          setFilterPosition({
-                            top: rect.bottom + window.scrollY + 8,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }
-                        setShowFilterCard(!showFilterCard);
-                        setShowSortCard(false);
-                      }}
-                      variant="outline"
-                      className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative z-50 ${
-                        activeFiltersCount() > 0
-                          ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                      title="Filters"
-                    >
-                      <Filter className="h-4 w-4" />
-                      {activeFiltersCount() > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center z-50">
-                          {activeFiltersCount()}
-                        </span>
-                      )}
-                    </Button>
-
-                {/* Filter Card */}
-                {showFilterCard && (
-                  <div 
-                    ref={filterCardRef} 
-                    className="fixed w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[500px]"
-                    style={{
-                      top: `${filterPosition.top}px`,
-                      right: `${filterPosition.right}px`,
-                    }}
-                  >
-                    <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
-                      <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4 text-white" />
-                        <h3 className="text-base font-semibold text-white">Filter Projects</h3>
-                      </div>
-                      <button
-                        onClick={() => setShowFilterCard(false)}
-                        className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="p-4 overflow-y-auto flex-1">
-                      {/* Client Filter */}
-                      <div className="mb-4">
-                        <Label className="text-xs font-semibold text-gray-700 mb-2 block">Client</Label>
-                        <Select
-                          value={localFilters.client_id || 'all'}
-                          onValueChange={(value) => handleFilterChange('client_id', value)}
-                        >
-                          <SelectTrigger className="w-full h-9">
-                            <SelectValue placeholder="All Clients" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Clients</SelectItem>
-                            {clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id.toString()}>
-                                {client.client_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Status Filter */}
-                      {filterOptions.statuses && filterOptions.statuses.length > 0 && (
-                        <div className="mb-4">
-                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Status</Label>
-                          <Select
-                            value={localFilters.status || 'all'}
-                            onValueChange={(value) => handleFilterChange('status', value)}
-                          >
-                            <SelectTrigger className="w-full h-9">
-                              <SelectValue placeholder="All Statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Statuses</SelectItem>
-                              {filterOptions.statuses.map((status) => (
-                                <SelectItem key={status} value={status}>
-                                  {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Priority Filter */}
-                      {filterOptions.priorities && filterOptions.priorities.length > 0 && (
-                        <div className="mb-4">
-                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Priority</Label>
-                          <Select
-                            value={localFilters.priority || 'all'}
-                            onValueChange={(value) => handleFilterChange('priority', value)}
-                          >
-                            <SelectTrigger className="w-full h-9">
-                              <SelectValue placeholder="All Priorities" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Priorities</SelectItem>
-                              {filterOptions.priorities.map((priority) => (
-                                <SelectItem key={priority} value={priority}>
-                                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Project Type Filter */}
-                      {filterOptions.projectTypes && filterOptions.projectTypes.length > 0 && (
-                        <div className="mb-4">
-                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Project Type</Label>
-                          <Select
-                            value={localFilters.project_type_id || 'all'}
-                            onValueChange={(value) => handleFilterChange('project_type_id', value)}
-                          >
-                            <SelectTrigger className="w-full h-9">
-                              <SelectValue placeholder="All Types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Types</SelectItem>
-                              {filterOptions.projectTypes.map((type) => (
-                                <SelectItem key={type.id} value={type.id.toString()}>
-                                  {type.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Date Range Filters */}
-                      <div className="mb-4">
-                        <Label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-2">
-                          <Calendar className="h-3 w-3" />
-                          Date Range
-                        </Label>
-                        <div className="space-y-2">
-                          <div>
-                            <Label htmlFor="start_date" className="text-xs text-gray-600 mb-1 block">Start Date</Label>
-                            <Input
-                              id="start_date"
-                              type="date"
-                              value={localFilters.start_date}
-                              onChange={(e) => setLocalFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                              className="w-full h-9 border-gray-300 rounded-lg"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="end_date" className="text-xs text-gray-600 mb-1 block">End Date</Label>
-                            <Input
-                              id="end_date"
-                              type="date"
-                              value={localFilters.end_date}
-                              onChange={(e) => setLocalFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                              className="w-full h-9 border-gray-300 rounded-lg"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Filter Actions */}
-                    <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
+                  <DropdownMenu open={showFilterCard} onOpenChange={(open) => {
+                    setShowFilterCard(open);
+                    if (open) setShowSortCard(false);
+                  }}>
+                    <DropdownMenuTrigger asChild>
                       <Button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          resetFilters();
-                        }}
                         variant="outline"
-                        className="flex-1 border-gray-300 hover:bg-gray-100 text-sm h-9"
-                        disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
+                        className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative ${
+                          activeFiltersCount() > 0
+                            ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                        title="Filters"
                       >
-                        Clear All
+                        <Filter className="h-4 w-4" />
+                        {activeFiltersCount() > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                            {activeFiltersCount()}
+                          </span>
+                        )}
                       </Button>
-                      <Button
-                        type="button"
-                        onClick={applyFilters}
-                        className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
-                      >
-                        Apply Filters
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-96 p-0 rounded-xl shadow-2xl border-2 border-gray-200 overflow-hidden flex flex-col max-h-[500px] bg-white"
+                    >
+                      <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4 text-white" />
+                          <h3 className="text-base font-semibold text-white">Filter Projects</h3>
+                        </div>
+                        <button
+                          onClick={() => setShowFilterCard(false)}
+                          className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="p-4 overflow-y-auto flex-1">
+                        {/* Client Filter */}
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Client</Label>
+                          <Select
+                            value={localFilters.client_id || 'all'}
+                            onValueChange={(value) => handleFilterChange('client_id', value)}
+                          >
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue placeholder="All Clients" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Clients</SelectItem>
+                              {clients.map((client) => (
+                                <SelectItem key={client.id} value={client.id.toString()}>
+                                  {client.client_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Status Filter */}
+                        {filterOptions.statuses && filterOptions.statuses.length > 0 && (
+                          <div className="mb-4">
+                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Status</Label>
+                            <Select
+                              value={localFilters.status || 'all'}
+                              onValueChange={(value) => handleFilterChange('status', value)}
+                            >
+                              <SelectTrigger className="w-full h-9">
+                                <SelectValue placeholder="All Statuses" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
+                                {filterOptions.statuses.map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Priority Filter */}
+                        {filterOptions.priorities && filterOptions.priorities.length > 0 && (
+                          <div className="mb-4">
+                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Priority</Label>
+                            <Select
+                              value={localFilters.priority || 'all'}
+                              onValueChange={(value) => handleFilterChange('priority', value)}
+                            >
+                              <SelectTrigger className="w-full h-9">
+                                <SelectValue placeholder="All Priorities" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Priorities</SelectItem>
+                                {filterOptions.priorities.map((priority) => (
+                                  <SelectItem key={priority} value={priority}>
+                                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Project Type Filter */}
+                        {filterOptions.projectTypes && filterOptions.projectTypes.length > 0 && (
+                          <div className="mb-4">
+                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Project Type</Label>
+                            <Select
+                              value={localFilters.project_type_id || 'all'}
+                              onValueChange={(value) => handleFilterChange('project_type_id', value)}
+                            >
+                              <SelectTrigger className="w-full h-9">
+                                <SelectValue placeholder="All Types" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                {filterOptions.projectTypes.map((type) => (
+                                  <SelectItem key={type.id} value={type.id.toString()}>
+                                    {type.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Date Range Filters */}
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-2">
+                            <Calendar className="h-3 w-3" />
+                            Date Range
+                          </Label>
+                          <div className="space-y-2">
+                            <div>
+                              <Label htmlFor="start_date" className="text-xs text-gray-600 mb-1 block">Start Date</Label>
+                              <Input
+                                id="start_date"
+                                type="date"
+                                value={localFilters.start_date}
+                                onChange={(e) => setLocalFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                                className="w-full h-9 border-gray-300 rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="end_date" className="text-xs text-gray-600 mb-1 block">End Date</Label>
+                              <Input
+                                id="end_date"
+                                type="date"
+                                value={localFilters.end_date}
+                                onChange={(e) => setLocalFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                                className="w-full h-9 border-gray-300 rounded-lg"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Filter Actions */}
+                      <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
+                        <Button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            resetFilters();
+                          }}
+                          variant="outline"
+                          className="flex-1 border-gray-300 hover:bg-gray-100 text-sm h-9"
+                          disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
+                        >
+                          Clear All
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={applyFilters}
+                          className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
+                        >
+                          Apply Filters
+                        </Button>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   {/* Sort Button */}
-                  <div className="relative z-50">
-                    <Button
-                      ref={sortButtonRef}
-                      onClick={() => {
-                        if (sortButtonRef.current) {
-                          const rect = sortButtonRef.current.getBoundingClientRect();
-                          setSortPosition({
-                            top: rect.bottom + window.scrollY + 8,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }
-                        setShowSortCard(!showSortCard);
-                        setShowFilterCard(false);
-                      }}
-                      variant="outline"
-                      className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative z-50"
-                      title="Sort"
-                    >
-                      <ArrowUpDown className="h-4 w-4" />
-                    </Button>
-
-                    {/* Sort Card */}
-                    {showSortCard && (
-                      <div 
-                        ref={sortCardRef} 
-                        className="fixed w-80 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[300px]"
-                        style={{
-                          top: `${sortPosition.top}px`,
-                          right: `${sortPosition.right}px`,
-                        }}
+                  <DropdownMenu open={showSortCard} onOpenChange={(open) => {
+                    setShowSortCard(open);
+                    if (open) setShowFilterCard(false);
+                  }}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative"
+                        title="Sort"
                       >
-                        <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
-                          <div className="flex items-center gap-2">
-                            <ArrowUpDown className="h-4 w-4 text-white" />
-                            <h3 className="text-base font-semibold text-white">Sort Projects</h3>
-                          </div>
-                          <button
-                            onClick={() => setShowSortCard(false)}
-                            className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-80 p-0 rounded-xl shadow-2xl border-2 border-gray-200 overflow-hidden flex flex-col max-h-[300px] bg-white"
+                    >
+                      <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <ArrowUpDown className="h-4 w-4 text-white" />
+                          <h3 className="text-base font-semibold text-white">Sort Projects</h3>
+                        </div>
+                        <button
+                          onClick={() => setShowSortCard(false)}
+                          className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="p-4 overflow-y-auto flex-1">
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Sort By</Label>
+                          <Select
+                            value={sortBy}
+                            onValueChange={(value) => setSortBy(value)}
                           >
-                            <X className="h-4 w-4" />
-                          </button>
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="created_at">Date Created</SelectItem>
+                              <SelectItem value="project_name">Project Name</SelectItem>
+                              <SelectItem value="project_code">Project Code</SelectItem>
+                              <SelectItem value="status">Status</SelectItem>
+                              <SelectItem value="priority">Priority</SelectItem>
+                              <SelectItem value="contract_amount">Contract Amount</SelectItem>
+                              <SelectItem value="start_date">Start Date</SelectItem>
+                              <SelectItem value="planned_end_date">End Date</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
 
-                        <div className="p-4 overflow-y-auto flex-1">
-                          <div className="mb-4">
-                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Sort By</Label>
-                            <Select
-                              value={sortBy}
-                              onValueChange={(value) => setSortBy(value)}
-                            >
-                              <SelectTrigger className="w-full h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="created_at">Date Created</SelectItem>
-                                <SelectItem value="project_name">Project Name</SelectItem>
-                                <SelectItem value="project_code">Project Code</SelectItem>
-                                <SelectItem value="status">Status</SelectItem>
-                                <SelectItem value="priority">Priority</SelectItem>
-                                <SelectItem value="contract_amount">Contract Amount</SelectItem>
-                                <SelectItem value="start_date">Start Date</SelectItem>
-                                <SelectItem value="planned_end_date">End Date</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="mb-4">
-                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Order</Label>
-                            <Select
-                              value={sortOrder}
-                              onValueChange={(value) => setSortOrder(value)}
-                            >
-                              <SelectTrigger className="w-full h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="asc">Ascending</SelectItem>
-                                <SelectItem value="desc">Descending</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Sort Actions */}
-                        <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
-                          <Button
-                            type="button"
-                            onClick={applySort}
-                            className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9"
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Order</Label>
+                          <Select
+                            value={sortOrder}
+                            onValueChange={(value) => setSortOrder(value)}
                           >
-                            Apply Sort
-                          </Button>
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="asc">Ascending</SelectItem>
+                              <SelectItem value="desc">Descending</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Sort Actions */}
+                      <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
+                        <Button
+                          type="button"
+                          onClick={applySort}
+                          className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9"
+                        >
+                          Apply Sort
+                        </Button>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
                 {has('projects.create') && (
@@ -827,10 +729,9 @@ export default function ProjectsIndex() {
                             <span className="text-gray-400 italic">No client</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-left px-4 py-4 text-sm">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${typeColors[project.project_type?.name] || 'bg-gray-100 text-gray-800 border border-gray-200'}`}>
+                        <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
+                          
                             {project.project_type?.name || '---'}
-                          </span>
                         </TableCell>
                         <TableCell className="text-left px-4 py-4 text-sm">
                           <span className="font-bold text-gray-900">

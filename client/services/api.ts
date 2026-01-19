@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.111:8000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -138,8 +138,42 @@ class ApiService {
     return this.get(`/client/billings/${id}`);
   }
 
-  async initiatePayment(billingId: number, data: { amount?: number; payment_method_type?: string }): Promise<ApiResponse<any>> {
+  async initiatePayment(billingId: number, data: { amount?: number; payment_method_type?: 'card' }): Promise<ApiResponse<any>> {
     return this.post(`/client/billings/${billingId}/pay`, data);
+  }
+
+  async createPaymentMethod(
+    billingId: number,
+    cardData: {
+      cardNumber: string;
+      expMonth: number;
+      expYear: number;
+      cvc: string;
+      cardholderName: string;
+      name: string;
+      phone: string;
+    }
+  ): Promise<ApiResponse<any>> {
+    return this.post(`/client/billings/${billingId}/payment-method`, {
+      card_number: cardData.cardNumber,
+      exp_month: cardData.expMonth,
+      exp_year: cardData.expYear,
+      cvc: cardData.cvc,
+      cardholder_name: cardData.cardholderName,
+      name: cardData.name,
+      phone: cardData.phone,
+    });
+  }
+
+  async confirmPaymentIntent(
+    billingId: number,
+    paymentIntentId: string,
+    returnUrl: string
+  ): Promise<ApiResponse<any>> {
+    return this.post(`/client/billings/${billingId}/payment-intent/confirm`, {
+      payment_intent_id: paymentIntentId,
+      return_url: returnUrl,
+    });
   }
 
   async checkPaymentStatus(billingId: number): Promise<ApiResponse<any>> {

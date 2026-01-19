@@ -14,6 +14,7 @@ import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import { Trash2, SquarePen, Filter, X, Search, ArrowUpDown, AlertCircle, FolderOpen, Plus, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { Switch } from "@/Components/ui/switch";
 import { usePermission } from '@/utils/permissions';
 import { toast } from 'sonner';
@@ -52,12 +53,6 @@ export default function ProjectTypesIndex() {
   const [deleteProjectType, setDeleteProjectType] = useState(null);
   const [showFilterCard, setShowFilterCard] = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
-  const filterCardRef = useRef(null);
-  const sortCardRef = useRef(null);
-  const filterButtonRef = useRef(null);
-  const sortButtonRef = useRef(null);
-  const [filterPosition, setFilterPosition] = useState({ top: 0, right: 0 });
-  const [sortPosition, setSortPosition] = useState({ top: 0, right: 0 });
   
   const initializeFilters = (filterProps) => {
     return {
@@ -81,57 +76,6 @@ export default function ProjectTypesIndex() {
     if (pageProps.sort_order) setSortOrder(pageProps.sort_order);
   }, [pageProps.sort_by, pageProps.sort_order]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const target = event.target;
-      
-      let isSelectClick = false;
-      
-      if (target.closest) {
-        isSelectClick = 
-          target.closest('[data-radix-select-content]') ||
-          target.closest('[data-radix-select-viewport]') ||
-          target.closest('[data-radix-select-item]') ||
-          target.closest('[role="listbox"]') ||
-          target.closest('[role="option"]');
-      }
-      
-      if (!isSelectClick && target.getAttribute) {
-        const role = target.getAttribute('role');
-        const dataAttr = target.getAttribute('data-radix-select-content') || 
-                        target.getAttribute('data-radix-select-viewport') ||
-                        target.getAttribute('data-radix-select-item');
-        isSelectClick = role === 'listbox' || role === 'option' || !!dataAttr;
-      }
-      
-      if (!isSelectClick) {
-        let current = target;
-        while (current) {
-          if (current.id && current.id.startsWith('radix-')) {
-            isSelectClick = true;
-            break;
-          }
-          current = current.parentElement;
-        }
-      }
-
-      if (isSelectClick) {
-        return;
-      }
-
-      if (filterCardRef.current && !filterCardRef.current.contains(event.target)) {
-        setShowFilterCard(false);
-      }
-      if (sortCardRef.current && !sortCardRef.current.contains(event.target)) {
-        setShowSortCard(false);
-      }
-    };
-
-    if (showFilterCard || showSortCard) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showFilterCard, showSortCard]);
 
   // Count active filters
   const activeFiltersCount = () => {
@@ -394,200 +338,170 @@ export default function ProjectTypesIndex() {
                   />
                 </div>
                 <div className="flex gap-2 relative z-50">
-                  <div className="relative z-50">
-                    <Button
-                      ref={filterButtonRef}
-                      onClick={() => {
-                        if (filterButtonRef.current) {
-                          const rect = filterButtonRef.current.getBoundingClientRect();
-                          setFilterPosition({
-                            top: rect.bottom + window.scrollY + 8,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }
-                        setShowFilterCard(!showFilterCard);
-                        setShowSortCard(false);
-                      }}
-                      variant="outline"
-                      className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative z-50 ${
-                        activeFiltersCount() > 0
-                          ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                      title="Filters"
-                    >
-                      <Filter className="h-4 w-4" />
-                      {activeFiltersCount() > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center z-50">
-                          {activeFiltersCount()}
-                        </span>
-                      )}
-                    </Button>
-
-                    {/* Filter Card */}
-                    {showFilterCard && (
-                      <div 
-                        ref={filterCardRef} 
-                        className="fixed w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[400px]"
-                        style={{
-                          top: `${filterPosition.top}px`,
-                          right: `${filterPosition.right}px`,
-                        }}
+                  <DropdownMenu open={showFilterCard} onOpenChange={(open) => {
+                    setShowFilterCard(open);
+                    if (open) setShowSortCard(false);
+                  }}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative ${
+                          activeFiltersCount() > 0
+                            ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                        title="Filters"
                       >
-                        <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
-                          <div className="flex items-center gap-2">
-                            <Filter className="h-4 w-4 text-white" />
-                            <h3 className="text-base font-semibold text-white">Filter Project Types</h3>
-                          </div>
-                          <button
-                            onClick={() => setShowFilterCard(false)}
-                            className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                        <Filter className="h-4 w-4" />
+                        {activeFiltersCount() > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                            {activeFiltersCount()}
+                          </span>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-96 p-0 rounded-xl shadow-2xl border-2 border-gray-200 overflow-hidden flex flex-col max-h-[400px] bg-white"
+                    >
+                      <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4 text-white" />
+                          <h3 className="text-base font-semibold text-white">Filter Project Types</h3>
                         </div>
+                        <button
+                          onClick={() => setShowFilterCard(false)}
+                          className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
 
-                        <div className="p-4 overflow-y-auto flex-1">
-                          {/* Status Filter */}
-                          <div className="mb-4">
-                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Status</Label>
-                            <Select
-                              value={localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined ? String(localFilters.is_active) : 'all'}
-                              onValueChange={(value) => handleFilterChange('is_active', value)}
-                            >
-                              <SelectTrigger className="w-full h-9">
-                                <SelectValue placeholder="All Status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="true">Active</SelectItem>
-                                <SelectItem value="false">Inactive</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Filter Actions */}
-                        <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
-                          <Button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              resetFilters();
-                            }}
-                            variant="outline"
-                            className="flex-1 border-gray-300 hover:bg-gray-100 text-sm h-9"
-                            disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
+                      <div className="p-4 overflow-y-auto flex-1">
+                        {/* Status Filter */}
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Status</Label>
+                          <Select
+                            value={localFilters.is_active !== '' && localFilters.is_active !== null && localFilters.is_active !== undefined ? String(localFilters.is_active) : 'all'}
+                            onValueChange={(value) => handleFilterChange('is_active', value)}
                           >
-                            Clear All
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={applyFilters}
-                            className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
-                          >
-                            Apply Filters
-                          </Button>
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="true">Active</SelectItem>
+                              <SelectItem value="false">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Filter Actions */}
+                      <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
+                        <Button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            resetFilters();
+                          }}
+                          variant="outline"
+                          className="flex-1 border-gray-300 hover:bg-gray-100 text-sm h-9"
+                          disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
+                        >
+                          Clear All
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={applyFilters}
+                          className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={activeFiltersCount() === 0 && sortBy === 'created_at' && sortOrder === 'desc'}
+                        >
+                          Apply Filters
+                        </Button>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
                   {/* Sort Button */}
-                  <div className="relative z-50">
-                    <Button
-                      ref={sortButtonRef}
-                      onClick={() => {
-                        if (sortButtonRef.current) {
-                          const rect = sortButtonRef.current.getBoundingClientRect();
-                          setSortPosition({
-                            top: rect.bottom + window.scrollY + 8,
-                            right: window.innerWidth - rect.right,
-                          });
-                        }
-                        setShowSortCard(!showSortCard);
-                        setShowFilterCard(false);
-                      }}
-                      variant="outline"
-                      className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative z-50"
-                      title="Sort"
-                    >
-                      <ArrowUpDown className="h-4 w-4" />
-                    </Button>
-
-                    {/* Sort Card */}
-                    {showSortCard && (
-                      <div 
-                        ref={sortCardRef} 
-                        className="fixed w-80 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[300px]"
-                        style={{
-                          top: `${sortPosition.top}px`,
-                          right: `${sortPosition.right}px`,
-                        }}
+                  <DropdownMenu open={showSortCard} onOpenChange={(open) => {
+                    setShowSortCard(open);
+                    if (open) setShowFilterCard(false);
+                  }}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative"
+                        title="Sort"
                       >
-                        <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
-                          <div className="flex items-center gap-2">
-                            <ArrowUpDown className="h-4 w-4 text-white" />
-                            <h3 className="text-base font-semibold text-white">Sort Project Types</h3>
-                          </div>
-                          <button
-                            onClick={() => setShowSortCard(false)}
-                            className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-80 p-0 rounded-xl shadow-2xl border-2 border-gray-200 overflow-hidden flex flex-col max-h-[300px] bg-white"
+                    >
+                      <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <ArrowUpDown className="h-4 w-4 text-white" />
+                          <h3 className="text-base font-semibold text-white">Sort Project Types</h3>
+                        </div>
+                        <button
+                          onClick={() => setShowSortCard(false)}
+                          className="text-white hover:bg-zinc-900 rounded-lg p-1 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="p-4 overflow-y-auto flex-1">
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Sort By</Label>
+                          <Select
+                            value={sortBy}
+                            onValueChange={(value) => setSortBy(value)}
                           >
-                            <X className="h-4 w-4" />
-                          </button>
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="created_at">Date Created</SelectItem>
+                              <SelectItem value="name">Name</SelectItem>
+                              <SelectItem value="is_active">Status</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
 
-                        <div className="p-4 overflow-y-auto flex-1">
-                          <div className="mb-4">
-                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Sort By</Label>
-                            <Select
-                              value={sortBy}
-                              onValueChange={(value) => setSortBy(value)}
-                            >
-                              <SelectTrigger className="w-full h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="created_at">Date Created</SelectItem>
-                                <SelectItem value="name">Name</SelectItem>
-                                <SelectItem value="is_active">Status</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="mb-4">
-                            <Label className="text-xs font-semibold text-gray-700 mb-2 block">Order</Label>
-                            <Select
-                              value={sortOrder}
-                              onValueChange={(value) => setSortOrder(value)}
-                            >
-                              <SelectTrigger className="w-full h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="asc">Ascending</SelectItem>
-                                <SelectItem value="desc">Descending</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Sort Actions */}
-                        <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
-                          <Button
-                            type="button"
-                            onClick={applySort}
-                            className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9"
+                        <div className="mb-4">
+                          <Label className="text-xs font-semibold text-gray-700 mb-2 block">Order</Label>
+                          <Select
+                            value={sortOrder}
+                            onValueChange={(value) => setSortOrder(value)}
                           >
-                            Apply Sort
-                          </Button>
+                            <SelectTrigger className="w-full h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="asc">Ascending</SelectItem>
+                              <SelectItem value="desc">Descending</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Sort Actions */}
+                      <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
+                        <Button
+                          type="button"
+                          onClick={applySort}
+                          className="flex-1 bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md text-sm h-9"
+                        >
+                          Apply Sort
+                        </Button>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
               {has('projects.create') && (

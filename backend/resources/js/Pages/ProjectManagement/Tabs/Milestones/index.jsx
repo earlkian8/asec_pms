@@ -511,22 +511,21 @@ export default function MilestonesTab({ project, milestoneData }) {
     return statusMap[status] || { label: status, color: 'gray', icon: Clock };
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusSelectClassName = (status) => {
     const statusInfo = formatStatus(status);
-    const Icon = statusInfo.icon;
+    const baseClass = 'w-[140px] h-8 text-xs border-0 rounded font-medium';
     
-    return (
-      <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md font-medium ${
-        statusInfo.color === 'yellow' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
-        statusInfo.color === 'blue' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-        statusInfo.color === 'green' ? 'bg-green-50 text-green-700 border border-green-200' :
-        statusInfo.color === 'red' ? 'bg-red-50 text-red-700 border border-red-200' :
-        'bg-gray-50 text-gray-700 border border-gray-200'
-      }`}>
-        <Icon size={12} className="opacity-70" />
-        {statusInfo.label}
-      </span>
-    );
+    if (statusInfo.color === 'yellow') {
+      return `${baseClass} bg-amber-100 text-amber-700 hover:bg-amber-200`;
+    } else if (statusInfo.color === 'blue') {
+      return `${baseClass} bg-blue-100 text-blue-700 hover:bg-blue-200`;
+    } else if (statusInfo.color === 'green') {
+      return `${baseClass} bg-green-100 text-green-700 hover:bg-green-200`;
+    } else if (statusInfo.color === 'red') {
+      return `${baseClass} bg-red-100 text-red-700 hover:bg-red-200`;
+    } else {
+      return `${baseClass} bg-gray-100 text-gray-700 hover:bg-gray-200`;
+    }
   };
 
   // Helper function to check if all tasks in a milestone are completed
@@ -1032,9 +1031,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                               value={milestone.status}
                               onValueChange={(value) => handleMilestoneStatusChange(milestone, value)}
                             >
-                              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent p-0 hover:bg-gray-100 rounded">
+                              <SelectTrigger className={getStatusSelectClassName(milestone.status)}>
                                 <SelectValue>
-                                  {getStatusBadge(milestone.status)}
+                                  {formatStatus(milestone.status).label}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -1239,9 +1238,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                                     value={taskWithMilestone.status}
                                     onValueChange={(value) => handleTaskStatusChange(taskWithMilestone, value)}
                                   >
-                                    <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent p-0 hover:bg-gray-100 rounded">
+                                    <SelectTrigger className={getStatusSelectClassName(taskWithMilestone.status)}>
                                       <SelectValue>
-                                        {getStatusBadge(taskWithMilestone.status)}
+                                        {formatStatus(taskWithMilestone.status).label}
                                       </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>

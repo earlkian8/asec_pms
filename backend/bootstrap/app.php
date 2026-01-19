@@ -30,5 +30,47 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Handle validation exceptions for API routes
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+        });
+
+        // Handle authentication exceptions for API routes
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated. Please login.',
+                ], 401);
+            }
+        });
+
+        // Handle general exceptions for API routes
+        $exceptions->render(function (\Exception $e, $request) {
+            if ($request->is('api/*')) {
+                \Illuminate\Support\Facades\Log::error('API Error', [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                ]);
+
+                $message = config('app.debug') 
+                    ? $e->getMessage() 
+                    : 'An error occurred. Please try again later or contact support.';
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                ], 500);
+            }
+        });
     })->create();

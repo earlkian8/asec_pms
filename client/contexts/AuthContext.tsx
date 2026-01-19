@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (
     email: string,
     password: string
-  ): Promise<{ success: boolean; message?: string }> => {
+  ): Promise<{ success: boolean; message?: string; errors?: Record<string, string[]>; mustChangePassword?: boolean }> => {
     try {
       setIsLoading(true);
       const response = await apiService.post<{
@@ -95,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_active: boolean;
         };
         token: string;
+        must_change_password?: boolean;
       }>('/client/login', { email, password });
 
       if (response.success && response.data) {
@@ -123,15 +124,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           mustChangePassword: response.data.must_change_password || false 
         };
       } else {
+        // Return error message and validation errors if available
         return {
           success: false,
           message: response.message || 'Login failed. Please check your credentials.',
+          errors: response.errors,
         };
       }
     } catch (error) {
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'An error occurred during login',
+        message: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.',
       };
     } finally {
       setIsLoading(false);

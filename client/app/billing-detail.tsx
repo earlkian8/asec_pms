@@ -118,7 +118,7 @@ export default function BillingDetailScreen() {
     }
   };
 
-  const checkPaymentStatus = async () => {
+  const checkPaymentStatus = async (retryCount = 0) => {
     if (!id) return;
 
     try {
@@ -128,22 +128,63 @@ export default function BillingDetailScreen() {
         const status = response.data.status;
         
         if (status === 'paid') {
+          // Backend confirmed payment is paid - safe to show success
           setPaymentStatus('idle');
           setShowPaymentModal(false);
           dialog.showSuccess('Payment completed successfully!', 'Payment Success');
           fetchBilling(); // Refresh billing data
           router.replace(`/billing-detail?id=${id}`); // Refresh the page
         } else if (status === 'failed' || status === 'cancelled') {
+          // Payment failed or was cancelled
           setPaymentStatus('idle');
           setShowPaymentModal(false);
-          dialog.showError(`Payment ${status}. Please try again.`, 'Payment Failed');
+          const errorMsg = status === 'failed' 
+            ? 'Payment failed. Please try again or use a different payment method.'
+            : 'Payment was cancelled. Please try again if you wish to proceed.';
+          dialog.showError(errorMsg, 'Payment Failed');
         } else if (status === 'pending') {
-          // Still pending, continue checking
-          setPaymentStatus('checking');
+          // Still pending - continue checking with exponential backoff (max 5 retries)
+          if (retryCount < 5) {
+            setPaymentStatus('checking');
+            const delay = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s, 10s, 10s
+            setTimeout(async () => {
+              await checkPaymentStatus(retryCount + 1);
+            }, delay);
+          } else {
+            // Max retries reached - show message but keep checking
+            console.warn('Max retries reached for payment status check, payment still pending');
+            setPaymentStatus('checking');
+            // Continue checking but with longer intervals
+            setTimeout(async () => {
+              await checkPaymentStatus(0); // Reset retry count for extended checking
+            }, 10000);
+          }
+        } else if (status === 'no_pending_payment') {
+          // No pending payment found - might already be paid or doesn't exist
+          setPaymentStatus('idle');
+          fetchBilling(); // Refresh to see current state
+        }
+      } else {
+        // API call succeeded but no data - log and retry
+        console.warn('Payment status check returned no data, retrying...');
+        if (retryCount < 3) {
+          setTimeout(async () => {
+            await checkPaymentStatus(retryCount + 1);
+          }, 2000);
         }
       }
     } catch (err) {
       console.error('Error checking payment status:', err);
+      // Retry on error (network issues, etc.) - but limit retries
+      if (retryCount < 3) {
+        setTimeout(async () => {
+          await checkPaymentStatus(retryCount + 1);
+        }, 2000);
+      } else {
+        // Max retries reached - show error
+        setPaymentStatus('idle');
+        dialog.showError('Unable to verify payment status. Please check your connection and try again.', 'Status Check Failed');
+      }
     }
   };
 
@@ -349,44 +390,20 @@ export default function BillingDetailScreen() {
         return;
       }
 
-      // Step 4: Confirm Payment Intent (REQUIRED for live keys)
-      console.log('Step 4: Confirming payment intent...');
-      
-      const confirmResult = await apiService.confirmPaymentIntent(
-        billing.id,
-        paymentIntentId,
-        returnUrl
-      );
-
-      console.log('Payment intent confirmation result:', {
-        success: confirmResult.success,
-        hasData: !!confirmResult.data,
-        error: confirmResult.message,
-        status: confirmResult.data?.status,
-        hasNextAction: !!confirmResult.data?.next_action,
-      });
-
-      if (!confirmResult.success || !confirmResult.data) {
-        const errorMsg = confirmResult.message || 'Failed to confirm payment intent';
-        console.error('Payment intent confirmation failed:', errorMsg);
-        setCardFormError(errorMsg);
-        setProcessing(false);
-        return;
-      }
-
-      const confirmedPaymentIntent = confirmResult.data.payment_intent || confirmResult.data;
-      const status = confirmedPaymentIntent.attributes?.status || confirmResult.data.status;
-      const nextAction = confirmedPaymentIntent.attributes?.next_action || confirmResult.data.next_action;
+      // Handle payment status directly from attachment result
+      // PayMongo completes payment when attachment succeeds - no separate confirmation needed
+      const status = attachResult.data.attributes?.status;
+      const nextAction = attachResult.data.attributes?.next_action;
 
       // Log full nextAction object for debugging
-      console.log('Full nextAction object after confirmation:', JSON.stringify(nextAction, null, 2));
+      console.log('Full nextAction object after attachment:', JSON.stringify(nextAction, null, 2));
 
       // Extract redirect URL - only use if next_action.type === 'redirect' AND redirect.url exists
       const redirectUrl = (nextAction?.type === 'redirect' && nextAction?.redirect?.url) 
         ? nextAction.redirect.url 
         : null;
 
-      console.log('Step 5: Handling payment status after confirmation:', {
+      console.log('Handling payment status after attachment:', {
         status,
         hasNextAction: !!nextAction,
         nextActionType: nextAction?.type,
@@ -394,12 +411,15 @@ export default function BillingDetailScreen() {
         nextActionKeys: nextAction ? Object.keys(nextAction) : [],
       });
 
-      // Step 5: Handle payment status after confirmation
+      // Handle payment status based on attachment result
+      // CRITICAL: Always verify with backend before showing success to ensure data integrity
       if (status === 'succeeded') {
-        console.log('Payment succeeded after confirmation');
-        // Payment succeeded
+        console.log('Payment attachment returned succeeded - verifying with backend before confirming...');
+        // Don't show success yet - verify with backend first
+        // Backend will only mark as 'paid' if PayMongo confirms 'succeeded'
         setPaymentStatus('checking');
         setShowPaymentModal(false);
+        // Check immediately to verify payment status with backend
         setTimeout(async () => {
           await checkPaymentStatus();
         }, 1000);
@@ -427,19 +447,44 @@ export default function BillingDetailScreen() {
           setClientKey(null);
           setPublicKey(null);
         }
-      } else if (status === 'processing') {
-        console.log('Payment is processing after confirmation, will check status');
-        // Payment is processing
+      } else if (status === 'processing' || status === 'awaiting_capture') {
+        console.log(`Payment is ${status} after attachment, will check status with backend`);
+        // Payment is processing or awaiting capture - check status with backend
         setPaymentStatus('checking');
         setShowPaymentModal(false);
+        // Use exponential backoff for processing status (2s, then 4s, then 8s max)
         setTimeout(async () => {
           await checkPaymentStatus();
         }, 2000);
-      } else {
-        const errorMsg = `Payment could not be processed. Status: ${status}. Please try again.`;
-        console.error('Unexpected payment status after confirmation:', status);
+      } else if (status === 'awaiting_payment_method') {
+        // Payment method issue - show specific error
+        const errorMsg = 'Payment method validation failed. Please check your card details and try again.';
+        console.error('Payment method validation failed:', status);
         setCardFormError(errorMsg);
+        dialog.showError(errorMsg, 'Payment Method Error');
         setProcessing(false);
+      } else if (status === 'failed' || status === 'cancelled' || status === 'void') {
+        // Payment failed or was cancelled/voided
+        const errorMsg = status === 'failed' 
+          ? 'Payment failed. Please try again or use a different payment method.'
+          : 'Payment was cancelled. Please try again if you wish to proceed.';
+        console.error(`Payment ${status} after attachment`);
+        setCardFormError(errorMsg);
+        dialog.showError(errorMsg, 'Payment Failed');
+        setProcessing(false);
+        setPaymentStatus('idle');
+      } else {
+        // Unknown or unhandled status
+        const errorMsg = `Payment status is unclear (${status}). Please check your payment status or contact support.`;
+        console.error('Unexpected payment status after attachment:', status);
+        setCardFormError(errorMsg);
+        dialog.showError(errorMsg, 'Payment Status Unknown');
+        setProcessing(false);
+        // Set to checking to allow backend to determine actual status
+        setPaymentStatus('checking');
+        setTimeout(async () => {
+          await checkPaymentStatus();
+        }, 2000);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';

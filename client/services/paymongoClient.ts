@@ -272,8 +272,12 @@ class PayMongoClient {
   }
 
   /**
-   * Confirm Payment Intent (REQUIRED for live keys)
-   * This must be called after attaching a payment method
+   * Confirm Payment Intent (DEPRECATED - Not needed for PayMongo)
+   * 
+   * @deprecated This method is deprecated. PayMongo does not require a separate confirmation step.
+   * When attaching a payment method, the payment is automatically confirmed if successful.
+   * The attachment response already contains the final status and next_action.
+   * This method is kept for backward compatibility but should not be used in new code.
    */
   async confirmPaymentIntent(
     paymentIntentId: string,

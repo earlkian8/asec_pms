@@ -27,6 +27,109 @@ class ClientBillingController extends Controller
     }
 
     /**
+     * Map PayMongo payment intent status to our payment status
+     * CRITICAL: Only 'succeeded' maps to 'paid' - ensures data integrity
+     * 
+     * @param string $payMongoStatus
+     * @return string
+     */
+    private function mapPayMongoStatusToPaymentStatus(string $payMongoStatus): string
+    {
+        switch ($payMongoStatus) {
+            case 'succeeded':
+                return 'paid';
+            case 'failed':
+                return 'failed';
+            case 'cancelled':
+            case 'void':
+                return 'cancelled';
+            case 'processing':
+            case 'awaiting_next_action':
+            case 'awaiting_payment_method':
+            case 'awaiting_capture':
+                return 'pending';
+            default:
+                // Unknown status - log warning but keep as pending for safety
+                Log::warning('Unknown PayMongo payment intent status encountered', [
+                    'status' => $payMongoStatus,
+                    'timestamp' => now()->toIso8601String(),
+                ]);
+                return 'pending';
+        }
+    }
+
+    /**
+     * Update payment status with logging and idempotency checks
+     * Only updates if status actually changes to ensure data integrity
+     * 
+     * @param BillingPayment $payment
+     * @param string $newStatus
+     * @param string $payMongoStatus
+     * @param Billing $billing
+     * @param mixed $client
+     * @return bool True if status was updated, false if already in target state
+     */
+    private function updatePaymentStatus(
+        BillingPayment $payment,
+        string $newStatus,
+        string $payMongoStatus,
+        Billing $billing,
+        $client
+    ): bool {
+        $previousStatus = $payment->payment_status;
+        
+        // Idempotency check: Don't update if already in target state
+        if ($payment->payment_status === $newStatus) {
+            Log::info('Payment status check: Already in target state', [
+                'payment_id' => $payment->id,
+                'payment_code' => $payment->payment_code,
+                'status' => $newStatus,
+                'paymongo_status' => $payMongoStatus,
+            ]);
+            return false;
+        }
+
+        // Log status transition for audit trail
+        Log::info('Payment status transition', [
+            'payment_id' => $payment->id,
+            'payment_code' => $payment->payment_code,
+            'billing_id' => $billing->id,
+            'billing_code' => $billing->billing_code,
+            'previous_status' => $previousStatus,
+            'new_status' => $newStatus,
+            'paymongo_status' => $payMongoStatus,
+            'timestamp' => now()->toIso8601String(),
+        ]);
+
+        // Update payment status
+        $payment->payment_status = $newStatus;
+        $payment->save();
+
+        // Only update billing status when payment status changes to/from 'paid'
+        // This ensures billing status accurately reflects paid amounts
+        $wasPaid = $previousStatus === 'paid';
+        $isPaid = $newStatus === 'paid';
+
+        if ($wasPaid !== $isPaid) {
+            $this->billingService->calculateBillingStatus($billing);
+            $billing->refresh();
+
+            // Notify admin only when payment is actually completed (paid)
+            if ($isPaid) {
+                $this->createSystemNotification(
+                    'general',
+                    'Payment Completed',
+                    "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
+                    $billing->project,
+                    null
+                );
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Get all billings for the authenticated client
      */
     public function index(Request $request)
@@ -370,7 +473,12 @@ class ClientBillingController extends Controller
     }
 
     /**
-     * Confirm payment intent (REQUIRED for live keys)
+     * Confirm payment intent (DEPRECATED - Not needed for PayMongo)
+     * 
+     * @deprecated This endpoint is deprecated. PayMongo does not require a separate confirmation step.
+     * When attaching a payment method, the payment is automatically confirmed if successful.
+     * The attachment response already contains the final status and next_action.
+     * This endpoint is kept for backward compatibility but should not be used in new code.
      */
     public function confirmPaymentIntent(Request $request, $id)
     {
@@ -496,31 +604,23 @@ class ClientBillingController extends Controller
             if ($payMongoResult['success']) {
                 $payMongoStatus = $payMongoResult['status'];
                 
-                // Update payment status based on PayMongo Payment Intent status
-                if ($payMongoStatus === 'succeeded') {
-                    $payment->payment_status = 'paid';
-                    $payment->save();
-                    
-                    // Update billing status
-                    $this->billingService->calculateBillingStatus($billing);
-                    $billing->refresh();
-
-                    // Notify admin
-                    $this->createSystemNotification(
-                        'general',
-                        'Payment Completed',
-                        "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
-                        $billing->project,
-                        null
-                    );
-                } elseif (in_array($payMongoStatus, ['failed', 'cancel'])) {
-                    $payment->payment_status = $payMongoStatus === 'cancel' ? 'cancelled' : 'failed';
-                    $payment->save();
-                } elseif (in_array($payMongoStatus, ['awaiting_payment_method', 'awaiting_next_action', 'processing'])) {
-                    // Keep as pending for these intermediate states
-                    $payment->payment_status = 'pending';
-                    $payment->save();
-                }
+                // Map PayMongo status to our payment status using comprehensive mapping
+                $newPaymentStatus = $this->mapPayMongoStatusToPaymentStatus($payMongoStatus);
+                
+                // Update payment status with logging and idempotency checks
+                $this->updatePaymentStatus($payment, $newPaymentStatus, $payMongoStatus, $billing, $client);
+                
+                // Refresh payment to get updated status
+                $payment->refresh();
+            } else {
+                // PayMongo API call failed - log error but don't change payment status
+                // This ensures we don't mark as paid if we can't verify with PayMongo
+                Log::error('Failed to retrieve PayMongo payment intent status', [
+                    'payment_id' => $payment->id,
+                    'payment_code' => $payment->payment_code,
+                    'payment_intent_id' => $payment->paymongo_payment_intent_id,
+                    'error' => $payMongoResult['error'] ?? 'Unknown error',
+                ]);
             }
         } elseif ($payment->paymongo_source_id) {
             // Legacy GCash source-based payments (for backward compatibility)
@@ -546,57 +646,81 @@ class ClientBillingController extends Controller
                     );
                     
                     if ($paymentResult['success']) {
-                        $paymentStatus = $paymentResult['status'];
+                        $paymentStatusFromResult = $paymentResult['status'];
                         
-                        if ($paymentStatus === 'paid') {
-                            $payment->payment_status = 'paid';
+                        // Map payment status - only 'paid' should mark as paid
+                        // Use similar logic to payment intent status mapping
+                        $newPaymentStatus = $paymentStatusFromResult === 'paid' ? 'paid' : 
+                                          ($paymentStatusFromResult === 'failed' ? 'failed' : 'pending');
+                        
+                        // Update with logging and idempotency
+                        $previousStatus = $payment->payment_status;
+                        if ($payment->payment_status !== $newPaymentStatus) {
+                            Log::info('Legacy source payment status transition', [
+                                'payment_id' => $payment->id,
+                                'payment_code' => $payment->payment_code,
+                                'previous_status' => $previousStatus,
+                                'new_status' => $newPaymentStatus,
+                                'source_status' => $sourceStatus,
+                                'payment_result_status' => $paymentStatusFromResult,
+                            ]);
+                            
+                            $payment->payment_status = $newPaymentStatus;
                             $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
                                 'payment_id' => $paymentResult['payment_id'],
                             ]);
                             $payment->save();
                             
-                            // Update billing status
-                            $this->billingService->calculateBillingStatus($billing);
-                            $billing->refresh();
-
-                            // Notify admin
-                            $this->createSystemNotification(
-                                'general',
-                                'Payment Completed',
-                                "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
-                                $billing->project,
-                                null
-                            );
-                        } elseif (in_array($paymentStatus, ['failed', 'pending'])) {
-                            // Payment creation succeeded but status is pending or failed
-                            $payment->payment_status = $paymentStatus === 'pending' ? 'pending' : 'failed';
-                            $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
-                                'payment_id' => $paymentResult['payment_id'],
-                            ]);
-                            $payment->save();
+                            // Only update billing if status changed to/from 'paid'
+                            if (($previousStatus === 'paid') !== ($newPaymentStatus === 'paid')) {
+                                $this->billingService->calculateBillingStatus($billing);
+                                $billing->refresh();
+                                
+                                if ($newPaymentStatus === 'paid') {
+                                    $this->createSystemNotification(
+                                        'general',
+                                        'Payment Completed',
+                                        "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
+                                        $billing->project,
+                                        null
+                                    );
+                                }
+                            }
                         }
+                    } else {
+                        // Payment creation failed - log but don't change status
+                        Log::error('Failed to create payment from source', [
+                            'payment_id' => $payment->id,
+                            'payment_code' => $payment->payment_code,
+                            'source_id' => $payment->paymongo_source_id,
+                            'error' => $paymentResult['error'] ?? 'Unknown error',
+                        ]);
                     }
                 } elseif ($sourceStatus === 'paid') {
-                    // Source is already paid (shouldn't happen, but handle it)
-                    $payment->payment_status = 'paid';
-                    $payment->save();
-                    
-                    // Update billing status
-                    $this->billingService->calculateBillingStatus($billing);
-                    $billing->refresh();
-
-                    // Notify admin
-                    $this->createSystemNotification(
-                        'general',
-                        'Payment Completed',
-                        "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
-                        $billing->project,
-                        null
-                    );
+                    // Source is already paid - use updatePaymentStatus for consistency
+                    $this->updatePaymentStatus($payment, 'paid', 'source_paid', $billing, $client);
+                    $payment->refresh();
                 } elseif (in_array($sourceStatus, ['failed', 'cancelled'])) {
-                    $payment->payment_status = $sourceStatus;
-                    $payment->save();
+                    // Map source status to payment status
+                    $newPaymentStatus = $sourceStatus === 'cancelled' ? 'cancelled' : 'failed';
+                    $this->updatePaymentStatus($payment, $newPaymentStatus, $sourceStatus, $billing, $client);
+                    $payment->refresh();
+                } else {
+                    // Unknown source status - log and keep as pending
+                    Log::warning('Unknown source status encountered', [
+                        'payment_id' => $payment->id,
+                        'payment_code' => $payment->payment_code,
+                        'source_status' => $sourceStatus,
+                    ]);
                 }
+            } else {
+                // Source API call failed - log error but don't change payment status
+                Log::error('Failed to retrieve PayMongo source status', [
+                    'payment_id' => $payment->id,
+                    'payment_code' => $payment->payment_code,
+                    'source_id' => $payment->paymongo_source_id,
+                    'error' => $sourceResult['error'] ?? 'Unknown error',
+                ]);
             }
         }
 
@@ -824,38 +948,57 @@ class ClientBillingController extends Controller
                         );
                         
                         if ($paymentResult['success']) {
-                            $paymentStatus = $paymentResult['status'];
+                            $paymentStatusFromResult = $paymentResult['status'];
                             
-                            if ($paymentStatus === 'paid') {
-                                $payment->payment_status = 'paid';
+                            // Map payment status - only 'paid' should mark as paid
+                            $newPaymentStatus = $paymentStatusFromResult === 'paid' ? 'paid' : 
+                                              ($paymentStatusFromResult === 'failed' ? 'failed' : 'pending');
+                            
+                            // Update with logging and idempotency
+                            $previousStatus = $payment->payment_status;
+                            if ($payment->payment_status !== $newPaymentStatus) {
+                                Log::info('Payment return handler: Payment status transition', [
+                                    'payment_id' => $payment->id,
+                                    'payment_code' => $payment->payment_code,
+                                    'previous_status' => $previousStatus,
+                                    'new_status' => $newPaymentStatus,
+                                    'source_status' => $sourceStatus,
+                                    'payment_result_status' => $paymentStatusFromResult,
+                                ]);
+                                
+                                $payment->payment_status = $newPaymentStatus;
                                 $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
                                     'payment_id' => $paymentResult['payment_id'],
                                 ]);
                                 $payment->save();
                                 
-                                // Update billing status
+                                // Only update billing if status changed to/from 'paid'
                                 $billing = $payment->billing;
-                                if ($billing) {
+                                if ($billing && (($previousStatus === 'paid') !== ($newPaymentStatus === 'paid'))) {
                                     $this->billingService->calculateBillingStatus($billing);
                                 }
-                            } elseif (in_array($paymentStatus, ['failed', 'pending'])) {
-                                // Payment creation succeeded but status is pending or failed
-                                $payment->payment_status = $paymentStatus === 'pending' ? 'pending' : 'failed';
-                                $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
-                                    'payment_id' => $paymentResult['payment_id'],
-                                ]);
-                                $payment->save();
                             }
                         }
                     } elseif ($sourceStatus === 'paid') {
-                        // Source is already paid (shouldn't happen, but handle it)
-                        $payment->payment_status = 'paid';
-                        $payment->save();
-                        
-                        // Update billing status
-                        $billing = $payment->billing;
-                        if ($billing) {
-                            $this->billingService->calculateBillingStatus($billing);
+                        // Source is already paid - use consistent status update
+                        $previousStatus = $payment->payment_status;
+                        if ($payment->payment_status !== 'paid') {
+                            Log::info('Payment return handler: Source already paid', [
+                                'payment_id' => $payment->id,
+                                'payment_code' => $payment->payment_code,
+                                'previous_status' => $previousStatus,
+                                'new_status' => 'paid',
+                                'source_status' => $sourceStatus,
+                            ]);
+                            
+                            $payment->payment_status = 'paid';
+                            $payment->save();
+                            
+                            // Update billing status
+                            $billing = $payment->billing;
+                            if ($billing) {
+                                $this->billingService->calculateBillingStatus($billing);
+                            }
                         }
                     }
                 }
@@ -892,8 +1035,20 @@ class ClientBillingController extends Controller
             $payment = BillingPayment::where('payment_code', $paymentCode)->first();
             
             if ($payment) {
-                $payment->payment_status = 'failed';
-                $payment->save();
+                // Only update if not already failed (idempotency)
+                if ($payment->payment_status !== 'failed') {
+                    $previousStatus = $payment->payment_status;
+                    
+                    Log::info('Payment return handler: Payment marked as failed', [
+                        'payment_id' => $payment->id,
+                        'payment_code' => $payment->payment_code,
+                        'previous_status' => $previousStatus,
+                        'new_status' => 'failed',
+                    ]);
+                    
+                    $payment->payment_status = 'failed';
+                    $payment->save();
+                }
             }
         } catch (\Exception $e) {
             Log::error('Payment Failed Handler Error', [

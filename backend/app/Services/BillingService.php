@@ -95,7 +95,11 @@ class BillingService
 
     public function calculateBillingStatus(Billing $billing)
     {
-        $totalPaid = $billing->payments()->sum('payment_amount');
+        // CRITICAL: Only sum payments with status='paid' to ensure data integrity
+        // Pending, failed, or cancelled payments should not count towards billing status
+        $totalPaid = $billing->payments()
+            ->where('payment_status', 'paid')
+            ->sum('payment_amount');
         
         if ($totalPaid == 0) {
             $billing->status = 'unpaid';

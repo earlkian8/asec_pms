@@ -277,8 +277,16 @@ class PayMongoService
     }
 
     /**
-     * Confirm payment intent (REQUIRED for live keys)
-     * This must be called after attaching a payment method
+     * Confirm payment intent (DEPRECATED - Not needed for PayMongo)
+     * 
+     * @deprecated This method is deprecated. PayMongo does not require a separate confirmation step.
+     * When attaching a payment method, the payment is automatically confirmed if successful.
+     * The attachment response already contains the final status and next_action.
+     * This method is kept for backward compatibility but should not be used in new code.
+     * 
+     * @param string $paymentIntentId
+     * @param string|null $returnUrl
+     * @return array
      */
     public function confirmPaymentIntent(string $paymentIntentId, ?string $returnUrl = null)
     {

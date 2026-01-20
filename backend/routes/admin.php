@@ -156,7 +156,14 @@ Route::middleware('auth')->group(function () {
     });
     // Reports & Analytics
     Route::prefix('reports')->name('reports.')->group(function(){
-        Route::get('/', [ReportsController::class, 'index'])->name('index');
+        Route::get('/', [ReportsController::class, 'index'])->middleware('permission:reports.view')->name('index');
+        Route::get('/export/project-performance', [ReportsController::class, 'exportProjectPerformance'])->middleware('permission:reports.view')->name('export.project-performance');
+        Route::get('/export/financial', [ReportsController::class, 'exportFinancial'])->middleware('permission:reports.view')->name('export.financial');
+        Route::get('/export/client', [ReportsController::class, 'exportClient'])->middleware('permission:reports.view')->name('export.client');
+        Route::get('/export/inventory', [ReportsController::class, 'exportInventory'])->middleware('permission:reports.view')->name('export.inventory');
+        Route::get('/export/team-productivity', [ReportsController::class, 'exportTeamProductivity'])->middleware('permission:reports.view')->name('export.team-productivity');
+        Route::get('/export/budget', [ReportsController::class, 'exportBudget'])->middleware('permission:reports.view')->name('export.budget');
+        Route::get('/export/all', [ReportsController::class, 'exportAll'])->middleware('permission:reports.view')->name('export.all');
     });
 
     // User Management

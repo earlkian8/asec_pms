@@ -14,6 +14,7 @@ import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import { Trash2, SquarePen, Filter, X, Search, ArrowUpDown, AlertCircle, FolderOpen, Plus, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { Switch } from "@/Components/ui/switch";
 import { usePermission } from '@/utils/permissions';
 import { toast } from 'sonner';
@@ -52,8 +53,6 @@ export default function ClientTypesIndex() {
   const [deleteClientType, setDeleteClientType] = useState(null);
   const [showFilterCard, setShowFilterCard] = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
-  const filterCardRef = useRef(null);
-  const sortCardRef = useRef(null);
   
   const initializeFilters = (filterProps) => {
     return {
@@ -77,57 +76,6 @@ export default function ClientTypesIndex() {
     if (pageProps.sort_order) setSortOrder(pageProps.sort_order);
   }, [pageProps.sort_by, pageProps.sort_order]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const target = event.target;
-      
-      let isSelectClick = false;
-      
-      if (target.closest) {
-        isSelectClick = 
-          target.closest('[data-radix-select-content]') ||
-          target.closest('[data-radix-select-viewport]') ||
-          target.closest('[data-radix-select-item]') ||
-          target.closest('[role="listbox"]') ||
-          target.closest('[role="option"]');
-      }
-      
-      if (!isSelectClick && target.getAttribute) {
-        const role = target.getAttribute('role');
-        const dataAttr = target.getAttribute('data-radix-select-content') || 
-                        target.getAttribute('data-radix-select-viewport') ||
-                        target.getAttribute('data-radix-select-item');
-        isSelectClick = role === 'listbox' || role === 'option' || !!dataAttr;
-      }
-      
-      if (!isSelectClick) {
-        let current = target;
-        while (current) {
-          if (current.id && current.id.startsWith('radix-')) {
-            isSelectClick = true;
-            break;
-          }
-          current = current.parentElement;
-        }
-      }
-
-      if (isSelectClick) {
-        return;
-      }
-
-      if (filterCardRef.current && !filterCardRef.current.contains(event.target)) {
-        setShowFilterCard(false);
-      }
-      if (sortCardRef.current && !sortCardRef.current.contains(event.target)) {
-        setShowSortCard(false);
-      }
-    };
-
-    if (showFilterCard || showSortCard) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showFilterCard, showSortCard]);
 
   // Count active filters
   const activeFiltersCount = () => {
@@ -392,34 +340,32 @@ export default function ClientTypesIndex() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <div className="relative">
-                    <Button
-                      onClick={() => {
-                        setShowFilterCard(!showFilterCard);
-                        setShowSortCard(false);
-                      }}
-                      variant="outline"
-                      className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center ${
-                        activeFiltersCount() > 0
-                          ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                      title="Filters"
-                    >
-                      <Filter className="h-4 w-4" />
-                      {activeFiltersCount() > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
-                          {activeFiltersCount()}
-                        </span>
-                      )}
-                    </Button>
-
-                    {/* Filter Card */}
-                    {showFilterCard && (
-                      <div 
-                        ref={filterCardRef} 
-                        className="absolute top-full right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-50 overflow-hidden flex flex-col max-h-[400px]"
+                  <DropdownMenu open={showFilterCard} onOpenChange={(open) => {
+                    setShowFilterCard(open);
+                    if (open) setShowSortCard(false);
+                  }}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative ${
+                          activeFiltersCount() > 0
+                            ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                        title="Filters"
                       >
+                        <Filter className="h-4 w-4" />
+                        {activeFiltersCount() > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                            {activeFiltersCount()}
+                          </span>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-96 p-0 rounded-xl shadow-2xl border-2 border-gray-200 overflow-hidden flex flex-col max-h-[400px] bg-white"
+                    >
                         <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">
                             <Filter className="h-4 w-4 text-white" />
@@ -477,30 +423,27 @@ export default function ClientTypesIndex() {
                             Apply Filters
                           </Button>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
 
                   {/* Sort Button */}
-                  <div className="relative">
-                    <Button
-                      onClick={() => {
-                        setShowSortCard(!showSortCard);
-                        setShowFilterCard(false);
-                      }}
-                      variant="outline"
-                      className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                      title="Sort"
-                    >
-                      <ArrowUpDown className="h-4 w-4" />
-                    </Button>
-
-                    {/* Sort Card */}
-                    {showSortCard && (
-                      <div 
-                        ref={sortCardRef} 
-                        className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border-2 border-gray-200 z-50 overflow-hidden flex flex-col max-h-[300px]"
+                  <DropdownMenu open={showSortCard} onOpenChange={(open) => {
+                    setShowSortCard(open);
+                    if (open) setShowFilterCard(false);
+                  }}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative"
+                        title="Sort"
                       >
+                        <ArrowUpDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent 
+                      align="end" 
+                      className="w-80 p-0 rounded-xl shadow-2xl border-2 border-gray-200 overflow-hidden flex flex-col max-h-[300px] bg-white"
+                    >
                         <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
                           <div className="flex items-center gap-2">
                             <ArrowUpDown className="h-4 w-4 text-white" />
@@ -559,9 +502,8 @@ export default function ClientTypesIndex() {
                             Apply Sort
                           </Button>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
               </div>
               {has('clients.create') && (

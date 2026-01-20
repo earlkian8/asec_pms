@@ -66,6 +66,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/store/{project}', [ProjectMilestonesController::class, 'store'])->middleware('permission:project-milestones.create')->name('store');
             Route::put('/update/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'update'])->middleware('permission:project-milestones.update')->name('update');
             Route::delete('/destroy/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'destroy'])->middleware('permission:project-milestones.delete')->name('destroy');
+            Route::get('/export-pdf/{project}', [ProjectMilestonesController::class, 'exportPdf'])->middleware('permission:project-milestones.view')->name('export-pdf');
         });
 
         // Project Tasks

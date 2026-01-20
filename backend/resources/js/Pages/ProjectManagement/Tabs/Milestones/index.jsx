@@ -93,6 +93,9 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
   
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
+  
   // Filter and sort states
   const [searchInput, setSearchInput] = useState(milestoneData?.search || '');
   const [showFilterCard, setShowFilterCard] = useState(false);
@@ -293,6 +296,25 @@ export default function MilestonesTab({ project, milestoneData }) {
         setShowSortCard(false);
       }
     });
+  };
+
+  // Handle PDF export
+  const handleExportPdf = () => {
+    if (isExporting) return;
+    
+    setIsExporting(true);
+    const exportUrl = route('project-management.project-milestones.export-pdf', project.id);
+    
+    // Open in new window to trigger download
+    window.open(exportUrl, '_blank');
+    
+    // Show success toast after a delay
+    setTimeout(() => {
+      setIsExporting(false);
+      toast.success('Milestone PDF export initiated', {
+        description: 'Your PDF download should start shortly.',
+      });
+    }, 1000);
   };
 
   // Reset/Clear all filters
@@ -861,6 +883,25 @@ export default function MilestonesTab({ project, milestoneData }) {
           </div>
         </div>
         <div className="flex gap-2">
+          {has('project-milestones.view') && (
+            <Button
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md hover:shadow-lg transition-all duration-200 px-6 h-11 whitespace-nowrap"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Export PDF
+                </>
+              )}
+            </Button>
+          )}
           {has('project-milestones.create') && (
             <Button
               className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md hover:shadow-lg transition-all duration-200 px-6 h-11 whitespace-nowrap"

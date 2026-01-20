@@ -38,6 +38,14 @@ import EditReceivingReport from './edit';
 import DeleteReceivingReport from './delete';
 import DeleteMaterialAllocation from './delete-allocation';
 import ViewMaterialAllocation from './view';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/Components/ui/dropdown-menu';
 
 export default function MaterialAllocationTab({ project, materialAllocationData }) {
   const { has } = usePermission();

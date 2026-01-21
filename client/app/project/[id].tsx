@@ -50,6 +50,21 @@ export default function ProjectDetailScreen() {
     }).format(amount);
   };
 
+  const getRoleIcon = (role: string): { icon: string; color: string; borderColor: string; bgColor: string } => {
+    const roleLower = role.toLowerCase();
+    if (roleLower.includes('manager') || roleLower.includes('lead') || roleLower.includes('supervisor')) {
+      return { icon: 'briefcase-outline', color: '#3B82F6', borderColor: '#3B82F650', bgColor: '#3B82F615' }; // blue
+    } else if (roleLower.includes('engineer') || roleLower.includes('architect') || roleLower.includes('designer')) {
+      return { icon: 'hammer-outline', color: '#8B5CF6', borderColor: '#8B5CF650', bgColor: '#8B5CF615' }; // purple
+    } else if (roleLower.includes('worker') || roleLower.includes('labor') || roleLower.includes('technician')) {
+      return { icon: 'construct-outline', color: '#F59E0B', borderColor: '#F59E0B50', bgColor: '#F59E0B15' }; // amber
+    } else if (roleLower.includes('admin') || roleLower.includes('coordinator')) {
+      return { icon: 'document-text-outline', color: '#10B981', borderColor: '#10B98150', bgColor: '#10B98115' }; // green
+    } else {
+      return { icon: 'person-outline', color: '#6B7280', borderColor: '#6B728050', bgColor: '#6B728015' }; // gray (default)
+    }
+  };
+
   const backgroundColor = '#F3F4F6'; // gray-100
   const cardBg = '#FFFFFF'; // white
   const textColor = '#111827'; // gray-900
@@ -512,21 +527,30 @@ export default function ProjectDetailScreen() {
             {project.teamMembers.length > 0 && (
               <View style={[styles.teamCard, { backgroundColor: cardBg, borderColor }]}>
                 <Text style={[styles.sectionTitle, { color: textColor }]}>Team Members</Text>
-                {project.teamMembers.map((member) => (
-                  <View key={member.id} style={styles.teamMember}>
-                    <View style={[styles.teamAvatar, { backgroundColor: '#3B82F6' }]}>
-                      <Ionicons name="person" size={20} color="#FFFFFF" />
+                {project.teamMembers.map((member, index) => {
+                  const roleIcon = getRoleIcon(member.role || '');
+                  return (
+                    <View
+                      key={member.id}
+                      style={[
+                        styles.teamMember,
+                        { borderLeftColor: roleIcon.borderColor },
+                        index < project.teamMembers.length - 1 && { borderBottomColor: borderColor },
+                      ]}>
+                      <View style={[styles.teamIconContainer, { backgroundColor: roleIcon.bgColor }]}>
+                        <Ionicons name={roleIcon.icon as any} size={18} color={roleIcon.color} />
+                      </View>
+                      <View style={styles.teamInfo}>
+                        <Text style={[styles.teamName, { color: textColor }, !member.name && styles.placeholderText]}>
+                          {member.name || 'Unnamed Team Member'}
+                        </Text>
+                        <Text style={[styles.teamRole, { color: textSecondary }, !member.role && styles.placeholderText]}>
+                          {member.role || 'No role specified'}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.teamInfo}>
-                      <Text style={[styles.teamName, { color: textColor }, !member.name && styles.placeholderText]}>
-                        {member.name || 'Unnamed Team Member'}
-                      </Text>
-                      <Text style={[styles.teamRole, { color: textSecondary }, !member.role && styles.placeholderText]}>
-                        {member.role || 'No role specified'}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
@@ -1059,26 +1083,31 @@ const styles = StyleSheet.create({
   teamMember: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    paddingLeft: 12,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    marginBottom: 0,
   },
-  teamAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  teamIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   teamInfo: {
     flex: 1,
   },
   teamName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   teamRole: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '400',
   },
   milestonesList: {

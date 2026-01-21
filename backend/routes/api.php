@@ -109,7 +109,7 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::get('/dashboard/history', [TaskManagementDashboardController::class, 'history']);
     Route::get('/tasks', [TaskManagementDashboardController::class, 'tasks']);
     
-    // Task detail routes
+    // Task detail routes 
     Route::get('/tasks/{id}', [TaskManagementTaskController::class, 'show']);
     Route::put('/tasks/{id}/status', [TaskManagementTaskController::class, 'updateStatus']);
     

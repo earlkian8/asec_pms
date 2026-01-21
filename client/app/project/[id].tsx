@@ -11,6 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import { FIRM_CONTACT } from '@/constants/contact';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +21,7 @@ import { useProjectDetail, ProjectDetail, ProgressUpdate } from '@/hooks/useProj
 import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
 import { useDialog } from '@/contexts/DialogContext';
+import { API_BASE_URL, apiService } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -238,6 +240,21 @@ export default function ProjectDetailScreen() {
         <Text style={[styles.updateDescription, { color: textSecondary }, !update.description && styles.placeholderText]}>
           {update.description || 'No description provided for this update.'}
         </Text>
+        {update.file && update.file.type?.startsWith('image/') && update.file.url && (
+          <View style={styles.updateImageContainer}>
+            <Image
+              source={{
+                uri: update.file.url.startsWith('http') 
+                  ? update.file.url 
+                  : `${API_BASE_URL.replace('/api', '')}${update.file.url}`,
+              }}
+              style={styles.updateImage}
+              contentFit="contain"
+              transition={200}
+              placeholder={{ blurhash: 'LGF5]+Yk^6#M@-5c,1J5@[or[Q6.' }}
+            />
+          </View>
+        )}
       </AnimatedCard>
     );
   };
@@ -1202,6 +1219,18 @@ const styles = StyleSheet.create({
   updateDescription: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  updateImageContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  updateImage: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#F9FAFB',
   },
   updateContext: {
     flexDirection: 'row',

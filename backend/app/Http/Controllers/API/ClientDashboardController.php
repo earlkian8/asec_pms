@@ -563,6 +563,29 @@ class ClientDashboardController extends Controller
         foreach ($project->milestones as $milestone) {
             foreach ($milestone->tasks as $task) {
                 foreach ($task->progressUpdates as $update) {
+                    $fileData = null;
+                    if ($update->file_path) {
+                        // Generate storage URL using request host (works for mobile apps, not just localhost)
+                        // This matches TaskDetailModal's approach of using window.location.origin
+                        $fileUrl = null;
+                        if (Storage::disk('public')->exists($update->file_path)) {
+                            // Use request scheme and host instead of APP_URL to work from any client
+                            $scheme = $request->getScheme();
+                            $host = $request->getHost();
+                            $port = $request->getPort();
+                            $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+                            $fileUrl = $baseUrl . '/storage/' . $update->file_path;
+                        }
+                        
+                        $fileData = [
+                            'path' => $update->file_path,
+                            'type' => $update->file_type,
+                            'name' => $update->original_name,
+                            'size' => $update->file_size,
+                            'url' => $fileUrl,
+                        ];
+                    }
+
                     $allProgressUpdates->push([
                         'id' => (string) $update->id,
                         'title' => 'Progress Update - ' . $task->title,
@@ -574,6 +597,7 @@ class ClientDashboardController extends Controller
                         'taskName' => $task->title,
                         'milestoneId' => (string) $milestone->id,
                         'milestoneName' => $milestone->name,
+                        'file' => $fileData,
                     ]);
                 }
             }
@@ -803,13 +827,19 @@ class ClientDashboardController extends Controller
         $fileContent = Storage::disk($disk)->get($progressUpdate->file_path);
         $mimeType = Storage::disk($disk)->mimeType($progressUpdate->file_path) ?? 'application/octet-stream';
 
+        // Determine Content-Disposition: inline for images, attachment for other files
+        $isImage = str_starts_with($mimeType, 'image/');
+        $contentDisposition = $isImage 
+            ? 'inline; filename="' . $progressUpdate->original_name . '"'
+            : 'attachment; filename="' . $progressUpdate->original_name . '"';
+
         // Get the origin from the request for CORS
         $origin = $request->header('Origin');
         
         // Build response with file
         $response = response($fileContent, 200)
             ->header('Content-Type', $mimeType)
-            ->header('Content-Disposition', 'attachment; filename="' . $progressUpdate->original_name . '"')
+            ->header('Content-Disposition', $contentDisposition)
             ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
             ->header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With, Accept')
             ->header('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type');

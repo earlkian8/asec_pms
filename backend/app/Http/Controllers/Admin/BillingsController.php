@@ -284,6 +284,10 @@ class BillingsController extends Controller
             }
 
             $validated['paymongo_payment_intent_id'] = $payMongoResult['payment_intent_id'];
+            // Set reference_number to PayMongo payment intent ID for easy tracking
+            if (empty($validated['reference_number'])) {
+                $validated['reference_number'] = $payMongoResult['payment_intent_id'];
+            }
             $validated['payment_status'] = 'pending';
             $validated['paymongo_metadata'] = [
                 'client_key' => $payMongoResult['client_key'] ?? null,

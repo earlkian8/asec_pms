@@ -183,8 +183,9 @@ class ReportsController extends Controller
 
     private function getFinancialReport($startDate, $endDate, $projectId, $clientId)
     {
-        // Revenue (from payments)
-        $paymentQuery = BillingPayment::whereBetween('payment_date', [$startDate, $endDate]);
+        // Revenue (from payments) - Only count paid payments for accurate revenue reporting
+        $paymentQuery = BillingPayment::where('payment_status', 'paid')
+            ->whereBetween('payment_date', [$startDate, $endDate]);
         
         if ($projectId) {
             $paymentQuery->whereHas('billing', function ($q) use ($projectId) {
@@ -521,8 +522,9 @@ class ReportsController extends Controller
                 $monthEnd = $endDate;
             }
 
-            // Revenue
-            $revenue = BillingPayment::whereBetween('payment_date', [$current, $monthEnd])
+            // Revenue - Only count paid payments
+            $revenue = BillingPayment::where('payment_status', 'paid')
+                ->whereBetween('payment_date', [$current, $monthEnd])
                 ->sum('payment_amount');
 
             // Expenses

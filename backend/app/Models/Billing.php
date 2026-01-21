@@ -52,7 +52,10 @@ class Billing extends Model
     // Computed properties
     public function getTotalPaidAttribute()
     {
-        return $this->payments()->sum('payment_amount');
+        // Only count payments with status='paid' - pending, failed, or cancelled payments should not count
+        return $this->payments()
+            ->where('payment_status', 'paid')
+            ->sum('payment_amount');
     }
 
     public function getRemainingAmountAttribute()

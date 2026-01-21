@@ -66,6 +66,8 @@ export default function BillingDetailScreen() {
   const [cardFormError, setCardFormError] = useState<string | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [amountTouched, setAmountTouched] = useState(false);
+  const [showPaymentDetailModal, setShowPaymentDetailModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Billing['payments'][0] | null>(null);
 
   useEffect(() => {
     fetchBilling();
@@ -796,7 +798,14 @@ export default function BillingDetailScreen() {
           <View style={[styles.card, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
             <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Payment History</Text>
             {billing.payments.slice(0, 10).map((payment) => (
-              <View key={payment.id} style={styles.paymentItem}>
+              <TouchableOpacity
+                key={payment.id}
+                style={styles.paymentItem}
+                onPress={() => {
+                  setSelectedPayment(payment);
+                  setShowPaymentDetailModal(true);
+                }}
+                activeOpacity={0.7}>
                 <View style={styles.paymentItemHeader}>
                   <Text style={[styles.paymentCode, { color: AppColors.text }]}>{payment.payment_code}</Text>
                   <Text style={[styles.paymentAmount, { color: AppColors.text }]}>
@@ -827,8 +836,9 @@ export default function BillingDetailScreen() {
                       </Text>
                     </View>
                   )}
+                  <Ionicons name="chevron-forward" size={16} color={AppColors.textSecondary} style={{ marginLeft: 'auto' }} />
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -1138,6 +1148,195 @@ export default function BillingDetailScreen() {
               )}
             />
           )}
+        </View>
+      </Modal>
+
+      {/* Payment Detail Receipt Modal */}
+      <Modal
+        visible={showPaymentDetailModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPaymentDetailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.receiptModalContent, { backgroundColor: AppColors.card }]}>
+            {selectedPayment && (
+              <>
+                {/* Receipt Header */}
+                <View style={styles.receiptHeader}>
+                  <View style={styles.receiptHeaderTop}>
+                    <View style={styles.receiptIconContainer}>
+                      <Receipt size={32} color={AppColors.primary} />
+                    </View>
+                    <View style={styles.receiptTitleContainer}>
+                      <Text style={[styles.receiptTitle, { color: AppColors.text }]}>Payment Receipt</Text>
+                      <Text style={[styles.receiptSubtitle, { color: AppColors.textSecondary }]}>Transaction Details</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowPaymentDetailModal(false)} style={styles.receiptCloseButton}>
+                    <XCircle size={24} color={AppColors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.receiptScroll} showsVerticalScrollIndicator={false}>
+                  {/* Payment Code - Prominent */}
+                  <View style={styles.receiptPaymentCodeSection}>
+                    <Text style={[styles.receiptPaymentCodeLabel, { color: AppColors.textSecondary }]}>Payment Code</Text>
+                    <Text style={[styles.receiptPaymentCode, { color: AppColors.primary }]}>
+                      {selectedPayment.payment_code}
+                    </Text>
+                  </View>
+
+                  {/* Amount Section */}
+                  <View style={[styles.receiptAmountSection, { backgroundColor: AppColors.background }]}>
+                    <Text style={[styles.receiptAmountLabel, { color: AppColors.textSecondary }]}>Amount Paid</Text>
+                    <Text style={[styles.receiptAmountValue, { color: AppColors.success }]}>
+                      {formatCurrency(selectedPayment.payment_amount)}
+                    </Text>
+                    <Text style={[styles.receiptCurrency, { color: AppColors.textSecondary }]}>PHP</Text>
+                  </View>
+
+                  {/* Status Badge */}
+                  <View style={styles.receiptStatusSection}>
+                    {selectedPayment.payment_status && (
+                      <View style={[styles.receiptStatusBadge, {
+                        backgroundColor: selectedPayment.payment_status === 'paid' ? '#D1FAE5' : 
+                                        selectedPayment.payment_status === 'pending' ? '#FEF3C7' : 
+                                        selectedPayment.payment_status === 'failed' ? '#FEE2E2' : '#E5E7EB',
+                      }]}>
+                        {selectedPayment.payment_status === 'paid' && (
+                          <CheckCircle size={16} color="#065F46" />
+                        )}
+                        {selectedPayment.payment_status === 'pending' && (
+                          <Clock size={16} color="#92400E" />
+                        )}
+                        {(selectedPayment.payment_status === 'failed' || selectedPayment.payment_status === 'cancelled') && (
+                          <XCircle size={16} color={selectedPayment.payment_status === 'failed' ? '#991B1B' : '#6B7280'} />
+                        )}
+                        <Text style={[styles.receiptStatusText, {
+                          color: selectedPayment.payment_status === 'paid' ? '#065F46' : 
+                                 selectedPayment.payment_status === 'pending' ? '#92400E' : 
+                                 selectedPayment.payment_status === 'failed' ? '#991B1B' : '#6B7280',
+                        }]}>
+                          {selectedPayment.payment_status.toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Receipt Divider */}
+                  <View style={[styles.receiptDivider, { backgroundColor: AppColors.border }]} />
+
+                  {/* Payment Details */}
+                  <View style={styles.receiptDetailsSection}>
+                    <Text style={[styles.receiptSectionTitle, { color: AppColors.text }]}>Payment Details</Text>
+                    
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Billing Code</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {billing.billing_code}
+                      </Text>
+                    </View>
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Project</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {billing.project.project_name}
+                      </Text>
+                    </View>
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Payment Date</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {new Date(selectedPayment.payment_date).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Payment Method</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {selectedPayment.payment_method === 'paymongo' ? 'PayMongo (Card)' : 
+                         selectedPayment.payment_method.replace('_', ' ').toUpperCase()}
+                      </Text>
+                    </View>
+
+                    {selectedPayment.reference_number && (
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Reference Number</Text>
+                        <Text style={[styles.receiptDetailValue, { color: AppColors.text, fontFamily: 'monospace' }]}>
+                          {selectedPayment.reference_number}
+                        </Text>
+                      </View>
+                    )}
+
+                    {selectedPayment.paymongo_payment_intent_id && (
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>PayMongo Payment ID</Text>
+                        <Text style={[styles.receiptDetailValue, { color: AppColors.text, fontFamily: 'monospace', fontSize: 11 }]}>
+                          {selectedPayment.paymongo_payment_intent_id}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* PayMongo Section */}
+                  {selectedPayment.payment_method === 'paymongo' && (
+                    <>
+                      <View style={[styles.receiptDivider, { backgroundColor: AppColors.border, marginTop: 20 }]} />
+                      <View style={styles.receiptDetailsSection}>
+                        <Text style={[styles.receiptSectionTitle, { color: AppColors.text }]}>Payment Gateway</Text>
+                        <View style={[styles.receiptGatewayBadge, { backgroundColor: `${AppColors.primary}15` }]}>
+                          <CreditCard size={18} color={AppColors.primary} />
+                          <Text style={[styles.receiptGatewayText, { color: AppColors.primary }]}>PayMongo</Text>
+                        </View>
+                        <Text style={[styles.receiptGatewayInfo, { color: AppColors.textSecondary }]}>
+                          Your payment was processed securely through PayMongo payment gateway
+                        </Text>
+                      </View>
+                    </>
+                  )}
+
+                  {/* Receipt Footer */}
+                  <View style={styles.receiptFooter}>
+                    <View style={[styles.receiptDivider, { backgroundColor: AppColors.border }]} />
+                    {selectedPayment.payment_status === 'paid' ? (
+                      <>
+                        <Text style={[styles.receiptThankYou, { color: AppColors.success }]}>Payment Confirmed!</Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary }]}>
+                          Thank you for your payment. Your transaction has been successfully processed.
+                        </Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary, marginTop: 4 }]}>
+                          This receipt serves as your official payment confirmation.
+                        </Text>
+                      </>
+                    ) : selectedPayment.payment_status === 'pending' ? (
+                      <>
+                        <Text style={[styles.receiptThankYou, { color: AppColors.warning }]}>Payment Pending</Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary }]}>
+                          Your payment is currently being processed. Please allow a few moments for the transaction to complete.
+                        </Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary, marginTop: 4 }]}>
+                          You will receive a confirmation once the payment is successfully processed.
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.receiptThankYou, { color: AppColors.text }]}>Payment Status</Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary }]}>
+                          This receipt shows the current status of your payment transaction.
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+          </View>
         </View>
       </Modal>
     </View>
@@ -1694,6 +1893,181 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: AppColors.background,
+  },
+  receiptModalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '95%',
+    paddingBottom: 40,
+  },
+  receiptHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: AppColors.border,
+  },
+  receiptHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  receiptIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${AppColors.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  receiptTitleContainer: {
+    flex: 1,
+  },
+  receiptTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  receiptSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  receiptCloseButton: {
+    padding: 4,
+  },
+  receiptScroll: {
+    padding: 20,
+  },
+  receiptPaymentCodeSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: AppColors.border,
+  },
+  receiptPaymentCodeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  receiptPaymentCode: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+  },
+  receiptAmountSection: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: AppColors.success,
+    borderStyle: 'dashed',
+  },
+  receiptAmountLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  receiptAmountValue: {
+    fontSize: 36,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  receiptCurrency: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  receiptStatusSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  receiptStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1.5,
+  },
+  receiptStatusText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  receiptDivider: {
+    height: 1,
+    marginVertical: 20,
+  },
+  receiptDetailsSection: {
+    marginBottom: 20,
+  },
+  receiptSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  receiptDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: `${AppColors.border}80`,
+  },
+  receiptDetailLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  receiptDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1.5,
+    textAlign: 'right',
+  },
+  receiptGatewayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  receiptGatewayText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  receiptGatewayInfo: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  receiptFooter: {
+    alignItems: 'center',
+    paddingTop: 20,
+    marginTop: 10,
+  },
+  receiptThankYou: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  receiptFooterText: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
 

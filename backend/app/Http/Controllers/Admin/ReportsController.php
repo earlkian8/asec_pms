@@ -17,6 +17,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\Reports\ProjectPerformanceExport;
+use App\Exports\Reports\FinancialReportExport;
+use App\Exports\Reports\ClientReportExport;
+use App\Exports\Reports\InventoryReportExport;
+use App\Exports\Reports\TeamProductivityExport;
+use App\Exports\Reports\BudgetReportExport;
+use App\Exports\Reports\AllReportsExport;
 
 class ReportsController extends Controller
 {
@@ -556,6 +564,170 @@ class ReportsController extends Controller
         }
 
         return $months;
+    }
+
+    public function exportProjectPerformance(Request $request)
+    {
+        $dateRange = $request->get('date_range', 'last_6_months');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $projectId = $request->get('project_id');
+        $clientId = $request->get('client_id');
+        $format = $request->get('format', 'xlsx');
+
+        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
+        $projectPerformance = $this->getProjectPerformanceReport($dateStart, $dateEnd, $projectId, $clientId);
+
+        $filename = $this->generateFilename('project-performance', $dateRange, $startDate, $endDate, $format);
+
+        if ($format === 'csv') {
+            return Excel::download(new ProjectPerformanceExport($projectPerformance), $filename, \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new ProjectPerformanceExport($projectPerformance), $filename);
+    }
+
+    public function exportFinancial(Request $request)
+    {
+        $dateRange = $request->get('date_range', 'last_6_months');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $projectId = $request->get('project_id');
+        $clientId = $request->get('client_id');
+        $format = $request->get('format', 'xlsx');
+
+        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
+        $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
+
+        $filename = $this->generateFilename('financial-report', $dateRange, $startDate, $endDate, $format);
+
+        if ($format === 'csv') {
+            return Excel::download(new FinancialReportExport($financialReport), $filename, \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new FinancialReportExport($financialReport), $filename);
+    }
+
+    public function exportClient(Request $request)
+    {
+        $dateRange = $request->get('date_range', 'last_6_months');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $clientId = $request->get('client_id');
+        $format = $request->get('format', 'xlsx');
+
+        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
+        $clientReport = $this->getClientReport($dateStart, $dateEnd, $clientId);
+
+        $filename = $this->generateFilename('client-report', $dateRange, $startDate, $endDate, $format);
+
+        if ($format === 'csv') {
+            return Excel::download(new ClientReportExport($clientReport), $filename, \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new ClientReportExport($clientReport), $filename);
+    }
+
+    public function exportInventory(Request $request)
+    {
+        $format = $request->get('format', 'xlsx');
+        $inventoryReport = $this->getInventoryReport();
+
+        $filename = $this->generateFilename('inventory-report', 'all', null, null, $format);
+
+        if ($format === 'csv') {
+            return Excel::download(new InventoryReportExport($inventoryReport), $filename, \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new InventoryReportExport($inventoryReport), $filename);
+    }
+
+    public function exportTeamProductivity(Request $request)
+    {
+        $dateRange = $request->get('date_range', 'last_6_months');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $projectId = $request->get('project_id');
+        $format = $request->get('format', 'xlsx');
+
+        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
+        $teamProductivity = $this->getTeamProductivityReport($dateStart, $dateEnd, $projectId);
+
+        $filename = $this->generateFilename('team-productivity', $dateRange, $startDate, $endDate, $format);
+
+        if ($format === 'csv') {
+            return Excel::download(new TeamProductivityExport($teamProductivity), $filename, \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new TeamProductivityExport($teamProductivity), $filename);
+    }
+
+    public function exportBudget(Request $request)
+    {
+        $dateRange = $request->get('date_range', 'last_6_months');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $projectId = $request->get('project_id');
+        $clientId = $request->get('client_id');
+        $format = $request->get('format', 'xlsx');
+
+        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
+        $budgetReport = $this->getBudgetReport($dateStart, $dateEnd, $projectId, $clientId);
+
+        $filename = $this->generateFilename('budget-report', $dateRange, $startDate, $endDate, $format);
+
+        if ($format === 'csv') {
+            return Excel::download(new BudgetReportExport($budgetReport), $filename, \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new BudgetReportExport($budgetReport), $filename);
+    }
+
+    public function exportAll(Request $request)
+    {
+        $dateRange = $request->get('date_range', 'last_6_months');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        $projectId = $request->get('project_id');
+        $clientId = $request->get('client_id');
+
+        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
+
+        $projectPerformance = $this->getProjectPerformanceReport($dateStart, $dateEnd, $projectId, $clientId);
+        $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
+        $clientReport = $this->getClientReport($dateStart, $dateEnd, $clientId);
+        $inventoryReport = $this->getInventoryReport();
+        $teamProductivity = $this->getTeamProductivityReport($dateStart, $dateEnd, $projectId);
+        $budgetReport = $this->getBudgetReport($dateStart, $dateEnd, $projectId, $clientId);
+
+        $filename = $this->generateFilename('all-reports', $dateRange, $startDate, $endDate, 'xlsx');
+
+        return Excel::download(
+            new AllReportsExport(
+                $projectPerformance,
+                $financialReport,
+                $clientReport,
+                $inventoryReport,
+                $teamProductivity,
+                $budgetReport
+            ),
+            $filename
+        );
+    }
+
+    private function generateFilename($reportType, $dateRange, $startDate, $endDate, $format)
+    {
+        $timestamp = now()->format('Ymd_His');
+        $dateRangeStr = 'all';
+
+        if ($startDate && $endDate) {
+            $dateRangeStr = Carbon::parse($startDate)->format('Y-m-d') . '_to_' . Carbon::parse($endDate)->format('Y-m-d');
+        } elseif ($dateRange && $dateRange !== 'custom') {
+            $dateRangeStr = str_replace('_', '-', $dateRange);
+        }
+
+        $extension = $format === 'csv' ? 'csv' : 'xlsx';
+        return "{$reportType}_{$dateRangeStr}_{$timestamp}.{$extension}";
     }
 }
 

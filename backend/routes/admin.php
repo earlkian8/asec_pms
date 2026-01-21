@@ -66,6 +66,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/store/{project}', [ProjectMilestonesController::class, 'store'])->middleware('permission:project-milestones.create')->name('store');
             Route::put('/update/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'update'])->middleware('permission:project-milestones.update')->name('update');
             Route::delete('/destroy/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'destroy'])->middleware('permission:project-milestones.delete')->name('destroy');
+            Route::get('/export-pdf/{project}', [ProjectMilestonesController::class, 'exportPdf'])->middleware('permission:project-milestones.view')->name('export-pdf');
         });
 
         // Project Tasks
@@ -156,7 +157,14 @@ Route::middleware('auth')->group(function () {
     });
     // Reports & Analytics
     Route::prefix('reports')->name('reports.')->group(function(){
-        Route::get('/', [ReportsController::class, 'index'])->name('index');
+        Route::get('/', [ReportsController::class, 'index'])->middleware('permission:reports.view')->name('index');
+        Route::get('/export/project-performance', [ReportsController::class, 'exportProjectPerformance'])->middleware('permission:reports.view')->name('export.project-performance');
+        Route::get('/export/financial', [ReportsController::class, 'exportFinancial'])->middleware('permission:reports.view')->name('export.financial');
+        Route::get('/export/client', [ReportsController::class, 'exportClient'])->middleware('permission:reports.view')->name('export.client');
+        Route::get('/export/inventory', [ReportsController::class, 'exportInventory'])->middleware('permission:reports.view')->name('export.inventory');
+        Route::get('/export/team-productivity', [ReportsController::class, 'exportTeamProductivity'])->middleware('permission:reports.view')->name('export.team-productivity');
+        Route::get('/export/budget', [ReportsController::class, 'exportBudget'])->middleware('permission:reports.view')->name('export.budget');
+        Route::get('/export/all', [ReportsController::class, 'exportAll'])->middleware('permission:reports.view')->name('export.all');
     });
 
     // User Management

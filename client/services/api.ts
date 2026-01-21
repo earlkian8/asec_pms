@@ -1,5 +1,5 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
-
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-inqqb.ondigitalocean.app/api';
+// const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
 interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -44,10 +44,10 @@ class ApiService {
   ): Promise<ApiResponse<T> | Blob | string> {
     const { responseType = 'json', ...fetchOptions } = options;
     const url = `${this.baseURL}${endpoint}`;
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Accept': responseType === 'json' ? 'application/json' : '*/*',
       ...(responseType === 'json' && { 'Content-Type': 'application/json' }),
-      ...fetchOptions.headers,
+      ...(fetchOptions.headers as Record<string, string>),
     };
 
     if (this.token) {
@@ -81,12 +81,39 @@ class ApiService {
         return await response.text();
       }
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // If response is not JSON, return a generic error
         return {
           success: false,
-          message: data.message || 'An error occurred',
+          message: response.statusText || 'An error occurred',
+        };
+      }
+
+      if (!response.ok) {
+        // Extract error message from response
+        let errorMessage = data.message || 'An error occurred';
+        
+        // If there are validation errors, format them into a readable message
+        if (data.errors && typeof data.errors === 'object') {
+          const errorMessages: string[] = [];
+          Object.keys(data.errors).forEach(key => {
+            if (Array.isArray(data.errors[key])) {
+              errorMessages.push(...data.errors[key]);
+            } else if (typeof data.errors[key] === 'string') {
+              errorMessages.push(data.errors[key]);
+            }
+          });
+          if (errorMessages.length > 0) {
+            errorMessage = errorMessages[0]; // Use first error message
+          }
+        }
+
+        return {
+          success: false,
+          message: errorMessage,
           errors: data.errors,
         };
       }
@@ -99,9 +126,18 @@ class ApiService {
       if (responseType !== 'json') {
         throw error;
       }
+      
+      // Handle network errors
+      let errorMessage = 'Network error occurred';
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorMessage = 'Unable to connect to server. Please check your internet connection.';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Network error occurred',
+        message: errorMessage,
       };
     }
   }
@@ -111,31 +147,41 @@ class ApiService {
   }
 
   async post<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
+    const result = await this.request<T>(endpoint, {
       method: 'POST',
       body: JSON.stringify(body),
+      responseType: 'json',
     });
+    return result as ApiResponse<T>;
   }
 
   async put<T>(endpoint: string, body?: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, {
+    const result = await this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(body),
+      responseType: 'json',
     });
+    return result as ApiResponse<T>;
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+    const result = await this.request<T>(endpoint, { 
+      method: 'DELETE',
+      responseType: 'json',
+    });
+    return result as ApiResponse<T>;
   }
 
   // Billing methods
   async getBillings(params?: Record<string, any>): Promise<ApiResponse<any>> {
     const queryString = params ? new URLSearchParams(params).toString() : '';
-    return this.get(`/client/billings${queryString ? `?${queryString}` : ''}`);
+    const result = await this.get(`/client/billings${queryString ? `?${queryString}` : ''}`, { responseType: 'json' });
+    return result as ApiResponse<any>;
   }
 
   async getBilling(id: number): Promise<ApiResponse<any>> {
-    return this.get(`/client/billings/${id}`);
+    const result = await this.get(`/client/billings/${id}`, { responseType: 'json' });
+    return result as ApiResponse<any>;
   }
 
   async initiatePayment(billingId: number, data: { amount?: number; payment_method_type?: 'card' }): Promise<ApiResponse<any>> {
@@ -185,12 +231,14 @@ class ApiService {
   }
 
   async checkPaymentStatus(billingId: number): Promise<ApiResponse<any>> {
-    return this.get(`/client/billings/${billingId}/payment-status`);
+    const result = await this.get(`/client/billings/${billingId}/payment-status`, { responseType: 'json' });
+    return result as ApiResponse<any>;
   }
 
   async getBillingTransactions(params?: Record<string, any>): Promise<ApiResponse<any>> {
     const queryString = params ? new URLSearchParams(params).toString() : '';
-    return this.get(`/client/billings/transactions${queryString ? `?${queryString}` : ''}`);
+    const result = await this.get(`/client/billings/transactions${queryString ? `?${queryString}` : ''}`, { responseType: 'json' });
+    return result as ApiResponse<any>;
   }
 }
 

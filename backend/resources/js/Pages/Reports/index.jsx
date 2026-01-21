@@ -2,38 +2,23 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
-  BarChart3,
   DollarSign,
-  TrendingUp,
   Users,
   Package,
   FileText,
-  Calendar,
-  Filter,
   Download,
-  PieChart
+  ChevronDown
 } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
 import { Button } from '@/Components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/Components/ui/dropdown-menu';
 
 export default function Reports({ 
   projectPerformance, 
@@ -42,7 +27,6 @@ export default function Reports({
   inventoryReport, 
   teamProductivity, 
   budgetReport, 
-  trends,
   filters,
   options 
 }) {
@@ -53,6 +37,8 @@ export default function Reports({
     project_id: filters.project_id || '',
     client_id: filters.client_id || '',
   });
+
+  const [exporting, setExporting] = useState({});
 
   const formatCurrency = (amount) => {
     if (!amount && amount !== 0) return '₱0.00';
@@ -86,30 +72,37 @@ export default function Reports({
     router.get(route('reports.index'));
   };
 
-  // Chart colors
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  const buildExportUrl = (routeName, format = 'xlsx') => {
+    const params = new URLSearchParams({
+      date_range: data.date_range,
+      format: format,
+    });
+    
+    if (data.start_date) params.append('start_date', data.start_date);
+    if (data.end_date) params.append('end_date', data.end_date);
+    if (data.project_id) params.append('project_id', data.project_id);
+    if (data.client_id) params.append('client_id', data.client_id);
+    
+    return route(routeName) + '?' + params.toString();
+  };
 
-  // Prepare chart data
-  const trendsData = trends || [];
-  const projectStatusData = Object.entries(projectPerformance?.by_status || {}).map(([name, value]) => ({
-    name: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    value: value,
-    color: name === 'active' ? '#10b981' : 
-           name === 'completed' ? '#3b82f6' : 
-           name === 'on_hold' ? '#f59e0b' : 
-           name === 'cancelled' ? '#ef4444' : '#6b7280'
-  }));
+  const handleExport = (routeName, format, exportKey) => {
+    setExporting({ ...exporting, [exportKey]: true });
+    const url = buildExportUrl(routeName, format);
+    window.open(url, '_blank');
+    setTimeout(() => {
+      setExporting({ ...exporting, [exportKey]: false });
+    }, 1000);
+  };
 
-  const projectTypeData = Object.entries(projectPerformance?.by_type || {}).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value: value
-  }));
-
-  const billingStatusData = Object.entries(financialReport?.billing_status || {}).map(([status, data]) => ({
-    name: status.charAt(0).toUpperCase() + status.slice(1),
-    value: parseFloat(data.total || 0),
-    count: data.count || 0
-  }));
+  const handleExportAll = () => {
+    setExporting({ ...exporting, all: true });
+    const url = buildExportUrl('reports.export.all', 'xlsx');
+    window.open(url, '_blank');
+    setTimeout(() => {
+      setExporting({ ...exporting, all: false });
+    }, 1000);
+  };
 
   const breadcrumbs = [
     { title: "Home", href: route("dashboard") },
@@ -121,6 +114,23 @@ export default function Reports({
       <Head title="Reports & Analytics" />
 
       <div className="w-full sm:px-3 lg:px-4 space-y-3">
+        {/* Export All Button */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Reports & Analytics</h2>
+              <p className="text-sm text-gray-500 mt-1">Export comprehensive reports in CSV or Excel format</p>
+            </div>
+            <Button 
+              onClick={handleExportAll}
+              disabled={exporting.all}
+              className="flex items-center gap-2"
+            >
+              <Download size={16} />
+              {exporting.all ? 'Exporting...' : 'Export All Reports'}
+            </Button>
+          </div>
+        </div>
 
         {/* Filters */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
@@ -216,6 +226,23 @@ export default function Reports({
               <FileText className="text-gray-600" size={18} />
               Project Performance
             </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-2" disabled={exporting.projectPerformance}>
+                  <Download size={14} />
+                  {exporting.projectPerformance ? 'Exporting...' : 'Export'}
+                  <ChevronDown size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('reports.export.project-performance', 'csv', 'projectPerformance')}>
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('reports.export.project-performance', 'xlsx', 'projectPerformance')}>
+                  Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
@@ -237,40 +264,49 @@ export default function Reports({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div>
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">Projects by Status</h4>
-              <ResponsiveContainer width="100%" height={220}>
-                <RechartsPieChart>
-                  <Pie
-                    data={projectStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {projectStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </RechartsPieChart>
-              </ResponsiveContainer>
+          {/* Projects by Status Table */}
+          <div className="mb-3">
+            <h4 className="text-xs font-semibold text-gray-700 mb-2">Projects by Status</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left p-2 py-2.5 text-xs font-semibold text-gray-700">Status</th>
+                    <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(projectPerformance?.by_status || {}).map(([status, count]) => (
+                    <tr key={status} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="p-2 py-2.5 text-sm text-gray-900 capitalize">{status.replace('_', ' ')}</td>
+                      <td className="text-right p-2 py-2.5 text-sm text-gray-900">{count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">Projects by Type</h4>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={projectTypeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" stroke="#6b7280" style={{ fontSize: '13px' }} />
-                  <YAxis stroke="#6b7280" style={{ fontSize: '13px' }} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          </div>
+
+          {/* Projects by Type Table */}
+          <div>
+            <h4 className="text-xs font-semibold text-gray-700 mb-2">Projects by Type</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left p-2 py-2.5 text-xs font-semibold text-gray-700">Type</th>
+                    <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(projectPerformance?.by_type || {}).map(([type, count]) => (
+                    <tr key={type} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="p-2 py-2.5 text-sm text-gray-900">{type}</td>
+                      <td className="text-right p-2 py-2.5 text-sm text-gray-900">{count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -282,6 +318,23 @@ export default function Reports({
               <DollarSign className="text-gray-600" size={18} />
               Financial Report
             </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-2" disabled={exporting.financial}>
+                  <Download size={14} />
+                  {exporting.financial ? 'Exporting...' : 'Export'}
+                  <ChevronDown size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('reports.export.financial', 'csv', 'financial')}>
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('reports.export.financial', 'xlsx', 'financial')}>
+                  Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
@@ -305,43 +358,28 @@ export default function Reports({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div>
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">Revenue vs Expenses Trend</h4>
-              <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={trendsData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="month" stroke="#6b7280" style={{ fontSize: '13px' }} />
-                  <YAxis stroke="#6b7280" style={{ fontSize: '13px' }} tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Legend />
-                  <Area type="monotone" dataKey="revenue" stroke="#10b981" fillOpacity={1} fill="url(#colorRevenue)" name="Revenue" />
-                  <Area type="monotone" dataKey="total_expenses" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpenses)" name="Expenses" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">Billing Status</h4>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={billingStatusData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" stroke="#6b7280" style={{ fontSize: '13px' }} />
-                  <YAxis stroke="#6b7280" style={{ fontSize: '13px' }} tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Legend />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Amount" />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Billing Status Table */}
+          <div>
+            <h4 className="text-xs font-semibold text-gray-700 mb-2">Billing Status Breakdown</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left p-2 py-2.5 text-xs font-semibold text-gray-700">Status</th>
+                    <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Count</th>
+                    <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(financialReport?.billing_status || {}).map(([status, data]) => (
+                    <tr key={status} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="p-2 py-2.5 text-sm text-gray-900 capitalize">{status}</td>
+                      <td className="text-right p-2 py-2.5 text-sm text-gray-900">{data.count || 0}</td>
+                      <td className="text-right p-2 py-2.5 text-sm text-gray-900">{formatCurrency(data.total || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -350,9 +388,26 @@ export default function Reports({
         <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="text-gray-600" size={18} />
+              <FileText className="text-gray-600" size={18} />
               Budget vs Actual
             </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-2" disabled={exporting.budget}>
+                  <Download size={14} />
+                  {exporting.budget ? 'Exporting...' : 'Export'}
+                  <ChevronDown size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('reports.export.budget', 'csv', 'budget')}>
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('reports.export.budget', 'xlsx', 'budget')}>
+                  Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
@@ -387,7 +442,7 @@ export default function Reports({
                 </tr>
               </thead>
               <tbody>
-                {budgetReport?.projects?.slice(0, 10).map((project) => (
+                {budgetReport?.projects?.map((project) => (
                   <tr key={project.project_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="p-2 py-2.5">
                       <div>
@@ -414,10 +469,29 @@ export default function Reports({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Team Productivity */}
           <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
-              <Users className="text-gray-600" size={18} />
-              Team Productivity
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Users className="text-gray-600" size={18} />
+                Team Productivity
+              </h3>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2" disabled={exporting.teamProductivity}>
+                    <Download size={14} />
+                    {exporting.teamProductivity ? 'Exporting...' : 'Export'}
+                    <ChevronDown size={14} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExport('reports.export.team-productivity', 'csv', 'teamProductivity')}>
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('reports.export.team-productivity', 'xlsx', 'teamProductivity')}>
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <div className="space-y-2 mb-2">
               <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                 <span className="text-xs text-gray-600">Total Hours</span>
@@ -434,26 +508,54 @@ export default function Reports({
             </div>
             <div>
               <h4 className="text-xs font-semibold text-gray-700 mb-2">Top Performers</h4>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                {teamProductivity?.by_user?.slice(0, 5).map((user, index) => (
-                  <div key={user.user_id} className="flex justify-between items-center p-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded border border-gray-200">
-                    <div>
-                      <p className="text-xs font-medium text-gray-900">{user.user_name}</p>
-                      <p className="text-xs text-gray-500">{user.total_hours} hours</p>
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700">{formatCurrency(user.total_cost)}</span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="text-left p-2 py-2.5 text-xs font-semibold text-gray-700">User</th>
+                      <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Hours</th>
+                      <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamProductivity?.by_user?.slice(0, 10).map((user) => (
+                      <tr key={user.user_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="p-2 py-2.5 text-sm text-gray-900">{user.user_name}</td>
+                        <td className="text-right p-2 py-2.5 text-sm text-gray-900">{user.total_hours}</td>
+                        <td className="text-right p-2 py-2.5 text-sm text-gray-900">{formatCurrency(user.total_cost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
 
           {/* Inventory Report */}
           <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
-              <Package className="text-gray-600" size={18} />
-              Inventory Summary
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Package className="text-gray-600" size={18} />
+                Inventory Summary
+              </h3>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2" disabled={exporting.inventory}>
+                    <Download size={14} />
+                    {exporting.inventory ? 'Exporting...' : 'Export'}
+                    <ChevronDown size={14} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExport('reports.export.inventory', 'csv', 'inventory')}>
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('reports.export.inventory', 'xlsx', 'inventory')}>
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded p-2.5 border border-gray-200">
                 <p className="text-xs text-gray-600 mb-1">Total Items</p>
@@ -466,22 +568,36 @@ export default function Reports({
             </div>
             <div>
               <h4 className="text-xs font-semibold text-gray-700 mb-2">Low Stock Items</h4>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                {inventoryReport?.low_stock_items?.length > 0 ? (
-                  inventoryReport.low_stock_items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-2 bg-gradient-to-r from-red-50 to-red-100 rounded border border-red-200">
-                      <div>
-                        <p className="text-xs font-medium text-gray-900">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">{item.item_code}</p>
-                      </div>
-                      <span className="text-xs font-semibold text-red-700">
-                        {item.current_stock} {item.unit_of_measure}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-gray-500 text-center py-2">No low stock items</p>
-                )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="text-left p-2 py-2.5 text-xs font-semibold text-gray-700">Item</th>
+                      <th className="text-right p-2 py-2.5 text-xs font-semibold text-gray-700">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventoryReport?.low_stock_items?.length > 0 ? (
+                      inventoryReport.low_stock_items.map((item) => (
+                        <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="p-2 py-2.5">
+                            <div>
+                              <p className="text-xs font-medium text-gray-900">{item.item_name}</p>
+                              <p className="text-xs text-gray-500">{item.item_code}</p>
+                            </div>
+                          </td>
+                          <td className="text-right p-2 py-2.5 text-sm text-red-700 font-semibold">
+                            {item.current_stock} {item.unit_of_measure}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="2" className="p-2 py-2.5 text-xs text-gray-500 text-center">No low stock items</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -489,10 +605,29 @@ export default function Reports({
 
         {/* Client Report */}
         <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-          <h3 className="text-base font-semibold text-gray-900 mb-2 flex items-center gap-2">
-            <Users className="text-gray-600" size={18} />
-            Top Clients
-          </h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <Users className="text-gray-600" size={18} />
+              Top Clients
+            </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-2" disabled={exporting.client}>
+                  <Download size={14} />
+                  {exporting.client ? 'Exporting...' : 'Export'}
+                  <ChevronDown size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('reports.export.client', 'csv', 'client')}>
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('reports.export.client', 'xlsx', 'client')}>
+                  Export as Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -527,4 +662,3 @@ export default function Reports({
     </AuthenticatedLayout>
   );
 }
-

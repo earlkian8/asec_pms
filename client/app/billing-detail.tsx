@@ -353,7 +353,7 @@ export default function BillingDetailScreen() {
       // PayMongo requires HTTPS public URL for live keys (not localhost or local IP)
       // Use environment variable for public HTTPS URL, or fallback to API base URL
       const PAYMONGO_RETURN_URL = process.env.EXPO_PUBLIC_PAYMONGO_RETURN_URL;
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-inqqb.ondigitalocean.app/api';
       
       // Use configured return URL if available, otherwise construct from API base URL
       const baseReturnUrl = PAYMONGO_RETURN_URL || `${API_BASE_URL}/client/payment/return`;

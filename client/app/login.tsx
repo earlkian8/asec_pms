@@ -15,6 +15,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import Logo from '@/components/Logo';
+import Toast from '@/components/Toast';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const { login } = useAuth();
   const dialog = useDialog();
   const router = useRouter();
@@ -29,11 +32,14 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     // Clear previous errors
     setErrors({});
+    setShowToast(false);
     
     // Validate inputs
     const newErrors: { email?: string; password?: string } = {};
     if (!email || !email.trim()) {
       newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
     }
     if (!password || !password.trim()) {
       newErrors.password = 'Password is required';
@@ -51,6 +57,7 @@ export default function LoginScreen() {
     if (result.success) {
       // Clear errors on success
       setErrors({});
+      setShowToast(false);
       // Redirect to change password page if password needs to be changed
       if (result.mustChangePassword) {
         router.replace('/change-password');
@@ -58,11 +65,28 @@ export default function LoginScreen() {
         router.replace('/(tabs)');
       }
     } else {
-      // Show validation errors on input fields
-      setErrors({
-        email: result.message || 'Invalid credentials. Please try again.',
-        password: result.message || 'Invalid credentials. Please try again.',
-      });
+      // Handle validation errors from backend
+      const fieldErrors: { email?: string; password?: string } = {};
+      
+      if (result.errors) {
+        // Map backend validation errors to fields
+        if (result.errors.email && Array.isArray(result.errors.email)) {
+          fieldErrors.email = result.errors.email[0];
+        }
+        if (result.errors.password && Array.isArray(result.errors.password)) {
+          fieldErrors.password = result.errors.password[0];
+        }
+      }
+
+      // If we have field-specific errors, show them on fields
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors);
+      } else {
+        // Otherwise show general error message in toast
+        const errorMessage = result.message || 'Login failed. Please check your credentials.';
+        setToastMessage(errorMessage);
+        setShowToast(true);
+      }
     }
   };
 
@@ -72,6 +96,9 @@ export default function LoginScreen() {
     if (errors.email) {
       setErrors(prev => ({ ...prev, email: undefined }));
     }
+    if (showToast) {
+      setShowToast(false);
+    }
   };
 
   const handlePasswordChange = (text: string) => {
@@ -79,6 +106,9 @@ export default function LoginScreen() {
     // Clear error when user starts typing
     if (errors.password) {
       setErrors(prev => ({ ...prev, password: undefined }));
+    }
+    if (showToast) {
+      setShowToast(false);
     }
   };
 
@@ -92,6 +122,13 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Toast
+        visible={showToast}
+        message={toastMessage}
+        type="error"
+        duration={5000}
+        onDismiss={() => setShowToast(false)}
+      />
       <LinearGradient
         colors={['#F3F4F6', '#FFFFFF']}
         style={styles.gradient}

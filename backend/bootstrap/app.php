@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         attributes: ['middleware' => ['web', 'auth:sanctum']]
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Add CORS middleware to API routes (must be first)
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+        
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,

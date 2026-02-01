@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
 // const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app.app/api';
 interface ApiResponse<T> {
   success: boolean;

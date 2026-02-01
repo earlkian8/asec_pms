@@ -32,17 +32,8 @@ import {
 import { useDialog } from '@/contexts/DialogContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-const AppColors = {
-  primary: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  card: '#FFFFFF',
-  background: '#F3F4F6',
-  text: '#111827',
-  textSecondary: '#4B5563',
-  border: '#E5E7EB',
-};
+import { AppColors } from '@/constants/colors';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 export default function BillingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -627,14 +618,6 @@ export default function BillingDetailScreen() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {

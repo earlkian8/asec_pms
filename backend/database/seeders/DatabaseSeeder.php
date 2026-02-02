@@ -21,8 +21,11 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             ClientTypeSeeder::class,
+            ProjectTypeSeeder::class,
+            // InventorySeeder::class,
             // ProjectTypeSeeder::class,
             InventorySeeder::class,
+
         ]);
 
         // Create or update admin user with Super Admin role

@@ -68,70 +68,53 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Project Platform',
-            type: 'section',
-            items: [
-                {
-                    title: 'Project Management',
-                    href: route('project-management.index'),
-                    routeName: 'project-management.*',
-                    icon: FolderOpen
-                },
-                {
-                    title: 'Project Type',
-                    href: route('project-type-management.index'),
-                    routeName: 'project-type-management.*',
-                    icon: FolderOpen
-                },
-                {
-                    title: 'Employee Management',
-                    href: route('employee-management.index'),
-                    routeName: 'employee-management.*',
-                    icon: UserCheck
-                }
-            ]
+            title: 'Project Management',
+            href: route('project-management.index'),
+            routeName: 'project-management.*',
+            icon: FolderOpen,
+            type: 'single'
         },
         {
-            title: 'Client Platform',
-            type: 'section',
-            items: [
-                {
-                    title: 'Client Management',
-                    href: route('client-management.index'),
-                    routeName: 'client-management.*',
-                    icon: Users
-                },
-                {
-                    title: 'Client Type',
-                    href: route('client-type-management.index'),
-                    routeName: 'client-type-management.*',
-                    icon: FolderOpen
-                }
-            ]
+            title: 'Project Type',
+            href: route('project-type-management.index'),
+            routeName: 'project-type-management.*',
+            icon: FolderOpen,
+            type: 'single'
         },
         {
-            title: 'Inventory Platform',
-            type: 'section',
-            items: [
-                {
-                    title: 'Inventory Management',
-                    href: route('inventory-management.index'),
-                    routeName: 'inventory-management.*',
-                    icon: Boxes
-                }
-            ]
+            title: 'Employee Management',
+            href: route('employee-management.index'),
+            routeName: 'employee-management.*',
+            icon: UserCheck,
+            type: 'single'
         },
         {
-            title: 'Billing Platform',
-            type: 'section',
-            items: [
-                {
-                    title: 'Billing Management',
-                    href: route('billing-management.index'),
-                    routeName: 'billing-management.*',
-                    icon: BadgeDollarSign
-                }
-            ]
+            title: 'Client Management',
+            href: route('client-management.index'),
+            routeName: 'client-management.*',
+            icon: Users,
+            type: 'single'
+        },
+        {
+            title: 'Client Type',
+            href: route('client-type-management.index'),
+            routeName: 'client-type-management.*',
+            icon: FolderOpen,
+            type: 'single'
+        },
+        {
+            title: 'Inventory Management',
+            href: route('inventory-management.index'),
+            routeName: 'inventory-management.*',
+            icon: Boxes,
+            type: 'single'
+        },
+        {
+            title: 'Billing Management',
+            href: route('billing-management.index'),
+            routeName: 'billing-management.*',
+            icon: BadgeDollarSign,
+            type: 'single'
         },
         {
             title: 'Reports & Analytics',
@@ -172,92 +155,48 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             if (module.title === 'Dashboard') {
                 return has('dashboard.view') ? module : null;
             }
-            if (module.title === 'Project Platform') {
-                // Filter items within the collapsible
-                if (module.items) {
-                    const filteredItems = module.items.filter(item => {
-                        if (item.title === 'Project Management') {
-                            return hasModuleAccess([
-                                'projects.view', 'projects.create', 'projects.update', 'projects.delete',
-                                'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
-                                'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
-                                'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
-                                'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
-                                'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
-                                'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
-                                'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
-                                'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
-                            ]);
-                        }
-                        if (item.title === 'Project Type') {
-                            return hasModuleAccess([
-                                'projects.view', 'projects.create', 'projects.update', 'projects.delete'
-                            ]);
-                        }
-                        if (item.title === 'Employee Management') {
-                            return hasModuleAccess([
-                                'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status'
-                            ]);
-                        }
-                        return true;
-                    });
-                    // Only show the collapsible if it has at least one item
-                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
-                }
-                return module;
+            if (module.title === 'Project Management') {
+                return hasModuleAccess([
+                    'projects.view', 'projects.create', 'projects.update', 'projects.delete',
+                    'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
+                    'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
+                    'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+                    'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
+                    'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
+                    'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
+                    'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
+                    'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
+                ]) ? module : null;
             }
-            if (module.title === 'Client Platform') {
-                // Filter items within the collapsible
-                if (module.items) {
-                    const filteredItems = module.items.filter(item => {
-                        if (item.title === 'Client Management') {
-                            return hasModuleAccess([
-                                'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
-                            ]);
-                        }
-                        if (item.title === 'Client Type') {
-                            return hasModuleAccess([
-                                'clients.view', 'clients.create', 'clients.update', 'clients.delete'
-                            ]);
-                        }
-                        return true;
-                    });
-                    // Only show the collapsible if it has at least one item
-                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
-                }
-                return module;
+            if (module.title === 'Project Type') {
+                return hasModuleAccess([
+                    'projects.view', 'projects.create', 'projects.update', 'projects.delete'
+                ]) ? module : null;
             }
-            if (module.title === 'Inventory Platform') {
-                // Filter items within the collapsible
-                if (module.items) {
-                    const filteredItems = module.items.filter(item => {
-                        if (item.title === 'Inventory Management') {
-                            return hasModuleAccess([
-                                'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
-                            ]);
-                        }
-                        return true;
-                    });
-                    // Only show the collapsible if it has at least one item
-                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
-                }
-                return module;
+            if (module.title === 'Employee Management') {
+                return hasModuleAccess([
+                    'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status'
+                ]) ? module : null;
             }
-            if (module.title === 'Billing Platform') {
-                // Filter items within the collapsible
-                if (module.items) {
-                    const filteredItems = module.items.filter(item => {
-                        if (item.title === 'Billing Management') {
-                            return hasModuleAccess([
-                                'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments'
-                            ]);
-                        }
-                        return true;
-                    });
-                    // Only show the collapsible if it has at least one item
-                    return filteredItems.length > 0 ? { ...module, items: filteredItems } : null;
-                }
-                return module;
+            if (module.title === 'Client Management') {
+                return hasModuleAccess([
+                    'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
+                ]) ? module : null;
+            }
+            if (module.title === 'Client Type') {
+                return hasModuleAccess([
+                    'clients.view', 'clients.create', 'clients.update', 'clients.delete'
+                ]) ? module : null;
+            }
+            if (module.title === 'Inventory Management') {
+                return hasModuleAccess([
+                    'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
+                ]) ? module : null;
+            }
+            if (module.title === 'Billing Management') {
+                return hasModuleAccess([
+                    'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments'
+                ]) ? module : null;
             }
             if (module.title === 'Reports & Analytics') {
                 return hasModuleAccess([

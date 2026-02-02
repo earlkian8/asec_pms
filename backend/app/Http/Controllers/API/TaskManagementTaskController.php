@@ -149,10 +149,16 @@ class TaskManagementTaskController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $formattedUpdates = $updates->map(function ($update) {
+        // Generate storage URL using request host (works for mobile apps, not just localhost)
+        $scheme = $request->getScheme();
+        $host = $request->getHost();
+        $port = $request->getPort();
+        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+
+        $formattedUpdates = $updates->map(function ($update) use ($baseUrl) {
             $fileUrl = null;
             if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                $fileUrl = Storage::disk('public')->url($update->file_path);
+                $fileUrl = $baseUrl . '/storage/' . $update->file_path;
             }
 
             return [
@@ -244,10 +250,15 @@ class TaskManagementTaskController extends Controller
                     );
         }
 
+        // Generate storage URL using request host (works for mobile apps, not just localhost)
+        $scheme = $request->getScheme();
+        $host = $request->getHost();
+        $port = $request->getPort();
+        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            // Generate URL for public storage file
-            $fileUrl = Storage::disk('public')->url($progressUpdate->file_path);
+            $fileUrl = $baseUrl . '/storage/' . $progressUpdate->file_path;
         }
 
         return response()->json([
@@ -330,10 +341,15 @@ class TaskManagementTaskController extends Controller
         $progressUpdate->save();
         $progressUpdate->load('createdBy');
 
+        // Generate storage URL using request host (works for mobile apps, not just localhost)
+        $scheme = $request->getScheme();
+        $host = $request->getHost();
+        $port = $request->getPort();
+        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            // Generate URL for public storage file
-            $fileUrl = Storage::disk('public')->url($progressUpdate->file_path);
+            $fileUrl = $baseUrl . '/storage/' . $progressUpdate->file_path;
         }
 
         return response()->json([

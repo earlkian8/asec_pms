@@ -103,6 +103,12 @@ class ClientBillingController extends Controller
 
         // Update payment status
         $payment->payment_status = $newStatus;
+        
+        // Ensure reference_number is set for PayMongo payments
+        if ($payment->paymongo_payment_intent_id && !$payment->reference_number) {
+            $payment->reference_number = $payment->paymongo_payment_intent_id;
+        }
+        
         $payment->save();
 
         // Only update billing status when payment status changes to/from 'paid'
@@ -318,6 +324,10 @@ class ClientBillingController extends Controller
             }
 
             $payment->paymongo_payment_intent_id = $payMongoResult['payment_intent_id'];
+            // Set reference_number to PayMongo payment intent ID for easy tracking
+            if (!$payment->reference_number) {
+                $payment->reference_number = $payMongoResult['payment_intent_id'];
+            }
             $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
                 'client_key' => $payMongoResult['client_key'] ?? null,
             ]);

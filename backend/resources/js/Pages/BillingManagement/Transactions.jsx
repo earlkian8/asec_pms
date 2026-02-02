@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/Components/ui/table";
 import { Input } from "@/Components/ui/input";
-import { CreditCard, Search, DollarSign, TrendingUp } from 'lucide-react';
+import { CreditCard, Search } from 'lucide-react';
 
 export default function Transactions({ transactions: transactionsData, search: initialSearch }) {
   const [searchInput, setSearchInput] = useState(initialSearch || '');
@@ -45,6 +45,21 @@ export default function Transactions({ transactions: transactionsData, search: i
       'other': 'bg-gray-100 text-gray-800 border border-gray-200',
     };
     return badges[method] || 'bg-gray-100 text-gray-800 border border-gray-200';
+  };
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      'paid': 'bg-green-100 text-green-800 border border-green-200',
+      'pending': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+      'failed': 'bg-red-100 text-red-800 border border-red-200',
+      'cancelled': 'bg-gray-100 text-gray-800 border border-gray-200',
+    };
+    return badges[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 border border-gray-200';
+  };
+
+  const getStatusLabel = (status) => {
+    if (!status) return 'Unknown';
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
   // Handle search with debounce
@@ -104,12 +119,6 @@ export default function Transactions({ transactions: transactionsData, search: i
 
   const showPagination = pageLinks.length > 0 || prevLink?.url || nextLink?.url;
 
-  // Calculate stats
-  const totalTransactions = transactions.length;
-  const totalAmount = transactions.reduce((sum, t) => sum + parseFloat(t.payment_amount || 0), 0);
-  const cashCount = transactions.filter(t => t.payment_method === 'cash').length;
-  const bankTransferCount = transactions.filter(t => t.payment_method === 'bank_transfer').length;
-
   const columns = [
     { header: 'Payment Code', width: '12%' },
     { header: 'Payment Date', width: '10%' },
@@ -118,64 +127,11 @@ export default function Transactions({ transactions: transactionsData, search: i
     { header: 'Payment Amount', width: '12%' },
     { header: 'Payment Method', width: '12%' },
     { header: 'Reference Number', width: '12%' },
-    { header: 'Created By', width: '10%' },
-    { header: 'Notes', width: '15%' },
+    { header: 'Status', width: '10%' },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Quick Stats */}
-      <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Transactions</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{totalTransactions}</p>
-              </div>
-              <div className="bg-blue-200 rounded-full p-3">
-                <CreditCard className="h-5 w-5 text-blue-700" />
-              </div>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Total Amount</p>
-                <p className="text-lg font-bold text-green-900 mt-1">
-                  ₱{formatNumber(totalAmount)}
-                </p>
-              </div>
-              <div className="bg-green-200 rounded-full p-3">
-                <DollarSign className="h-5 w-5 text-green-700" />
-              </div>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Cash Payments</p>
-                <p className="text-2xl font-bold text-purple-900 mt-1">{cashCount}</p>
-              </div>
-              <div className="bg-purple-200 rounded-full p-3">
-                <TrendingUp className="h-5 w-5 text-purple-700" />
-              </div>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-orange-700 uppercase tracking-wide">Bank Transfers</p>
-                <p className="text-2xl font-bold text-orange-900 mt-1">{bankTransferCount}</p>
-              </div>
-              <div className="bg-orange-200 rounded-full p-3">
-                <CreditCard className="h-5 w-5 text-orange-700" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Search Bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between">
         <div className="relative flex-1 max-w-md">
@@ -253,21 +209,18 @@ export default function Transactions({ transactions: transactionsData, search: i
                     </span>
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                    {transaction.reference_number ? (
+                    {(transaction.reference_number || transaction.paymongo_payment_intent_id) ? (
                       <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded border border-gray-200">
-                        {transaction.reference_number}
+                        {transaction.reference_number || transaction.paymongo_payment_intent_id}
                       </span>
                     ) : (
                       <span className="text-gray-400 italic">---</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-left px-4 py-4 text-sm text-gray-700">
-                    {transaction.created_by?.name || '---'}
-                  </TableCell>
-                  <TableCell className="text-left px-4 py-4 text-sm text-gray-700 max-w-xs">
-                    {transaction.notes ? (
-                      <span className="truncate block" title={transaction.notes}>
-                        {transaction.notes}
+                  <TableCell className="text-left px-4 py-4 text-sm">
+                    {transaction.payment_status ? (
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBadge(transaction.payment_status)}`}>
+                        {getStatusLabel(transaction.payment_status)}
                       </span>
                     ) : (
                       <span className="text-gray-400 italic">---</span>

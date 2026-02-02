@@ -13,13 +13,23 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FIRM_CONTACT } from '@/constants/contact';
 import { Ionicons } from '@expo/vector-icons';
+import { Mail, MessageSquare, AlertCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mail } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
-import { useProjectDetail, ProjectDetail, ProgressUpdate } from '@/hooks/useProjectDetail';
-import AnimatedCard from '@/components/AnimatedCard';
+import { useProjectDetail, ProjectDetail } from '@/hooks/useProjectDetail';
 import AnimatedView from '@/components/AnimatedView';
+import AnimatedCard from '@/components/AnimatedCard';
+import MilestoneCard from '@/components/cards/MilestoneCard';
+import UpdateCard from '@/components/cards/UpdateCard';
+import BudgetDisplay from '@/components/cards/BudgetDisplay';
+import InfoRow from '@/components/ui/InfoRow';
+import LoadingState from '@/components/ui/LoadingState';
+import EmptyState from '@/components/ui/EmptyState';
+import { formatCurrency } from '@/utils/formatCurrency';
+import { AppColors } from '@/constants/colors';
+import { getRoleIcon, getProjectStatusColors } from '@/utils/statusHelpers';
 import { useDialog } from '@/contexts/DialogContext';
+import { API_BASE_URL, apiService } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -39,227 +49,26 @@ export default function ProjectDetailScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
-  const backgroundColor = '#F3F4F6'; // gray-100
-  const cardBg = '#FFFFFF'; // white
-  const textColor = '#111827'; // gray-900
-  const textSecondary = '#4B5563'; // gray-600
-  const borderColor = '#E5E7EB'; // gray-200
-
-  const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-    active: { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' }, // green-100/green-700
-    'on-hold': { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' }, // yellow-100/yellow-700
-    completed: { bg: '#DBEAFE', text: '#1E40AF', dot: '#3B82F6' }, // blue-100/blue-700
-    pending: { bg: '#F3F4F6', text: '#4B5563', dot: '#6B7280' }, // gray-100/gray-600
-  };
-
-  const StatBox = ({
-    label,
-    value,
-    icon,
-    color,
-  }: {
-    label: string;
-    value: string | number;
-    icon: string;
-    color: string;
-  }) => (
-    <View style={[styles.statBox, { backgroundColor: cardBg, borderColor }]}>
-      <View style={[styles.statIcon, { backgroundColor: `${color}15` }]}>
-        <Ionicons name={icon as any} size={20} color={color} />
-      </View>
-      <Text style={[styles.statValue, { color: textColor }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: textSecondary }]}>{label}</Text>
-    </View>
-  );
-
-  const MilestoneCard = ({ milestone, index }: { milestone: ProjectDetail['milestones'][0]; index: number }) => {
-    const milestoneStatusColors: Record<string, { bg: string; text: string; icon: string }> = {
-      completed: { bg: '#D1FAE5', text: '#065F46', icon: 'checkmark-circle' }, // green-100/green-700
-      'in-progress': { bg: '#DBEAFE', text: '#1E40AF', icon: 'time' }, // blue-100/blue-700
-      pending: { bg: '#F3F4F6', text: '#4B5563', icon: 'hourglass-outline' }, // gray-100/gray-600
-      'on-hold': { bg: '#FEF3C7', text: '#92400E', icon: 'pause-circle' }, // yellow-100/yellow-700
-    };
-
-    const msStatus = milestoneStatusColors[milestone.status] || milestoneStatusColors.pending;
-
-    return (
-      <AnimatedCard
-        index={index}
-        delay={100}
-        style={[styles.milestoneCard, { backgroundColor: cardBg, borderColor }]}>
-        <View style={styles.milestoneHeader}>
-          <View style={styles.milestoneTitleRow}>
-            <View style={[styles.milestoneStatusBadge, { backgroundColor: msStatus.bg }]}>
-              <Ionicons name={msStatus.icon as any} size={14} color={msStatus.text} />
-              <Text style={[styles.milestoneStatusText, { color: msStatus.text }]}>
-                {milestone.status.replace('-', ' ').toUpperCase()}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.milestoneName, { color: textColor }, !milestone.name && styles.placeholderText]}>
-            {milestone.name || 'Unnamed Milestone'}
-          </Text>
-          <Text style={[styles.milestoneDescription, { color: textSecondary }, !milestone.description && styles.placeholderText]}>
-            {milestone.description || 'No description provided for this milestone.'}
-          </Text>
-        </View>
-
-        <View style={styles.milestoneProgress}>
-          <View style={styles.milestoneProgressHeader}>
-            <Text style={[styles.milestoneProgressLabel, { color: textSecondary }]}>Progress</Text>
-            <Text style={[styles.milestoneProgressPercent, { color: textColor }]}>
-              {milestone.progress}%
-            </Text>
-          </View>
-          <View style={[styles.milestoneProgressBar, { backgroundColor: '#E5E7EB' }]}>
-            <LinearGradient
-              colors={milestone.status === 'completed' ? ['#10B981', '#059669'] : ['#3B82F6', '#2563EB']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.milestoneProgressFill, { width: `${milestone.progress}%` }]}
-            />
-          </View>
-        </View>
-
-        <View style={styles.milestoneInfo}>
-          <View style={styles.milestoneInfoItem}>
-            <Ionicons name="calendar-outline" size={13} color={textSecondary} />
-            <Text style={[styles.milestoneInfoText, { color: textSecondary }]}>
-              Due: {new Date(milestone.dueDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
-          </View>
-          {milestone.completedDate && (
-            <View style={styles.milestoneInfoItem}>
-              <Ionicons name="checkmark-circle-outline" size={13} color="#10B981" />
-              <Text style={[styles.milestoneInfoText, { color: '#10B981' }]}>
-                Completed: {new Date(milestone.completedDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {milestone.tasks && milestone.tasks.length > 0 && (
-          <View style={styles.tasksContainer}>
-            <Text style={[styles.tasksTitle, { color: textColor }]}>Tasks</Text>
-            {milestone.tasks.map((task) => {
-              const taskStatusColors: Record<string, { color: string; icon: string }> = {
-                completed: { color: '#10B981', icon: 'checkmark-circle' },
-                'in-progress': { color: '#3B82F6', icon: 'time' },
-                pending: { color: '#6B7280', icon: 'ellipse-outline' },
-              };
-              const taskStatus = taskStatusColors[task.status] || taskStatusColors.pending;
-
-              return (
-                <View key={task.id} style={styles.taskItem}>
-                  <Ionicons name={taskStatus.icon as any} size={14} color={taskStatus.color} />
-                  <Text style={[styles.taskName, { color: textColor }]}>{task.name || 'Unnamed Task'}</Text>
-                  <Text style={[styles.taskAssignee, { color: textSecondary }, !task.assignedTo && styles.placeholderText]}>
-                    {task.assignedTo || 'Unassigned'}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-      </AnimatedCard>
-    );
-  };
-
-  const UpdateCard = ({ update, index }: { update: ProgressUpdate; index: number }) => {
-    const updateTypeColors: Record<string, { bg: string; icon: string }> = {
-      request: { bg: '#F59E0B', icon: 'chatbubble-ellipses' },
-      progress: { bg: '#3B82F6', icon: 'trending-up' },
-      milestone: { bg: '#10B981', icon: 'flag' },
-      issue: { bg: '#EF4444', icon: 'alert-circle' },
-      general: { bg: '#8B5CF6', icon: 'information-circle' },
-    };
-
-    const updateType = updateTypeColors[update.type] || updateTypeColors.general;
-
-    return (
-      <AnimatedCard
-        index={index}
-        delay={100}
-        style={[styles.updateCard, { backgroundColor: cardBg, borderColor }]}>
-        <View style={styles.updateHeader}>
-          <View style={[styles.updateIconContainer, { backgroundColor: `${updateType.bg}15` }]}>
-            <Ionicons name={updateType.icon as any} size={20} color={updateType.bg} />
-          </View>
-          <View style={styles.updateContent}>
-            <Text style={[styles.updateTitle, { color: textColor }, !update.title && styles.placeholderText]}>
-              {update.title || 'Untitled Update'}
-            </Text>
-            <Text style={[styles.updateDate, { color: textSecondary }]}>
-              {new Date(update.date).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })} • {update.author || 'Unknown Author'}
-            </Text>
-            {(update.taskName || update.milestoneName) && (
-              <View style={styles.updateContext}>
-                {update.milestoneName && (
-                  <View style={styles.updateContextItem}>
-                    <Ionicons name="flag-outline" size={12} color={textSecondary} />
-                    <Text style={[styles.updateContextText, { color: textSecondary }]}>
-                      {update.milestoneName}
-                    </Text>
-                  </View>
-                )}
-                {update.taskName && (
-                  <View style={styles.updateContextItem}>
-                    <Ionicons name="list-outline" size={12} color={textSecondary} />
-                    <Text style={[styles.updateContextText, { color: textSecondary }]}>
-                      {update.taskName}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-        <Text style={[styles.updateDescription, { color: textSecondary }, !update.description && styles.placeholderText]}>
-          {update.description || 'No description provided for this update.'}
-        </Text>
-      </AnimatedCard>
-    );
-  };
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={{ color: '#4B5563', marginTop: 12 }}>Loading project details...</Text>
+      <View style={[styles.container, { backgroundColor: AppColors.background }]}>
+        <LoadingState message="Loading project details..." />
       </View>
     );
   }
 
   if (error || !project) {
     return (
-      <View style={[styles.container, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
-        <Text style={{ color: '#111827', fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>
-          {error || 'Project not found'}
-        </Text>
+      <View style={[styles.container, { backgroundColor: AppColors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <EmptyState
+          icon={AlertCircle}
+          title={error || 'Project not found'}
+          iconColor={AppColors.error}
+        />
         <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: '#3B82F6', marginTop: 16 }]}
+          style={[styles.retryButton, { backgroundColor: AppColors.primary, marginTop: 16 }]}
           onPress={refresh}>
           <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>Retry</Text>
         </TouchableOpacity>
@@ -298,22 +107,43 @@ export default function ProjectDetailScreen() {
     return null;
   }
 
+  // Simple StatBox for project detail stats
+  const StatBox = ({
+    label,
+    value,
+    icon,
+    color,
+  }: {
+    label: string;
+    value: string | number;
+    icon: string;
+    color: string;
+  }) => (
+    <View style={[styles.statBox, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+      <View style={[styles.statIcon, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon as any} size={20} color={color} />
+      </View>
+      <Text style={[styles.statValue, { color: AppColors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: AppColors.textSecondary }]}>{label}</Text>
+    </View>
+  );
+
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <View style={[styles.container, { backgroundColor: AppColors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+      <View style={[styles.header, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={textColor} />
+          <Ionicons name="arrow-back" size={24} color={AppColors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <View style={styles.headerTitleRow}>
-            <Text style={[styles.headerTitle, { color: textColor }]} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: AppColors.text }]} numberOfLines={1}>
               {project?.name || 'Loading...'}
             </Text>
           </View>
           <View style={styles.headerSubtitle}>
-            <View style={[styles.statusDot, { backgroundColor: statusColors[project?.status || 'pending']?.dot || statusColors.pending.dot }]} />
-            <Text style={[styles.headerSubtitleText, { color: textSecondary }]}>
+            <View style={[styles.statusDot, { backgroundColor: getProjectStatusColors(project?.status || 'pending').dot }]} />
+            <Text style={[styles.headerSubtitleText, { color: AppColors.textSecondary }]}>
               {(project?.status || 'pending').replace('-', ' ').toUpperCase()}
             </Text>
           </View>
@@ -323,13 +153,13 @@ export default function ProjectDetailScreen() {
             style={styles.headerActionButton}
             onPress={() => handleContact()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Mail size={20} color={textColor} />
+            <Mail size={20} color={AppColors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Tabs */}
-      <View style={[styles.tabsContainer, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+      <View style={[styles.tabsContainer, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -346,7 +176,7 @@ export default function ProjectDetailScreen() {
               <Text
                 style={[
                   styles.tabText,
-                  { color: selectedTab === tab ? '#3B82F6' : textSecondary },
+                  { color: selectedTab === tab ? AppColors.primary : AppColors.textSecondary },
                 ]}>
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </Text>
@@ -365,13 +195,13 @@ export default function ProjectDetailScreen() {
         {selectedTab === 'overview' && (
           <>
             {/* Progress Overview */}
-            <View style={[styles.progressCard, { backgroundColor: cardBg, borderColor }]}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Project Progress</Text>
+            <View style={[styles.progressCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Project Progress</Text>
               <View style={styles.progressOverview}>
-                <Text style={[styles.progressPercent, { color: textColor }]}>
+                <Text style={[styles.progressPercent, { color: AppColors.text }]}>
                   {project.progress}%
                 </Text>
-                <View style={[styles.progressBar, { backgroundColor: '#E5E7EB' }]}>
+                <View style={[styles.progressBar, { backgroundColor: AppColors.border }]}>
                   <LinearGradient
                     colors={['#3B82F6', '#2563EB']}
                     start={{ x: 0, y: 0 }}
@@ -417,46 +247,46 @@ export default function ProjectDetailScreen() {
             </View>
 
             {/* Project Details */}
-            <View style={[styles.detailsCard, { backgroundColor: cardBg, borderColor }]}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Project Details</Text>
+            <View style={[styles.detailsCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Project Details</Text>
               <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={18} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }, !project.location && styles.placeholderText]}>
+                <Ionicons name="location-outline" size={18} color={AppColors.textSecondary} />
+                <Text style={[styles.detailText, { color: AppColors.text }, !project.location && styles.placeholderText]}>
                   {project.location || 'No location specified'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
-                <Ionicons name="document-text-outline" size={18} color={textSecondary} />
-                <Text style={[styles.detailText, { color: textColor }, !project.description && styles.placeholderText]}>
+                <Ionicons name="document-text-outline" size={18} color={AppColors.textSecondary} />
+                <Text style={[styles.detailText, { color: AppColors.text }, !project.description && styles.placeholderText]}>
                   {project.description || 'No description provided for this project.'}
                 </Text>
               </View>
             </View>
 
             {/* Budget Breakdown */}
-            <View style={[styles.budgetCard, { backgroundColor: cardBg, borderColor }]}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Budget Breakdown</Text>
+            <View style={[styles.budgetCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Budget Breakdown</Text>
               <View style={styles.budgetRow}>
                 <View style={styles.budgetItem}>
-                  <Text style={[styles.budgetLabel, { color: textSecondary }]}>Total Budget</Text>
-                  <Text style={[styles.budgetValue, { color: textColor }]}>
+                  <Text style={[styles.budgetLabel, { color: AppColors.textSecondary }]}>Total Budget</Text>
+                  <Text style={[styles.budgetValue, { color: AppColors.text }]}>
                     {formatCurrency(project.budget)}
                   </Text>
                 </View>
                 <View style={styles.budgetItem}>
-                  <Text style={[styles.budgetLabel, { color: textSecondary }]}>Spent</Text>
-                  <Text style={[styles.budgetValue, { color: '#EF4444' }]}>
+                  <Text style={[styles.budgetLabel, { color: AppColors.textSecondary }]}>Spent</Text>
+                  <Text style={[styles.budgetValue, { color: AppColors.error }]}>
                     {formatCurrency(project.spent)}
                   </Text>
                 </View>
                 <View style={styles.budgetItem}>
-                  <Text style={[styles.budgetLabel, { color: textSecondary }]}>Remaining</Text>
-                  <Text style={[styles.budgetValue, { color: '#10B981' }]}>
+                  <Text style={[styles.budgetLabel, { color: AppColors.textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.budgetValue, { color: AppColors.success }]}>
                     {formatCurrency(project.budget - project.spent)}
                   </Text>
                 </View>
               </View>
-              <View style={[styles.budgetBar, { backgroundColor: '#E5E7EB' }]}>
+              <View style={[styles.budgetBar, { backgroundColor: AppColors.border }]}>
                 <View
                   style={[
                     styles.budgetFill,
@@ -470,20 +300,20 @@ export default function ProjectDetailScreen() {
               {project.budgetBreakdown && (
                 <View style={styles.budgetBreakdown}>
                   <View style={styles.budgetBreakdownItem}>
-                    <Text style={[styles.budgetBreakdownLabel, { color: textSecondary }]}>Materials</Text>
-                    <Text style={[styles.budgetBreakdownValue, { color: textColor }]}>
+                    <Text style={[styles.budgetBreakdownLabel, { color: AppColors.textSecondary }]}>Materials</Text>
+                    <Text style={[styles.budgetBreakdownValue, { color: AppColors.text }]}>
                       {formatCurrency(project.budgetBreakdown.materialCosts)}
                     </Text>
                   </View>
                   <View style={styles.budgetBreakdownItem}>
-                    <Text style={[styles.budgetBreakdownLabel, { color: textSecondary }]}>Labor</Text>
-                    <Text style={[styles.budgetBreakdownValue, { color: textColor }]}>
+                    <Text style={[styles.budgetBreakdownLabel, { color: AppColors.textSecondary }]}>Labor</Text>
+                    <Text style={[styles.budgetBreakdownValue, { color: AppColors.text }]}>
                       {formatCurrency(project.budgetBreakdown.laborCosts)}
                     </Text>
                   </View>
                   <View style={styles.budgetBreakdownItem}>
-                    <Text style={[styles.budgetBreakdownLabel, { color: textSecondary }]}>Miscellaneous</Text>
-                    <Text style={[styles.budgetBreakdownValue, { color: textColor }]}>
+                    <Text style={[styles.budgetBreakdownLabel, { color: AppColors.textSecondary }]}>Miscellaneous</Text>
+                    <Text style={[styles.budgetBreakdownValue, { color: AppColors.text }]}>
                       {formatCurrency(project.budgetBreakdown.miscellaneousExpenses)}
                     </Text>
                   </View>
@@ -493,30 +323,39 @@ export default function ProjectDetailScreen() {
 
             {/* Team Members */}
             {project.teamMembers.length > 0 && (
-              <View style={[styles.teamCard, { backgroundColor: cardBg, borderColor }]}>
-                <Text style={[styles.sectionTitle, { color: textColor }]}>Team Members</Text>
-                {project.teamMembers.map((member) => (
-                  <View key={member.id} style={styles.teamMember}>
-                    <View style={[styles.teamAvatar, { backgroundColor: '#3B82F6' }]}>
-                      <Ionicons name="person" size={20} color="#FFFFFF" />
+              <View style={[styles.teamCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+                <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Team Members</Text>
+                {project.teamMembers.map((member, index) => {
+                  const roleIcon = getRoleIcon(member.role || '');
+                  return (
+                    <View
+                      key={member.id}
+                      style={[
+                        styles.teamMember,
+                        { borderLeftColor: roleIcon.borderColor },
+                        index < project.teamMembers.length - 1 && { borderBottomColor: AppColors.border },
+                      ]}>
+                      <View style={[styles.teamIconContainer, { backgroundColor: roleIcon.bgColor }]}>
+                        <Ionicons name={roleIcon.icon as any} size={18} color={roleIcon.color} />
+                      </View>
+                      <View style={styles.teamInfo}>
+                        <Text style={[styles.teamName, { color: AppColors.text }, !member.name && styles.placeholderText]}>
+                          {member.name || 'Unnamed Team Member'}
+                        </Text>
+                        <Text style={[styles.teamRole, { color: AppColors.textSecondary }, !member.role && styles.placeholderText]}>
+                          {member.role || 'No role specified'}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.teamInfo}>
-                      <Text style={[styles.teamName, { color: textColor }, !member.name && styles.placeholderText]}>
-                        {member.name || 'Unnamed Team Member'}
-                      </Text>
-                      <Text style={[styles.teamRole, { color: textSecondary }, !member.role && styles.placeholderText]}>
-                        {member.role || 'No role specified'}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
             {/* Action Buttons */}
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#FEF3C7', borderColor }]}
+                style={[styles.actionButton, { backgroundColor: '#FEF3C7', borderColor: AppColors.border }]}
                 onPress={() => setShowRequestUpdate(true)}>
                 <Ionicons name="chatbubble-outline" size={18} color="#F59E0B" />
                 <Text style={[styles.actionButtonText, { color: '#F59E0B' }]}>Request Update</Text>
@@ -538,13 +377,12 @@ export default function ProjectDetailScreen() {
             {project.recentUpdates.length > 0 ? (
               project.recentUpdates.map((update, index) => <UpdateCard key={update.id} update={update} index={index} />)
             ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-ellipses-outline" size={64} color={textSecondary} />
-                <Text style={[styles.emptyStateText, { color: textColor }]}>No updates yet</Text>
-                <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
-                  Updates and progress reports will appear here
-                </Text>
-              </View>
+              <EmptyState
+                icon={MessageSquare}
+                title="No updates yet"
+                subtitle="Updates and progress reports will appear here"
+                iconColor={AppColors.textSecondary}
+              />
             )}
           </View>
         )}
@@ -572,10 +410,10 @@ export default function ProjectDetailScreen() {
                     key={issue.id}
                     index={index}
                     delay={100}
-                    style={[styles.issueCard, { backgroundColor: cardBg, borderColor }]}>
+                    style={StyleSheet.flatten([styles.issueCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
                     <View style={styles.issueHeader}>
                       <View style={styles.issueTitleRow}>
-                        <Text style={[styles.issueTitle, { color: textColor }]}>{issue.title}</Text>
+                        <Text style={[styles.issueTitle, { color: AppColors.text }]}>{issue.title}</Text>
                         <View style={[styles.issueBadge, { backgroundColor: priority.bg }]}>
                           <Text style={[styles.issueBadgeText, { color: priority.text }]}>
                             {issue.priority.toUpperCase()}
@@ -590,28 +428,28 @@ export default function ProjectDetailScreen() {
                         </View>
                       </View>
                     </View>
-                    <Text style={[styles.issueDescription, { color: textSecondary }]}>
+                    <Text style={[styles.issueDescription, { color: AppColors.textSecondary }]}>
                       {issue.description || 'No description provided'}
                     </Text>
                     <View style={styles.issueInfo}>
                       <View style={styles.issueInfoItem}>
-                        <Ionicons name="person-outline" size={13} color={textSecondary} />
-                        <Text style={[styles.issueInfoText, { color: textSecondary }]}>
+                        <Ionicons name="person-outline" size={13} color={AppColors.textSecondary} />
+                        <Text style={[styles.issueInfoText, { color: AppColors.textSecondary }]}>
                           Reported by: {issue.reportedBy}
                         </Text>
                       </View>
                       {issue.assignedTo && issue.assignedTo !== 'Unassigned' && (
                         <View style={styles.issueInfoItem}>
-                          <Ionicons name="person-add-outline" size={13} color={textSecondary} />
-                          <Text style={[styles.issueInfoText, { color: textSecondary }]}>
+                          <Ionicons name="person-add-outline" size={13} color={AppColors.textSecondary} />
+                          <Text style={[styles.issueInfoText, { color: AppColors.textSecondary }]}>
                             Assigned to: {issue.assignedTo}
                           </Text>
                         </View>
                       )}
                       {issue.dueDate && (
                         <View style={styles.issueInfoItem}>
-                          <Ionicons name="calendar-outline" size={13} color={textSecondary} />
-                          <Text style={[styles.issueInfoText, { color: textSecondary }]}>
+                          <Ionicons name="calendar-outline" size={13} color={AppColors.textSecondary} />
+                          <Text style={[styles.issueInfoText, { color: AppColors.textSecondary }]}>
                             Due: {new Date(issue.dueDate).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric',
@@ -638,9 +476,9 @@ export default function ProjectDetailScreen() {
               })
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="checkmark-circle-outline" size={64} color={textSecondary} />
-                <Text style={[styles.emptyStateText, { color: textColor }]}>No issues reported</Text>
-                <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
+                <Ionicons name="checkmark-circle-outline" size={64} color={AppColors.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: AppColors.text }]}>No issues reported</Text>
+                <Text style={[styles.emptyStateSubtext, { color: AppColors.textSecondary }]}>
                   All issues have been resolved
                 </Text>
               </View>
@@ -664,10 +502,10 @@ export default function ProjectDetailScreen() {
                     key={allocation.id}
                     index={index}
                     delay={100}
-                    style={[styles.materialCard, { backgroundColor: cardBg, borderColor }]}>
+                    style={StyleSheet.flatten([styles.materialCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
                     <View style={styles.materialHeader}>
                       <View style={styles.materialTitleRow}>
-                        <Text style={[styles.materialTitle, { color: textColor }]}>
+                        <Text style={[styles.materialTitle, { color: AppColors.text }]}>
                           {allocation.itemName}
                         </Text>
                         <View style={[styles.materialStatusBadge, { backgroundColor: status.bg }]}>
@@ -676,46 +514,46 @@ export default function ProjectDetailScreen() {
                           </Text>
                         </View>
                       </View>
-                      <Text style={[styles.materialCode, { color: textSecondary }]}>
+                      <Text style={[styles.materialCode, { color: AppColors.textSecondary }]}>
                         Code: {allocation.itemCode}
                       </Text>
                     </View>
                     <View style={styles.materialDetails}>
                       <View style={styles.materialDetailRow}>
-                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Allocated</Text>
-                        <Text style={[styles.materialDetailValue, { color: textColor }]}>
+                        <Text style={[styles.materialDetailLabel, { color: AppColors.textSecondary }]}>Allocated</Text>
+                        <Text style={[styles.materialDetailValue, { color: AppColors.text }]}>
                           {allocation.quantityAllocated} {allocation.unit}
                         </Text>
                       </View>
                       <View style={styles.materialDetailRow}>
-                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Received</Text>
-                        <Text style={[styles.materialDetailValue, { color: '#10B981' }]}>
+                        <Text style={[styles.materialDetailLabel, { color: AppColors.textSecondary }]}>Received</Text>
+                        <Text style={[styles.materialDetailValue, { color: AppColors.success }]}>
                           {allocation.quantityReceived} {allocation.unit}
                         </Text>
                       </View>
                       <View style={styles.materialDetailRow}>
-                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Remaining</Text>
-                        <Text style={[styles.materialDetailValue, { color: textColor }]}>
+                        <Text style={[styles.materialDetailLabel, { color: AppColors.textSecondary }]}>Remaining</Text>
+                        <Text style={[styles.materialDetailValue, { color: AppColors.text }]}>
                           {allocation.quantityRemaining} {allocation.unit}
                         </Text>
                       </View>
                       <View style={styles.materialDetailRow}>
-                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Unit Price</Text>
-                        <Text style={[styles.materialDetailValue, { color: textColor }]}>
+                        <Text style={[styles.materialDetailLabel, { color: AppColors.textSecondary }]}>Unit Price</Text>
+                        <Text style={[styles.materialDetailValue, { color: AppColors.text }]}>
                           {formatCurrency(allocation.unitPrice)}
                         </Text>
                       </View>
                       <View style={styles.materialDetailRow}>
-                        <Text style={[styles.materialDetailLabel, { color: textSecondary }]}>Total Cost</Text>
-                        <Text style={[styles.materialDetailValue, { color: '#3B82F6', fontWeight: '700' }]}>
+                        <Text style={[styles.materialDetailLabel, { color: AppColors.textSecondary }]}>Total Cost</Text>
+                        <Text style={[styles.materialDetailValue, { color: AppColors.primary, fontWeight: '700' }]}>
                           {formatCurrency(allocation.totalCost)}
                         </Text>
                       </View>
                     </View>
                     {allocation.notes && (
                       <View style={styles.materialNotes}>
-                        <Text style={[styles.materialNotesLabel, { color: textSecondary }]}>Notes:</Text>
-                        <Text style={[styles.materialNotesText, { color: textSecondary }]}>
+                        <Text style={[styles.materialNotesLabel, { color: AppColors.textSecondary }]}>Notes:</Text>
+                        <Text style={[styles.materialNotesText, { color: AppColors.textSecondary }]}>
                           {allocation.notes}
                         </Text>
                       </View>
@@ -725,9 +563,9 @@ export default function ProjectDetailScreen() {
               })
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="cube-outline" size={64} color={textSecondary} />
-                <Text style={[styles.emptyStateText, { color: textColor }]}>No material allocations</Text>
-                <Text style={[styles.emptyStateSubtext, { color: textSecondary }]}>
+                <Ionicons name="cube-outline" size={64} color={AppColors.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: AppColors.text }]}>No material allocations</Text>
+                <Text style={[styles.emptyStateSubtext, { color: AppColors.textSecondary }]}>
                   Material allocations will appear here when added
                 </Text>
               </View>
@@ -738,16 +576,16 @@ export default function ProjectDetailScreen() {
         {selectedTab === 'budget' && (
           <View style={styles.budgetDetailList}>
             {/* Labor Costs */}
-            <View style={[styles.budgetSectionCard, { backgroundColor: cardBg, borderColor }]}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Labor Costs</Text>
+            <View style={[styles.budgetSectionCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Labor Costs</Text>
               {project.laborCosts && project.laborCosts.length > 0 ? (
                 project.laborCosts.map((laborCost, index) => (
                   <View key={laborCost.id} style={styles.budgetItemRow}>
                     <View style={styles.budgetItemInfo}>
-                      <Text style={[styles.budgetItemName, { color: textColor }]}>
+                      <Text style={[styles.budgetItemName, { color: AppColors.text }]}>
                         {laborCost.assignableName}
                       </Text>
-                      <Text style={[styles.budgetItemMeta, { color: textSecondary }]}>
+                      <Text style={[styles.budgetItemMeta, { color: AppColors.textSecondary }]}>
                         {laborCost.workDate
                           ? new Date(laborCost.workDate).toLocaleDateString('en-US', {
                               month: 'short',
@@ -758,22 +596,22 @@ export default function ProjectDetailScreen() {
                         • {laborCost.hoursWorked} hrs @ {formatCurrency(laborCost.hourlyRate)}/hr
                       </Text>
                       {laborCost.description && (
-                        <Text style={[styles.budgetItemDescription, { color: textSecondary }]}>
+                        <Text style={[styles.budgetItemDescription, { color: AppColors.textSecondary }]}>
                           {laborCost.description}
                         </Text>
                       )}
                     </View>
-                    <Text style={[styles.budgetItemAmount, { color: textColor }]}>
+                    <Text style={[styles.budgetItemAmount, { color: AppColors.text }]}>
                       {formatCurrency(laborCost.totalCost)}
                     </Text>
                   </View>
                 ))
               ) : (
-                <Text style={[styles.emptyText, { color: textSecondary }]}>No labor costs recorded</Text>
+                <Text style={[styles.emptyText, { color: AppColors.textSecondary }]}>No labor costs recorded</Text>
               )}
               {project.budgetBreakdown && (
                 <View style={styles.budgetSectionTotal}>
-                  <Text style={[styles.budgetSectionTotalLabel, { color: textColor }]}>Total Labor Costs</Text>
+                  <Text style={[styles.budgetSectionTotalLabel, { color: AppColors.text }]}>Total Labor Costs</Text>
                   <Text style={[styles.budgetSectionTotalValue, { color: '#3B82F6' }]}>
                     {formatCurrency(project.budgetBreakdown.laborCosts)}
                   </Text>
@@ -782,16 +620,16 @@ export default function ProjectDetailScreen() {
             </View>
 
             {/* Miscellaneous Expenses */}
-            <View style={[styles.budgetSectionCard, { backgroundColor: cardBg, borderColor }]}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Miscellaneous Expenses</Text>
+            <View style={[styles.budgetSectionCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Miscellaneous Expenses</Text>
               {project.miscellaneousExpenses && project.miscellaneousExpenses.length > 0 ? (
                 project.miscellaneousExpenses.map((expense, index) => (
                   <View key={expense.id} style={styles.budgetItemRow}>
                     <View style={styles.budgetItemInfo}>
-                      <Text style={[styles.budgetItemName, { color: textColor }]}>
+                      <Text style={[styles.budgetItemName, { color: AppColors.text }]}>
                         {expense.expenseName}
                       </Text>
-                      <Text style={[styles.budgetItemMeta, { color: textSecondary }]}>
+                      <Text style={[styles.budgetItemMeta, { color: AppColors.textSecondary }]}>
                         {expense.expenseType}{' '}
                         {expense.expenseDate
                           ? '• ' +
@@ -803,22 +641,22 @@ export default function ProjectDetailScreen() {
                           : ''}
                       </Text>
                       {expense.description && (
-                        <Text style={[styles.budgetItemDescription, { color: textSecondary }]}>
+                        <Text style={[styles.budgetItemDescription, { color: AppColors.textSecondary }]}>
                           {expense.description}
                         </Text>
                       )}
                     </View>
-                    <Text style={[styles.budgetItemAmount, { color: textColor }]}>
+                    <Text style={[styles.budgetItemAmount, { color: AppColors.text }]}>
                       {formatCurrency(expense.amount)}
                     </Text>
                   </View>
                 ))
               ) : (
-                <Text style={[styles.emptyText, { color: textSecondary }]}>No miscellaneous expenses recorded</Text>
+                <Text style={[styles.emptyText, { color: AppColors.textSecondary }]}>No miscellaneous expenses recorded</Text>
               )}
               {project.budgetBreakdown && (
                 <View style={styles.budgetSectionTotal}>
-                  <Text style={[styles.budgetSectionTotalLabel, { color: textColor }]}>
+                  <Text style={[styles.budgetSectionTotalLabel, { color: AppColors.text }]}>
                     Total Miscellaneous Expenses
                   </Text>
                   <Text style={[styles.budgetSectionTotalValue, { color: '#3B82F6' }]}>
@@ -1042,26 +880,31 @@ const styles = StyleSheet.create({
   teamMember: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    paddingLeft: 12,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    marginBottom: 0,
   },
-  teamAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  teamIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   teamInfo: {
     flex: 1,
   },
   teamName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   teamRole: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '400',
   },
   milestonesList: {
@@ -1202,6 +1045,18 @@ const styles = StyleSheet.create({
   updateDescription: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  updateImageContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  updateImage: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#F9FAFB',
   },
   updateContext: {
     flexDirection: 'row',

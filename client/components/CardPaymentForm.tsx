@@ -5,8 +5,10 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { CreditCard, HelpCircle, Lock } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface CardPaymentFormProps {
   onSubmit: (cardData: {
@@ -228,6 +230,7 @@ export default function CardPaymentForm({
     <View style={styles.container}>
       {(error || validationError) && (
         <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={18} color={AppColors.error} />
           <Text style={styles.errorText}>{error || validationError}</Text>
         </View>
       )}
@@ -387,10 +390,22 @@ export default function CardPaymentForm({
           style={[styles.button, styles.submitButton, { backgroundColor: AppColors.primary }]}
           onPress={handleSubmit}
           disabled={loading}>
-          <Text style={styles.submitButtonText}>
-            {loading ? 'Processing...' : 'Pay Now'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Lock size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.submitButtonText}>Pay Now</Text>
+            </>
+          )}
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.securityFooter}>
+        <View style={styles.securityRow}>
+          <Lock size={14} color={AppColors.success} />
+          <Text style={styles.securityText}>Your payment information is encrypted and secure</Text>
+        </View>
       </View>
     </View>
   );
@@ -405,11 +420,17 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: AppColors.error,
   },
   errorText: {
     color: '#991B1B',
     fontSize: 14,
     fontWeight: '500',
+    flex: 1,
   },
   formGroup: {
     marginBottom: 16,
@@ -422,10 +443,15 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: 12,
     paddingHorizontal: 16,
     backgroundColor: AppColors.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   inputIcon: {
     marginRight: 12,
@@ -436,11 +462,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   inputFull: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: AppColors.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   row: {
     flexDirection: 'row',
@@ -499,7 +530,14 @@ const styles = StyleSheet.create({
     backgroundColor: AppColors.card,
   },
   submitButton: {
-    // backgroundColor set inline
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: AppColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cancelButtonText: {
     fontSize: 16,
@@ -509,5 +547,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  securityFooter: {
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.border,
+  },
+  securityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  securityText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: AppColors.textSecondary,
   },
 });

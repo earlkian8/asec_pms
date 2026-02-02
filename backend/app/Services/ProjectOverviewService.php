@@ -56,8 +56,10 @@ class ProjectOverviewService
             ->get();
         
         $totalBilled = $billings->sum('billing_amount');
+        // Use the billing model's total_paid attribute which filters by payment_status='paid'
+        // This ensures data integrity and consistency across the system
         $totalPaid = $billings->sum(function ($billing) {
-            return $billing->payments->sum('payment_amount');
+            return $billing->total_paid;
         });
         $totalRemaining = $totalBilled - $totalPaid;
         $paymentPercentage = $totalBilled > 0 ? ($totalPaid / $totalBilled) * 100 : 0;

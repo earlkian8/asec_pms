@@ -15,7 +15,6 @@ import { useDialog } from '@/contexts/DialogContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import Logo from '@/components/Logo';
-import Toast from '@/components/Toast';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -23,8 +22,6 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
   const { login } = useAuth();
   const dialog = useDialog();
   const router = useRouter();
@@ -32,21 +29,16 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     // Clear previous errors
     setErrors({});
-    setShowToast(false);
     
     // Validate inputs
-    const newErrors: { email?: string; password?: string } = {};
-    if (!email || !email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    if (!password || !password.trim()) {
-      newErrors.password = 'Password is required';
+    if (!email || !password) {
+      dialog.showError('Please enter both email and password', 'Error');
+      return;
     }
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    // Client-side email validation
+    if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      setErrors({ email: 'Please enter a valid email address' });
       return;
     }
 
@@ -57,13 +49,17 @@ export default function LoginScreen() {
     if (result.success) {
       // Clear errors on success
       setErrors({});
-      setShowToast(false);
-      // Redirect to change password page if password needs to be changed
-      if (result.mustChangePassword) {
-        router.replace('/change-password');
-      } else {
-        router.replace('/(tabs)');
-      }
+      // Show success message
+      dialog.showSuccess('Login successful!', 'Success');
+      // Small delay to show success message before navigation
+      setTimeout(() => {
+        // Redirect to change password page if password needs to be changed
+        if (result.mustChangePassword) {
+          router.replace('/change-password');
+        } else {
+          router.replace('/(tabs)');
+        }
+      }, 500);
     } else {
       // Handle validation errors from backend
       const fieldErrors: { email?: string; password?: string } = {};
@@ -78,14 +74,16 @@ export default function LoginScreen() {
         }
       }
 
-      // If we have field-specific errors, show them on fields
+      // If we have field-specific errors, show them on fields AND in dialog
       if (Object.keys(fieldErrors).length > 0) {
         setErrors(fieldErrors);
+        // Show dialog with first field error
+        const firstError = Object.values(fieldErrors)[0];
+        dialog.showError(firstError || 'Please check your credentials and try again.', 'Login Failed');
       } else {
-        // Otherwise show general error message in toast
-        const errorMessage = result.message || 'Login failed. Please check your credentials.';
-        setToastMessage(errorMessage);
-        setShowToast(true);
+        // Show general error message in dialog
+        const errorMessage = result.message || 'Please check your credentials and try again.';
+        dialog.showError(errorMessage, 'Login Failed');
       }
     }
   };
@@ -96,9 +94,6 @@ export default function LoginScreen() {
     if (errors.email) {
       setErrors(prev => ({ ...prev, email: undefined }));
     }
-    if (showToast) {
-      setShowToast(false);
-    }
   };
 
   const handlePasswordChange = (text: string) => {
@@ -106,9 +101,6 @@ export default function LoginScreen() {
     // Clear error when user starts typing
     if (errors.password) {
       setErrors(prev => ({ ...prev, password: undefined }));
-    }
-    if (showToast) {
-      setShowToast(false);
     }
   };
 
@@ -122,13 +114,6 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <Toast
-        visible={showToast}
-        message={toastMessage}
-        type="error"
-        duration={5000}
-        onDismiss={() => setShowToast(false)}
-      />
       <LinearGradient
         colors={['#F3F4F6', '#FFFFFF']}
         style={styles.gradient}

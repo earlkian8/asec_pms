@@ -78,8 +78,9 @@ class DashboardController extends Controller
         // Total billed: Sum of all billing amounts from existing billings
         $totalBilled = Billing::sum('billing_amount');
         
-        // Total paid: Sum of all payment transactions (even if billing is deleted)
-        $totalPaid = BillingPayment::sum('payment_amount');
+        // Total paid: Sum of all payment transactions with status='paid' (even if billing is deleted)
+        // Only count confirmed paid payments - exclude pending, failed, or cancelled payments
+        $totalPaid = BillingPayment::where('payment_status', 'paid')->sum('payment_amount');
         
         // Total remaining: Calculate from existing billings minus payments
         // This ensures accuracy even if some billings are deleted
@@ -141,11 +142,12 @@ class DashboardController extends Controller
 
         $totalBudgetUsed = $totalLaborCost + $totalMaterialCost;
 
-        // Monthly Revenue (last 6 months)
-        $monthlyRevenue = BillingPayment::select(
-            DB::raw("DATE_TRUNC('month', payment_date) as month"),
-            DB::raw('SUM(payment_amount) as total')
-        )
+        // Monthly Revenue (last 6 months) - Only count paid payments
+        $monthlyRevenue = BillingPayment::where('payment_status', 'paid')
+            ->select(
+                DB::raw("DATE_TRUNC('month', payment_date) as month"),
+                DB::raw('SUM(payment_amount) as total')
+            )
             ->where('payment_date', '>=', now()->subMonths(6))
             ->groupBy('month')
             ->orderBy('month', 'asc')

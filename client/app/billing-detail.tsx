@@ -32,17 +32,8 @@ import {
 import { useDialog } from '@/contexts/DialogContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-const AppColors = {
-  primary: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  card: '#FFFFFF',
-  background: '#F3F4F6',
-  text: '#111827',
-  textSecondary: '#4B5563',
-  border: '#E5E7EB',
-};
+import { AppColors } from '@/constants/colors';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 export default function BillingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -64,6 +55,10 @@ export default function BillingDetailScreen() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [threeDSecureUrl, setThreeDSecureUrl] = useState<string | null>(null);
   const [cardFormError, setCardFormError] = useState<string | null>(null);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [amountTouched, setAmountTouched] = useState(false);
+  const [showPaymentDetailModal, setShowPaymentDetailModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Billing['payments'][0] | null>(null);
 
   useEffect(() => {
     fetchBilling();
@@ -89,6 +84,8 @@ export default function BillingDetailScreen() {
       setPublicKey(null);
       setCardFormError(null);
       setCustomAmount('');
+      setAmountError(null);
+      setAmountTouched(false);
       setPaymentStatus('idle');
       setProcessing(false);
       setThreeDSecureUrl(null);
@@ -188,6 +185,57 @@ export default function BillingDetailScreen() {
     }
   };
 
+  const validateAmount = (amountStr: string): string | null => {
+    if (!amountStr || amountStr.trim() === '') {
+      return null; // Empty is allowed (will use full remaining amount)
+    }
+
+    const amount = parseFloat(amountStr);
+    
+    if (isNaN(amount)) {
+      return 'Please enter a valid number';
+    }
+
+    if (amount <= 0) {
+      return 'Amount must be greater than 0';
+    }
+
+    // PayMongo maximum amount in cents: 999999999 (approximately 9,999,999.99 PHP)
+    const MAX_AMOUNT_PHP = 9999999.99;
+    if (amount > MAX_AMOUNT_PHP) {
+      return `Maximum payment amount is ${formatCurrency(MAX_AMOUNT_PHP)}. Please contact support for larger payments.`;
+    }
+
+    if (!billing) {
+      return null; // Can't validate without billing info
+    }
+
+    if (amount > billing.remaining_amount) {
+      return `Amount cannot exceed remaining amount of ${formatCurrency(billing.remaining_amount)}`;
+    }
+
+    return null; // Valid
+  };
+
+  const handleAmountChange = (text: string) => {
+    // Remove any non-numeric characters except decimal point
+    const cleaned = text.replace(/[^\d.]/g, '');
+    
+    // Only allow one decimal point
+    const parts = cleaned.split('.');
+    let formatted = parts[0];
+    if (parts.length > 1) {
+      formatted += '.' + parts.slice(1).join('').slice(0, 2); // Limit to 2 decimal places
+    }
+    
+    setCustomAmount(formatted);
+    setAmountTouched(true);
+    
+    // Validate in real-time
+    const error = validateAmount(formatted);
+    setAmountError(error);
+  };
+
   const handleInitiatePayment = async () => {
     console.log('handleInitiatePayment called');
     
@@ -197,18 +245,35 @@ export default function BillingDetailScreen() {
       return;
     }
 
+    // Validate amount before proceeding
+    if (customAmount && customAmount.trim() !== '') {
+      const validationError = validateAmount(customAmount);
+      if (validationError) {
+        setAmountError(validationError);
+        setAmountTouched(true);
+        dialog.showError(validationError);
+        return;
+      }
+    }
+
     const amount = customAmount ? parseFloat(customAmount) : billing.remaining_amount;
     console.log('Payment amount:', amount);
 
     if (isNaN(amount) || amount <= 0) {
       console.error('Invalid amount:', amount);
-      dialog.showError('Please enter a valid amount');
+      const errorMsg = 'Please enter a valid amount';
+      setAmountError(errorMsg);
+      setAmountTouched(true);
+      dialog.showError(errorMsg);
       return;
     }
 
     if (amount > billing.remaining_amount) {
       console.error('Amount exceeds remaining:', amount, '>', billing.remaining_amount);
-      dialog.showError(`Amount cannot exceed remaining amount of ${formatCurrency(billing.remaining_amount)}`);
+      const errorMsg = `Amount cannot exceed remaining amount of ${formatCurrency(billing.remaining_amount)}`;
+      setAmountError(errorMsg);
+      setAmountTouched(true);
+      dialog.showError(errorMsg);
       return;
     }
 
@@ -226,6 +291,29 @@ export default function BillingDetailScreen() {
 
       console.log('Payment intent response:', response);
 
+      if (!response.success) {
+        // Extract error message from API response
+        let errorMessage = response.message || 'Failed to initiate payment';
+        
+        // Parse error message to make it more user-friendly
+        if (errorMessage.includes('amount cannot be greater than 999999999')) {
+          errorMessage = 'Payment amount exceeds the maximum limit. Maximum payment amount is ₱9,999,999.99. Please contact support for larger payments.';
+          // Also set it as an amount error to highlight the input field
+          setAmountError(errorMessage);
+          setAmountTouched(true);
+        } else if (errorMessage.includes('amount')) {
+          // Extract the specific amount-related error
+          errorMessage = `Payment amount error: ${errorMessage.replace(/Failed to create payment intent: /gi, '')}`;
+          setAmountError(errorMessage);
+          setAmountTouched(true);
+        }
+        
+        console.error('Payment intent creation failed:', errorMessage, response);
+        dialog.showError(errorMessage);
+        setProcessing(false);
+        return;
+      }
+
       if (response.success && response.data) {
         const { payment_intent_id, client_key, public_key } = response.data;
 
@@ -241,7 +329,8 @@ export default function BillingDetailScreen() {
             client_key,
             public_key,
           });
-          dialog.showError('Failed to initialize payment. Missing required payment information. Please try again.');
+          const errorMsg = 'Failed to initialize payment. Missing required payment information. Please try again.';
+          dialog.showError(errorMsg);
           setProcessing(false);
           return;
         }
@@ -253,6 +342,9 @@ export default function BillingDetailScreen() {
         paymongoClient.setPublicKey(public_key);
 
         console.log('Payment intent initialized successfully, showing card form');
+        
+        // Clear any previous amount errors since payment intent was created successfully
+        setAmountError(null);
         
         // Payment form will be shown in modal, user will enter card details
         setPaymentStatus('idle');
@@ -266,7 +358,16 @@ export default function BillingDetailScreen() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       console.error('Error in handleInitiatePayment:', err);
-      dialog.showError(`Payment initialization failed: ${errorMessage}. Please try again.`);
+      
+      // Try to parse error message if it contains amount-related information
+      let displayMessage = errorMessage;
+      if (errorMessage.includes('amount') || errorMessage.includes('999999999')) {
+        displayMessage = 'Payment amount exceeds the maximum limit. Maximum payment amount is ₱9,999,999.99. Please contact support for larger payments.';
+        setAmountError(displayMessage);
+        setAmountTouched(true);
+      }
+      
+      dialog.showError(`Payment initialization failed: ${displayMessage}. Please try again.`);
       setProcessing(false);
     }
   };
@@ -517,14 +618,6 @@ export default function BillingDetailScreen() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -687,8 +780,15 @@ export default function BillingDetailScreen() {
         {billing.payments && billing.payments.length > 0 && (
           <View style={[styles.card, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
             <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Payment History</Text>
-            {billing.payments.map((payment) => (
-              <View key={payment.id} style={styles.paymentItem}>
+            {billing.payments.slice(0, 10).map((payment) => (
+              <TouchableOpacity
+                key={payment.id}
+                style={styles.paymentItem}
+                onPress={() => {
+                  setSelectedPayment(payment);
+                  setShowPaymentDetailModal(true);
+                }}
+                activeOpacity={0.7}>
                 <View style={styles.paymentItemHeader}>
                   <Text style={[styles.paymentCode, { color: AppColors.text }]}>{payment.payment_code}</Text>
                   <Text style={[styles.paymentAmount, { color: AppColors.text }]}>
@@ -719,8 +819,9 @@ export default function BillingDetailScreen() {
                       </Text>
                     </View>
                   )}
+                  <Ionicons name="chevron-forward" size={16} color={AppColors.textSecondary} style={{ marginLeft: 'auto' }} />
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -823,71 +924,158 @@ export default function BillingDetailScreen() {
                 <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
               </View>
             ) : (
-              <ScrollView style={styles.modalScroll}>
-                <View style={styles.paymentAmountSection}>
-                  <Text style={[styles.paymentAmountLabel, { color: AppColors.textSecondary }]}>
-                    Remaining Amount
-                  </Text>
-                  <Text style={[styles.paymentAmountValue, { color: AppColors.text }]}>
-                    {formatCurrency(billing.remaining_amount)}
-                  </Text>
-                </View>
-
-                <View style={styles.customAmountSection}>
-                  <Text style={[styles.customAmountLabel, { color: AppColors.textSecondary }]}>
-                    Amount to Pay (Optional)
-                  </Text>
-                  <Text style={[styles.customAmountHint, { color: AppColors.textSecondary }]}>
-                    Leave empty to pay full remaining amount
-                  </Text>
-                  <TextInput
-                    style={[styles.customAmountInput, { backgroundColor: AppColors.background, borderColor: AppColors.border, color: AppColors.text }]}
-                    placeholder="Enter amount"
-                    placeholderTextColor={AppColors.textSecondary}
-                    value={customAmount}
-                    onChangeText={setCustomAmount}
-                    keyboardType="decimal-pad"
-                    editable={!paymentIntentId}
-                  />
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                {/* Step Indicators */}
+                <View style={styles.stepIndicatorContainer}>
+                  <View style={styles.stepIndicator}>
+                    <View style={[styles.stepCircle, { backgroundColor: !paymentIntentId ? AppColors.primary : AppColors.success }]}>
+                      {!paymentIntentId ? (
+                        <Text style={styles.stepNumber}>1</Text>
+                      ) : (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <Text style={[styles.stepLabel, { color: !paymentIntentId ? AppColors.text : AppColors.textSecondary }]}>
+                      Amount
+                    </Text>
+                  </View>
+                  <View style={[styles.stepLine, { backgroundColor: !paymentIntentId ? AppColors.border : AppColors.primary }]} />
+                  <View style={styles.stepIndicator}>
+                    <View style={[styles.stepCircle, { backgroundColor: paymentIntentId ? AppColors.primary : AppColors.border }]}>
+                      <Text style={[styles.stepNumber, { color: paymentIntentId ? '#FFFFFF' : AppColors.textSecondary }]}>2</Text>
+                    </View>
+                    <Text style={[styles.stepLabel, { color: paymentIntentId ? AppColors.text : AppColors.textSecondary }]}>
+                      Payment
+                    </Text>
+                  </View>
                 </View>
 
                 {!paymentIntentId ? (
-                  <TouchableOpacity
-                    style={[
-                      styles.confirmButton,
-                      {
-                        backgroundColor: processing ? AppColors.textSecondary : AppColors.primary,
-                        opacity: processing ? 0.6 : 1,
-                      }
-                    ]}
-                    onPress={() => {
-                      console.log('Continue to Payment button clicked');
-                      console.log('Button state:', { 
-                        processing, 
-                        paymentIntentId,
-                        billing: !!billing,
-                        amount: customAmount || billing?.remaining_amount,
-                      });
-                      
-                      if (processing) {
-                        console.warn('Button click ignored - already processing');
-                        return;
-                      }
-                      
-                      handleInitiatePayment();
-                    }}
-                    disabled={processing}>
-                    {processing ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.confirmButtonText}>Continue to Payment</Text>
-                    )}
-                  </TouchableOpacity>
+                  <>
+                    {/* Step 1: Amount Section */}
+                    <View style={[styles.amountCard, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
+                      <View style={styles.amountCardHeader}>
+                        <View style={styles.amountCardHeaderLeft}>
+                          <Text style={[styles.amountCardLabel, { color: AppColors.textSecondary }]}>
+                            Remaining Balance
+                          </Text>
+                          <Text style={[styles.amountCardValue, { color: AppColors.text }]}>
+                            {formatCurrency(billing.remaining_amount)}
+                          </Text>
+                        </View>
+                        <View style={[styles.amountBadge, { backgroundColor: `${AppColors.primary}15` }]}>
+                          <Text style={[styles.amountBadgeText, { color: AppColors.primary }]}>
+                            Due
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={[styles.divider, { backgroundColor: AppColors.border, marginVertical: 20 }]} />
+
+                      <View>
+                        <Text style={[styles.customAmountLabel, { color: AppColors.text, marginBottom: 4 }]}>
+                          Enter Amount to Pay
+                        </Text>
+                        <Text style={[styles.customAmountHint, { color: AppColors.textSecondary, marginBottom: 8 }]}>
+                          Leave empty to pay the full remaining balance
+                        </Text>
+                        <View style={[styles.maxAmountInfo, { backgroundColor: `${AppColors.warning}10`, borderColor: `${AppColors.warning}30` }]}>
+                          <Ionicons name="information-circle-outline" size={16} color={AppColors.warning} />
+                          <Text style={[styles.maxAmountText, { color: AppColors.textSecondary }]}>
+                            Maximum amount per transaction: <Text style={{ fontWeight: '700', color: AppColors.text }}>{formatCurrency(9999999.99)}</Text>
+                          </Text>
+                        </View>
+                        <View style={styles.amountInputWrapper}>
+                          <Text style={[styles.amountInputPrefix, { color: AppColors.textSecondary }]}>₱</Text>
+                          <TextInput
+                            style={[
+                              styles.customAmountInput,
+                              {
+                                backgroundColor: AppColors.card,
+                                borderColor: amountError ? AppColors.error : AppColors.border,
+                                borderWidth: amountError ? 2 : 1,
+                                color: AppColors.text,
+                              },
+                            ]}
+                            placeholder="0.00"
+                            placeholderTextColor={AppColors.textSecondary}
+                            value={customAmount}
+                            onChangeText={handleAmountChange}
+                            onBlur={() => setAmountTouched(true)}
+                            keyboardType="decimal-pad"
+                            editable={!paymentIntentId}
+                          />
+                        </View>
+                        {amountError && amountTouched && (
+                          <View style={styles.errorContainer}>
+                            <Ionicons name="alert-circle" size={16} color={AppColors.error} />
+                            <Text style={[styles.errorText, { color: AppColors.error, marginLeft: 6 }]}>
+                              {amountError}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.confirmButton,
+                        {
+                          backgroundColor: processing || amountError ? AppColors.textSecondary : AppColors.primary,
+                          opacity: processing || amountError ? 0.6 : 1,
+                        }
+                      ]}
+                      onPress={() => {
+                        console.log('Continue to Payment button clicked');
+                        console.log('Button state:', { 
+                          processing, 
+                          paymentIntentId,
+                          billing: !!billing,
+                          amount: customAmount || billing?.remaining_amount,
+                          amountError,
+                        });
+                        
+                        if (processing || amountError) {
+                          console.warn('Button click ignored - already processing or validation error');
+                          return;
+                        }
+                        
+                        handleInitiatePayment();
+                      }}
+                      disabled={processing || !!amountError}>
+                      {processing ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Text style={styles.confirmButtonText}>Continue to Payment Details</Text>
+                          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
                 ) : (
-                  <View>
-                    <Text style={[styles.paymentMethodLabel, { color: AppColors.textSecondary, marginBottom: 16 }]}>
-                      Enter Card Details
-                    </Text>
+                  <>
+                    {/* Step 2: Payment Details Section */}
+                    <View style={[styles.paymentDetailsCard, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
+                      <View style={styles.paymentDetailsHeader}>
+                        <View style={styles.paymentDetailsHeaderLeft}>
+                          <CreditCard size={20} color={AppColors.primary} />
+                          <Text style={[styles.paymentDetailsTitle, { color: AppColors.text }]}>
+                            Payment Details
+                          </Text>
+                        </View>
+                        <View style={[styles.securityBadge, { backgroundColor: `${AppColors.success}15` }]}>
+                          <Ionicons name="lock-closed" size={14} color={AppColors.success} />
+                          <Text style={[styles.securityBadgeText, { color: AppColors.success }]}>
+                            Secure
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.paymentDetailsSubtitle, { color: AppColors.textSecondary }]}>
+                        Enter your card information to complete the payment
+                      </Text>
+                    </View>
+
                     <CardPaymentForm
                       initialPhone={user?.phone_number || ''}
                       initialName={user?.name || ''}
@@ -901,7 +1089,7 @@ export default function BillingDetailScreen() {
                       loading={processing}
                       error={cardFormError || undefined}
                     />
-                  </View>
+                  </>
                 )}
               </ScrollView>
             )}
@@ -943,6 +1131,195 @@ export default function BillingDetailScreen() {
               )}
             />
           )}
+        </View>
+      </Modal>
+
+      {/* Payment Detail Receipt Modal */}
+      <Modal
+        visible={showPaymentDetailModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPaymentDetailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.receiptModalContent, { backgroundColor: AppColors.card }]}>
+            {selectedPayment && (
+              <>
+                {/* Receipt Header */}
+                <View style={styles.receiptHeader}>
+                  <View style={styles.receiptHeaderTop}>
+                    <View style={styles.receiptIconContainer}>
+                      <Receipt size={32} color={AppColors.primary} />
+                    </View>
+                    <View style={styles.receiptTitleContainer}>
+                      <Text style={[styles.receiptTitle, { color: AppColors.text }]}>Payment Receipt</Text>
+                      <Text style={[styles.receiptSubtitle, { color: AppColors.textSecondary }]}>Transaction Details</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowPaymentDetailModal(false)} style={styles.receiptCloseButton}>
+                    <XCircle size={24} color={AppColors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.receiptScroll} showsVerticalScrollIndicator={false}>
+                  {/* Payment Code - Prominent */}
+                  <View style={styles.receiptPaymentCodeSection}>
+                    <Text style={[styles.receiptPaymentCodeLabel, { color: AppColors.textSecondary }]}>Payment Code</Text>
+                    <Text style={[styles.receiptPaymentCode, { color: AppColors.primary }]}>
+                      {selectedPayment.payment_code}
+                    </Text>
+                  </View>
+
+                  {/* Amount Section */}
+                  <View style={[styles.receiptAmountSection, { backgroundColor: AppColors.background }]}>
+                    <Text style={[styles.receiptAmountLabel, { color: AppColors.textSecondary }]}>Amount Paid</Text>
+                    <Text style={[styles.receiptAmountValue, { color: AppColors.success }]}>
+                      {formatCurrency(selectedPayment.payment_amount)}
+                    </Text>
+                    <Text style={[styles.receiptCurrency, { color: AppColors.textSecondary }]}>PHP</Text>
+                  </View>
+
+                  {/* Status Badge */}
+                  <View style={styles.receiptStatusSection}>
+                    {selectedPayment.payment_status && (
+                      <View style={[styles.receiptStatusBadge, {
+                        backgroundColor: selectedPayment.payment_status === 'paid' ? '#D1FAE5' : 
+                                        selectedPayment.payment_status === 'pending' ? '#FEF3C7' : 
+                                        selectedPayment.payment_status === 'failed' ? '#FEE2E2' : '#E5E7EB',
+                      }]}>
+                        {selectedPayment.payment_status === 'paid' && (
+                          <CheckCircle size={16} color="#065F46" />
+                        )}
+                        {selectedPayment.payment_status === 'pending' && (
+                          <Clock size={16} color="#92400E" />
+                        )}
+                        {(selectedPayment.payment_status === 'failed' || selectedPayment.payment_status === 'cancelled') && (
+                          <XCircle size={16} color={selectedPayment.payment_status === 'failed' ? '#991B1B' : '#6B7280'} />
+                        )}
+                        <Text style={[styles.receiptStatusText, {
+                          color: selectedPayment.payment_status === 'paid' ? '#065F46' : 
+                                 selectedPayment.payment_status === 'pending' ? '#92400E' : 
+                                 selectedPayment.payment_status === 'failed' ? '#991B1B' : '#6B7280',
+                        }]}>
+                          {selectedPayment.payment_status.toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Receipt Divider */}
+                  <View style={[styles.receiptDivider, { backgroundColor: AppColors.border }]} />
+
+                  {/* Payment Details */}
+                  <View style={styles.receiptDetailsSection}>
+                    <Text style={[styles.receiptSectionTitle, { color: AppColors.text }]}>Payment Details</Text>
+                    
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Billing Code</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {billing.billing_code}
+                      </Text>
+                    </View>
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Project</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {billing.project.project_name}
+                      </Text>
+                    </View>
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Payment Date</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {new Date(selectedPayment.payment_date).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Payment Method</Text>
+                      <Text style={[styles.receiptDetailValue, { color: AppColors.text }]}>
+                        {selectedPayment.payment_method === 'paymongo' ? 'PayMongo (Card)' : 
+                         selectedPayment.payment_method.replace('_', ' ').toUpperCase()}
+                      </Text>
+                    </View>
+
+                    {selectedPayment.reference_number && (
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>Reference Number</Text>
+                        <Text style={[styles.receiptDetailValue, { color: AppColors.text, fontFamily: 'monospace' }]}>
+                          {selectedPayment.reference_number}
+                        </Text>
+                      </View>
+                    )}
+
+                    {selectedPayment.paymongo_payment_intent_id && (
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={[styles.receiptDetailLabel, { color: AppColors.textSecondary }]}>PayMongo Payment ID</Text>
+                        <Text style={[styles.receiptDetailValue, { color: AppColors.text, fontFamily: 'monospace', fontSize: 11 }]}>
+                          {selectedPayment.paymongo_payment_intent_id}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* PayMongo Section */}
+                  {selectedPayment.payment_method === 'paymongo' && (
+                    <>
+                      <View style={[styles.receiptDivider, { backgroundColor: AppColors.border, marginTop: 20 }]} />
+                      <View style={styles.receiptDetailsSection}>
+                        <Text style={[styles.receiptSectionTitle, { color: AppColors.text }]}>Payment Gateway</Text>
+                        <View style={[styles.receiptGatewayBadge, { backgroundColor: `${AppColors.primary}15` }]}>
+                          <CreditCard size={18} color={AppColors.primary} />
+                          <Text style={[styles.receiptGatewayText, { color: AppColors.primary }]}>PayMongo</Text>
+                        </View>
+                        <Text style={[styles.receiptGatewayInfo, { color: AppColors.textSecondary }]}>
+                          Your payment was processed securely through PayMongo payment gateway
+                        </Text>
+                      </View>
+                    </>
+                  )}
+
+                  {/* Receipt Footer */}
+                  <View style={styles.receiptFooter}>
+                    <View style={[styles.receiptDivider, { backgroundColor: AppColors.border }]} />
+                    {selectedPayment.payment_status === 'paid' ? (
+                      <>
+                        <Text style={[styles.receiptThankYou, { color: AppColors.success }]}>Payment Confirmed!</Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary }]}>
+                          Thank you for your payment. Your transaction has been successfully processed.
+                        </Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary, marginTop: 4 }]}>
+                          This receipt serves as your official payment confirmation.
+                        </Text>
+                      </>
+                    ) : selectedPayment.payment_status === 'pending' ? (
+                      <>
+                        <Text style={[styles.receiptThankYou, { color: AppColors.warning }]}>Payment Pending</Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary }]}>
+                          Your payment is currently being processed. Please allow a few moments for the transaction to complete.
+                        </Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary, marginTop: 4 }]}>
+                          You will receive a confirmation once the payment is successfully processed.
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.receiptThankYou, { color: AppColors.text }]}>Payment Status</Text>
+                        <Text style={[styles.receiptFooterText, { color: AppColors.textSecondary }]}>
+                          This receipt shows the current status of your payment transaction.
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+          </View>
         </View>
       </Modal>
     </View>
@@ -1275,24 +1652,170 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   customAmountLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     marginBottom: 4,
   },
   customAmountHint: {
-    fontSize: 12,
+    fontSize: 13,
     marginBottom: 8,
+    lineHeight: 18,
   },
   customAmountInput: {
+    flex: 1,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  stepIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    paddingVertical: 8,
+  },
+  stepIndicator: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stepLine: {
+    height: 2,
+    width: 40,
+    marginHorizontal: 8,
+  },
+  amountCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  amountCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  amountCardHeaderLeft: {
+    flex: 1,
+  },
+  amountCardLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  amountCardValue: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  amountBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  amountBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  amountInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  amountInputPrefix: {
+    fontSize: 20,
+    fontWeight: '600',
+    paddingTop: 2,
+  },
+  maxAmountInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 8,
+  },
+  maxAmountText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  paymentDetailsCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  paymentDetailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  paymentDetailsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  paymentDetailsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  paymentDetailsSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  securityBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   confirmButton: {
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: AppColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   confirmButtonText: {
     color: '#FFFFFF',
@@ -1353,6 +1876,181 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: AppColors.background,
+  },
+  receiptModalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '95%',
+    paddingBottom: 40,
+  },
+  receiptHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: AppColors.border,
+  },
+  receiptHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  receiptIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${AppColors.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  receiptTitleContainer: {
+    flex: 1,
+  },
+  receiptTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  receiptSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  receiptCloseButton: {
+    padding: 4,
+  },
+  receiptScroll: {
+    padding: 20,
+  },
+  receiptPaymentCodeSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: AppColors.border,
+  },
+  receiptPaymentCodeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  receiptPaymentCode: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+  },
+  receiptAmountSection: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: AppColors.success,
+    borderStyle: 'dashed',
+  },
+  receiptAmountLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  receiptAmountValue: {
+    fontSize: 36,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  receiptCurrency: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  receiptStatusSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  receiptStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1.5,
+  },
+  receiptStatusText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  receiptDivider: {
+    height: 1,
+    marginVertical: 20,
+  },
+  receiptDetailsSection: {
+    marginBottom: 20,
+  },
+  receiptSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  receiptDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: `${AppColors.border}80`,
+  },
+  receiptDetailLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  receiptDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1.5,
+    textAlign: 'right',
+  },
+  receiptGatewayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  receiptGatewayText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  receiptGatewayInfo: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  receiptFooter: {
+    alignItems: 'center',
+    paddingTop: 20,
+    marginTop: 10,
+  },
+  receiptThankYou: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  receiptFooterText: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
 

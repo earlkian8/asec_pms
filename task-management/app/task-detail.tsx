@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
 import {
   Calendar,
@@ -30,7 +31,7 @@ import {
 import { Task, ProgressUpdate, Issue } from '@/types';
 import { AppColors, getStatusColor, getPriorityColor, getIssueStatusColor } from '@/utils/colors';
 import { formatDate, formatDateTime, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
-import { apiService } from '@/services/api';
+import { apiService, API_BASE_URL } from '@/services/api';
 import ProgressUpdateModal from '@/components/ProgressUpdateModal';
 import IssueReportModal from '@/components/IssueReportModal';
 import StatusSelectorModal from '@/components/StatusSelectorModal';
@@ -542,7 +543,21 @@ export default function TaskDetailScreen() {
                       {update.description || 'No description provided.'}
                     </Text>
                     
-                    {update.file_path ? (
+                    {update.file_path && update.file_type?.startsWith('image/') && update.file_url ? (
+                      <View style={styles.updateImageContainer}>
+                        <Image
+                          source={{
+                            uri: update.file_url.startsWith('http') 
+                              ? update.file_url 
+                              : `${API_BASE_URL.replace('/api', '')}${update.file_url}`,
+                          }}
+                          style={styles.updateImage}
+                          contentFit="contain"
+                          transition={200}
+                          placeholder={{ blurhash: 'LGF5]+Yk^6#M@-5c,1J5@[or[Q6.' }}
+                        />
+                      </View>
+                    ) : update.file_path ? (
                       <TouchableOpacity
                         style={styles.fileAttachment}
                         onPress={() => {
@@ -1381,6 +1396,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: AppColors.background,
+  },
+  updateImageContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: AppColors.border,
+  },
+  updateImage: {
+    width: '100%',
+    height: 300,
     backgroundColor: AppColors.background,
   },
 });

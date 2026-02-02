@@ -22,11 +22,10 @@ export interface ProjectDetailTask {
 }
 
 export interface ProgressUpdateFile {
-  id: string;
-  name: string;
+  path: string;
   type: string;
+  name: string;
   size: number;
-  uploadDate: string;
   url: string;
 }
 
@@ -37,7 +36,7 @@ export interface ProgressUpdate {
   type: 'request' | 'progress';
   author: string;
   date: string;
-  file?: ProgressUpdateFile | null; // Optional - files are not displayed in client app
+  file?: ProgressUpdateFile | null;
   taskId?: string;
   taskName?: string;
   milestoneId?: string;

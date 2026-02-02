@@ -22,8 +22,8 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ClientTypeSeeder::class,
             ProjectTypeSeeder::class,
-            // InventorySeeder::class,
-            // ProjectTypeSeeder::class,
+            InventorySeeder::class,
+            ProjectTypeSeeder::class,
             InventorySeeder::class,
 
         ]);

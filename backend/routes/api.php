@@ -3,14 +3,14 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
-use App\Http\Controllers\Api\ClientAuthController;
-use App\Http\Controllers\Api\ClientDashboardController;
-use App\Http\Controllers\Api\ClientNotificationController;
-use App\Http\Controllers\Api\ClientBillingController;
-use App\Http\Controllers\Api\ChatController;
-use App\Http\Controllers\Api\TaskManagementAuthController;
-use App\Http\Controllers\Api\TaskManagementDashboardController;
-use App\Http\Controllers\Api\TaskManagementTaskController;
+use App\Http\Controllers\API\ClientAuthController;
+use App\Http\Controllers\API\ClientDashboardController;
+use App\Http\Controllers\API\ClientNotificationController;
+use App\Http\Controllers\API\ClientBillingController;
+use App\Http\Controllers\API\ChatController;
+use App\Http\Controllers\API\TaskManagementAuthController;
+use App\Http\Controllers\API\TaskManagementDashboardController;
+use App\Http\Controllers\API\TaskManagementTaskController;
 
 // Public routes
 Route::prefix('client')->group(function () {

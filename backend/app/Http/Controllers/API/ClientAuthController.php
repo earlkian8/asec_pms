@@ -6,9 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Database\QueryException;
 
 class ClientAuthController extends Controller
 {
@@ -17,103 +15,55 @@ class ClientAuthController extends Controller
      */
     public function login(Request $request)
     {
-        try {
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
+        $request->validate([
+            'email' => 'required|string|email',
+            'password' => 'required|string',
+        ]);
+
+        $client = Client::where('email', $request->email)->first();
+
+        if (!$client || !Hash::check($request->password, $client->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['Invalid email or password'],
             ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
         }
 
-        try {
-            $client = Client::where('email', $request->email)->first();
-
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The provided credentials are incorrect.',
-                    'errors' => [
-                        'email' => ['The provided credentials are incorrect.'],
-                    ],
-                ], 401);
-            }
-
-            if (!Hash::check($request->password, $client->password)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The provided credentials are incorrect.',
-                    'errors' => [
-                        'email' => ['The provided credentials are incorrect.'],
-                    ],
-                ], 401);
-            }
-
-            if (!$client->is_active) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Your account is inactive. Please contact support.',
-                    'errors' => [
-                        'email' => ['Your account is inactive. Please contact support.'],
-                    ],
-                ], 403);
-            }
-
-            // Revoke all existing tokens (optional - for single device login)
-            // $client->tokens()->delete();
-
-            $token = $client->createToken('client-api-token')->plainTextToken;
-
-            // Check if password needs to be changed (password_changed_at is null)
-            $mustChangePassword = is_null($client->password_changed_at);
-
+        if (!$client->is_active) {
             return response()->json([
-                'success' => true,
-                'message' => 'Login successful',
-                'data' => [
-                    'client' => [
-                        'id' => $client->id,
-                        'client_code' => $client->client_code,
-                        'name' => $client->client_name,
-                        'email' => $client->email,
-                        'contact_person' => $client->contact_person,
-                        'company' => $client->client_name,
-                        'phone_number' => $client->phone_number,
-                        'is_active' => $client->is_active,
-                    ],
-                    'token' => $token,
-                    'must_change_password' => $mustChangePassword,
+                'success' => false,
+                'message' => 'Your account is inactive. Please contact support.',
+                'errors' => [
+                    'email' => ['Your account is inactive. Please contact support.'],
                 ],
-            ]);
-        } catch (QueryException $e) {
-            Log::error('Client Login Database Error', [
-                'error' => $e->getMessage(),
-                'email' => $request->email,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Database connection error. Please try again later or contact support.',
-            ], 500);
-        } catch (\Exception $e) {
-            Log::error('Client Login Error', [
-                'error' => $e->getMessage(),
-                'email' => $request->email,
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'An unexpected error occurred. Please try again later or contact support.',
-            ], 500);
+            ], 403);
         }
+
+        // Revoke all existing tokens (optional - for single device login)
+        // $client->tokens()->delete();
+
+        $token = $client->createToken('client-api-token')->plainTextToken;
+
+        // Check if password needs to be changed (password_changed_at is null)
+        $mustChangePassword = is_null($client->password_changed_at);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'data' => [
+                'client' => [
+                    'id' => $client->id,
+                    'client_code' => $client->client_code,
+                    'name' => $client->client_name,
+                    'email' => $client->email,
+                    'contact_person' => $client->contact_person,
+                    'company' => $client->client_name,
+                    'phone_number' => $client->phone_number,
+                    'is_active' => $client->is_active,
+                ],
+                'token' => $token,
+                'must_change_password' => $mustChangePassword,
+            ],
+        ]);
     }
 
     /**

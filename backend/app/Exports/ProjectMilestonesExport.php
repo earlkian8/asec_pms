@@ -19,12 +19,12 @@ class ProjectMilestonesExport implements FromView, WithTitle
             'projectType',
             'milestones' => function ($query) {
                 $query->orderBy('due_date', 'asc')
-                      ->orderBy('start_date', 'asc');
+                    ->orderBy('start_date', 'asc');
             },
             'milestones.tasks' => function ($query) {
                 $query->orderBy('due_date', 'asc');
             },
-            'milestones.tasks.assignedUser'
+            'milestones.tasks.assignedUser',
         ]);
     }
 
@@ -35,17 +35,17 @@ class ProjectMilestonesExport implements FromView, WithTitle
             $tasks = $milestone->tasks;
             $totalTasks = $tasks->count();
             $completedTasks = $tasks->where('status', 'completed')->count();
-            
+
             // Calculate progress percentage based on tasks
-            $progressPercentage = $totalTasks > 0 
-                ? round(($completedTasks / $totalTasks) * 100, 1) 
+            $progressPercentage = $totalTasks > 0
+                ? round(($completedTasks / $totalTasks) * 100, 1)
                 : ($milestone->status === 'completed' ? 100 : 0);
-            
+
             // If milestone is marked as completed but has no tasks, set to 100%
             if ($milestone->status === 'completed' && $totalTasks === 0) {
                 $progressPercentage = 100;
             }
-            
+
             return [
                 'id' => $milestone->id,
                 'name' => $milestone->name,
@@ -75,12 +75,12 @@ class ProjectMilestonesExport implements FromView, WithTitle
         $completedMilestones = $milestones->where('status', 'completed')->count();
         $inProgressMilestones = $milestones->where('status', 'in_progress')->count();
         $pendingMilestones = $milestones->where('status', 'pending')->count();
-        
+
         // Calculate overall project progress
-        $overallProgress = $totalMilestones > 0 
-            ? round(($completedMilestones / $totalMilestones) * 100, 1) 
+        $overallProgress = $totalMilestones > 0
+            ? round(($completedMilestones / $totalMilestones) * 100, 1)
             : 0;
-        
+
         // Calculate total billing percentage
         $totalBillingPercentage = $milestones->sum('billing_percentage');
 

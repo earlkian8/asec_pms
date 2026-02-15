@@ -3,13 +3,13 @@
 namespace App\Exports\Reports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ClientReportExport implements FromArray, WithHeadings, WithTitle, WithColumnWidths, WithStyles
+class ClientReportExport implements FromArray, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     protected $data;
 
@@ -21,20 +21,20 @@ class ClientReportExport implements FromArray, WithHeadings, WithTitle, WithColu
     public function array(): array
     {
         $rows = [];
-        
+
         // Summary
         $rows[] = ['Summary'];
         $rows[] = ['Metric', 'Value'];
         $rows[] = [
             'Total Clients',
-            $this->data['total_clients'] ?? 0
+            $this->data['total_clients'] ?? 0,
         ];
         $rows[] = [
             'Active Clients',
-            $this->data['active_clients'] ?? 0
+            $this->data['active_clients'] ?? 0,
         ];
         $rows[] = []; // Empty row
-        
+
         // Top clients
         $rows[] = ['Top Clients'];
         $rows[] = ['Client Code', 'Client Name', 'Client Type', 'Total Projects', 'Active Projects', 'Completed Projects', 'Total Contract Value'];
@@ -47,11 +47,11 @@ class ClientReportExport implements FromArray, WithHeadings, WithTitle, WithColu
                     $client['total_projects'] ?? 0,
                     $client['active_projects'] ?? 0,
                     $client['completed_projects'] ?? 0,
-                    '₱' . number_format($client['total_contract_value'] ?? 0, 2)
+                    '₱'.number_format($client['total_contract_value'] ?? 0, 2),
                 ];
             }
         }
-        
+
         return $rows;
     }
 

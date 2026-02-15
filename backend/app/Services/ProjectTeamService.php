@@ -21,7 +21,7 @@ class ProjectTeamService
 
         // Validate sort column
         $allowedSortColumns = ['created_at', 'role', 'hourly_rate', 'start_date', 'end_date', 'is_active'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
@@ -36,12 +36,12 @@ class ProjectTeamService
                         $userQuery->where('name', 'ilike', "%{$search}%")
                             ->orWhere('email', 'ilike', "%{$search}%");
                     })
-                    ->orWhereHas('employee', function ($employeeQuery) use ($search) {
-                        $employeeQuery->where('first_name', 'ilike', "%{$search}%")
-                            ->orWhere('last_name', 'ilike', "%{$search}%")
-                            ->orWhere('email', 'ilike', "%{$search}%");
-                    })
-                    ->orWhere('role', 'ilike', "%{$search}%");
+                        ->orWhereHas('employee', function ($employeeQuery) use ($search) {
+                            $employeeQuery->where('first_name', 'ilike', "%{$search}%")
+                                ->orWhere('last_name', 'ilike', "%{$search}%")
+                                ->orWhere('email', 'ilike', "%{$search}%");
+                        })
+                        ->orWhere('role', 'ilike', "%{$search}%");
                 });
             })
             ->when($role, function ($query, $role) {
@@ -66,13 +66,13 @@ class ProjectTeamService
             ->pluck('user_id')
             ->filter()
             ->toArray();
-        
+
         $existingEmployeeIds = ProjectTeam::where('project_id', $project->id)
             ->whereNotNull('employee_id')
             ->pluck('employee_id')
             ->filter()
             ->toArray();
-        
+
         // Get available users
         $users = User::with('roles')
             ->whereNotIn('id', $existingUserIds)
@@ -87,7 +87,7 @@ class ProjectTeamService
                     'type' => 'user',
                 ];
             });
-        
+
         // Get available employees
         $employees = Employee::where('is_active', true)
             ->whereNotIn('id', $existingEmployeeIds)
@@ -97,13 +97,13 @@ class ProjectTeamService
             ->map(function ($employee) {
                 return [
                     'id' => $employee->id,
-                    'name' => $employee->first_name . ' ' . $employee->last_name,
+                    'name' => $employee->first_name.' '.$employee->last_name,
                     'email' => $employee->email,
                     'position' => $employee->position ?? 'No Position',
                     'type' => 'employee',
                 ];
             });
-        
+
         // Combine users and employees
         $allAssignables = $users->concat($employees);
 
@@ -117,8 +117,8 @@ class ProjectTeamService
 
         return [
             'projectTeams' => $projectTeams,
-            'users'        => $users,
-            'employees'    => $employees,
+            'users' => $users,
+            'employees' => $employees,
             'allAssignables' => $allAssignables,
             'filterOptions' => [
                 'roles' => $roles,

@@ -12,7 +12,7 @@ trait ClientNotificationTrait
      */
     protected function createClientNotification(Project $project, string $type, string $title, string $message)
     {
-        if (!$project->client_id) {
+        if (! $project->client_id) {
             return null;
         }
 
@@ -57,7 +57,7 @@ trait ClientNotificationTrait
      */
     protected function notifyMilestoneStatusChange(Project $project, string $milestoneName, string $status)
     {
-        $statusText = match($status) {
+        $statusText = match ($status) {
             'pending' => 'is pending',
             'in_progress' => 'is now in progress',
             'completed' => 'has been completed',
@@ -81,7 +81,7 @@ trait ClientNotificationTrait
             $project,
             'status_change',
             'Project Status Updated',
-            "Project '{$project->project_name}' status has been changed from " . ucfirst(str_replace('_', ' ', $oldStatus)) . " to " . ucfirst(str_replace('_', ' ', $newStatus)) . "."
+            "Project '{$project->project_name}' status has been changed from ".ucfirst(str_replace('_', ' ', $oldStatus)).' to '.ucfirst(str_replace('_', ' ', $newStatus)).'.'
         );
     }
 
@@ -98,4 +98,3 @@ trait ClientNotificationTrait
         );
     }
 }
-

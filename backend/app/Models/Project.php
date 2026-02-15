@@ -22,11 +22,13 @@ class Project extends Model
         'billing_type',
     ];
 
-    public function client(){
+    public function client()
+    {
         return $this->belongsTo(Client::class, 'client_id', 'id');
     }
 
-    public function projectType(){
+    public function projectType()
+    {
         return $this->belongsTo(ProjectType::class, 'project_type_id', 'id');
     }
 

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\InventoryTransaction;
 use App\Models\Project;
-use App\Models\User;
 use App\Services\InventoryService;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
@@ -36,7 +35,7 @@ class InventoryItemsController extends Controller
 
         // Validate sort column
         $allowedSortColumns = ['created_at', 'item_code', 'item_name', 'category', 'current_stock', 'min_stock_level', 'unit_price', 'is_active'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
@@ -47,9 +46,9 @@ class InventoryItemsController extends Controller
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('item_code', 'like', "%{$search}%")
-                      ->orWhere('item_name', 'like', "%{$search}%")
-                      ->orWhere('category', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('item_name', 'like', "%{$search}%")
+                        ->orWhere('category', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->when($category, function ($query, $category) {
@@ -68,6 +67,7 @@ class InventoryItemsController extends Controller
         // Add is_low_stock flag to each item
         $items->getCollection()->transform(function ($item) {
             $item->is_low_stock = $item->isLowStock();
+
             return $item;
         });
 
@@ -136,7 +136,7 @@ class InventoryItemsController extends Controller
         // Auto-generate item code
         do {
             $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-            $itemCode = 'INV-' . $random;
+            $itemCode = 'INV-'.$random;
         } while (InventoryItem::where('item_code', $itemCode)->exists());
 
         $data['item_code'] = $itemCode;
@@ -170,14 +170,14 @@ class InventoryItemsController extends Controller
         $this->adminActivityLogs(
             'Inventory Item',
             'Created',
-            'Created inventory item "' . $item->item_name . '" with code "' . $item->item_code . '"' . ($initialStock > 0 ? ' with initial stock of ' . $initialStock : '')
+            'Created inventory item "'.$item->item_name.'" with code "'.$item->item_code.'"'.($initialStock > 0 ? ' with initial stock of '.$initialStock : '')
         );
 
         // System-wide notification for new inventory item
         $this->createSystemNotification(
             'general',
             'New Inventory Item Added',
-            "A new inventory item '{$item->item_name}' ({$item->item_code}) has been added" . ($initialStock > 0 ? " with initial stock of {$initialStock}" : "") . ".",
+            "A new inventory item '{$item->item_name}' ({$item->item_code}) has been added".($initialStock > 0 ? " with initial stock of {$initialStock}" : '').'.',
             null,
             route('inventory-management.index')
         );
@@ -203,7 +203,7 @@ class InventoryItemsController extends Controller
         $this->adminActivityLogs(
             'Inventory Item',
             'Updated',
-            'Updated inventory item "' . $inventoryItem->item_name . '"'
+            'Updated inventory item "'.$inventoryItem->item_name.'"'
         );
 
         // System-wide notification for inventory item update
@@ -237,7 +237,7 @@ class InventoryItemsController extends Controller
         $this->adminActivityLogs(
             'Inventory Item',
             'Deleted',
-            'Deleted inventory item "' . $itemName . '" with code "' . $itemCode . '"'
+            'Deleted inventory item "'.$itemName.'" with code "'.$itemCode.'"'
         );
 
         // System-wide notification for inventory item deletion
@@ -282,13 +282,13 @@ class InventoryItemsController extends Controller
         $this->adminActivityLogs(
             'Inventory Transaction',
             'Stock In',
-            'Added ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' to "' . $inventoryItem->item_name . '"'
+            'Added '.$data['quantity'].' '.$inventoryItem->unit_of_measure.' to "'.$inventoryItem->item_name.'"'
         );
 
         // System-wide notification for stock in
         $message = "Stock in: {$data['quantity']} {$inventoryItem->unit_of_measure} added to '{$inventoryItem->item_name}'.";
-        if ($wasLowStock && !$isStillLowStock) {
-            $message .= " Low stock alert resolved.";
+        if ($wasLowStock && ! $isStillLowStock) {
+            $message .= ' Low stock alert resolved.';
         }
         $this->createSystemNotification(
             'general',
@@ -314,7 +314,7 @@ class InventoryItemsController extends Controller
 
         // Check if sufficient stock
         if ($inventoryItem->current_stock < $data['quantity']) {
-            return back()->with('error', 'Insufficient stock. Available: ' . $inventoryItem->current_stock . ' ' . $inventoryItem->unit_of_measure);
+            return back()->with('error', 'Insufficient stock. Available: '.$inventoryItem->current_stock.' '.$inventoryItem->unit_of_measure);
         }
 
         $transactionData = [
@@ -331,7 +331,7 @@ class InventoryItemsController extends Controller
         // If project_use, create material allocation but DON'T remove stock yet
         if ($data['stock_out_type'] === 'project_use' && isset($data['project_id'])) {
             $project = Project::findOrFail($data['project_id']);
-            
+
             // Create or update material allocation
             $allocation = $inventoryItem->materialAllocations()
                 ->where('project_id', $project->id)
@@ -355,7 +355,7 @@ class InventoryItemsController extends Controller
 
             $transactionData['project_id'] = $project->id;
             $transactionData['project_material_allocation_id'] = $allocation->id;
-            
+
             // Create transaction for tracking but DON'T update stock
             // Stock will be removed when receiving report is created
             $transaction = InventoryTransaction::create($transactionData);
@@ -369,7 +369,7 @@ class InventoryItemsController extends Controller
         $this->adminActivityLogs(
             'Inventory Transaction',
             'Stock Out',
-            'Removed ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' from "' . $inventoryItem->item_name . '" (' . $data['stock_out_type'] . ')'
+            'Removed '.$data['quantity'].' '.$inventoryItem->unit_of_measure.' from "'.$inventoryItem->item_name.'" ('.$data['stock_out_type'].')'
         );
 
         // System-wide notification for stock out (especially if it causes low stock)
@@ -380,7 +380,7 @@ class InventoryItemsController extends Controller
 
             $message = "Stock out: {$data['quantity']} {$inventoryItem->unit_of_measure} removed from '{$inventoryItem->item_name}' ({$data['stock_out_type']}).";
             if ($isLowStock) {
-                $message .= " WARNING: Item is now below minimum stock level!";
+                $message .= ' WARNING: Item is now below minimum stock level!';
             }
             $this->createSystemNotification(
                 $isLowStock ? 'issue' : 'general',
@@ -407,7 +407,7 @@ class InventoryItemsController extends Controller
         $this->adminActivityLogs(
             'Inventory Item',
             'Update Status',
-            'Updated inventory item "' . $inventoryItem->item_name . '" status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
+            'Updated inventory item "'.$inventoryItem->item_name.'" status to '.($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
 
         // Inertia handles state preservation via 'only' option in frontend

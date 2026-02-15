@@ -3,13 +3,13 @@
 namespace App\Exports\Reports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class BudgetReportExport implements FromArray, WithHeadings, WithTitle, WithColumnWidths, WithStyles
+class BudgetReportExport implements FromArray, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     protected $data;
 
@@ -21,28 +21,28 @@ class BudgetReportExport implements FromArray, WithHeadings, WithTitle, WithColu
     public function array(): array
     {
         $rows = [];
-        
+
         // Summary
         $rows[] = ['Summary'];
         $rows[] = ['Metric', 'Amount'];
         $rows[] = [
             'Total Budget',
-            '₱' . number_format($this->data['summary']['total_budget'] ?? 0, 2)
+            '₱'.number_format($this->data['summary']['total_budget'] ?? 0, 2),
         ];
         $rows[] = [
             'Total Spent',
-            '₱' . number_format($this->data['summary']['total_spent'] ?? 0, 2)
+            '₱'.number_format($this->data['summary']['total_spent'] ?? 0, 2),
         ];
         $rows[] = [
             'Total Variance',
-            '₱' . number_format($this->data['summary']['total_variance'] ?? 0, 2)
+            '₱'.number_format($this->data['summary']['total_variance'] ?? 0, 2),
         ];
         $rows[] = [
             'Variance Percentage',
-            number_format($this->data['summary']['variance_percentage'] ?? 0, 2) . '%'
+            number_format($this->data['summary']['variance_percentage'] ?? 0, 2).'%',
         ];
         $rows[] = []; // Empty row
-        
+
         // Projects
         $rows[] = ['Projects Budget Details'];
         $rows[] = ['Project Code', 'Project Name', 'Status', 'Budget', 'Labor Cost', 'Material Cost', 'Miscellaneous Expenses', 'Total Spent', 'Variance', 'Variance %'];
@@ -52,17 +52,17 @@ class BudgetReportExport implements FromArray, WithHeadings, WithTitle, WithColu
                     $project['project_code'] ?? '',
                     $project['project_name'] ?? '',
                     ucfirst($project['status'] ?? ''),
-                    '₱' . number_format($project['budget'] ?? 0, 2),
-                    '₱' . number_format($project['labor_cost'] ?? 0, 2),
-                    '₱' . number_format($project['material_cost'] ?? 0, 2),
-                    '₱' . number_format($project['miscellaneous_expenses'] ?? 0, 2),
-                    '₱' . number_format($project['total_spent'] ?? 0, 2),
-                    '₱' . number_format($project['variance'] ?? 0, 2),
-                    number_format($project['variance_percentage'] ?? 0, 2) . '%'
+                    '₱'.number_format($project['budget'] ?? 0, 2),
+                    '₱'.number_format($project['labor_cost'] ?? 0, 2),
+                    '₱'.number_format($project['material_cost'] ?? 0, 2),
+                    '₱'.number_format($project['miscellaneous_expenses'] ?? 0, 2),
+                    '₱'.number_format($project['total_spent'] ?? 0, 2),
+                    '₱'.number_format($project['variance'] ?? 0, 2),
+                    number_format($project['variance_percentage'] ?? 0, 2).'%',
                 ];
             }
         }
-        
+
         return $rows;
     }
 

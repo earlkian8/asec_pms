@@ -1,14 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use App\Models\ProjectTask;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TaskManagementDashboardController extends Controller
 {
@@ -18,7 +17,7 @@ class TaskManagementDashboardController extends Controller
     public function statistics(Request $request)
     {
         $user = $request->user();
-        
+
         $tasks = ProjectTask::where('assigned_to', $user->id)
             ->with(['milestone.project'])
             ->get();
@@ -27,12 +26,13 @@ class TaskManagementDashboardController extends Controller
         $pending = $tasks->where('status', 'pending')->count();
         $inProgress = $tasks->where('status', 'in_progress')->count();
         $completed = $tasks->where('status', 'completed')->count();
-        
+
         // Count overdue tasks (due date is in the past and not completed)
         $overdue = $tasks->filter(function ($task) {
-            if (!$task->due_date || $task->status === 'completed') {
+            if (! $task->due_date || $task->status === 'completed') {
                 return false;
             }
+
             return Carbon::parse($task->due_date)->isPast();
         })->count();
 
@@ -44,6 +44,7 @@ class TaskManagementDashboardController extends Controller
                 return false;
             }
             $projectPriority = $task->milestone->project->priority ?? null;
+
             // Map project priority to task priority concept
             // High priority projects = critical tasks
             return $projectPriority === 'high';
@@ -75,7 +76,7 @@ class TaskManagementDashboardController extends Controller
             ->whereNotNull('due_date')
             ->with([
                 'milestone.project',
-                'assignedUser'
+                'assignedUser',
             ])
             ->orderBy('due_date', 'asc')
             ->limit($limit)
@@ -116,7 +117,7 @@ class TaskManagementDashboardController extends Controller
         $query = ProjectTask::where('assigned_to', $user->id)
             ->with([
                 'milestone.project',
-                'assignedUser'
+                'assignedUser',
             ]);
 
         // Filter by status
@@ -125,7 +126,7 @@ class TaskManagementDashboardController extends Controller
                 $query->where('status', '!=', 'completed')
                     ->whereNotNull('due_date')
                     ->where('due_date', '<', Carbon::now()->format('Y-m-d'));
-            } else if ($status === 'critical') {
+            } elseif ($status === 'critical') {
                 // Critical tasks are from high priority projects
                 $query->whereHas('milestone.project', function ($q) {
                     $q->where('priority', 'high');
@@ -189,7 +190,7 @@ class TaskManagementDashboardController extends Controller
             ->where('status', 'completed')
             ->with([
                 'milestone.project',
-                'assignedUser'
+                'assignedUser',
             ]);
 
         // Apply search filter to completed tasks
@@ -233,7 +234,7 @@ class TaskManagementDashboardController extends Controller
             ->with([
                 'task.milestone.project',
                 'task.assignedUser',
-                'createdBy'
+                'createdBy',
             ]);
 
         // Apply search filter to progress updates
@@ -311,7 +312,7 @@ class TaskManagementDashboardController extends Controller
     private function getTaskPriority($task)
     {
         $projectPriority = $task->milestone->project->priority ?? null;
-        
+
         // Map project priority to task priority
         // Projects have: low, medium, high
         // Tasks expect: low, medium, high, critical
@@ -327,4 +328,3 @@ class TaskManagementDashboardController extends Controller
         }
     }
 }
-

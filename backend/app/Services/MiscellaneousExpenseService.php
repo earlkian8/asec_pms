@@ -17,7 +17,7 @@ class MiscellaneousExpenseService
         $sortOrder = request('sort_order', 'desc');
 
         $allowedSortColumns = ['expense_date', 'expense_type', 'expense_name', 'amount', 'created_at'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'expense_date';
         }
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
@@ -27,9 +27,9 @@ class MiscellaneousExpenseService
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('expense_name', 'ilike', "%{$search}%")
-                      ->orWhere('expense_type', 'ilike', "%{$search}%")
-                      ->orWhere('description', 'ilike', "%{$search}%")
-                      ->orWhere('notes', 'ilike', "%{$search}%");
+                        ->orWhere('expense_type', 'ilike', "%{$search}%")
+                        ->orWhere('description', 'ilike', "%{$search}%")
+                        ->orWhere('notes', 'ilike', "%{$search}%");
                 });
             })
             ->when($expenseType, function ($query, $expenseType) {
@@ -82,4 +82,3 @@ class MiscellaneousExpenseService
         ];
     }
 }
-

@@ -20,7 +20,7 @@ class MaterialAllocationService
                         $itemQuery->where('item_name', 'like', "%{$search}%")
                             ->orWhere('item_code', 'like', "%{$search}%");
                     })
-                    ->orWhere('notes', 'like', "%{$search}%");
+                        ->orWhere('notes', 'like', "%{$search}%");
                 });
             })
             ->when($statusFilter !== 'all', function ($query) use ($statusFilter) {
@@ -31,7 +31,7 @@ class MaterialAllocationService
                 'allocatedBy',
                 'receivingReports' => function ($query) {
                     $query->with('receivedBy')->orderBy('received_at', 'desc');
-                }
+                },
             ])
             ->orderBy('allocated_at', 'desc')
             ->paginate(10)

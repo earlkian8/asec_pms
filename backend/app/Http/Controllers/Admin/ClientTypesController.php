@@ -23,7 +23,7 @@ class ClientTypesController extends Controller
 
         // Validate sort column
         $allowedSortColumns = ['created_at', 'name', 'is_active'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
@@ -34,14 +34,14 @@ class ClientTypesController extends Controller
             ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
                 $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
             })
             ->orderBy($sortBy, $sortOrder)
-            ->when($sortBy !== 'created_at', function ($query) use ($sortOrder) {
+            ->when($sortBy !== 'created_at', function ($query) {
                 // Always add created_at as secondary sort to maintain stable position
                 $query->orderBy('created_at', 'desc');
             })
@@ -65,14 +65,14 @@ class ClientTypesController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => ['required', 'max:255', 'unique:client_types,name'],
+            'name' => ['required', 'max:255', 'unique:client_types,name'],
             'description' => ['nullable', 'string'],
-            'is_active'   => ['required', 'boolean'],
+            'is_active' => ['required', 'boolean'],
         ]);
 
         $clientType = ClientType::create($validated);
 
-        $this->adminActivityLogs('ClientType', 'Add', 'Added Client Type ' . $clientType->name);
+        $this->adminActivityLogs('ClientType', 'Add', 'Added Client Type '.$clientType->name);
 
         try {
             $this->createSystemNotification(
@@ -84,7 +84,7 @@ class ClientTypesController extends Controller
             );
         } catch (\Exception $e) {
             // Log error but don't fail the creation
-            \Log::error('Failed to create system notification: ' . $e->getMessage());
+            \Log::error('Failed to create system notification: '.$e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Client type added successfully.');
@@ -93,9 +93,9 @@ class ClientTypesController extends Controller
     public function update(Request $request, ClientType $clientType)
     {
         $validated = $request->validate([
-            'name'        => ['required', 'max:255', Rule::unique('client_types', 'name')->ignore($clientType->id)],
+            'name' => ['required', 'max:255', Rule::unique('client_types', 'name')->ignore($clientType->id)],
             'description' => ['nullable', 'string'],
-            'is_active'   => ['required', 'boolean'],
+            'is_active' => ['required', 'boolean'],
         ]);
 
         // Ensure is_active is a proper boolean
@@ -105,7 +105,7 @@ class ClientTypesController extends Controller
 
         $clientType->update($validated);
 
-        $this->adminActivityLogs('ClientType', 'Update', 'Updated Client Type ' . $oldName);
+        $this->adminActivityLogs('ClientType', 'Update', 'Updated Client Type '.$oldName);
 
         try {
             $this->createSystemNotification(
@@ -117,7 +117,7 @@ class ClientTypesController extends Controller
             );
         } catch (\Exception $e) {
             // Log error but don't fail the update
-            \Log::error('Failed to create system notification: ' . $e->getMessage());
+            \Log::error('Failed to create system notification: '.$e->getMessage());
         }
 
         return redirect()->route('client-type-management.index')->with('success', 'Client type updated successfully.');
@@ -136,7 +136,7 @@ class ClientTypesController extends Controller
 
         $clientType->delete();
 
-        $this->adminActivityLogs('ClientType', 'Delete', 'Deleted Client Type ' . $name);
+        $this->adminActivityLogs('ClientType', 'Delete', 'Deleted Client Type '.$name);
 
         try {
             $this->createSystemNotification(
@@ -148,7 +148,7 @@ class ClientTypesController extends Controller
             );
         } catch (\Exception $e) {
             // Log error but don't fail the deletion
-            \Log::error('Failed to create system notification: ' . $e->getMessage());
+            \Log::error('Failed to create system notification: '.$e->getMessage());
         }
 
         return redirect()->route('client-type-management.index')->with('success', 'Client type deleted successfully.');
@@ -174,7 +174,7 @@ class ClientTypesController extends Controller
         $this->adminActivityLogs(
             'ClientType',
             'Update Status',
-            'Updated Client Type ' . $clientType->name . ' status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
+            'Updated Client Type '.$clientType->name.' status to '.($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
 
         $status = $request->boolean('is_active') ? 'Active' : 'Inactive';
@@ -188,10 +188,9 @@ class ClientTypesController extends Controller
             );
         } catch (\Exception $e) {
             // Log error but don't fail the status update
-            \Log::error('Failed to create system notification: ' . $e->getMessage());
+            \Log::error('Failed to create system notification: '.$e->getMessage());
         }
 
         return redirect()->route('client-type-management.index')->with('success', 'Client type status updated successfully.');
     }
 }
-

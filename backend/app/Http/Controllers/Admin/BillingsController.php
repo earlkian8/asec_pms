@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreBillingRequest;
+use App\Http\Requests\UpdateBillingRequest;
 use App\Models\Billing;
 use App\Models\BillingPayment;
 use App\Models\Project;
@@ -13,7 +15,6 @@ use App\Services\PayMongoService;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BillingsController extends Controller
@@ -21,6 +22,7 @@ class BillingsController extends Controller
     use ActivityLogsTrait, NotificationTrait;
 
     protected $billingService;
+
     protected $payMongoService;
 
     public function __construct(BillingService $billingService, PayMongoService $payMongoService)
@@ -32,15 +34,30 @@ class BillingsController extends Controller
     public function index(Request $request)
     {
         $tab = $request->get('tab', 'billings');
-        
-        $data = $this->billingService->getBillingsData();
-        
-        // Get transactions data if on transactions tab
+
+        $billingsFilters = [
+            'search' => $request->input('search'),
+            'status' => $request->input('status'),
+            'project_id' => $request->input('project_id'),
+            'billing_type' => $request->input('billing_type'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+            'sort_by' => $request->input('sort_by', 'created_at'),
+            'sort_order' => $request->input('sort_order', 'desc'),
+        ];
+        $data = $this->billingService->getBillingsData($billingsFilters);
+
         if ($tab === 'transactions') {
-            $transactionsData = $this->billingService->getTransactionsData();
+            $transactionsFilters = [
+                'search' => $request->input('search'),
+                'transaction_project_id' => $request->input('transaction_project_id'),
+                'transaction_payment_method' => $request->input('transaction_payment_method'),
+                'per_page' => $request->input('per_page', 15),
+            ];
+            $transactionsData = $this->billingService->getTransactionsData($transactionsFilters);
             $data = array_merge($data, $transactionsData);
         }
-        
+
         // Get all projects for filter dropdown
         // Exclude projects where all billings are fully paid (done with client payment)
         // A project is excluded if it has billings AND all of them have status = 'paid'
@@ -51,6 +68,7 @@ class BillingsController extends Controller
         // Filter out projects where all billings are paid
         $projects = $projects->filter(function ($project) {
             $billings = $project->billings;
+
             // Include if no billings OR if there's at least one unpaid/partial billing
             return $billings->isEmpty() || $billings->contains(function ($billing) {
                 return in_array($billing->status, ['unpaid', 'partial']);
@@ -63,17 +81,9 @@ class BillingsController extends Controller
         return Inertia::render('BillingManagement/index', $data);
     }
 
-    public function store(Request $request)
+    public function store(StoreBillingRequest $request)
     {
-        $validated = $request->validate([
-            'project_id' => ['required', 'exists:projects,id'],
-            'billing_type' => ['required', 'in:fixed_price,milestone'],
-            'milestone_id' => ['nullable', 'exists:project_milestones,id', 'required_if:billing_type,milestone'],
-            'billing_amount' => ['required', 'numeric', 'min:0.01'],
-            'billing_date' => ['required', 'date'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:billing_date'],
-            'description' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         // Get project
         $project = Project::findOrFail($validated['project_id']);
@@ -88,8 +98,8 @@ class BillingsController extends Controller
             $milestone = ProjectMilestone::where('id', $validated['milestone_id'])
                 ->where('project_id', $validated['project_id'])
                 ->first();
-            
-            if (!$milestone) {
+
+            if (! $milestone) {
                 return back()->with('error', 'Milestone does not belong to this project.');
             }
 
@@ -107,17 +117,18 @@ class BillingsController extends Controller
         if ($validated['billing_type'] === 'fixed_price') {
             // For fixed price, check if billing amount exceeds contract amount
             if ($validated['billing_amount'] > $project->contract_amount) {
-                return back()->with('error', 'Billing amount cannot exceed contract amount (' . number_format($project->contract_amount, 2) . ').');
+                return back()->with('error', 'Billing amount cannot exceed contract amount ('.number_format($project->contract_amount, 2).').');
             }
 
             // Check total existing billings + new billing doesn't exceed contract amount
             $totalBilled = Billing::where('project_id', $project->id)
                 ->where('billing_type', 'fixed_price')
                 ->sum('billing_amount');
-            
+
             if (($totalBilled + $validated['billing_amount']) > $project->contract_amount) {
                 $remaining = $project->contract_amount - $totalBilled;
-                return back()->with('error', 'Total billings would exceed contract amount. Remaining billable amount: ' . number_format($remaining, 2) . '.');
+
+                return back()->with('error', 'Total billings would exceed contract amount. Remaining billable amount: '.number_format($remaining, 2).'.');
             }
         }
 
@@ -130,14 +141,14 @@ class BillingsController extends Controller
         $this->adminActivityLogs(
             'Billing',
             'Created',
-            'Created billing "' . $billing->billing_code . '" for project "' . $project->project_name . '"'
+            'Created billing "'.$billing->billing_code.'" for project "'.$project->project_name.'"'
         );
 
         // System-wide notification for new billing
         $this->createSystemNotification(
             'general',
             'New Billing Created',
-            "A new billing '{$billing->billing_code}' (₱" . number_format($billing->billing_amount, 2) . ") has been created for project '{$project->project_name}'.",
+            "A new billing '{$billing->billing_code}' (₱".number_format($billing->billing_amount, 2).") has been created for project '{$project->project_name}'.",
             $project,
             route('billing-management.show', $billing->id)
         );
@@ -145,19 +156,13 @@ class BillingsController extends Controller
         return back()->with('success', 'Billing created successfully.');
     }
 
-    public function update(Request $request, Billing $billing)
+    public function update(UpdateBillingRequest $request, Billing $billing)
     {
-        // Cannot update if fully paid
         if ($billing->status === 'paid') {
             return back()->with('error', 'Cannot update a fully paid billing.');
         }
 
-        $validated = $request->validate([
-            'billing_amount' => ['required', 'numeric', 'min:0.01'],
-            'billing_date' => ['required', 'date'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:billing_date'],
-            'description' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         // For fixed_price, billing amount should not be changed
         if ($billing->billing_type === 'fixed_price') {
@@ -167,7 +172,7 @@ class BillingsController extends Controller
         // Ensure new billing amount is not less than total paid
         $totalPaid = $billing->total_paid;
         if ($validated['billing_amount'] < $totalPaid) {
-            return back()->with('error', 'Billing amount cannot be less than total paid amount (' . number_format($totalPaid, 2) . ').');
+            return back()->with('error', 'Billing amount cannot be less than total paid amount ('.number_format($totalPaid, 2).').');
         }
 
         $billing->update($validated);
@@ -180,14 +185,14 @@ class BillingsController extends Controller
         $this->adminActivityLogs(
             'Billing',
             'Updated',
-            'Updated billing "' . $billing->billing_code . '"'
+            'Updated billing "'.$billing->billing_code.'"'
         );
 
         // System-wide notification for billing update
         $this->createSystemNotification(
             'general',
             'Billing Updated',
-            "Billing '{$billing->billing_code}' has been updated" . ($project ? " for project '{$project->project_name}'" : "") . ".",
+            "Billing '{$billing->billing_code}' has been updated".($project ? " for project '{$project->project_name}'" : '').'.',
             $project,
             route('billing-management.show', $billing->id)
         );
@@ -200,14 +205,14 @@ class BillingsController extends Controller
         // Allow deletion even if paid, but preserve transaction records
         $billingCode = $billing->billing_code;
         $paymentCount = $billing->payments()->count();
-        
+
         // IMPORTANT: Manually set billing_id to null for all payments BEFORE deleting the billing
         // This ensures transactions are preserved even if foreign key constraint fails
         if ($paymentCount > 0) {
             BillingPayment::where('billing_id', $billing->id)
                 ->update(['billing_id' => null]);
         }
-        
+
         // Now delete the billing
         $project = $billing->project;
         $billing->delete();
@@ -215,19 +220,19 @@ class BillingsController extends Controller
         $this->adminActivityLogs(
             'Billing',
             'Deleted',
-            'Deleted billing "' . $billingCode . '"' . ($paymentCount > 0 ? ' (preserved ' . $paymentCount . ' transaction record(s))' : '')
+            'Deleted billing "'.$billingCode.'"'.($paymentCount > 0 ? ' (preserved '.$paymentCount.' transaction record(s))' : '')
         );
 
         // System-wide notification for billing deletion
         $this->createSystemNotification(
             'general',
             'Billing Deleted',
-            "Billing '{$billingCode}' has been deleted" . ($project ? " for project '{$project->project_name}'" : "") . ".",
+            "Billing '{$billingCode}' has been deleted".($project ? " for project '{$project->project_name}'" : '').'.',
             $project,
             route('billing-management.index')
         );
 
-        return back()->with('success', 'Billing deleted successfully.' . ($paymentCount > 0 ? ' Transaction records have been preserved.' : ''));
+        return back()->with('success', 'Billing deleted successfully.'.($paymentCount > 0 ? ' Transaction records have been preserved.' : ''));
     }
 
     public function show(Billing $billing)
@@ -258,7 +263,7 @@ class BillingsController extends Controller
         // Check if payment amount exceeds remaining amount
         $remainingAmount = $billing->remaining_amount;
         if ($validated['payment_amount'] > $remainingAmount) {
-            return back()->with('error', 'Payment amount cannot exceed remaining amount (' . number_format($remainingAmount, 2) . ').');
+            return back()->with('error', 'Payment amount cannot exceed remaining amount ('.number_format($remainingAmount, 2).').');
         }
 
         $validated['billing_id'] = $billing->id;
@@ -269,7 +274,7 @@ class BillingsController extends Controller
         // Handle PayMongo payment
         if ($request->boolean('use_paymongo') && $validated['payment_method'] === 'paymongo') {
             $payMongoResult = $this->payMongoService->createPaymentIntent(
-                (float)$validated['payment_amount'],
+                (float) $validated['payment_amount'],
                 'PHP',
                 [
                     'billing_id' => $billing->id,
@@ -279,8 +284,8 @@ class BillingsController extends Controller
                 ]
             );
 
-            if (!$payMongoResult['success']) {
-                return back()->with('error', 'Failed to create PayMongo payment: ' . ($payMongoResult['error'] ?? 'Unknown error'));
+            if (! $payMongoResult['success']) {
+                return back()->with('error', 'Failed to create PayMongo payment: '.($payMongoResult['error'] ?? 'Unknown error'));
             }
 
             $validated['paymongo_payment_intent_id'] = $payMongoResult['payment_intent_id'];
@@ -308,7 +313,7 @@ class BillingsController extends Controller
         $this->adminActivityLogs(
             'Billing Payment',
             'Created',
-            'Recorded payment "' . $payment->payment_code . '" of ' . number_format((float)$payment->payment_amount, 2) . ' for billing "' . $billing->billing_code . '"'
+            'Recorded payment "'.$payment->payment_code.'" of '.number_format((float) $payment->payment_amount, 2).' for billing "'.$billing->billing_code.'"'
         );
 
         // System-wide notification for payment received
@@ -317,7 +322,7 @@ class BillingsController extends Controller
             $this->createSystemNotification(
                 'general',
                 'Payment Received',
-                "Payment of ₱" . number_format((float)$payment->payment_amount, 2) . " has been received for billing '{$billing->billing_code}'. Billing is now {$status}.",
+                'Payment of ₱'.number_format((float) $payment->payment_amount, 2)." has been received for billing '{$billing->billing_code}'. Billing is now {$status}.",
                 $project,
                 route('billing-management.show', $billing->id)
             );
@@ -326,4 +331,3 @@ class BillingsController extends Controller
         return back()->with('success', 'Payment recorded successfully.');
     }
 }
-

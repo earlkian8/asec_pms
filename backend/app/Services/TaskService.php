@@ -3,31 +3,31 @@
 namespace App\Services;
 
 use App\Models\Project;
-use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 
 class TaskService
 {
-    public function getTaskData(Project $project)
+    /**
+     * @param  array{search?: string}  $filters
+     * @return array{milestones: \Illuminate\Support\Collection, tasks: array, users: \Illuminate\Support\Collection, search: string|null}
+     */
+    public function getTaskData(Project $project, array $filters = []): array
     {
-        $search = request('search');
+        $search = $filters['search'] ?? null;
 
-        // Load all milestones for this project
         $milestones = $project->milestones()->orderBy('due_date', 'asc')->get();
 
         $taskData = [];
 
         foreach ($milestones as $milestone) {
             $tasks = ProjectTask::with([
-                'assignedUser',  // User who the task is assigned to
-                'milestone'      // The milestone this task belongs to
+                'assignedUser',
+                'milestone',
             ])
                 ->where('project_milestone_id', $milestone->id)
                 ->when($search, function ($query, $search) {
                     $query->where(function ($q) use ($search) {
-                        $q->where('title', 'ilike', "%{$search}%")
-                          ->orWhere('description', 'ilike', "%{$search}%")
-                          ->orWhere('status', 'ilike', "%{$search}%");
+                        query_where_search_in($q, ['title', 'description', 'status'], $search);
                     });
                 })
                 ->orderBy('due_date', 'asc')

@@ -29,7 +29,7 @@ class UsersController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -42,7 +42,7 @@ class UsersController extends Controller
 
         // Validate sort_by to prevent SQL injection
         $allowedSortColumns = ['name', 'email', 'created_at'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
@@ -50,13 +50,13 @@ class UsersController extends Controller
         $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
 
         $users = $query
-                      ->with('roles')
-                      ->orderBy($sortBy, $sortOrder)
-                      ->when($sortBy !== 'created_at', function ($query) {
-                          // Add created_at as secondary sort to maintain stable position when sorting by other fields
-                          $query->orderBy('created_at', 'desc');
-                      })
-                      ->paginate(10);
+            ->with('roles')
+            ->orderBy($sortBy, $sortOrder)
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         // Get all roles for the dropdowns
         $roles = Role::all(['id', 'name']);
@@ -101,7 +101,7 @@ class UsersController extends Controller
         $this->adminActivityLogs(
             'User',
             'Add',
-            'Created User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']
+            'Created User '.$user->name.' ('.$user->email.') with role: '.$validated['role']
         );
 
         // System-wide notification for new user
@@ -135,7 +135,7 @@ class UsersController extends Controller
         ];
 
         // Only update password if provided
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $updateData['password'] = Hash::make($validated['password']);
         }
 
@@ -149,7 +149,7 @@ class UsersController extends Controller
         $this->adminActivityLogs(
             'User',
             'Update',
-            'Updated User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']
+            'Updated User '.$user->name.' ('.$user->email.') with role: '.$validated['role']
         );
 
         // System-wide notification for user update
@@ -170,7 +170,7 @@ class UsersController extends Controller
         }
 
         $defaultPassword = 'asecpassword';
-        
+
         $user->update([
             'password' => Hash::make($defaultPassword),
         ]);
@@ -178,7 +178,7 @@ class UsersController extends Controller
         $this->adminActivityLogs(
             'User',
             'Reset Password',
-            'Reset password for User ' . $user->name . ' (' . $user->email . ')'
+            'Reset password for User '.$user->name.' ('.$user->email.')'
         );
 
         // System-wide notification for password reset
@@ -210,7 +210,7 @@ class UsersController extends Controller
         $this->adminActivityLogs(
             'User',
             'Delete',
-            'Deleted User ' . $userName . ' (' . $userEmail . ')'
+            'Deleted User '.$userName.' ('.$userEmail.')'
         );
 
         $user->delete();

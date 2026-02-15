@@ -3,21 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Project;
-use App\Models\ProjectType;
-use App\Models\Client;
 use App\Models\Billing;
 use App\Models\BillingPayment;
+use App\Models\Client;
 use App\Models\InventoryItem;
-use App\Models\ProjectTeam;
-use App\Models\ProjectMilestone;
-use App\Models\ProjectTask;
+use App\Models\Project;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
-use Illuminate\Http\Request;
+use App\Models\ProjectMilestone;
+use App\Models\ProjectTask;
+use App\Models\ProjectTeam;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -30,7 +28,7 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->get()
             ->pluck('count', 'status');
-        
+
         $projectsByType = Project::with('projectType')
             ->select('project_type_id', DB::raw('count(*) as count'))
             ->whereNotNull('project_type_id')
@@ -38,19 +36,21 @@ class DashboardController extends Controller
             ->get()
             ->mapWithKeys(function ($item) {
                 $typeName = $item->projectType ? $item->projectType->name : 'Unknown';
+
                 return [$typeName => $item->count];
             });
 
         $totalContractAmount = Project::sum('contract_amount');
-        
+
         // Calculate average completion based on milestones
         $allProjects = Project::with('milestones')->get();
         $completionPercentages = $allProjects->map(function ($project) {
             $milestones = $project->milestones;
             $totalMilestones = $milestones->count();
             $completedMilestones = $milestones->where('status', 'completed')->count();
-            return $totalMilestones > 0 
-                ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+
+            return $totalMilestones > 0
+                ? round(($completedMilestones / $totalMilestones) * 100, 2)
                 : 0;
         });
         $averageCompletion = $completionPercentages->avg() ?? 0;
@@ -64,9 +64,10 @@ class DashboardController extends Controller
                 $milestones = $project->milestones;
                 $totalMilestones = $milestones->count();
                 $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->milestones_completion_percentage = $totalMilestones > 0 
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                $project->milestones_completion_percentage = $totalMilestones > 0
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2)
                     : 0;
+
                 return $project->only(['id', 'project_code', 'project_name', 'status', 'milestones_completion_percentage', 'client_id', 'project_type_id', 'created_at']);
             });
 
@@ -77,15 +78,15 @@ class DashboardController extends Controller
         // Billing Statistics - Based on transactions (payments) to handle deleted billings
         // Total billed: Sum of all billing amounts from existing billings
         $totalBilled = Billing::sum('billing_amount');
-        
+
         // Total paid: Sum of all payment transactions with status='paid' (even if billing is deleted)
         // Only count confirmed paid payments - exclude pending, failed, or cancelled payments
         $totalPaid = BillingPayment::where('payment_status', 'paid')->sum('payment_amount');
-        
+
         // Total remaining: Calculate from existing billings minus payments
         // This ensures accuracy even if some billings are deleted
         $totalRemaining = $totalBilled - $totalPaid;
-        
+
         // Billing status counts - based on existing billings
         $billingsByStatus = Billing::select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
@@ -137,6 +138,7 @@ class DashboardController extends Controller
                 if ($allocation->inventoryItem) {
                     return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
                 }
+
                 return 0;
             });
 
@@ -180,6 +182,7 @@ class DashboardController extends Controller
                     if ($allocation->inventoryItem) {
                         return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
                     }
+
                     return 0;
                 });
             });
@@ -190,10 +193,10 @@ class DashboardController extends Controller
             $month = now()->subMonths($i);
             $monthKey = $month->format('Y-m');
             $monthLabel = $month->format('M Y');
-            
+
             $revenueData = $monthlyRevenue->get($monthKey);
             $laborData = $monthlyLaborCosts->get($monthKey);
-            
+
             $last6Months[] = [
                 'month' => $monthLabel,
                 'month_key' => $monthKey,
@@ -282,4 +285,3 @@ class DashboardController extends Controller
         ]);
     }
 }
-

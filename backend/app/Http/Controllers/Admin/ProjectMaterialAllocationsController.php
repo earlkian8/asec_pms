@@ -3,17 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryTransaction;
+use App\Models\MaterialReceivingReport;
 use App\Models\Project;
 use App\Models\ProjectMaterialAllocation;
-use App\Models\MaterialReceivingReport;
-use App\Models\InventoryTransaction;
-use App\Models\InventoryItem;
-use App\Models\User;
 use App\Services\InventoryService;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class ProjectMaterialAllocationsController extends Controller
 {
@@ -61,7 +58,7 @@ class ProjectMaterialAllocationsController extends Controller
             'quantity' => $data['quantity_received'],
             'project_id' => $project->id,
             'project_material_allocation_id' => $allocation->id,
-            'notes' => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
+            'notes' => '[RECEIVING_REPORT_ID:'.$receivingReport->id.'] Stock removed via receiving report'.($data['notes'] ? ' - '.$data['notes'] : ''),
             'created_by' => auth()->id(),
             'transaction_date' => $data['received_at'],
         ]);
@@ -76,7 +73,7 @@ class ProjectMaterialAllocationsController extends Controller
         $this->adminActivityLogs(
             'Material Receiving Report',
             'Created',
-            'Created receiving report for "' . $allocation->inventoryItem->item_name . '" - ' . $data['quantity_received'] . ' ' . $allocation->inventoryItem->unit_of_measure . ' received for project "' . $project->project_name . '"'
+            'Created receiving report for "'.$allocation->inventoryItem->item_name.'" - '.$data['quantity_received'].' '.$allocation->inventoryItem->unit_of_measure.' received for project "'.$project->project_name.'"'
         );
 
         // System-wide notification for material received
@@ -117,21 +114,21 @@ class ProjectMaterialAllocationsController extends Controller
         $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
             ->where('transaction_type', 'stock_out')
             ->where('stock_out_type', 'project_use')
-            ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $receivingReport->id . ']%')
+            ->where('notes', 'like', '%[RECEIVING_REPORT_ID:'.$receivingReport->id.']%')
             ->first();
 
         // Update allocation received quantity
         $oldQuantity = $receivingReport->quantity_received;
         $allocation->quantity_received -= $oldQuantity;
-        
+
         $receivingReport->update($data);
-        
+
         // Update the stock_out transaction quantity if found
         if ($stockOutTransaction) {
             $stockOutTransaction->update([
                 'quantity' => $data['quantity_received'],
                 'transaction_date' => $data['received_at'],
-                'notes' => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
+                'notes' => '[RECEIVING_REPORT_ID:'.$receivingReport->id.'] Stock removed via receiving report'.($data['notes'] ? ' - '.$data['notes'] : ''),
             ]);
         } else {
             // If transaction not found, create a new one
@@ -142,12 +139,12 @@ class ProjectMaterialAllocationsController extends Controller
                 'quantity' => $data['quantity_received'],
                 'project_id' => $project->id,
                 'project_material_allocation_id' => $allocation->id,
-                'notes' => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
+                'notes' => '[RECEIVING_REPORT_ID:'.$receivingReport->id.'] Stock removed via receiving report'.($data['notes'] ? ' - '.$data['notes'] : ''),
                 'created_by' => auth()->id(),
                 'transaction_date' => $data['received_at'],
             ]);
         }
-        
+
         $allocation->quantity_received += $data['quantity_received'];
         $allocation->updateStatus();
 
@@ -157,7 +154,7 @@ class ProjectMaterialAllocationsController extends Controller
         $this->adminActivityLogs(
             'Material Receiving Report',
             'Updated',
-            'Updated receiving report for "' . $allocation->inventoryItem->item_name . '" for project "' . $project->project_name . '"'
+            'Updated receiving report for "'.$allocation->inventoryItem->item_name.'" for project "'.$project->project_name.'"'
         );
 
         return back()->with('success', 'Receiving report updated successfully.');
@@ -171,7 +168,7 @@ class ProjectMaterialAllocationsController extends Controller
         $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
             ->where('transaction_type', 'stock_out')
             ->where('stock_out_type', 'project_use')
-            ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $receivingReport->id . ']%')
+            ->where('notes', 'like', '%[RECEIVING_REPORT_ID:'.$receivingReport->id.']%')
             ->first();
 
         if ($stockOutTransaction) {
@@ -181,7 +178,7 @@ class ProjectMaterialAllocationsController extends Controller
         // Update allocation received quantity
         $allocation->quantity_received -= $receivingReport->quantity_received;
         $allocation->updateStatus();
-        
+
         $receivingReport->delete();
 
         // Update current stock (this will add back the stock since transaction is deleted)
@@ -190,7 +187,7 @@ class ProjectMaterialAllocationsController extends Controller
         $this->adminActivityLogs(
             'Material Receiving Report',
             'Deleted',
-            'Deleted receiving report for "' . $allocation->inventoryItem->item_name . '" for project "' . $project->project_name . '"'
+            'Deleted receiving report for "'.$allocation->inventoryItem->item_name.'" for project "'.$project->project_name.'"'
         );
 
         return back()->with('success', 'Receiving report deleted successfully.');
@@ -207,7 +204,7 @@ class ProjectMaterialAllocationsController extends Controller
             $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
                 ->where('transaction_type', 'stock_out')
                 ->where('stock_out_type', 'project_use')
-                ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $report->id . ']%')
+                ->where('notes', 'like', '%[RECEIVING_REPORT_ID:'.$report->id.']%')
                 ->first();
 
             if ($stockOutTransaction) {
@@ -233,7 +230,7 @@ class ProjectMaterialAllocationsController extends Controller
         $this->adminActivityLogs(
             'Material Allocation',
             'Deleted',
-            'Deleted material allocation for "' . $itemName . '" from project "' . $project->project_name . '"'
+            'Deleted material allocation for "'.$itemName.'" from project "'.$project->project_name.'"'
         );
 
         return back()->with('success', 'Material allocation deleted successfully.');

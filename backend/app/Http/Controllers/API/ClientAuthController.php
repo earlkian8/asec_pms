@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -22,19 +22,15 @@ class ClientAuthController extends Controller
 
         $client = Client::where('email', $request->email)->first();
 
-        if (!$client || !Hash::check($request->password, $client->password)) {
+        if (! $client || ! Hash::check($request->password, $client->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid email or password'],
             ]);
         }
 
-        if (!$client->is_active) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account is inactive. Please contact support.',
-                'errors' => [
-                    'email' => ['Your account is inactive. Please contact support.'],
-                ],
+        if (! $client->is_active) {
+            return api_error('Your account is inactive. Please contact support.', [
+                'email' => ['Your account is inactive. Please contact support.'],
             ], 403);
         }
 
@@ -46,36 +42,8 @@ class ClientAuthController extends Controller
         // Check if password needs to be changed (password_changed_at is null)
         $mustChangePassword = is_null($client->password_changed_at);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
-                'client' => [
-                    'id' => $client->id,
-                    'client_code' => $client->client_code,
-                    'name' => $client->client_name,
-                    'email' => $client->email,
-                    'contact_person' => $client->contact_person,
-                    'company' => $client->client_name,
-                    'phone_number' => $client->phone_number,
-                    'is_active' => $client->is_active,
-                ],
-                'token' => $token,
-                'must_change_password' => $mustChangePassword,
-            ],
-        ]);
-    }
-
-    /**
-     * Get authenticated client
-     */
-    public function me(Request $request)
-    {
-        $client = $request->user();
-
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return api_success([
+            'client' => [
                 'id' => $client->id,
                 'client_code' => $client->client_code,
                 'name' => $client->client_name,
@@ -85,6 +53,27 @@ class ClientAuthController extends Controller
                 'phone_number' => $client->phone_number,
                 'is_active' => $client->is_active,
             ],
+            'token' => $token,
+            'must_change_password' => $mustChangePassword,
+        ], 'Login successful');
+    }
+
+    /**
+     * Get authenticated client
+     */
+    public function me(Request $request)
+    {
+        $client = $request->user();
+
+        return api_success([
+            'id' => $client->id,
+            'client_code' => $client->client_code,
+            'name' => $client->client_name,
+            'email' => $client->email,
+            'contact_person' => $client->contact_person,
+            'company' => $client->client_name,
+            'phone_number' => $client->phone_number,
+            'is_active' => $client->is_active,
         ]);
     }
 
@@ -96,10 +85,7 @@ class ClientAuthController extends Controller
         // Revoke current token
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully',
-        ]);
+        return api_success([], 'Logged out successfully');
     }
 
     /**
@@ -109,10 +95,7 @@ class ClientAuthController extends Controller
     {
         $request->user()->tokens()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out from all devices successfully',
-        ]);
+        return api_success([], 'Logged out from all devices successfully');
     }
 
     /**
@@ -128,11 +111,8 @@ class ClientAuthController extends Controller
         $client = $request->user();
 
         // Verify current password
-        if (!Hash::check($request->current_password, $client->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Current password is incorrect.',
-            ], 422);
+        if (! Hash::check($request->current_password, $client->password)) {
+            return api_error('Current password is incorrect.', null, 422);
         }
 
         // Update password
@@ -140,10 +120,6 @@ class ClientAuthController extends Controller
         $client->password_changed_at = now();
         $client->save();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password changed successfully. Please login again.',
-        ]);
+        return api_success([], 'Password changed successfully. Please login again.');
     }
 }
-

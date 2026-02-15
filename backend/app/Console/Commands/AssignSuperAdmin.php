@@ -27,20 +27,21 @@ class AssignSuperAdmin extends Command
     public function handle()
     {
         $email = $this->argument('email');
-        
+
         $user = User::where('email', $email)->first();
-        
-        if (!$user) {
+
+        if (! $user) {
             $this->error("User with email '{$email}' not found.");
+
             return 1;
         }
-        
+
         // Assign Super Admin role
         $user->syncRoles(['Super Admin']);
-        
+
         $this->info("Super Admin role has been assigned to: {$user->name} ({$user->email})");
-        $this->info("Current roles: " . $user->roles->pluck('name')->implode(', '));
-        
+        $this->info('Current roles: '.$user->roles->pluck('name')->implode(', '));
+
         return 0;
     }
 }

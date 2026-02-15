@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectLaborCost;
-use App\Models\ProjectTeam;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -55,7 +53,7 @@ class ProjectLaborCostsController extends Controller
         $this->adminActivityLogs(
             'Labor Cost',
             'Created',
-            'Created labor cost entry for ' . $assignableName . ' - ' . $data['hours_worked'] . ' hours on ' . $data['work_date'] . ' for project "' . $project->project_name . '"'
+            'Created labor cost entry for '.$assignableName.' - '.$data['hours_worked'].' hours on '.$data['work_date'].' for project "'.$project->project_name.'"'
         );
 
         // System-wide notification for labor cost
@@ -108,7 +106,7 @@ class ProjectLaborCostsController extends Controller
         $this->adminActivityLogs(
             'Labor Cost',
             'Updated',
-            'Updated labor cost entry for ' . $assignableName . ' for project "' . $project->project_name . '"'
+            'Updated labor cost entry for '.$assignableName.' for project "'.$project->project_name.'"'
         );
 
         // System-wide notification for labor cost update
@@ -135,7 +133,7 @@ class ProjectLaborCostsController extends Controller
         $this->adminActivityLogs(
             'Labor Cost',
             'Deleted',
-            'Deleted labor cost entry for ' . $assignableName . ' on ' . $workDate . ' from project "' . $project->project_name . '"'
+            'Deleted labor cost entry for '.$assignableName.' on '.$workDate.' from project "'.$project->project_name.'"'
         );
 
         // System-wide notification for labor cost deletion
@@ -150,4 +148,3 @@ class ProjectLaborCostsController extends Controller
         return back()->with('success', 'Labor cost entry deleted successfully.');
     }
 }
-

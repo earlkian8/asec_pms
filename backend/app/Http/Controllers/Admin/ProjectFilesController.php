@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectFile;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -14,33 +13,34 @@ use Illuminate\Support\Facades\Storage;
 class ProjectFilesController extends Controller
 {
     use ActivityLogsTrait, NotificationTrait;
+
     public function store(Request $request, Project $project)
     {
-        
+
         $validated = $request->validate([
-            'file'        => ['required', 'file', 'max:20480'], // 20MB
-            'category'    => ['nullable', 'in:contract,drafting,specification,report,photo,other'],
+            'file' => ['required', 'file', 'max:20480'], // 20MB
+            'category' => ['nullable', 'in:contract,drafting,specification,report,photo,other'],
             'description' => ['nullable', 'string'],
         ]);
 
-        $disk      = env('FILESYSTEM_DISK', 'public'); // use public by default
+        $disk = env('FILESYSTEM_DISK', 'public'); // use public by default
         $directory = "project_files/{$project->id}";
-        $uploaded  = $request->file('file');
+        $uploaded = $request->file('file');
 
         // Store file using your preferred method
         $filename = basename($uploaded->store($directory, $disk));
 
         $file = ProjectFile::create([
-            'project_id'    => $project->id,
-            'file_name'     => $filename,
+            'project_id' => $project->id,
+            'file_name' => $filename,
             'original_name' => $uploaded->getClientOriginalName(),
-            'file_path'     => $directory . '/' . $filename,
-            'file_size'     => $uploaded->getSize(),
-            'file_type'     => $uploaded->extension(),
-            'mime_type'     => $uploaded->getMimeType(),
-            'category'      => $validated['category'] ?? 'other',
-            'description'   => $validated['description'] ?? null,
-            'uploaded_at'   => now(),
+            'file_path' => $directory.'/'.$filename,
+            'file_size' => $uploaded->getSize(),
+            'file_type' => $uploaded->extension(),
+            'mime_type' => $uploaded->getMimeType(),
+            'category' => $validated['category'] ?? 'other',
+            'description' => $validated['description'] ?? null,
+            'uploaded_at' => now(),
         ]);
 
         $this->adminActivityLogs(
@@ -60,28 +60,29 @@ class ProjectFilesController extends Controller
 
         return redirect()->back()->with('success', 'File uploaded successfully.');
     }
-     public function update(Request $request, Project $project, ProjectFile $file)
+
+    public function update(Request $request, Project $project, ProjectFile $file)
     {
         if ($file->project_id !== $project->id) {
             abort(404);
         }
 
         $validated = $request->validate([
-            'category'    => ['nullable', 'in:contract,drafting,specification,report,photo,other'],
+            'category' => ['nullable', 'in:contract,drafting,specification,report,photo,other'],
             'description' => ['nullable', 'string'],
         ]);
 
         $oldCategory = $file->category;
-        $oldDesc     = $file->description;
+        $oldDesc = $file->description;
 
         $file->update($validated);
 
         $this->adminActivityLogs(
             'Project Files',
             'Update',
-            "Updated file {$file->original_name} in Project {$project->project_name}: " .
-            "Category: {$oldCategory} → {$file->category}, " .
-            "Description changed"
+            "Updated file {$file->original_name} in Project {$project->project_name}: ".
+            "Category: {$oldCategory} → {$file->category}, ".
+            'Description changed'
         );
 
         // System-wide notification for file update
@@ -96,14 +97,14 @@ class ProjectFilesController extends Controller
         return redirect()->back()->with('success', 'File updated successfully.');
     }
 
-    public function destroy(Request $request, Project $project, ProjectFile $file = null)
+    public function destroy(Request $request, Project $project, ?ProjectFile $file = null)
     {
         $disk = env('FILESYSTEM_DISK', 'public');
 
         // Bulk delete
         if ($request->has('ids') && is_array($request->ids)) {
             $validated = $request->validate([
-                'ids'   => 'required|array|min:1',
+                'ids' => 'required|array|min:1',
                 'ids.*' => 'integer|exists:project_files,id',
             ]);
 
@@ -136,7 +137,7 @@ class ProjectFilesController extends Controller
         }
 
         // Single delete
-        if (!$file || $file->project_id !== $project->id) {
+        if (! $file || $file->project_id !== $project->id) {
             abort(404);
         }
 
@@ -172,7 +173,7 @@ class ProjectFilesController extends Controller
 
         $disk = env('FILESYSTEM_DISK', 'public');
 
-        if (!Storage::disk($disk)->exists($file->file_path)) {
+        if (! Storage::disk($disk)->exists($file->file_path)) {
             return redirect()->back()->with('error', 'File not found on server.');
         }
 

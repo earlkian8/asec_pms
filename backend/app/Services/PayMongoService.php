@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Log;
 class PayMongoService
 {
     protected $secretKey;
+
     protected $publicKey;
+
     protected $apiUrl;
 
     public function __construct()
@@ -16,8 +18,8 @@ class PayMongoService
         $this->secretKey = config('services.paymongo.secret_key');
         $this->publicKey = config('services.paymongo.public_key');
         $this->apiUrl = config('services.paymongo.api_url', 'https://api.paymongo.com/v1');
-        
-        if (!$this->secretKey) {
+
+        if (! $this->secretKey) {
             throw new \Exception('PayMongo secret key is not configured');
         }
     }
@@ -27,8 +29,8 @@ class PayMongoService
      */
     protected function request(string $method, string $endpoint, array $data = [])
     {
-        $url = rtrim($this->apiUrl, '/') . '/' . ltrim($endpoint, '/');
-        
+        $url = rtrim($this->apiUrl, '/').'/'.ltrim($endpoint, '/');
+
         $response = Http::withBasicAuth($this->secretKey, '')
             ->withHeaders([
                 'Accept' => 'application/json',
@@ -50,9 +52,10 @@ class PayMongoService
             if (is_array($value) || is_object($value)) {
                 $flattened[$key] = json_encode($value);
             } else {
-                $flattened[$key] = (string)$value;
+                $flattened[$key] = (string) $value;
             }
         }
+
         return $flattened;
     }
 
@@ -62,8 +65,8 @@ class PayMongoService
     public function createPaymentIntent(float $amount, string $currency = 'PHP', array $metadata = [])
     {
         try {
-            $amountInCents = (int)($amount * 100); // Convert to cents
-            
+            $amountInCents = (int) ($amount * 100); // Convert to cents
+
             $response = $this->request('POST', 'payment_intents', [
                 'data' => [
                     'attributes' => [
@@ -173,8 +176,8 @@ class PayMongoService
                         'type' => 'card',
                         'details' => [
                             'card_number' => $cardNumber,
-                            'exp_month' => (int)($cardDetails['exp_month'] ?? 0),
-                            'exp_year' => (int)($cardDetails['exp_year'] ?? 0),
+                            'exp_month' => (int) ($cardDetails['exp_month'] ?? 0),
+                            'exp_year' => (int) ($cardDetails['exp_year'] ?? 0),
                             'cvc' => $cardDetails['cvc'] ?? '',
                         ],
                         'billing' => [
@@ -202,12 +205,12 @@ class PayMongoService
                     'card_number_length' => strlen($cardNumber),
                     'exp_month' => $cardDetails['exp_month'] ?? null,
                     'exp_year' => $cardDetails['exp_year'] ?? null,
-                    'has_cvc' => !empty($cardDetails['cvc']),
+                    'has_cvc' => ! empty($cardDetails['cvc']),
                 ],
                 'billing_details' => [
-                    'has_name' => !empty($billingDetails['name']),
-                    'has_email' => !empty($billingDetails['email']),
-                    'has_phone' => !empty($billingDetails['phone']),
+                    'has_name' => ! empty($billingDetails['name']),
+                    'has_email' => ! empty($billingDetails['email']),
+                    'has_phone' => ! empty($billingDetails['phone']),
                 ],
             ]);
 
@@ -278,21 +281,19 @@ class PayMongoService
 
     /**
      * Confirm payment intent (DEPRECATED - Not needed for PayMongo)
-     * 
+     *
      * @deprecated This method is deprecated. PayMongo does not require a separate confirmation step.
      * When attaching a payment method, the payment is automatically confirmed if successful.
      * The attachment response already contains the final status and next_action.
      * This method is kept for backward compatibility but should not be used in new code.
-     * 
-     * @param string $paymentIntentId
-     * @param string|null $returnUrl
+     *
      * @return array
      */
     public function confirmPaymentIntent(string $paymentIntentId, ?string $returnUrl = null)
     {
         try {
             $attributes = [];
-            
+
             // Include return_url if provided (required for 3D Secure flows)
             if ($returnUrl) {
                 $attributes['return_url'] = $returnUrl;
@@ -350,24 +351,24 @@ class PayMongoService
             // GCash maximum is 100,000 PHP per transaction
             // PayMaya and other sources may have different limits
             $maxAmount = 100000.00; // 100,000 PHP for GCash
-            $maxAmountInCents = (int)($maxAmount * 100); // 10,000,000 cents
-            $amountInCents = (int)($amount * 100);
-            
+            $maxAmountInCents = (int) ($maxAmount * 100); // 10,000,000 cents
+            $amountInCents = (int) ($amount * 100);
+
             if ($amount > $maxAmount) {
                 return [
                     'success' => false,
-                    'error' => 'Amount exceeds GCash maximum limit of ₱' . number_format($maxAmount, 2) . '. Please split your payment into multiple transactions or contact support for assistance.',
+                    'error' => 'Amount exceeds GCash maximum limit of ₱'.number_format($maxAmount, 2).'. Please split your payment into multiple transactions or contact support for assistance.',
                 ];
             }
 
             // Get base URL for redirects
             $baseUrl = config('app.url', 'http://localhost');
             $clientPortalUrl = config('app.client_portal_url', $baseUrl);
-            
+
             // Default redirect URLs if not provided
-            $successRedirect = $successUrl ?? rtrim($clientPortalUrl, '/') . '/payment/success';
-            $failedRedirect = $failedUrl ?? rtrim($clientPortalUrl, '/') . '/payment/failed';
-            
+            $successRedirect = $successUrl ?? rtrim($clientPortalUrl, '/').'/payment/success';
+            $failedRedirect = $failedUrl ?? rtrim($clientPortalUrl, '/').'/payment/failed';
+
             $response = $this->request('POST', 'sources', [
                 'data' => [
                     'attributes' => [
@@ -386,14 +387,14 @@ class PayMongoService
             if (isset($response['data'])) {
                 $attributes = $response['data']['attributes'] ?? [];
                 $redirect = $attributes['redirect'] ?? [];
-                
+
                 // Log for debugging
                 Log::info('PayMongo Source Created', [
                     'source_id' => $response['data']['id'],
                     'checkout_url' => $redirect['checkout_url'] ?? $redirect['url'] ?? null,
                     'redirect' => $redirect,
                 ]);
-                
+
                 return [
                     'success' => true,
                     'source_id' => $response['data']['id'],
@@ -423,7 +424,7 @@ class PayMongoService
 
             return [
                 'success' => false,
-                'error' => 'An unexpected error occurred while creating payment source: ' . $e->getMessage(),
+                'error' => 'An unexpected error occurred while creating payment source: '.$e->getMessage(),
             ];
         }
     }
@@ -475,8 +476,8 @@ class PayMongoService
     public function createPaymentFromSource(string $sourceId, float $amount, string $currency = 'PHP', array $metadata = [])
     {
         try {
-            $amountInCents = (int)($amount * 100);
-            
+            $amountInCents = (int) ($amount * 100);
+
             $response = $this->request('POST', 'payments', [
                 'data' => [
                     'attributes' => [

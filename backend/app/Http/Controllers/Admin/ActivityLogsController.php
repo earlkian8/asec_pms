@@ -21,15 +21,13 @@ class ActivityLogsController extends Controller
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('module', 'ilike', "%{$search}%")
-                      ->orWhere('action', 'ilike', "%{$search}%")
-                      ->orWhere('description', 'ilike', "%{$search}%")
-                      ->orWhere('ip_address', 'ilike', "%{$search}%");
+                        ->orWhere('action', 'ilike', "%{$search}%")
+                        ->orWhere('description', 'ilike', "%{$search}%")
+                        ->orWhere('ip_address', 'ilike', "%{$search}%");
                 });
             })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
-
-        
 
         return Inertia::render('UserManagement/ActivityLogs/index', [
             'logs' => $logs,

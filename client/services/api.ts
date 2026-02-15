@@ -1,11 +1,6 @@
+import type { ApiResponse } from '@/types/api';
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
-// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data?: T;
-  errors?: Record<string, string[]>;
-}
 
 class ApiService {
   private baseURL: string;
@@ -13,25 +8,16 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_BASE_URL;
-    // Load token from storage if available
-    // In a real app, you'd use AsyncStorage here
     this.loadToken();
   }
 
-  private async loadToken() {
-    // TODO: Load from AsyncStorage when available
-    // const token = await AsyncStorage.getItem('auth_token');
-    // if (token) this.setToken(token);
+  /** Load token from storage. Override or extend to use AsyncStorage/SecureStore for persistence. */
+  private async loadToken(): Promise<void> {
+    // Token is in-memory only by default. For persistence, use AsyncStorage.getItem('auth_token').
   }
 
-  setToken(token: string | null) {
+  setToken(token: string | null): void {
     this.token = token;
-    // TODO: Save to AsyncStorage when available
-    // if (token) {
-    //   AsyncStorage.setItem('auth_token', token);
-    // } else {
-    //   AsyncStorage.removeItem('auth_token');
-    // }
   }
 
   getToken(): string | null {
@@ -211,25 +197,6 @@ class ApiService {
     });
   }
 
-  /**
-   * Confirm Payment Intent (DEPRECATED - Not needed for PayMongo)
-   * 
-   * @deprecated This method is deprecated. PayMongo does not require a separate confirmation step.
-   * When attaching a payment method, the payment is automatically confirmed if successful.
-   * The attachment response already contains the final status and next_action.
-   * This method is kept for backward compatibility but should not be used in new code.
-   */
-  async confirmPaymentIntent(
-    billingId: number,
-    paymentIntentId: string,
-    returnUrl: string
-  ): Promise<ApiResponse<any>> {
-    return this.post(`/client/billings/${billingId}/payment-intent/confirm`, {
-      payment_intent_id: paymentIntentId,
-      return_url: returnUrl,
-    });
-  }
-
   async checkPaymentStatus(billingId: number): Promise<ApiResponse<any>> {
     const result = await this.get(`/client/billings/${billingId}/payment-status`, { responseType: 'json' });
     return result as ApiResponse<any>;
@@ -243,4 +210,5 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+export type { ApiResponse } from '@/types/api';
 

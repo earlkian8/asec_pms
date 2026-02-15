@@ -2,29 +2,26 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\Reports\AllReportsExport;
+use App\Exports\Reports\BudgetReportExport;
+use App\Exports\Reports\ClientReportExport;
+use App\Exports\Reports\FinancialReportExport;
+use App\Exports\Reports\InventoryReportExport;
+use App\Exports\Reports\ProjectPerformanceExport;
+use App\Exports\Reports\TeamProductivityExport;
 use App\Http\Controllers\Controller;
-use App\Models\Project;
-use App\Models\Client;
 use App\Models\Billing;
 use App\Models\BillingPayment;
+use App\Models\Client;
 use App\Models\InventoryItem;
-use App\Models\ProjectTeam;
-use App\Models\ProjectMilestone;
-use App\Models\ProjectTask;
+use App\Models\Project;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\Reports\ProjectPerformanceExport;
-use App\Exports\Reports\FinancialReportExport;
-use App\Exports\Reports\ClientReportExport;
-use App\Exports\Reports\InventoryReportExport;
-use App\Exports\Reports\TeamProductivityExport;
-use App\Exports\Reports\BudgetReportExport;
-use App\Exports\Reports\AllReportsExport;
 
 class ReportsController extends Controller
 {
@@ -119,16 +116,17 @@ class ReportsController extends Controller
         $projects = $query->with(['client:id,client_name', 'milestones'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
+                    ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
             })
             ->get()
             ->map(function ($project) {
                 $milestones = $project->milestones;
                 $totalMilestones = $milestones->count();
                 $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->completion_percentage = $totalMilestones > 0 
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                $project->completion_percentage = $totalMilestones > 0
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2)
                     : 0;
+
                 return $project;
             });
 
@@ -158,9 +156,9 @@ class ReportsController extends Controller
 
         // Overdue projects
         $overdueProjects = $projects->filter(function ($project) {
-            return $project->status !== 'completed' 
+            return $project->status !== 'completed'
                 && $project->status !== 'cancelled'
-                && $project->planned_end_date 
+                && $project->planned_end_date
                 && Carbon::parse($project->planned_end_date)->isPast();
         });
 
@@ -186,7 +184,7 @@ class ReportsController extends Controller
         // Revenue (from payments) - Only count paid payments for accurate revenue reporting
         $paymentQuery = BillingPayment::where('payment_status', 'paid')
             ->whereBetween('payment_date', [$startDate, $endDate]);
-        
+
         if ($projectId) {
             $paymentQuery->whereHas('billing', function ($q) use ($projectId) {
                 $q->where('project_id', $projectId);
@@ -197,7 +195,7 @@ class ReportsController extends Controller
 
         // Total Billed
         $billingQuery = Billing::whereBetween('billing_date', [$startDate, $endDate]);
-        
+
         if ($projectId) {
             $billingQuery->where('project_id', $projectId);
         } elseif ($clientId) {
@@ -235,6 +233,7 @@ class ReportsController extends Controller
                 if ($allocation->inventoryItem) {
                     return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
                 }
+
                 return 0;
             });
 
@@ -279,27 +278,27 @@ class ReportsController extends Controller
         $clients = $query->withCount(['projects' => function ($q) use ($startDate, $endDate) {
             $q->where(function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('start_date', [$startDate, $endDate])
-                      ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
+                    ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
             });
         }])
-        ->with(['projects' => function ($q) use ($startDate, $endDate) {
-            $q->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                      ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
-            })
-            ->with('milestones')
-            ->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
-        }])
-        ->get();
-        
+            ->with(['projects' => function ($q) use ($startDate, $endDate) {
+                $q->where(function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('start_date', [$startDate, $endDate])
+                        ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
+                })
+                    ->with('milestones')
+                    ->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
+            }])
+            ->get();
+
         // Calculate completion_percentage for each project
         $clients->each(function ($client) {
             $client->projects->each(function ($project) {
                 $milestones = $project->milestones;
                 $totalMilestones = $milestones->count();
                 $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->completion_percentage = $totalMilestones > 0 
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                $project->completion_percentage = $totalMilestones > 0
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2)
                     : 0;
             });
         });
@@ -308,7 +307,7 @@ class ReportsController extends Controller
             $totalContractValue = $client->projects->sum('contract_amount');
             $activeProjects = $client->projects->where('status', 'active')->count();
             $completedProjects = $client->projects->where('status', 'completed')->count();
-            
+
             return [
                 'id' => $client->id,
                 'client_code' => $client->client_code,
@@ -332,7 +331,7 @@ class ReportsController extends Controller
     {
         $totalItems = InventoryItem::count();
         $activeItems = InventoryItem::where('is_active', true)->count();
-        
+
         $lowStockItems = InventoryItem::where('is_active', true)
             ->get()
             ->filter(function ($item) {
@@ -448,9 +447,9 @@ class ReportsController extends Controller
         }
 
         $projects = $query->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
-            })
+            $q->whereBetween('start_date', [$startDate, $endDate])
+                ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
+        })
             ->get();
 
         $budgetData = $projects->map(function ($project) {
@@ -469,6 +468,7 @@ class ReportsController extends Controller
                     if ($allocation->inventoryItem) {
                         return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
                     }
+
                     return 0;
                 });
 
@@ -541,6 +541,7 @@ class ReportsController extends Controller
                     if ($allocation->inventoryItem) {
                         return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
                     }
+
                     return 0;
                 });
 
@@ -723,13 +724,13 @@ class ReportsController extends Controller
         $dateRangeStr = 'all';
 
         if ($startDate && $endDate) {
-            $dateRangeStr = Carbon::parse($startDate)->format('Y-m-d') . '_to_' . Carbon::parse($endDate)->format('Y-m-d');
+            $dateRangeStr = Carbon::parse($startDate)->format('Y-m-d').'_to_'.Carbon::parse($endDate)->format('Y-m-d');
         } elseif ($dateRange && $dateRange !== 'custom') {
             $dateRangeStr = str_replace('_', '-', $dateRange);
         }
 
         $extension = $format === 'csv' ? 'csv' : 'xlsx';
+
         return "{$reportType}_{$dateRangeStr}_{$timestamp}.{$extension}";
     }
 }
-

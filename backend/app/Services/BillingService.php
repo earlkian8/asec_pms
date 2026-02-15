@@ -7,40 +7,41 @@ use App\Models\BillingPayment;
 
 class BillingService
 {
-    public function getBillingsData()
-    {
-        $search = request('search');
-        $status = request('status');
-        $projectId = request('project_id');
-        $billingType = request('billing_type');
-        $startDate = request('start_date');
-        $endDate = request('end_date');
-        $sortBy = request('sort_by', 'created_at');
-        $sortOrder = request('sort_order', 'desc');
+    public function __construct(protected CodeGeneratorService $codeGeneratorService) {}
 
-        // Validate sort column
+    /**
+     * @param  array{search?: string, status?: string, project_id?: int|string, billing_type?: string, start_date?: string, end_date?: string, sort_by?: string, sort_order?: string}  $filters
+     * @return array{billings: \Illuminate\Contracts\Pagination\LengthAwarePaginator, search: string|null, filters: array, filterOptions: array, sort_by: string, sort_order: string}
+     */
+    public function getBillingsData(array $filters = []): array
+    {
+        $search = $filters['search'] ?? null;
+        $status = $filters['status'] ?? null;
+        $projectId = $filters['project_id'] ?? null;
+        $billingType = $filters['billing_type'] ?? null;
+        $startDate = $filters['start_date'] ?? null;
+        $endDate = $filters['end_date'] ?? null;
         $allowedSortColumns = ['created_at', 'billing_code', 'billing_date', 'due_date', 'billing_amount', 'status', 'billing_type'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        $sortBy = $filters['sort_by'] ?? 'created_at';
+        $sortOrder = $filters['sort_order'] ?? 'desc';
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
-
-        // Validate sort order
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $billings = Billing::with([
             'project:id,project_code,project_name,client_id',
             'project.client:id,client_name',
             'milestone:id,name',
-            'createdBy:id,name'
+            'createdBy:id,name',
         ])
             ->withCount('payments')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('billing_code', 'ilike', "%{$search}%")
-                      ->orWhereHas('project', function ($projectQuery) use ($search) {
-                          $projectQuery->where('project_name', 'ilike', "%{$search}%")
-                                      ->orWhere('project_code', 'ilike', "%{$search}%");
-                      });
+                    query_where_search($q, 'billing_code', $search);
+                    $q->orWhereHas('project', function ($projectQuery) use ($search) {
+                        query_where_search_in($projectQuery, ['project_name', 'project_code'], $search);
+                    });
                 });
             })
             ->when($status, function ($query, $status) {
@@ -67,6 +68,7 @@ class BillingService
             $billing->total_paid = $billing->total_paid;
             $billing->remaining_amount = $billing->remaining_amount;
             $billing->payment_percentage = $billing->payment_percentage;
+
             return $billing;
         });
 
@@ -100,7 +102,7 @@ class BillingService
         $totalPaid = $billing->payments()
             ->where('payment_status', 'paid')
             ->sum('payment_amount');
-        
+
         if ($totalPaid == 0) {
             $billing->status = 'unpaid';
         } elseif ($totalPaid >= $billing->billing_amount) {
@@ -108,29 +110,20 @@ class BillingService
         } else {
             $billing->status = 'partial';
         }
-        
+
         $billing->save();
+
         return $billing;
     }
 
-    public function generateBillingCode()
+    public function generateBillingCode(): string
     {
-        do {
-            $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-            $billingCode = 'BIL-' . $random;
-        } while (Billing::where('billing_code', $billingCode)->exists());
-
-        return $billingCode;
+        return $this->codeGeneratorService->generateUniqueCode('BIL', 'billings', 'billing_code', 6);
     }
 
-    public function generatePaymentCode()
+    public function generatePaymentCode(): string
     {
-        do {
-            $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-            $paymentCode = 'PAY-' . $random;
-        } while (BillingPayment::where('payment_code', $paymentCode)->exists());
-
-        return $paymentCode;
+        return $this->codeGeneratorService->generateUniqueCode('PAY', 'billing_payments', 'payment_code', 6);
     }
 
     public function getBillingDetails(Billing $billing)
@@ -139,7 +132,7 @@ class BillingService
             'project.client',
             'milestone',
             'payments.createdBy',
-            'createdBy'
+            'createdBy',
         ]);
 
         $billing->total_paid = $billing->total_paid;
@@ -149,30 +142,25 @@ class BillingService
         return $billing;
     }
 
-    public function getTransactionsData()
+    /**
+     * @param  array{search?: string, transaction_project_id?: int|string, project_id?: int|string, transaction_payment_method?: string, payment_method?: string, per_page?: int}  $filters
+     * @return array{transactions: \Illuminate\Contracts\Pagination\LengthAwarePaginator, search: string|null, project_id: int|string|null, payment_method: string|null}
+     */
+    public function getTransactionsData(array $filters = []): array
     {
         try {
-            // Get and sanitize input parameters
-            $search = request('search');
-            $projectId = request('transaction_project_id');
-            $paymentMethod = request('transaction_payment_method');
-
-            // Sanitize search input
-            if ($search) {
-                $search = trim($search);
-                if (empty($search)) {
-                    $search = null;
-                }
+            $search = isset($filters['search']) ? trim((string) $filters['search']) : null;
+            if ($search !== null && $search === '') {
+                $search = null;
             }
+            $projectId = $filters['transaction_project_id'] ?? $filters['project_id'] ?? null;
+            $paymentMethod = $filters['transaction_payment_method'] ?? $filters['payment_method'] ?? null;
 
-            // Validate project_id if provided
-            if ($projectId && !is_numeric($projectId)) {
+            if ($projectId && ! is_numeric($projectId)) {
                 $projectId = null;
             }
-
-            // Validate payment_method if provided
             $allowedPaymentMethods = ['cash', 'check', 'bank_transfer', 'credit_card', 'paymongo', 'other'];
-            if ($paymentMethod && !in_array($paymentMethod, $allowedPaymentMethods)) {
+            if ($paymentMethod && ! in_array($paymentMethod, $allowedPaymentMethods)) {
                 $paymentMethod = null;
             }
 
@@ -195,11 +183,10 @@ class BillingService
             // Apply search filter if provided
             if ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('payment_code', 'ilike', "%{$search}%")
-                      ->orWhere('reference_number', 'ilike', "%{$search}%")
-                      ->orWhereHas('billing', function ($billingQuery) use ($search) {
-                          $billingQuery->where('billing_code', 'ilike', "%{$search}%");
-                      });
+                    query_where_search_in($q, ['payment_code', 'reference_number'], $search);
+                    $q->orWhereHas('billing', function ($billingQuery) use ($search) {
+                        query_where_search($billingQuery, 'billing_code', $search);
+                    });
                 });
             }
 
@@ -220,26 +207,25 @@ class BillingService
             $query->orderBy('created_at', 'desc');
             $query->orderBy('id', 'desc'); // Tertiary sort for consistency
 
-            // Paginate results
-            $perPage = min((int)request('per_page', 15), 100); // Max 100 per page
+            $perPage = min((int) ($filters['per_page'] ?? 15), 100);
             $transactions = $query->paginate($perPage)->withQueryString();
-            
+
             // Transform results to ensure safe data access
             $transactions->getCollection()->transform(function ($transaction) {
                 // Ensure billing relationship exists
-                if (!$transaction->billing) {
-                    $transaction->billing = (object)[
+                if (! $transaction->billing) {
+                    $transaction->billing = (object) [
                         'id' => null,
                         'billing_code' => 'N/A',
-                        'project' => (object)[
+                        'project' => (object) [
                             'id' => null,
                             'project_code' => 'N/A',
                             'project_name' => 'N/A',
                         ],
                     ];
-                } elseif (!$transaction->billing->project) {
+                } elseif (! $transaction->billing->project) {
                     // Billing exists but project doesn't
-                    $transaction->billing->project = (object)[
+                    $transaction->billing->project = (object) [
                         'id' => null,
                         'project_code' => 'N/A',
                         'project_name' => 'N/A',
@@ -247,13 +233,13 @@ class BillingService
                 }
 
                 // Ensure createdBy relationship exists
-                if (!$transaction->createdBy) {
-                    $transaction->createdBy = (object)[
+                if (! $transaction->createdBy) {
+                    $transaction->createdBy = (object) [
                         'id' => null,
                         'name' => 'System',
                     ];
                 }
-                
+
                 return $transaction;
             });
 
@@ -305,4 +291,3 @@ class BillingService
         }
     }
 }
-

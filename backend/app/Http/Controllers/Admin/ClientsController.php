@@ -3,64 +3,54 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreClientRequest;
+use App\Http\Requests\UpdateClientRequest;
+use App\Mail\ClientCredentialsMail;
 use App\Models\Client;
 use App\Models\ClientType;
 use App\Models\User;
+use App\Services\CodeGeneratorService;
+use App\Support\IndexQueryHelper;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
-use App\Mail\ClientCredentialsMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ClientsController extends Controller
 {
     use ActivityLogsTrait, NotificationTrait;
 
+    public function __construct(protected CodeGeneratorService $codeGeneratorService) {}
+
     public function index(Request $request)
     {
         $search = $request->input('search');
         $clientTypeId = $request->input('client_type_id');
-        $isActive = $request->input('is_active');
+        $isActive = IndexQueryHelper::parseBoolean($request->input('is_active'));
         $city = $request->input('city');
         $province = $request->input('province');
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortOrder = $request->input('sort_order', 'desc');
-
-        // Validate sort column
         $allowedSortColumns = ['created_at', 'client_name', 'client_code', 'is_active', 'city', 'province', 'email'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
-            $sortBy = 'created_at';
-        }
-
-        // Validate sort order
-        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
+        $sortParams = IndexQueryHelper::sortParams($request, $allowedSortColumns);
+        $sortBy = $sortParams['sort_by'];
+        $sortOrder = $sortParams['sort_order'];
 
         $clients = Client::with('clientType')
             ->when($search, function ($query, $search) {
-                return $query->where(function ($q) use ($search) {
-                    $q->where('client_code', 'like', "%{$search}%")
-                      ->orWhere('client_name', 'like', "%{$search}%")
-                      ->orWhere('contact_person', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%")
-                      ->orWhere('phone_number', 'like', "%{$search}%")
-                      ->orWhere('city', 'like', "%{$search}%")
-                      ->orWhere('province', 'like', "%{$search}%");
-                });
+                return query_where_search_in($query, ['client_code', 'client_name', 'contact_person', 'email', 'phone_number', 'city', 'province'], $search);
             })
             ->when($clientTypeId, function ($query, $clientTypeId) {
                 $query->where('client_type_id', $clientTypeId);
             })
-            ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
-                $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
+            ->when($isActive !== null, function ($query) use ($isActive) {
+                $query->where('is_active', $isActive);
             })
             ->when($city, function ($query, $city) {
-                $query->where('city', 'like', "%{$city}%");
+                query_where_search($query, 'city', $city);
             })
             ->when($province, function ($query, $province) {
-                $query->where('province', 'like', "%{$province}%");
+                query_where_search($query, 'province', $province);
             })
             ->orderBy($sortBy, $sortOrder)
             ->when($sortBy !== 'created_at', function ($query) {
@@ -79,7 +69,7 @@ class ClientsController extends Controller
             'search' => $search,
             'filters' => [
                 'client_type_id' => $clientTypeId,
-                'is_active' => $isActive,
+                'is_active' => $request->input('is_active'),
                 'city' => $city,
                 'province' => $province,
             ],
@@ -93,26 +83,9 @@ class ClientsController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreClientRequest $request)
     {
-        $validated = $request->validate([
-            'client_name'     => ['required', 'max:255'],
-            'client_type_id'  => ['required', 'exists:client_types,id'],
-            'contact_person'  => ['required', 'max:255'],
-            'email'           => ['required', 'email', 'max:100'],
-            'phone_number'    => ['nullable', 'max:20'],
-            'address'         => ['nullable', 'max:255'],
-            'city'            => ['nullable', 'max:100'],
-            'province'        => ['nullable', 'max:100'],
-            'postal_code'     => ['nullable', 'max:20'],
-            'country'         => ['nullable', 'max:100'],
-            'tax_id'          => ['nullable', 'max:50'],
-            'business_permit' => ['nullable', 'max:50'],
-            'credit_limit'    => ['nullable', 'numeric'],
-            'payment_terms'   => ['nullable', 'max:100'],
-            'is_active'       => ['required', 'boolean'],
-            'notes'           => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         // If null, remove keys so DB default applies
         if (is_null($validated['credit_limit'] ?? null)) {
@@ -128,13 +101,7 @@ class ClientsController extends Controller
         // Hash the auto-generated password
         $validated['password'] = Hash::make($plainPassword);
 
-        // Generate unique client code
-        do {
-            $random = str_pad(rand(1, 999999), 3, '0', STR_PAD_LEFT); // 001–999
-            $clientCode = 'CLT-' . $random;
-        } while (Client::where('client_code', $clientCode)->exists());
-
-        $validated['client_code'] = $clientCode;
+        $validated['client_code'] = $this->codeGeneratorService->generateUniqueCode('CLT', 'clients', 'client_code', 3);
         // Set password_changed_at to null so client must change password on first login
         $validated['password_changed_at'] = null;
 
@@ -144,17 +111,17 @@ class ClientsController extends Controller
         if ($client->email && $plainPassword) {
             try {
                 $loginUrl = config('app.client_portal_url', url('/client/login'));
-                
+
                 // Send email using Brevo SMTP
                 Mail::to($client->email)
                     ->send(new ClientCredentialsMail($client, $plainPassword, $loginUrl));
             } catch (\Exception $e) {
                 // Re-throw the exception so user knows email failed
-                throw new \Exception('Client created but failed to send credentials email: ' . $e->getMessage());
+                throw new \Exception('Client created but failed to send credentials email: '.$e->getMessage());
             }
         }
 
-        $this->adminActivityLogs('Client', 'Add', 'Added Client ' . $client->client_name);
+        $this->adminActivityLogs('Client', 'Add', 'Added Client '.$client->client_name);
 
         // System-wide notification for new client
         $this->createSystemNotification(
@@ -168,27 +135,9 @@ class ClientsController extends Controller
         return redirect()->back()->with('success', 'Client added successfully.');
     }
 
-    public function update(Request $request, Client $client)
+    public function update(UpdateClientRequest $request, Client $client)
     {
-        $validated = $request->validate([
-            'client_code'     => ['required', 'max:20', Rule::unique('clients', 'client_code')->ignore($client->id)],
-            'client_name'     => ['required', 'max:255'],
-            'client_type_id'  => ['required', 'exists:client_types,id'],
-            'contact_person'  => ['required', 'max:255'],
-            'email'           => ['required', 'email', 'max:100'],
-            'phone_number'    => ['nullable', 'max:20'],
-            'address'         => ['nullable', 'max:255'],
-            'city'            => ['nullable', 'max:100'],
-            'province'        => ['nullable', 'max:100'],
-            'postal_code'     => ['nullable', 'max:20'],
-            'country'         => ['nullable', 'max:100'],
-            'tax_id'          => ['nullable', 'max:50'],
-            'business_permit' => ['nullable', 'max:50'],
-            'credit_limit'    => ['nullable', 'numeric'],
-            'payment_terms'   => ['nullable', 'max:100'],
-            'is_active'       => ['required', 'boolean'],
-            'notes'           => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
         // If null, remove keys so DB default applies
         if (is_null($validated['credit_limit'] ?? null)) {
             unset($validated['credit_limit']);
@@ -201,7 +150,7 @@ class ClientsController extends Controller
 
         $client->update($validated);
 
-        $this->adminActivityLogs('Client', 'Update', 'Updated Client ' . $oldName);
+        $this->adminActivityLogs('Client', 'Update', 'Updated Client '.$oldName);
 
         // System-wide notification for client update
         $this->createSystemNotification(
@@ -232,7 +181,7 @@ class ClientsController extends Controller
         }
 
         $client->delete();
-        $this->adminActivityLogs('Client', 'Delete', 'Deleted Client ' . $name);
+        $this->adminActivityLogs('Client', 'Delete', 'Deleted Client '.$name);
 
         // System-wide notification for client deletion
         $this->createSystemNotification(
@@ -259,7 +208,7 @@ class ClientsController extends Controller
         $this->adminActivityLogs(
             'Client',
             'Update Status',
-            'Updated Client ' . $client->client_name . ' status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
+            'Updated Client '.$client->client_name.' status to '.($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
 
         // System-wide notification for client status change
@@ -278,7 +227,7 @@ class ClientsController extends Controller
     public function resetPassword(Client $client)
     {
         $defaultPassword = 'clientpassword';
-        
+
         $client->update([
             'password' => Hash::make($defaultPassword),
             'password_changed_at' => null, // Force password change on next login
@@ -287,7 +236,7 @@ class ClientsController extends Controller
         $this->adminActivityLogs(
             'Client',
             'Reset Password',
-            'Reset password for Client ' . $client->client_name . ' (' . $client->client_code . ')'
+            'Reset password for Client '.$client->client_name.' ('.$client->client_code.')'
         );
 
         return redirect()->back()->with('success', 'Client password reset successfully. Client will be required to change password on next login.');

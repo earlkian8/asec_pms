@@ -3,13 +3,13 @@
 namespace App\Exports\Reports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class InventoryReportExport implements FromArray, WithHeadings, WithTitle, WithColumnWidths, WithStyles
+class InventoryReportExport implements FromArray, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     protected $data;
 
@@ -21,28 +21,28 @@ class InventoryReportExport implements FromArray, WithHeadings, WithTitle, WithC
     public function array(): array
     {
         $rows = [];
-        
+
         // Summary
         $rows[] = ['Summary'];
         $rows[] = ['Metric', 'Value'];
         $rows[] = [
             'Total Items',
-            $this->data['summary']['total_items'] ?? 0
+            $this->data['summary']['total_items'] ?? 0,
         ];
         $rows[] = [
             'Active Items',
-            $this->data['summary']['active_items'] ?? 0
+            $this->data['summary']['active_items'] ?? 0,
         ];
         $rows[] = [
             'Low Stock Count',
-            $this->data['summary']['low_stock_count'] ?? 0
+            $this->data['summary']['low_stock_count'] ?? 0,
         ];
         $rows[] = [
             'Total Inventory Value',
-            '₱' . number_format($this->data['summary']['total_value'] ?? 0, 2)
+            '₱'.number_format($this->data['summary']['total_value'] ?? 0, 2),
         ];
         $rows[] = []; // Empty row
-        
+
         // Items by category
         $rows[] = ['Items by Category'];
         $rows[] = ['Category', 'Count'];
@@ -50,12 +50,12 @@ class InventoryReportExport implements FromArray, WithHeadings, WithTitle, WithC
             foreach ($this->data['by_category'] as $category => $count) {
                 $rows[] = [
                     $category ?? 'Uncategorized',
-                    $count
+                    $count,
                 ];
             }
         }
         $rows[] = []; // Empty row
-        
+
         // Low stock items
         $rows[] = ['Low Stock Items'];
         $rows[] = ['Item Code', 'Item Name', 'Category', 'Current Stock', 'Unit of Measure', 'Unit Price', 'Reorder Level'];
@@ -67,13 +67,13 @@ class InventoryReportExport implements FromArray, WithHeadings, WithTitle, WithC
                     $item->category ?? '',
                     $item->current_stock ?? 0,
                     $item->unit_of_measure ?? '',
-                    '₱' . number_format($item->unit_price ?? 0, 2),
-                    $item->reorder_level ?? 0
+                    '₱'.number_format($item->unit_price ?? 0, 2),
+                    $item->reorder_level ?? 0,
                 ];
             }
         }
         $rows[] = []; // Empty row
-        
+
         // Most used items
         $rows[] = ['Most Used Items'];
         $rows[] = ['Item Code', 'Item Name', 'Total Quantity Used'];
@@ -82,11 +82,11 @@ class InventoryReportExport implements FromArray, WithHeadings, WithTitle, WithC
                 $rows[] = [
                     $item->inventoryItem->item_code ?? '',
                     $item->inventoryItem->item_name ?? '',
-                    number_format($item->total_used ?? 0, 2)
+                    number_format($item->total_used ?? 0, 2),
                 ];
             }
         }
-        
+
         return $rows;
     }
 

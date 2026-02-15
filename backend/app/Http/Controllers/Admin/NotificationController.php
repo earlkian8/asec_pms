@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class NotificationController extends Controller
 {
@@ -15,7 +14,7 @@ class NotificationController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         $notifications = Notification::where('user_id', $user->id)
             ->with('project:id,project_name')
             ->orderBy('created_at', 'desc')
@@ -33,7 +32,7 @@ class NotificationController extends Controller
     public function unreadCount(Request $request)
     {
         $user = $request->user();
-        
+
         $count = Notification::where('user_id', $user->id)
             ->where('read', false)
             ->count();
@@ -50,7 +49,7 @@ class NotificationController extends Controller
     public function countsByType(Request $request)
     {
         $user = $request->user();
-        
+
         $counts = Notification::where('user_id', $user->id)
             ->where('read', false)
             ->selectRaw('type, COUNT(*) as count')
@@ -91,7 +90,7 @@ class NotificationController extends Controller
     public function markAllAsRead(Request $request)
     {
         $user = $request->user();
-        
+
         Notification::where('user_id', $user->id)
             ->where('read', false)
             ->update(['read' => true]);
@@ -109,8 +108,8 @@ class NotificationController extends Controller
     {
         $user = $request->user();
         $types = $request->input('types', []);
-        
-        if (empty($types) || !is_array($types)) {
+
+        if (empty($types) || ! is_array($types)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Types array is required',

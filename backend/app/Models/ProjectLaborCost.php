@@ -56,6 +56,7 @@ class ProjectLaborCost extends Model
         if ($this->assignable_type === 'employee' && $this->employee_id) {
             return $this->employee();
         }
+
         return $this->user();
     }
 
@@ -71,7 +72,7 @@ class ProjectLaborCost extends Model
         if ($this->assignable_type === 'user' && $this->user) {
             return $this->user->name;
         }
-        
+
         // Fallback: if assignable_type is not set (legacy records), check which one exists
         if ($this->employee_id && $this->employee) {
             return $this->employee->full_name;
@@ -79,7 +80,7 @@ class ProjectLaborCost extends Model
         if ($this->user_id && $this->user) {
             return $this->user->name;
         }
-        
+
         return 'N/A';
     }
 
@@ -106,7 +107,7 @@ class ProjectLaborCost extends Model
         if ($value !== null) {
             return $value;
         }
+
         return $this->hours_worked * $this->hourly_rate;
     }
 }
-

@@ -1,44 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '@/services/api';
+import type { Billing, BillingPayment } from '@/types/api';
 
-export interface Billing {
-  id: number;
-  billing_code: string;
-  billing_type: 'fixed_price' | 'milestone';
-  billing_amount: number;
-  billing_date: string;
-  due_date: string | null;
-  status: 'unpaid' | 'partial' | 'paid';
-  description: string | null;
-  project: {
-    id: number;
-    project_code: string;
-    project_name: string;
-  };
-  milestone: {
-    id: number;
-    name: string;
-  } | null;
-  total_paid: number;
-  remaining_amount: number;
-  payment_percentage: number;
-  payments: Payment[];
-}
-
-export interface Payment {
-  id: number;
-  payment_code: string;
-  payment_amount: number;
-  payment_date: string;
-  payment_method: string;
-  payment_status: 'pending' | 'paid' | 'failed' | 'cancelled';
-  reference_number: string | null;
-  notes: string | null;
-  paid_by_client: boolean;
-  paymongo_payment_intent_id: string | null;
-  paymongo_source_id: string | null;
-  created_at: string;
-}
+export type { Billing } from '@/types/api';
+export type Payment = BillingPayment;
 
 export interface UseBillingsOptions {
   status?: string | null;

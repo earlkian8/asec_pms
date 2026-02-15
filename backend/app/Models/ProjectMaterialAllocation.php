@@ -67,6 +67,7 @@ class ProjectMaterialAllocation extends Model
         if ($value !== null) {
             return $value;
         }
+
         return $this->quantity_allocated - $this->quantity_received;
     }
 

@@ -18,6 +18,7 @@ class ClientBillingController extends Controller
     use NotificationTrait;
 
     protected $billingService;
+
     protected $payMongoService;
 
     public function __construct(BillingService $billingService, PayMongoService $payMongoService)
@@ -29,9 +30,6 @@ class ClientBillingController extends Controller
     /**
      * Map PayMongo payment intent status to our payment status
      * CRITICAL: Only 'succeeded' maps to 'paid' - ensures data integrity
-     * 
-     * @param string $payMongoStatus
-     * @return string
      */
     private function mapPayMongoStatusToPaymentStatus(string $payMongoStatus): string
     {
@@ -54,6 +52,7 @@ class ClientBillingController extends Controller
                     'status' => $payMongoStatus,
                     'timestamp' => now()->toIso8601String(),
                 ]);
+
                 return 'pending';
         }
     }
@@ -61,12 +60,8 @@ class ClientBillingController extends Controller
     /**
      * Update payment status with logging and idempotency checks
      * Only updates if status actually changes to ensure data integrity
-     * 
-     * @param BillingPayment $payment
-     * @param string $newStatus
-     * @param string $payMongoStatus
-     * @param Billing $billing
-     * @param mixed $client
+     *
+     * @param  mixed  $client
      * @return bool True if status was updated, false if already in target state
      */
     private function updatePaymentStatus(
@@ -77,7 +72,7 @@ class ClientBillingController extends Controller
         $client
     ): bool {
         $previousStatus = $payment->payment_status;
-        
+
         // Idempotency check: Don't update if already in target state
         if ($payment->payment_status === $newStatus) {
             Log::info('Payment status check: Already in target state', [
@@ -86,6 +81,7 @@ class ClientBillingController extends Controller
                 'status' => $newStatus,
                 'paymongo_status' => $payMongoStatus,
             ]);
+
             return false;
         }
 
@@ -103,12 +99,12 @@ class ClientBillingController extends Controller
 
         // Update payment status
         $payment->payment_status = $newStatus;
-        
+
         // Ensure reference_number is set for PayMongo payments
-        if ($payment->paymongo_payment_intent_id && !$payment->reference_number) {
+        if ($payment->paymongo_payment_intent_id && ! $payment->reference_number) {
             $payment->reference_number = $payment->paymongo_payment_intent_id;
         }
-        
+
         $payment->save();
 
         // Only update billing status when payment status changes to/from 'paid'
@@ -125,7 +121,7 @@ class ClientBillingController extends Controller
                 $this->createSystemNotification(
                     'general',
                     'Payment Completed',
-                    "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
+                    "Client {$client->client_name} completed payment of ₱".number_format((float) $payment->payment_amount, 2)." for billing '{$billing->billing_code}' via PayMongo.",
                     $billing->project,
                     null
                 );
@@ -141,7 +137,7 @@ class ClientBillingController extends Controller
     public function index(Request $request)
     {
         $client = $request->user();
-        
+
         $search = $request->get('search');
         $status = $request->get('status');
         $sortBy = $request->get('sort_by', 'created_at');
@@ -155,16 +151,16 @@ class ClientBillingController extends Controller
             'milestone:id,name',
             'payments' => function ($query) {
                 $query->orderBy('created_at', 'desc');
-            }
+            },
         ])
             ->whereIn('project_id', $projectIds)
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('billing_code', 'ilike', "%{$search}%")
-                      ->orWhereHas('project', function ($projectQuery) use ($search) {
-                          $projectQuery->where('project_name', 'ilike', "%{$search}%")
-                                      ->orWhere('project_code', 'ilike', "%{$search}%");
-                      });
+                        ->orWhereHas('project', function ($projectQuery) use ($search) {
+                            $projectQuery->where('project_name', 'ilike', "%{$search}%")
+                                ->orWhere('project_code', 'ilike', "%{$search}%");
+                        });
                 });
             })
             ->when($status, function ($query, $status) {
@@ -178,6 +174,7 @@ class ClientBillingController extends Controller
             $billing->total_paid = $billing->total_paid;
             $billing->remaining_amount = $billing->remaining_amount;
             $billing->payment_percentage = $billing->payment_percentage;
+
             return $billing;
         });
 
@@ -195,7 +192,7 @@ class ClientBillingController extends Controller
         $client = $request->user();
 
         // Validate ID is numeric to prevent route conflicts
-        if (!is_numeric($id)) {
+        if (! is_numeric($id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid billing ID',
@@ -207,7 +204,7 @@ class ClientBillingController extends Controller
             'milestone',
             'payments' => function ($query) {
                 $query->orderBy('created_at', 'desc');
-            }
+            },
         ])->findOrFail($id);
 
         // Verify billing belongs to client
@@ -234,7 +231,7 @@ class ClientBillingController extends Controller
     public function initiatePayment(Request $request, $id)
     {
         // Validate ID is numeric to prevent route conflicts
-        if (!is_numeric($id)) {
+        if (! is_numeric($id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid billing ID',
@@ -262,7 +259,7 @@ class ClientBillingController extends Controller
         }
 
         // Validate that client has required billing information for PayMongo
-        if (!$client->email) {
+        if (! $client->email) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email is required for payment processing. Please update your profile with a valid email address.',
@@ -305,7 +302,7 @@ class ClientBillingController extends Controller
 
             // Create PayMongo Payment Intent for card payment
             $payMongoResult = $this->payMongoService->createPaymentIntent(
-                (float)$amount,
+                (float) $amount,
                 'PHP',
                 [
                     'billing_id' => $billing->id,
@@ -315,17 +312,18 @@ class ClientBillingController extends Controller
                 ]
             );
 
-            if (!$payMongoResult['success']) {
+            if (! $payMongoResult['success']) {
                 DB::rollBack();
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to create payment intent: ' . ($payMongoResult['error'] ?? 'Unknown error'),
+                    'message' => 'Failed to create payment intent: '.($payMongoResult['error'] ?? 'Unknown error'),
                 ], 500);
             }
 
             $payment->paymongo_payment_intent_id = $payMongoResult['payment_intent_id'];
             // Set reference_number to PayMongo payment intent ID for easy tracking
-            if (!$payment->reference_number) {
+            if (! $payment->reference_number) {
                 $payment->reference_number = $payMongoResult['payment_intent_id'];
             }
             $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
@@ -340,7 +338,7 @@ class ClientBillingController extends Controller
             $this->createSystemNotification(
                 'general',
                 'Payment Initiated',
-                "Client {$client->client_name} initiated a payment of ₱" . number_format((float)$amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
+                "Client {$client->client_name} initiated a payment of ₱".number_format((float) $amount, 2)." for billing '{$billing->billing_code}' via PayMongo.",
                 $billing->project,
                 null
             );
@@ -380,7 +378,7 @@ class ClientBillingController extends Controller
     public function createPaymentMethod(Request $request, $id)
     {
         // Validate ID is numeric to prevent route conflicts
-        if (!is_numeric($id)) {
+        if (! is_numeric($id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid billing ID',
@@ -400,7 +398,7 @@ class ClientBillingController extends Controller
         }
 
         // Validate that client has required billing information
-        if (!$client->email) {
+        if (! $client->email) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email is required for payment processing. Please update your profile with a valid email address.',
@@ -423,15 +421,15 @@ class ClientBillingController extends Controller
             // Remove any spaces, dashes, or parentheses
             $phone = preg_replace('/[\s\-\(\)]/', '', $phone);
             // Add + prefix if it doesn't start with + and is a valid number
-            if ($phone && !str_starts_with($phone, '+')) {
+            if ($phone && ! str_starts_with($phone, '+')) {
                 // If it starts with 0, replace with country code +63 for Philippines
                 if (str_starts_with($phone, '0')) {
-                    $phone = '+63' . substr($phone, 1);
+                    $phone = '+63'.substr($phone, 1);
                 } elseif (str_starts_with($phone, '63')) {
-                    $phone = '+' . $phone;
+                    $phone = '+'.$phone;
                 } elseif (strlen($phone) >= 10) {
                     // Assume Philippines number if no country code
-                    $phone = '+63' . $phone;
+                    $phone = '+63'.$phone;
                 }
             }
 
@@ -453,7 +451,7 @@ class ClientBillingController extends Controller
             // Create payment method using PayMongo service
             $result = $this->payMongoService->createPaymentMethod($cardDetails, $billingDetails);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 return response()->json([
                     'success' => false,
                     'message' => $result['error'] ?? 'Failed to create payment method',
@@ -484,7 +482,7 @@ class ClientBillingController extends Controller
 
     /**
      * Confirm payment intent (DEPRECATED - Not needed for PayMongo)
-     * 
+     *
      * @deprecated This endpoint is deprecated. PayMongo does not require a separate confirmation step.
      * When attaching a payment method, the payment is automatically confirmed if successful.
      * The attachment response already contains the final status and next_action.
@@ -493,7 +491,7 @@ class ClientBillingController extends Controller
     public function confirmPaymentIntent(Request $request, $id)
     {
         // Validate ID is numeric to prevent route conflicts
-        if (!is_numeric($id)) {
+        if (! is_numeric($id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid billing ID',
@@ -522,11 +520,11 @@ class ClientBillingController extends Controller
         $returnUrl = $validated['return_url'] ?? null;
 
         // If return_url not provided, use configured return URL
-        if (!$returnUrl) {
+        if (! $returnUrl) {
             $returnUrl = config('services.paymongo.return_url');
-            if (!$returnUrl) {
+            if (! $returnUrl) {
                 // Fallback to app URL if not configured
-                $returnUrl = rtrim(config('app.url'), '/') . '/api/client/payment/return';
+                $returnUrl = rtrim(config('app.url'), '/').'/api/client/payment/return';
             }
         }
 
@@ -534,7 +532,7 @@ class ClientBillingController extends Controller
             // Confirm payment intent using PayMongo service
             $result = $this->payMongoService->confirmPaymentIntent($paymentIntentId, $returnUrl);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 return response()->json([
                     'success' => false,
                     'message' => $result['error'] ?? 'Failed to confirm payment intent',
@@ -571,7 +569,7 @@ class ClientBillingController extends Controller
     public function checkPaymentStatus(Request $request, $id)
     {
         // Validate ID is numeric to prevent route conflicts
-        if (!is_numeric($id)) {
+        if (! is_numeric($id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid billing ID',
@@ -597,7 +595,7 @@ class ClientBillingController extends Controller
             ->orderBy('created_at', 'desc')
             ->first();
 
-        if (!$payment) {
+        if (! $payment) {
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -610,16 +608,16 @@ class ClientBillingController extends Controller
         // Check PayMongo status
         if ($payment->paymongo_payment_intent_id) {
             $payMongoResult = $this->payMongoService->getPaymentIntent($payment->paymongo_payment_intent_id);
-            
+
             if ($payMongoResult['success']) {
                 $payMongoStatus = $payMongoResult['status'];
-                
+
                 // Map PayMongo status to our payment status using comprehensive mapping
                 $newPaymentStatus = $this->mapPayMongoStatusToPaymentStatus($payMongoStatus);
-                
+
                 // Update payment status with logging and idempotency checks
                 $this->updatePaymentStatus($payment, $newPaymentStatus, $payMongoStatus, $billing, $client);
-                
+
                 // Refresh payment to get updated status
                 $payment->refresh();
             } else {
@@ -636,16 +634,16 @@ class ClientBillingController extends Controller
             // Legacy GCash source-based payments (for backward compatibility)
             // Check source status for GCash payments
             $sourceResult = $this->payMongoService->getSource($payment->paymongo_source_id);
-            
+
             if ($sourceResult['success']) {
                 $sourceStatus = $sourceResult['status'];
-                
+
                 // Update payment status based on source status
                 if ($sourceStatus === 'chargeable') {
                     // Source is chargeable - create payment from source
                     $paymentResult = $this->payMongoService->createPaymentFromSource(
                         $payment->paymongo_source_id,
-                        (float)$payment->payment_amount,
+                        (float) $payment->payment_amount,
                         'PHP',
                         [
                             'billing_id' => $billing->id,
@@ -654,15 +652,15 @@ class ClientBillingController extends Controller
                             'client_id' => $client->id,
                         ]
                     );
-                    
+
                     if ($paymentResult['success']) {
                         $paymentStatusFromResult = $paymentResult['status'];
-                        
+
                         // Map payment status - only 'paid' should mark as paid
                         // Use similar logic to payment intent status mapping
-                        $newPaymentStatus = $paymentStatusFromResult === 'paid' ? 'paid' : 
+                        $newPaymentStatus = $paymentStatusFromResult === 'paid' ? 'paid' :
                                           ($paymentStatusFromResult === 'failed' ? 'failed' : 'pending');
-                        
+
                         // Update with logging and idempotency
                         $previousStatus = $payment->payment_status;
                         if ($payment->payment_status !== $newPaymentStatus) {
@@ -674,23 +672,23 @@ class ClientBillingController extends Controller
                                 'source_status' => $sourceStatus,
                                 'payment_result_status' => $paymentStatusFromResult,
                             ]);
-                            
+
                             $payment->payment_status = $newPaymentStatus;
                             $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
                                 'payment_id' => $paymentResult['payment_id'],
                             ]);
                             $payment->save();
-                            
+
                             // Only update billing if status changed to/from 'paid'
                             if (($previousStatus === 'paid') !== ($newPaymentStatus === 'paid')) {
                                 $this->billingService->calculateBillingStatus($billing);
                                 $billing->refresh();
-                                
+
                                 if ($newPaymentStatus === 'paid') {
                                     $this->createSystemNotification(
                                         'general',
                                         'Payment Completed',
-                                        "Client {$client->client_name} completed payment of ₱" . number_format((float)$payment->payment_amount, 2) . " for billing '{$billing->billing_code}' via PayMongo.",
+                                        "Client {$client->client_name} completed payment of ₱".number_format((float) $payment->payment_amount, 2)." for billing '{$billing->billing_code}' via PayMongo.",
                                         $billing->project,
                                         null
                                     );
@@ -756,7 +754,7 @@ class ClientBillingController extends Controller
         try {
             $client = $request->user();
 
-            if (!$client) {
+            if (! $client) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthenticated',
@@ -777,8 +775,8 @@ class ClientBillingController extends Controller
                 'payment_status',
                 'payment_method',
             ];
-            
-            if (!in_array($sortBy, $allowedSortColumns)) {
+
+            if (! in_array($sortBy, $allowedSortColumns)) {
                 $sortBy = 'created_at';
             }
 
@@ -803,7 +801,7 @@ class ClientBillingController extends Controller
             $query->where('paid_by_client', true);
 
             // Only get payments from client's projects
-            if (!empty($projectIds)) {
+            if (! empty($projectIds)) {
                 $query->whereHas('billing', function ($q) use ($projectIds) {
                     $q->whereIn('project_id', $projectIds);
                 });
@@ -827,10 +825,10 @@ class ClientBillingController extends Controller
             if ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('payment_code', 'ilike', "%{$search}%")
-                      ->orWhere('reference_number', 'ilike', "%{$search}%")
-                      ->orWhereHas('billing', function ($billingQuery) use ($search) {
-                          $billingQuery->where('billing_code', 'ilike', "%{$search}%");
-                      });
+                        ->orWhere('reference_number', 'ilike', "%{$search}%")
+                        ->orWhereHas('billing', function ($billingQuery) use ($search) {
+                            $billingQuery->where('billing_code', 'ilike', "%{$search}%");
+                        });
                 });
             }
 
@@ -849,31 +847,31 @@ class ClientBillingController extends Controller
             $query->orderBy('id', 'desc'); // Secondary sort for consistency
 
             // Paginate results
-            $perPage = min((int)$request->get('per_page', 15), 100); // Max 100 per page
+            $perPage = min((int) $request->get('per_page', 15), 100); // Max 100 per page
             $transactions = $query->paginate($perPage);
 
             // Transform results to ensure safe data access
             $transactions->getCollection()->transform(function ($transaction) {
                 // Ensure billing relationship exists
-                if (!$transaction->billing) {
-                    $transaction->billing = (object)[
+                if (! $transaction->billing) {
+                    $transaction->billing = (object) [
                         'id' => null,
                         'billing_code' => 'N/A',
-                        'project' => (object)[
+                        'project' => (object) [
                             'id' => null,
                             'project_code' => 'N/A',
                             'project_name' => 'N/A',
                         ],
                     ];
-                } elseif (!$transaction->billing->project) {
+                } elseif (! $transaction->billing->project) {
                     // Billing exists but project doesn't
-                    $transaction->billing->project = (object)[
+                    $transaction->billing->project = (object) [
                         'id' => null,
                         'project_code' => 'N/A',
                         'project_name' => 'N/A',
                     ];
                 }
-                
+
                 return $transaction;
             });
 
@@ -930,24 +928,24 @@ class ClientBillingController extends Controller
     {
         $paymentCode = $request->get('payment_code');
         $sourceId = $request->get('source_id');
-        
+
         try {
             // Find the payment
             $payment = BillingPayment::where('payment_code', $paymentCode)->first();
-            
+
             if ($payment && $sourceId) {
                 // Verify source status with PayMongo
                 $sourceResult = $this->payMongoService->getSource($sourceId);
-                
+
                 if ($sourceResult['success']) {
                     $sourceStatus = $sourceResult['status'];
-                    
+
                     // Update payment status based on source status
                     if ($sourceStatus === 'chargeable') {
                         // Source is chargeable - create payment from source
                         $paymentResult = $this->payMongoService->createPaymentFromSource(
                             $sourceId,
-                            (float)$payment->payment_amount,
+                            (float) $payment->payment_amount,
                             'PHP',
                             [
                                 'billing_id' => $payment->billing_id,
@@ -956,14 +954,14 @@ class ClientBillingController extends Controller
                                 'client_id' => $payment->billing->project->client_id ?? null,
                             ]
                         );
-                        
+
                         if ($paymentResult['success']) {
                             $paymentStatusFromResult = $paymentResult['status'];
-                            
+
                             // Map payment status - only 'paid' should mark as paid
-                            $newPaymentStatus = $paymentStatusFromResult === 'paid' ? 'paid' : 
+                            $newPaymentStatus = $paymentStatusFromResult === 'paid' ? 'paid' :
                                               ($paymentStatusFromResult === 'failed' ? 'failed' : 'pending');
-                            
+
                             // Update with logging and idempotency
                             $previousStatus = $payment->payment_status;
                             if ($payment->payment_status !== $newPaymentStatus) {
@@ -975,13 +973,13 @@ class ClientBillingController extends Controller
                                     'source_status' => $sourceStatus,
                                     'payment_result_status' => $paymentStatusFromResult,
                                 ]);
-                                
+
                                 $payment->payment_status = $newPaymentStatus;
                                 $payment->paymongo_metadata = array_merge($payment->paymongo_metadata ?? [], [
                                     'payment_id' => $paymentResult['payment_id'],
                                 ]);
                                 $payment->save();
-                                
+
                                 // Only update billing if status changed to/from 'paid'
                                 $billing = $payment->billing;
                                 if ($billing && (($previousStatus === 'paid') !== ($newPaymentStatus === 'paid'))) {
@@ -1000,10 +998,10 @@ class ClientBillingController extends Controller
                                 'new_status' => 'paid',
                                 'source_status' => $sourceStatus,
                             ]);
-                            
+
                             $payment->payment_status = 'paid';
                             $payment->save();
-                            
+
                             // Update billing status
                             $billing = $payment->billing;
                             if ($billing) {
@@ -1020,10 +1018,10 @@ class ClientBillingController extends Controller
                 'source_id' => $sourceId,
             ]);
         }
-        
+
         // Redirect to mobile app using deep link
-        $deepLink = "client://payment/success?payment_code=" . urlencode($paymentCode ?? '') . "&source_id=" . urlencode($sourceId ?? '');
-        
+        $deepLink = 'client://payment/success?payment_code='.urlencode($paymentCode ?? '').'&source_id='.urlencode($sourceId ?? '');
+
         // Return HTML that redirects to the app
         return response()->view('payment-redirect', [
             'deepLink' => $deepLink,
@@ -1039,23 +1037,23 @@ class ClientBillingController extends Controller
     {
         $paymentCode = $request->get('payment_code');
         $sourceId = $request->get('source_id');
-        
+
         try {
             // Find the payment and mark as failed
             $payment = BillingPayment::where('payment_code', $paymentCode)->first();
-            
+
             if ($payment) {
                 // Only update if not already failed (idempotency)
                 if ($payment->payment_status !== 'failed') {
                     $previousStatus = $payment->payment_status;
-                    
+
                     Log::info('Payment return handler: Payment marked as failed', [
                         'payment_id' => $payment->id,
                         'payment_code' => $payment->payment_code,
                         'previous_status' => $previousStatus,
                         'new_status' => 'failed',
                     ]);
-                    
+
                     $payment->payment_status = 'failed';
                     $payment->save();
                 }
@@ -1067,10 +1065,10 @@ class ClientBillingController extends Controller
                 'source_id' => $sourceId,
             ]);
         }
-        
+
         // Redirect to mobile app using deep link
-        $deepLink = "client://payment/failed?payment_code=" . urlencode($paymentCode ?? '') . "&source_id=" . urlencode($sourceId ?? '');
-        
+        $deepLink = 'client://payment/failed?payment_code='.urlencode($paymentCode ?? '').'&source_id='.urlencode($sourceId ?? '');
+
         // Return HTML that redirects to the app
         return response()->view('payment-redirect', [
             'deepLink' => $deepLink,

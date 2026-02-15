@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
-use App\Models\ProjectTeam;
 use App\Models\ProjectTask;
+use App\Models\ProjectTeam;
 use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
@@ -18,23 +18,23 @@ class ProjectTeamsController extends Controller
     public function store(Request $request, Project $project)
     {
         $validated = $request->validate([
-            'assignables'            => ['required', 'array', 'min:1'],
-            'assignables.*.id'       => ['required'],
-            'assignables.*.type'     => ['required', 'in:user,employee'],
-            'assignables.*.role'     => ['required', 'string', 'max:50'],
+            'assignables' => ['required', 'array', 'min:1'],
+            'assignables.*.id' => ['required'],
+            'assignables.*.type' => ['required', 'in:user,employee'],
+            'assignables.*.role' => ['required', 'string', 'max:50'],
             'assignables.*.hourly_rate' => ['required', 'numeric', 'min:0'],
-            'assignables.*.start_date'  => ['required', 'date'],
-            'assignables.*.end_date'    => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
+            'assignables.*.start_date' => ['required', 'date'],
+            'assignables.*.end_date' => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
-        
+
         // Validate IDs based on type
         foreach ($validated['assignables'] as $index => $assignable) {
-            if (!isset($assignable['id']) || !isset($assignable['type'])) {
+            if (! isset($assignable['id']) || ! isset($assignable['type'])) {
                 return redirect()->back()->withErrors([
-                    "assignables.{$index}.id" => 'Invalid assignable data provided.'
+                    "assignables.{$index}.id" => 'Invalid assignable data provided.',
                 ])->withInput();
             }
-            
+
             if ($assignable['type'] === 'user') {
                 $request->validate([
                     "assignables.{$index}.id" => ['required', 'integer', 'exists:users,id'],
@@ -45,7 +45,7 @@ class ProjectTeamsController extends Controller
                 ]);
             } else {
                 return redirect()->back()->withErrors([
-                    "assignables.{$index}.type" => 'Invalid assignable type. Must be "user" or "employee".'
+                    "assignables.{$index}.type" => 'Invalid assignable type. Must be "user" or "employee".',
                 ])->withInput();
             }
         }
@@ -56,24 +56,24 @@ class ProjectTeamsController extends Controller
                 if ($assignable['start_date']) {
                     if ($project->start_date && $assignable['start_date'] < $project->start_date) {
                         return redirect()->back()->withErrors([
-                            "assignables.{$index}.start_date" => "Start date cannot be before project start date ({$project->start_date})"
+                            "assignables.{$index}.start_date" => "Start date cannot be before project start date ({$project->start_date})",
                         ])->withInput();
                     }
                     if ($project->planned_end_date && $assignable['start_date'] > $project->planned_end_date) {
                         return redirect()->back()->withErrors([
-                            "assignables.{$index}.start_date" => "Start date cannot be after project end date ({$project->planned_end_date})"
+                            "assignables.{$index}.start_date" => "Start date cannot be after project end date ({$project->planned_end_date})",
                         ])->withInput();
                     }
                 }
                 if ($assignable['end_date']) {
                     if ($project->start_date && $assignable['end_date'] < $project->start_date) {
                         return redirect()->back()->withErrors([
-                            "assignables.{$index}.end_date" => "End date cannot be before project start date ({$project->start_date})"
+                            "assignables.{$index}.end_date" => "End date cannot be before project start date ({$project->start_date})",
                         ])->withInput();
                     }
                     if ($project->planned_end_date && $assignable['end_date'] > $project->planned_end_date) {
                         return redirect()->back()->withErrors([
-                            "assignables.{$index}.end_date" => "End date cannot be after project end date ({$project->planned_end_date})"
+                            "assignables.{$index}.end_date" => "End date cannot be after project end date ({$project->planned_end_date})",
                         ])->withInput();
                     }
                 }
@@ -84,48 +84,50 @@ class ProjectTeamsController extends Controller
         $skipped = 0;
         foreach ($validated['assignables'] as $assignable) {
             // Validate assignable data
-            if (!isset($assignable['id']) || !isset($assignable['type']) || !isset($assignable['role'])) {
+            if (! isset($assignable['id']) || ! isset($assignable['type']) || ! isset($assignable['role'])) {
                 $skipped++;
+
                 continue;
             }
-            
+
             // Check if already exists
             $exists = ProjectTeam::where('project_id', $project->id)
                 ->where('role', $assignable['role'])
                 ->where(function ($query) use ($assignable) {
                     if ($assignable['type'] === 'user') {
                         $query->where('user_id', $assignable['id'])
-                              ->whereNull('employee_id');
+                            ->whereNull('employee_id');
                     } elseif ($assignable['type'] === 'employee') {
                         $query->where('employee_id', $assignable['id'])
-                              ->whereNull('user_id');
+                            ->whereNull('user_id');
                     }
                 })
                 ->exists();
 
             if ($exists) {
                 $skipped++;
+
                 continue; // skip duplicates
             }
 
             try {
                 $teamMember = ProjectTeam::create([
-                    'project_id'      => $project->id,
-                    'user_id'        => $assignable['type'] === 'user' ? (int)$assignable['id'] : null,
-                    'employee_id'    => $assignable['type'] === 'employee' ? (int)$assignable['id'] : null,
+                    'project_id' => $project->id,
+                    'user_id' => $assignable['type'] === 'user' ? (int) $assignable['id'] : null,
+                    'employee_id' => $assignable['type'] === 'employee' ? (int) $assignable['id'] : null,
                     'assignable_type' => $assignable['type'],
-                    'role'            => $assignable['role'],
-                    'hourly_rate'     => $assignable['hourly_rate'],
-                    'start_date'      => $assignable['start_date'],
-                    'end_date'        => $assignable['end_date'] ?? null,
-                    'is_active'       => true,
+                    'role' => $assignable['role'],
+                    'hourly_rate' => $assignable['hourly_rate'],
+                    'start_date' => $assignable['start_date'],
+                    'end_date' => $assignable['end_date'] ?? null,
+                    'is_active' => true,
                 ]);
 
                 // System-wide notification for team member added
-                $assignableName = $assignable['type'] === 'user' 
-                    ? User::find($assignable['id'])?->name 
-                    : \App\Models\Employee::find($assignable['id'])?->first_name . ' ' . \App\Models\Employee::find($assignable['id'])?->last_name;
-                
+                $assignableName = $assignable['type'] === 'user'
+                    ? User::find($assignable['id'])?->name
+                    : \App\Models\Employee::find($assignable['id'])?->first_name.' '.\App\Models\Employee::find($assignable['id'])?->last_name;
+
                 if ($assignableName) {
                     $this->createSystemNotification(
                         'general',
@@ -138,12 +140,13 @@ class ProjectTeamsController extends Controller
 
                 $added++;
             } catch (\Exception $e) {
-                \Log::error('Error creating project team member: ' . $e->getMessage());
+                \Log::error('Error creating project team member: '.$e->getMessage());
                 $skipped++;
+
                 continue;
             }
         }
-        
+
         if ($skipped > 0 && $added === 0) {
             return redirect()->back()->with('error', "No team members were added. {$skipped} member(s) were skipped (may already exist or have invalid data).");
         }
@@ -151,12 +154,12 @@ class ProjectTeamsController extends Controller
         return redirect()->back()->with('success', "$added team member(s) assigned successfully.");
     }
 
-    public function destroy(Request $request, Project $project, ProjectTeam $projectTeam = null)
+    public function destroy(Request $request, Project $project, ?ProjectTeam $projectTeam = null)
     {
         // If request has "ids", then it's a bulk destroy
         if ($request->has('ids') && is_array($request->ids)) {
             $validated = $request->validate([
-                'ids'   => 'required|array|min:1',
+                'ids' => 'required|array|min:1',
                 'ids.*' => 'integer|exists:project_teams,id',
             ]);
 
@@ -167,7 +170,7 @@ class ProjectTeamsController extends Controller
 
             foreach ($teams as $team) {
                 $assignableName = $team->assignable_name;
-                $role     = $team->role;
+                $role = $team->role;
 
                 // Unassign all tasks assigned to this team member in this project (only for users, not employees)
                 if ($team->user_id) {
@@ -200,12 +203,12 @@ class ProjectTeamsController extends Controller
         }
 
         // Otherwise, it's a single destroy
-        if (!$projectTeam || $projectTeam->project_id !== $project->id) {
+        if (! $projectTeam || $projectTeam->project_id !== $project->id) {
             abort(404);
         }
 
         $assignableName = $projectTeam->assignable_name;
-        $role     = $projectTeam->role;
+        $role = $projectTeam->role;
 
         // Unassign all tasks assigned to this team member in this project (only for users, not employees)
         if ($projectTeam->user_id) {
@@ -236,7 +239,6 @@ class ProjectTeamsController extends Controller
         return redirect()->back()->with('success', 'Team member removed successfully.');
     }
 
-
     public function handleStatus(Request $request, Project $project, ProjectTeam $projectTeam)
     {
         if ($projectTeam->project_id !== $project->id) {
@@ -258,7 +260,7 @@ class ProjectTeamsController extends Controller
         $this->adminActivityLogs(
             'Project Team',
             'Update Status',
-            'Updated ' . $assignableName . ' status to ' . $status . ' in Project ' . $project->project_name
+            'Updated '.$assignableName.' status to '.$status.' in Project '.$project->project_name
         );
 
         // System-wide notification for team member status update
@@ -280,11 +282,11 @@ class ProjectTeamsController extends Controller
         }
 
         $validated = $request->validate([
-            'role'        => ['required', 'string', 'max:50'],
+            'role' => ['required', 'string', 'max:50'],
             'hourly_rate' => ['required', 'numeric', 'min:0'],
-            'start_date'  => ['required', 'date'],
-            'end_date'    => ['nullable', 'date', 'after_or_equal:start_date'],
-            'is_active'   => ['required', 'boolean'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'is_active' => ['required', 'boolean'],
         ]);
 
         // Validate dates against project dates
@@ -292,24 +294,24 @@ class ProjectTeamsController extends Controller
             if ($validated['start_date']) {
                 if ($project->start_date && $validated['start_date'] < $project->start_date) {
                     return redirect()->back()->withErrors([
-                        'start_date' => "Start date cannot be before project start date ({$project->start_date})"
+                        'start_date' => "Start date cannot be before project start date ({$project->start_date})",
                     ])->withInput();
                 }
                 if ($project->planned_end_date && $validated['start_date'] > $project->planned_end_date) {
                     return redirect()->back()->withErrors([
-                        'start_date' => "Start date cannot be after project end date ({$project->planned_end_date})"
+                        'start_date' => "Start date cannot be after project end date ({$project->planned_end_date})",
                     ])->withInput();
                 }
             }
             if ($validated['end_date']) {
                 if ($project->start_date && $validated['end_date'] < $project->start_date) {
                     return redirect()->back()->withErrors([
-                        'end_date' => "End date cannot be before project start date ({$project->start_date})"
+                        'end_date' => "End date cannot be before project start date ({$project->start_date})",
                     ])->withInput();
                 }
                 if ($project->planned_end_date && $validated['end_date'] > $project->planned_end_date) {
                     return redirect()->back()->withErrors([
-                        'end_date' => "End date cannot be after project end date ({$project->planned_end_date})"
+                        'end_date' => "End date cannot be after project end date ({$project->planned_end_date})",
                     ])->withInput();
                 }
             }
@@ -317,27 +319,27 @@ class ProjectTeamsController extends Controller
 
         // Save old values for logging
         $oldAssignable = $projectTeam->assignable_name;
-        $oldRole   = $projectTeam->role;
-        $oldRate   = $projectTeam->hourly_rate;
-        $oldDates  = ($projectTeam->start_date ?? '---') . ' - ' . ($projectTeam->end_date ?? '---');
+        $oldRole = $projectTeam->role;
+        $oldRate = $projectTeam->hourly_rate;
+        $oldDates = ($projectTeam->start_date ?? '---').' - '.($projectTeam->end_date ?? '---');
         $oldStatus = $projectTeam->is_active ? 'Active' : 'Inactive';
 
         $projectTeam->update($validated);
 
         $projectTeam->refresh();
 
-        $newRole   = $validated['role'];
-        $newRate   = $validated['hourly_rate'] ?? '---';
-        $newDates  = ($validated['start_date'] ?? '---') . ' - ' . ($validated['end_date'] ?? '---');
+        $newRole = $validated['role'];
+        $newRate = $validated['hourly_rate'] ?? '---';
+        $newDates = ($validated['start_date'] ?? '---').' - '.($validated['end_date'] ?? '---');
         $newStatus = $validated['is_active'] ? 'Active' : 'Inactive';
 
         $this->adminActivityLogs(
             'Project Team',
             'Update',
-            "Updated team member {$oldAssignable} in Project {$project->project_name}: " .
-            "Role: {$oldRole} → {$newRole}, " .
-            "Rate: {$oldRate} → {$newRate}, " .
-            "Dates: {$oldDates} → {$newDates}, " .
+            "Updated team member {$oldAssignable} in Project {$project->project_name}: ".
+            "Role: {$oldRole} → {$newRole}, ".
+            "Rate: {$oldRate} → {$newRate}, ".
+            "Dates: {$oldDates} → {$newDates}, ".
             "Status: {$oldStatus} → {$newStatus}"
         );
 

@@ -59,4 +59,3 @@ class Chat extends Model
         return $this->hasOne(Message::class)->latestOfMany();
     }
 }
-

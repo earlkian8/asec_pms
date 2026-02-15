@@ -5,7 +5,6 @@ namespace App\Events;
 use App\Models\Message;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -32,7 +31,7 @@ class MessageSent implements ShouldBroadcastNow
     {
         // Broadcast to a private channel for the specific chat
         return [
-            new PrivateChannel('chat.' . $this->message->chat_id),
+            new PrivateChannel('chat.'.$this->message->chat_id),
         ];
     }
 
@@ -54,8 +53,8 @@ class MessageSent implements ShouldBroadcastNow
             'chat_id' => $this->message->chat_id,
             'sender_type' => $this->message->sender_type,
             'sender_id' => $this->message->sender_id,
-            'sender_name' => $this->message->sender_type === 'client' 
-                ? $this->message->chat->client->client_name 
+            'sender_name' => $this->message->sender_type === 'client'
+                ? $this->message->chat->client->client_name
                 : ($this->message->chat->user ? $this->message->chat->user->name : 'Admin'),
             'message' => $this->message->message,
             'read' => $this->message->read,
@@ -63,4 +62,3 @@ class MessageSent implements ShouldBroadcastNow
         ];
     }
 }
-

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProjectFile extends Model
 {
-     use HasFactory;
+    use HasFactory;
 
     protected $table = 'project_files';
 
@@ -26,7 +26,7 @@ class ProjectFile extends Model
 
     protected $casts = [
         'uploaded_at' => 'datetime',
-        'file_size'   => 'integer',
+        'file_size' => 'integer',
     ];
 
     /**

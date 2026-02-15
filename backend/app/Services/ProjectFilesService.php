@@ -15,9 +15,9 @@ class ProjectFilesService
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('file_name', 'ilike', "%{$search}%")
-                      ->orWhere('original_name', 'ilike', "%{$search}%")
-                      ->orWhere('category', 'ilike', "%{$search}%")
-                      ->orWhere('description', 'ilike', "%{$search}%");
+                        ->orWhere('original_name', 'ilike', "%{$search}%")
+                        ->orWhere('category', 'ilike', "%{$search}%")
+                        ->orWhere('description', 'ilike', "%{$search}%");
                 });
             })
             ->orderBy('uploaded_at', 'desc')
@@ -26,8 +26,8 @@ class ProjectFilesService
 
         return [
             'project' => $project->load('client'),
-            'files'   => $files,
-            'search'  => $search,
+            'files' => $files,
+            'search' => $search,
         ];
     }
 }

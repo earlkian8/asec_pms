@@ -1,37 +1,36 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
-use App\Models\User;
+use App\Models\ProjectTask;
 use App\Traits\NotificationTrait;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class TaskManagementTaskController extends Controller
 {
     use NotificationTrait;
+
     /**
      * Get task detail with related data
      */
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->with([
                 'milestone.project',
-                'assignedUser'
+                'assignedUser',
             ])
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -67,12 +66,12 @@ class TaskManagementTaskController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -96,7 +95,7 @@ class TaskManagementTaskController extends Controller
             $this->createSystemNotification(
                 'task',
                 'Task Status Updated',
-                "Task '{$task->title}' status has been changed from " . ucfirst(str_replace('_', ' ', $oldStatus)) . " to " . ucfirst(str_replace('_', ' ', $request->status)) . " in project '{$project->project_name}'.",
+                "Task '{$task->title}' status has been changed from ".ucfirst(str_replace('_', ' ', $oldStatus)).' to '.ucfirst(str_replace('_', ' ', $request->status))." in project '{$project->project_name}'.",
                 $project,
                 null // API doesn't have web routes
             );
@@ -132,12 +131,12 @@ class TaskManagementTaskController extends Controller
     public function progressUpdates(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -153,12 +152,12 @@ class TaskManagementTaskController extends Controller
         $scheme = $request->getScheme();
         $host = $request->getHost();
         $port = $request->getPort();
-        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+        $baseUrl = $scheme.'://'.$host.($port && $port != 80 && $port != 443 ? ':'.$port : '');
 
         $formattedUpdates = $updates->map(function ($update) use ($baseUrl) {
             $fileUrl = null;
             if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                $fileUrl = $baseUrl . '/storage/' . $update->file_path;
+                $fileUrl = $baseUrl.'/storage/'.$update->file_path;
             }
 
             return [
@@ -189,12 +188,12 @@ class TaskManagementTaskController extends Controller
     public function storeProgressUpdate(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -214,12 +213,12 @@ class TaskManagementTaskController extends Controller
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $directory = "progress_updates/{$task->id}";
-            
+
             // Store in storage/app/public
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename = time().'_'.$file->getClientOriginalName();
             $file->storeAs($directory, $filename, 'public');
-            
-            $filePath = $directory . '/' . $filename;
+
+            $filePath = $directory.'/'.$filename;
             $originalName = $file->getClientOriginalName();
             $fileType = $file->getMimeType();
             $fileSize = $file->getSize();
@@ -242,23 +241,23 @@ class TaskManagementTaskController extends Controller
         if ($task->milestone && $task->milestone->project) {
             $project = $task->milestone->project;
             $this->createSystemNotification(
-                        'update',
-                        'New Progress Update',
-                        "A new progress update has been added for task '{$task->title}' in milestone '{$task->milestone->name}' for project '{$project->project_name}'.",
-                        $project,
-                        null // API doesn't have web routes
-                    );
+                'update',
+                'New Progress Update',
+                "A new progress update has been added for task '{$task->title}' in milestone '{$task->milestone->name}' for project '{$project->project_name}'.",
+                $project,
+                null // API doesn't have web routes
+            );
         }
 
         // Generate storage URL using request host (works for mobile apps, not just localhost)
         $scheme = $request->getScheme();
         $host = $request->getHost();
         $port = $request->getPort();
-        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+        $baseUrl = $scheme.'://'.$host.($port && $port != 80 && $port != 443 ? ':'.$port : '');
 
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            $fileUrl = $baseUrl . '/storage/' . $progressUpdate->file_path;
+            $fileUrl = $baseUrl.'/storage/'.$progressUpdate->file_path;
         }
 
         return response()->json([
@@ -287,12 +286,12 @@ class TaskManagementTaskController extends Controller
     public function updateProgressUpdate(Request $request, $id, $updateId)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -304,7 +303,7 @@ class TaskManagementTaskController extends Controller
             ->where('created_by', $user->id)
             ->first();
 
-        if (!$progressUpdate) {
+        if (! $progressUpdate) {
             return response()->json([
                 'success' => false,
                 'message' => 'Progress update not found or you do not have permission to edit it',
@@ -328,11 +327,11 @@ class TaskManagementTaskController extends Controller
 
             $file = $request->file('file');
             $directory = "progress_updates/{$task->id}";
-            
-            $filename = time() . '_' . $file->getClientOriginalName();
+
+            $filename = time().'_'.$file->getClientOriginalName();
             $file->storeAs($directory, $filename, 'public');
-            
-            $progressUpdate->file_path = $directory . '/' . $filename;
+
+            $progressUpdate->file_path = $directory.'/'.$filename;
             $progressUpdate->original_name = $file->getClientOriginalName();
             $progressUpdate->file_type = $file->getMimeType();
             $progressUpdate->file_size = $file->getSize();
@@ -345,11 +344,11 @@ class TaskManagementTaskController extends Controller
         $scheme = $request->getScheme();
         $host = $request->getHost();
         $port = $request->getPort();
-        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+        $baseUrl = $scheme.'://'.$host.($port && $port != 80 && $port != 443 ? ':'.$port : '');
 
         $fileUrl = null;
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            $fileUrl = $baseUrl . '/storage/' . $progressUpdate->file_path;
+            $fileUrl = $baseUrl.'/storage/'.$progressUpdate->file_path;
         }
 
         return response()->json([
@@ -378,12 +377,12 @@ class TaskManagementTaskController extends Controller
     public function deleteProgressUpdate(Request $request, $id, $updateId)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -395,7 +394,7 @@ class TaskManagementTaskController extends Controller
             ->where('created_by', $user->id)
             ->first();
 
-        if (!$progressUpdate) {
+        if (! $progressUpdate) {
             return response()->json([
                 'success' => false,
                 'message' => 'Progress update not found or you do not have permission to delete it',
@@ -421,12 +420,12 @@ class TaskManagementTaskController extends Controller
     public function downloadProgressUpdateFile(Request $request, $id, $updateId)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -437,14 +436,14 @@ class TaskManagementTaskController extends Controller
             ->where('project_task_id', $id)
             ->first();
 
-        if (!$progressUpdate || !$progressUpdate->file_path) {
+        if (! $progressUpdate || ! $progressUpdate->file_path) {
             return response()->json([
                 'success' => false,
                 'message' => 'File not found',
             ], 404);
         }
 
-        if (!Storage::disk('public')->exists($progressUpdate->file_path)) {
+        if (! Storage::disk('public')->exists($progressUpdate->file_path)) {
             return response()->json([
                 'success' => false,
                 'message' => 'File does not exist',
@@ -463,12 +462,12 @@ class TaskManagementTaskController extends Controller
     public function issues(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -513,13 +512,13 @@ class TaskManagementTaskController extends Controller
     public function storeIssue(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->with('milestone.project')
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -552,12 +551,12 @@ class TaskManagementTaskController extends Controller
         if ($task->milestone && $task->milestone->project) {
             $project = $task->milestone->project;
             $this->createSystemNotification(
-                        'issue',
-                        'New Issue Reported',
-                        "A new issue '{$request->title}' has been reported for task '{$task->title}' in project '{$project->project_name}'.",
-                        $project,
-                        null // API doesn't have web routes
-                    );
+                'issue',
+                'New Issue Reported',
+                "A new issue '{$request->title}' has been reported for task '{$task->title}' in project '{$project->project_name}'.",
+                $project,
+                null // API doesn't have web routes
+            );
         }
 
         return response()->json([
@@ -590,12 +589,12 @@ class TaskManagementTaskController extends Controller
     public function updateIssue(Request $request, $id, $issueId)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -607,7 +606,7 @@ class TaskManagementTaskController extends Controller
             ->where('reported_by', $user->id)
             ->first();
 
-        if (!$issue) {
+        if (! $issue) {
             return response()->json([
                 'success' => false,
                 'message' => 'Issue not found or you do not have permission to edit it',
@@ -634,7 +633,7 @@ class TaskManagementTaskController extends Controller
             $this->createSystemNotification(
                 'issue',
                 'Issue Priority Updated',
-                "Issue '{$issue->title}' priority has been changed from " . ucfirst($oldPriority) . " to " . ucfirst($request->priority) . " for project '{$project->project_name}'.",
+                "Issue '{$issue->title}' priority has been changed from ".ucfirst($oldPriority).' to '.ucfirst($request->priority)." for project '{$project->project_name}'.",
                 $project,
                 null // API doesn't have web routes
             );
@@ -670,12 +669,12 @@ class TaskManagementTaskController extends Controller
     public function deleteIssue(Request $request, $id, $issueId)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
             ->where('assigned_to', $user->id)
             ->first();
 
-        if (!$task) {
+        if (! $task) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -687,7 +686,7 @@ class TaskManagementTaskController extends Controller
             ->where('reported_by', $user->id)
             ->first();
 
-        if (!$issue) {
+        if (! $issue) {
             return response()->json([
                 'success' => false,
                 'message' => 'Issue not found or you do not have permission to delete it',
@@ -708,7 +707,7 @@ class TaskManagementTaskController extends Controller
     private function getTaskPriority($task)
     {
         $projectPriority = $task->milestone->project->priority ?? null;
-        
+
         switch ($projectPriority) {
             case 'high':
                 return 'critical';
@@ -721,4 +720,3 @@ class TaskManagementTaskController extends Controller
         }
     }
 }
-

@@ -1,29 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '@/services/api';
+import type { DashboardStatistics, DashboardProject } from '@/types/api';
 
-export interface DashboardStatistics {
-  totalProjects: number;
-  activeProjects: number;
-  completedProjects: number;
-  totalBudget: number;
-  totalSpent: number;
-  onTimeProjects: number;
-  overdueProjects: number;
-}
-
-export interface DashboardProject {
-  id: string;
-  name: string;
-  description: string;
-  status: 'active' | 'on-hold' | 'completed' | 'pending';
-  progress: number;
-  startDate: string;
-  expectedCompletion: string;
-  budget: number;
-  spent: number;
-  location: string;
-  projectManager: string;
-}
+export type { DashboardStatistics, DashboardProject } from '@/types/api';
 
 export function useDashboard() {
   const [statistics, setStatistics] = useState<DashboardStatistics | null>(null);

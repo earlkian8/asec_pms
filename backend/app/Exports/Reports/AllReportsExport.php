@@ -7,10 +7,15 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 class AllReportsExport implements WithMultipleSheets
 {
     protected $projectPerformance;
+
     protected $financialReport;
+
     protected $clientReport;
+
     protected $inventoryReport;
+
     protected $teamProductivity;
+
     protected $budgetReport;
 
     public function __construct(

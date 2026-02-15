@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -17,7 +16,8 @@ class RolesController extends Controller
     /**
      * Display a listing of roles.
      */
-    public function index(Request $request){
+    public function index(Request $request)
+    {
         $search = $request->get('search', '');
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
@@ -30,7 +30,7 @@ class RolesController extends Controller
 
         // Validate sort_by to prevent SQL injection
         $allowedSortColumns = ['name', 'created_at', 'users_count'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
@@ -38,12 +38,12 @@ class RolesController extends Controller
         $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
 
         $roles = $query->withCount('users') // counts assigned users
-                    ->orderBy($sortBy, $sortOrder)
-                    ->when($sortBy !== 'created_at', function ($query) {
-                        // Add created_at as secondary sort to maintain stable position when sorting by other fields
-                        $query->orderBy('created_at', 'desc');
-                    })
-                    ->paginate(10);
+            ->orderBy($sortBy, $sortOrder)
+            ->when($sortBy !== 'created_at', function ($query) {
+                // Add created_at as secondary sort to maintain stable position when sorting by other fields
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
         return Inertia::render('UserManagement/Roles/index', [
             'roles' => $roles,
@@ -52,7 +52,6 @@ class RolesController extends Controller
             'sort_order' => $sortOrder,
         ]);
     }
-
 
     /**
      * Store a newly created role in storage.
@@ -72,7 +71,7 @@ class RolesController extends Controller
         $this->adminActivityLogs(
             'Role',
             'Add',
-            'Created Role ' . $role->name
+            'Created Role '.$role->name
         );
 
         // System-wide notification for new role
@@ -93,7 +92,7 @@ class RolesController extends Controller
     {
         // Get all permissions grouped by module
         $allPermissions = \Spatie\Permission\Models\Permission::orderBy('name')->get();
-        
+
         // Get role's current permissions
         $rolePermissions = $role->permissions->pluck('name')->toArray();
 
@@ -102,11 +101,11 @@ class RolesController extends Controller
         foreach ($allPermissions as $permission) {
             $parts = explode('.', $permission->name);
             $module = $parts[0];
-            
-            if (!isset($groupedPermissions[$module])) {
+
+            if (! isset($groupedPermissions[$module])) {
                 $groupedPermissions[$module] = [];
             }
-            
+
             $groupedPermissions[$module][] = [
                 'id' => $permission->id,
                 'name' => $permission->name,
@@ -132,14 +131,14 @@ class RolesController extends Controller
         ]);
 
         $permissions = $validated['permissions'] ?? [];
-        
+
         // Sync permissions to role
         $role->syncPermissions($permissions);
 
         $this->adminActivityLogs(
             'Role',
             'Update Permissions',
-            'Updated permissions for Role ' . $role->name
+            'Updated permissions for Role '.$role->name
         );
 
         // System-wide notification for role permission changes
@@ -163,7 +162,7 @@ class RolesController extends Controller
     {
         // Check if role has users assigned
         $usersCount = $role->users()->count();
-        
+
         if ($usersCount > 0) {
             return redirect()->back()->with('error', "Cannot delete role '{$role->name}' because it has {$usersCount} user(s) assigned to it. Please reassign users to other roles first.");
         }
@@ -173,7 +172,7 @@ class RolesController extends Controller
         $this->adminActivityLogs(
             'Role',
             'Delete',
-            'Deleted Role ' . $roleName
+            'Deleted Role '.$roleName
         );
 
         $role->delete();

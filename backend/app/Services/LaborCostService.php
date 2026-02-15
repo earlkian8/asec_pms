@@ -20,13 +20,13 @@ class LaborCostService
                     $q->whereHas('user', function ($userQuery) use ($search) {
                         $userQuery->where('name', 'ilike', "%{$search}%");
                     })
-                    ->orWhereHas('employee', function ($employeeQuery) use ($search) {
-                        $employeeQuery->where('first_name', 'ilike', "%{$search}%")
-                            ->orWhere('last_name', 'ilike', "%{$search}%")
-                            ->orWhere('email', 'ilike', "%{$search}%");
-                    })
-                    ->orWhere('description', 'ilike', "%{$search}%")
-                    ->orWhere('notes', 'ilike', "%{$search}%");
+                        ->orWhereHas('employee', function ($employeeQuery) use ($search) {
+                            $employeeQuery->where('first_name', 'ilike', "%{$search}%")
+                                ->orWhere('last_name', 'ilike', "%{$search}%")
+                                ->orWhere('email', 'ilike', "%{$search}%");
+                        })
+                        ->orWhere('description', 'ilike', "%{$search}%")
+                        ->orWhere('notes', 'ilike', "%{$search}%");
                 });
             })
             ->when($dateFrom, function ($query, $dateFrom) {
@@ -38,7 +38,7 @@ class LaborCostService
             ->with([
                 'user',
                 'employee',
-                'createdBy'
+                'createdBy',
             ])
             ->orderBy('work_date', 'desc')
             ->orderBy('created_at', 'desc')
@@ -55,7 +55,7 @@ class LaborCostService
                 if ($teamMember->assignable_type === 'employee' && $teamMember->employee) {
                     return [
                         'id' => $teamMember->employee->id,
-                        'name' => $teamMember->employee->first_name . ' ' . $teamMember->employee->last_name,
+                        'name' => $teamMember->employee->first_name.' '.$teamMember->employee->last_name,
                         'email' => $teamMember->employee->email,
                         'hourly_rate' => $teamMember->hourly_rate,
                         'type' => 'employee',
@@ -69,6 +69,7 @@ class LaborCostService
                         'type' => 'user',
                     ];
                 }
+
                 return null;
             })
             ->filter();
@@ -107,4 +108,3 @@ class LaborCostService
         ];
     }
 }
-

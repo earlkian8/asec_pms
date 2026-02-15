@@ -24,9 +24,9 @@ class ProjectTeam extends Model
 
     protected $casts = [
         'hourly_rate' => 'decimal:2',
-        'start_date'  => 'date',
-        'end_date'    => 'date',
-        'is_active'   => 'boolean',
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'is_active' => 'boolean',
     ];
 
     protected $appends = [
@@ -65,6 +65,7 @@ class ProjectTeam extends Model
         if ($this->assignable_type === 'employee' && $this->employee_id) {
             return $this->employee();
         }
+
         return $this->user();
     }
 
@@ -80,7 +81,7 @@ class ProjectTeam extends Model
         if ($this->assignable_type === 'user' && $this->user) {
             return $this->user->name;
         }
-        
+
         // Fallback: if assignable_type is not set (legacy records), check which one exists
         if ($this->employee_id && $this->employee) {
             return $this->employee->full_name;
@@ -88,7 +89,7 @@ class ProjectTeam extends Model
         if ($this->user_id && $this->user) {
             return $this->user->name;
         }
-        
+
         return 'N/A';
     }
 
@@ -115,7 +116,7 @@ class ProjectTeam extends Model
     {
         return $query->where(function ($q) {
             $q->whereNull('end_date')
-              ->orWhere('end_date', '>=', now()->toDateString());
+                ->orWhere('end_date', '>=', now()->toDateString());
         });
     }
 
@@ -124,12 +125,12 @@ class ProjectTeam extends Model
      */
     public function isCurrentlyActive(): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 
         $today = now()->toDateString();
-        
+
         if ($this->start_date && $this->start_date > $today) {
             return false;
         }

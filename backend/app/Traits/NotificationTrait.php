@@ -5,6 +5,7 @@ namespace App\Traits;
 use App\Models\Notification;
 use App\Models\Project;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 trait NotificationTrait
 {
@@ -33,6 +34,7 @@ trait NotificationTrait
         foreach ($users as $user) {
             $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
         }
+
         return $notifications;
     }
 
@@ -44,23 +46,39 @@ trait NotificationTrait
         $users = User::all();
         $notifications = [];
         $authId = auth()->id();
-        
+
         // If no users exist, return empty array
         if ($users->isEmpty()) {
             return $notifications;
         }
-        
+
         foreach ($users as $user) {
             // Skip the user who triggered the notification to avoid self-notification
             if ($authId && $user->id !== $authId) {
                 $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
-            } elseif (!$authId) {
+            } elseif (! $authId) {
                 // If no authenticated user, notify all users
                 $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
             }
         }
-        
+
         return $notifications;
+    }
+
+    /**
+     * Create system-wide notification without failing the main action.
+     * Logs and swallows exceptions so the request can complete.
+     */
+    protected function safeSystemNotification(string $type, string $title, string $message, ?Project $project = null, ?string $link = null): void
+    {
+        try {
+            $this->createSystemNotification($type, $title, $message, $project, $link);
+        } catch (\Throwable $e) {
+            Log::warning('System notification failed', [
+                'message' => $e->getMessage(),
+                'title' => $title,
+            ]);
+        }
     }
 
     /**
@@ -98,7 +116,7 @@ trait NotificationTrait
      */
     protected function notifyUserMilestoneStatusChange(User $user, Project $project, string $milestoneName, string $status)
     {
-        $statusText = match($status) {
+        $statusText = match ($status) {
             'in_progress' => 'is now in progress',
             'completed' => 'has been completed',
             default => "status changed to {$status}",
@@ -123,7 +141,7 @@ trait NotificationTrait
             $user,
             'status_change',
             'Project Status Updated',
-            "Project '{$project->project_name}' status has been changed from " . ucfirst(str_replace('_', ' ', $oldStatus)) . " to " . ucfirst(str_replace('_', ' ', $newStatus)) . ".",
+            "Project '{$project->project_name}' status has been changed from ".ucfirst(str_replace('_', ' ', $oldStatus)).' to '.ucfirst(str_replace('_', ' ', $newStatus)).'.',
             $project,
             route('project-management.view', $project->id)
         );
@@ -159,4 +177,3 @@ trait NotificationTrait
         );
     }
 }
-

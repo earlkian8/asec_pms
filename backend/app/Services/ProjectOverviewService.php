@@ -2,15 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Billing;
 use App\Models\Project;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
-use App\Models\ProjectMiscellaneousExpense;
-use App\Models\Billing;
-use App\Models\BillingPayment;
 use App\Models\ProjectMilestone;
-use App\Models\ProjectTeam;
+use App\Models\ProjectMiscellaneousExpense;
 use App\Models\ProjectTask;
+use App\Models\ProjectTeam;
 
 class ProjectOverviewService
 {
@@ -30,11 +29,12 @@ class ProjectOverviewService
         $materialAllocations = ProjectMaterialAllocation::where('project_id', $project->id)
             ->with('inventoryItem')
             ->get();
-        
+
         $totalMaterialCost = $materialAllocations->sum(function ($allocation) {
             if ($allocation->inventoryItem) {
                 return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
             }
+
             return 0;
         });
 
@@ -54,7 +54,7 @@ class ProjectOverviewService
         $billings = Billing::where('project_id', $project->id)
             ->with(['payments', 'milestone'])
             ->get();
-        
+
         $totalBilled = $billings->sum('billing_amount');
         // Use the billing model's total_paid attribute which filters by payment_status='paid'
         // This ensures data integrity and consistency across the system
@@ -80,7 +80,7 @@ class ProjectOverviewService
             ->current()
             ->with(['user', 'employee'])
             ->get();
-        
+
         $totalTeamMembers = $teamMembers->count();
         $activeTeamMembers = $teamMembers->where('is_active', true)->count();
 
@@ -95,7 +95,7 @@ class ProjectOverviewService
         $tasks = ProjectTask::whereHas('milestone', function ($query) use ($project) {
             $query->where('project_id', $project->id);
         })->get();
-        
+
         $totalTasks = $tasks->count();
         $completedTasks = $tasks->where('status', 'completed')->count();
         $inProgressTasks = $tasks->where('status', 'in_progress')->count();
@@ -126,6 +126,7 @@ class ProjectOverviewService
                     if ($allocation->inventoryItem) {
                         return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
                     }
+
                     return 0;
                 });
             });
@@ -244,4 +245,3 @@ class ProjectOverviewService
         ];
     }
 }
-

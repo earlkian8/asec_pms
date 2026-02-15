@@ -51,7 +51,7 @@ class InventoryItem extends Model
             $stockIn = $this->transactions()
                 ->where('transaction_type', 'stock_in')
                 ->sum('quantity');
-            
+
             // For stock_out, exclude project_use transactions that don't have receiving reports yet
             // (these are the initial allocation transactions that haven't been received)
             $stockOut = $this->transactions()
@@ -61,11 +61,11 @@ class InventoryItem extends Model
                         ->orWhere(function ($q) {
                             // Include project_use transactions only if they have a receiving report ID in notes
                             $q->where('stock_out_type', 'project_use')
-                              ->where('notes', 'like', '%[RECEIVING_REPORT_ID:%');
+                                ->where('notes', 'like', '%[RECEIVING_REPORT_ID:%');
                         });
                 })
                 ->sum('quantity');
-            
+
             return $stockIn - $stockOut;
         } catch (\Exception $e) {
             // Table doesn't exist, return current_stock value
@@ -76,9 +76,10 @@ class InventoryItem extends Model
     // Check if stock is low
     public function isLowStock()
     {
-        if (!$this->min_stock_level) {
+        if (! $this->min_stock_level) {
             return false;
         }
+
         return $this->current_stock <= $this->min_stock_level;
     }
 }

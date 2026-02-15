@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -25,7 +24,7 @@ class EmployeesController extends Controller
 
         // Validate sort column
         $allowedSortColumns = ['created_at', 'first_name', 'last_name', 'email', 'position', 'is_active'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
@@ -33,14 +32,14 @@ class EmployeesController extends Controller
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $employees = Employee::when($search, function ($query, $search) {
-                return $query->where(function ($q) use ($search) {
-                    $q->where('first_name', 'ilike', "%{$search}%")
-                      ->orWhere('last_name', 'ilike', "%{$search}%")
-                      ->orWhere('email', 'ilike', "%{$search}%")
-                      ->orWhere('phone', 'ilike', "%{$search}%")
-                      ->orWhere('position', 'ilike', "%{$search}%");
-                });
-            })
+            return $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhere('last_name', 'ilike', "%{$search}%")
+                    ->orWhere('email', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'ilike', "%{$search}%")
+                    ->orWhere('position', 'ilike', "%{$search}%");
+            });
+        })
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
                 $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
             })
@@ -76,16 +75,16 @@ class EmployeesController extends Controller
     {
         $validated = $request->validate([
             'first_name' => ['required', 'max:100'],
-            'last_name'  => ['required', 'max:100'],
-            'email'      => ['required', 'email', Rule::unique('employees', 'email')],
-            'phone'      => ['nullable', 'string', 'max:20'],
-            'position'   => ['nullable', 'string', 'max:100'],
+            'last_name' => ['required', 'max:100'],
+            'email' => ['required', 'email', Rule::unique('employees', 'email')],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'position' => ['nullable', 'string', 'max:100'],
             'is_active' => ['required', 'boolean'],
         ]);
 
         $employee = Employee::create($validated);
 
-        $this->adminActivityLogs('Employee', 'Add', 'Added Employee ' . $employee->first_name . ' ' . $employee->last_name);
+        $this->adminActivityLogs('Employee', 'Add', 'Added Employee '.$employee->first_name.' '.$employee->last_name);
 
         // System-wide notification for new employee
         $this->createSystemNotification(
@@ -103,23 +102,23 @@ class EmployeesController extends Controller
     {
         $validated = $request->validate([
             'first_name' => ['required', 'max:100'],
-            'last_name'  => ['required', 'max:100'],
+            'last_name' => ['required', 'max:100'],
             'email' => [
-                    'required',
-                    'email',
-                    Rule::unique('employees', 'email')->ignore($employee->id, $employee->getKeyName())
+                'required',
+                'email',
+                Rule::unique('employees', 'email')->ignore($employee->id, $employee->getKeyName()),
 
-                ],
-            'phone'      => ['nullable', 'string', 'max:20'],
-            'position'   => ['nullable', 'string', 'max:100'],
+            ],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'position' => ['nullable', 'string', 'max:100'],
             'is_active' => ['required', 'boolean'],
         ]);
 
-        $oldName = $employee->first_name . ' ' . $employee->last_name;
+        $oldName = $employee->first_name.' '.$employee->last_name;
 
         $employee->update($validated);
 
-        $this->adminActivityLogs('Employee', 'Update', 'Updated Employee ' . $oldName . ' to ' . $validated['first_name'] . ' ' . $validated['last_name']);
+        $this->adminActivityLogs('Employee', 'Update', 'Updated Employee '.$oldName.' to '.$validated['first_name'].' '.$validated['last_name']);
 
         // System-wide notification for employee update
         $this->createSystemNotification(
@@ -135,12 +134,12 @@ class EmployeesController extends Controller
 
     public function destroy(Employee $employee)
     {
-        $name = $employee->first_name . ' ' . $employee->last_name;
+        $name = $employee->first_name.' '.$employee->last_name;
 
         try {
             $employee->delete();
 
-            $this->adminActivityLogs('Employee', 'Delete', 'Deleted Employee ' . $name);
+            $this->adminActivityLogs('Employee', 'Delete', 'Deleted Employee '.$name);
 
             // System-wide notification for employee deletion
             $this->createSystemNotification(
@@ -154,14 +153,13 @@ class EmployeesController extends Controller
             return redirect()->back()->with('success', 'Employee deleted successfully.');
         } catch (\Illuminate\Database\QueryException $e) {
             // Check for foreign key violation (Postgres: 23503)
-            if ($e->getCode() == "23503") {
+            if ($e->getCode() == '23503') {
                 return redirect()->back()->with('error', "Cannot delete employee {$name} because they are still assigned to a project team.");
             }
 
             return redirect()->back()->with('error', 'Failed to delete employee. Please try again.');
         }
     }
-
 
     public function handleStatus(Request $request, Employee $employee)
     {
@@ -184,8 +182,8 @@ class EmployeesController extends Controller
         $this->adminActivityLogs(
             'Employee',
             'Update Status',
-            'Updated Employee ' . $employee->first_name . ' ' . $employee->last_name .
-            ' status to ' . ($employee->is_active ? 'Active' : 'Inactive')
+            'Updated Employee '.$employee->first_name.' '.$employee->last_name.
+            ' status to '.($employee->is_active ? 'Active' : 'Inactive')
         );
 
         // System-wide notification for employee status change

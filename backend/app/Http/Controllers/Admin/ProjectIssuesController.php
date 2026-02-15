@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectIssue;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
@@ -49,7 +48,7 @@ class ProjectIssuesController extends Controller
         $this->adminActivityLogs(
             'Project Issue',
             'Created',
-            'Created issue "' . $data['title'] . '" for project "' . $project->project_name . '"'
+            'Created issue "'.$data['title'].'" for project "'.$project->project_name.'"'
         );
 
         // Create notification for client
@@ -87,9 +86,9 @@ class ProjectIssuesController extends Controller
         ]);
 
         // Set resolved_at if status is resolved or closed
-        if (in_array($data['status'], ['resolved', 'closed']) && !$issue->resolved_at) {
+        if (in_array($data['status'], ['resolved', 'closed']) && ! $issue->resolved_at) {
             $data['resolved_at'] = now();
-        } elseif (!in_array($data['status'], ['resolved', 'closed'])) {
+        } elseif (! in_array($data['status'], ['resolved', 'closed'])) {
             $data['resolved_at'] = null;
         }
 
@@ -106,7 +105,7 @@ class ProjectIssuesController extends Controller
         $this->adminActivityLogs(
             'Project Issue',
             'Updated',
-            'Updated issue "' . $issue->title . '" for project "' . $project->project_name . '"'
+            'Updated issue "'.$issue->title.'" for project "'.$project->project_name.'"'
         );
 
         // System-wide notification for issue update
@@ -134,7 +133,7 @@ class ProjectIssuesController extends Controller
         $this->adminActivityLogs(
             'Project Issue',
             'Deleted',
-            'Deleted issue "' . $issueTitle . '" from project "' . $project->project_name . '"'
+            'Deleted issue "'.$issueTitle.'" from project "'.$project->project_name.'"'
         );
 
         // System-wide notification for issue deletion
@@ -149,9 +148,3 @@ class ProjectIssuesController extends Controller
         return back()->with('success', 'Issue deleted successfully');
     }
 }
-
-
-
-
-
-

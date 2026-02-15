@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -22,7 +22,7 @@ class TaskManagementAuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid email or password'],
             ]);
@@ -100,7 +100,7 @@ class TaskManagementAuthController extends Controller
 
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'email' => 'sometimes|required|email|unique:users,email,'.$user->id,
             'current_password' => 'required_with:password',
             'password' => 'sometimes|required|string|min:8|confirmed',
         ]);
@@ -118,7 +118,7 @@ class TaskManagementAuthController extends Controller
         // Update password if provided
         if ($request->has('password')) {
             // Verify current password
-            if (!Hash::check($request->current_password, $user->password)) {
+            if (! Hash::check($request->current_password, $user->password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Current password is incorrect',
@@ -140,6 +140,4 @@ class TaskManagementAuthController extends Controller
             ],
         ]);
     }
-
 }
-

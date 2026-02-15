@@ -18,7 +18,7 @@ class InventoryService
 
         // Validate sort column
         $allowedSortColumns = ['item_code', 'item_name', 'category', 'current_stock', 'min_stock_level', 'unit_price', 'is_active', 'created_at'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'item_name';
         }
 
@@ -29,9 +29,9 @@ class InventoryService
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('item_code', 'like', "%{$search}%")
-                      ->orWhere('item_name', 'like', "%{$search}%")
-                      ->orWhere('category', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('item_name', 'like', "%{$search}%")
+                        ->orWhere('category', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->when($category, function ($query, $category) {
@@ -47,6 +47,7 @@ class InventoryService
         // Add is_low_stock flag to each item
         $items->getCollection()->transform(function ($item) {
             $item->is_low_stock = $item->isLowStock();
+
             return $item;
         });
 
@@ -91,7 +92,7 @@ class InventoryService
                 'inventoryItem',
                 'project:id,project_code,project_name',
                 'createdBy:id,name',
-                'materialAllocation'
+                'materialAllocation',
             ])
                 ->when($itemId, function ($query, $itemId) {
                     $query->where('inventory_item_id', $itemId);
@@ -100,9 +101,9 @@ class InventoryService
                     $query->where(function ($q) use ($search) {
                         $q->whereHas('inventoryItem', function ($itemQuery) use ($search) {
                             $itemQuery->where('item_name', 'ilike', "%{$search}%")
-                                      ->orWhere('item_code', 'ilike', "%{$search}%");
+                                ->orWhere('item_code', 'ilike', "%{$search}%");
                         })
-                        ->orWhere('notes', 'ilike', "%{$search}%");
+                            ->orWhere('notes', 'ilike', "%{$search}%");
                     });
                 })
                 ->orderBy('transaction_date', 'desc')
@@ -129,6 +130,7 @@ class InventoryService
     {
         $calculatedStock = $item->calculateCurrentStock();
         $item->update(['current_stock' => $calculatedStock]);
+
         return $calculatedStock;
     }
 
@@ -141,26 +143,26 @@ class InventoryService
                 'materialAllocation' => function ($query) {
                     $query->with([
                         'inventoryItem:id,item_code,item_name,unit_of_measure',
-                        'project:id,project_code,project_name'
+                        'project:id,project_code,project_name',
                     ]);
                 },
                 'receivedBy' => function ($query) {
                     $query->select('id', 'name')->with('roles:id,name');
-                }
+                },
             ])
                 ->when($search, function ($query, $search) {
                     $query->where(function ($q) use ($search) {
                         $q->whereHas('materialAllocation', function ($allocationQuery) use ($search) {
                             $allocationQuery->whereHas('inventoryItem', function ($itemQuery) use ($search) {
                                 $itemQuery->where('item_name', 'ilike', "%{$search}%")
-                                          ->orWhere('item_code', 'ilike', "%{$search}%");
+                                    ->orWhere('item_code', 'ilike', "%{$search}%");
                             })
-                            ->orWhereHas('project', function ($projectQuery) use ($search) {
-                                $projectQuery->where('project_name', 'ilike', "%{$search}%")
-                                            ->orWhere('project_code', 'ilike', "%{$search}%");
-                            });
+                                ->orWhereHas('project', function ($projectQuery) use ($search) {
+                                    $projectQuery->where('project_name', 'ilike', "%{$search}%")
+                                        ->orWhere('project_code', 'ilike', "%{$search}%");
+                                });
                         })
-                        ->orWhere('notes', 'ilike', "%{$search}%");
+                            ->orWhere('notes', 'ilike', "%{$search}%");
                     });
                 })
                 ->orderBy('received_at', 'desc')

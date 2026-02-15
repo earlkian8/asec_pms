@@ -5,14 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
-use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProjectMilestonesController extends Controller
 {
@@ -27,7 +26,7 @@ class ProjectMilestonesController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status' => ['required', Rule::in(['pending','in_progress','completed'])],
+            'status' => ['required', Rule::in(['pending', 'in_progress', 'completed'])],
         ]);
 
         $milestone = $project->milestones()->create($data);
@@ -35,7 +34,7 @@ class ProjectMilestonesController extends Controller
         $this->adminActivityLogs(
             'Milestone',
             'Created',
-            'Created milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
+            'Created milestone "'.$milestone->name.'" for project "'.$project->project_name.'"'
         );
 
         // Create notification for client
@@ -61,21 +60,21 @@ class ProjectMilestonesController extends Controller
             'start_date' => 'nullable|date',
             'due_date' => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status' => ['required', Rule::in(['pending','in_progress','completed'])],
+            'status' => ['required', Rule::in(['pending', 'in_progress', 'completed'])],
         ]);
 
         // Validate: Cannot mark as completed unless all tasks are completed
         if ($data['status'] === 'completed') {
             $tasks = $milestone->tasks;
             $totalTasks = $tasks->count();
-            
+
             if ($totalTasks > 0) {
                 $completedTasks = $tasks->where('status', 'completed')->count();
                 $incompleteTasks = $totalTasks - $completedTasks;
-                
+
                 if ($incompleteTasks > 0) {
                     return back()->withErrors([
-                        'status' => "Cannot mark milestone as completed. {$incompleteTasks} task(s) still need to be completed."
+                        'status' => "Cannot mark milestone as completed. {$incompleteTasks} task(s) still need to be completed.",
                     ]);
                 }
             }
@@ -87,7 +86,7 @@ class ProjectMilestonesController extends Controller
         $this->adminActivityLogs(
             'Milestone',
             'Updated',
-            'Updated milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
+            'Updated milestone "'.$milestone->name.'" for project "'.$project->project_name.'"'
         );
 
         // System-wide notification for milestone update
@@ -110,7 +109,7 @@ class ProjectMilestonesController extends Controller
         $this->adminActivityLogs(
             'Milestone',
             'Deleted',
-            'Deleted milestone "' . $milestoneName . '" from project "' . $project->project_name . '"'
+            'Deleted milestone "'.$milestoneName.'" from project "'.$project->project_name.'"'
         );
 
         // System-wide notification for milestone deletion
@@ -132,12 +131,12 @@ class ProjectMilestonesController extends Controller
             'projectType',
             'milestones' => function ($query) {
                 $query->orderBy('due_date', 'asc')
-                      ->orderBy('start_date', 'asc');
+                    ->orderBy('start_date', 'asc');
             },
             'milestones.tasks' => function ($query) {
                 $query->orderBy('due_date', 'asc');
             },
-            'milestones.tasks.assignedUser'
+            'milestones.tasks.assignedUser',
         ]);
 
         // Calculate milestone progress and aggregate data
@@ -145,17 +144,17 @@ class ProjectMilestonesController extends Controller
             $tasks = $milestone->tasks;
             $totalTasks = $tasks->count();
             $completedTasks = $tasks->where('status', 'completed')->count();
-            
+
             // Calculate progress percentage based on tasks
-            $progressPercentage = $totalTasks > 0 
-                ? round(($completedTasks / $totalTasks) * 100, 1) 
+            $progressPercentage = $totalTasks > 0
+                ? round(($completedTasks / $totalTasks) * 100, 1)
                 : ($milestone->status === 'completed' ? 100 : 0);
-            
+
             // If milestone is marked as completed but has no tasks, set to 100%
             if ($milestone->status === 'completed' && $totalTasks === 0) {
                 $progressPercentage = 100;
             }
-            
+
             return [
                 'id' => $milestone->id,
                 'name' => $milestone->name,
@@ -185,12 +184,12 @@ class ProjectMilestonesController extends Controller
         $completedMilestones = $milestones->where('status', 'completed')->count();
         $inProgressMilestones = $milestones->where('status', 'in_progress')->count();
         $pendingMilestones = $milestones->where('status', 'pending')->count();
-        
+
         // Calculate overall project progress
-        $overallProgress = $totalMilestones > 0 
-            ? round(($completedMilestones / $totalMilestones) * 100, 1) 
+        $overallProgress = $totalMilestones > 0
+            ? round(($completedMilestones / $totalMilestones) * 100, 1)
             : 0;
-        
+
         // Calculate total billing percentage
         $totalBillingPercentage = $milestones->sum('billing_percentage');
 
@@ -231,7 +230,7 @@ class ProjectMilestonesController extends Controller
         ])->render();
 
         // Configure Dompdf options
-        $options = new Options();
+        $options = new Options;
         $options->set('defaultFont', 'Arial');
         $options->set('isRemoteEnabled', true);
         $options->set('isHtml5ParserEnabled', true);

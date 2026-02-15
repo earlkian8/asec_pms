@@ -13,7 +13,9 @@ class ClientCredentialsMail extends Mailable
     use Queueable, SerializesModels;
 
     public $client;
+
     public $password;
+
     public $loginUrl;
 
     /**
@@ -36,7 +38,7 @@ class ClientCredentialsMail extends Mailable
                 config('mail.from.address'),
                 config('mail.from.name')
             ),
-            subject: 'Welcome to ' . config('app.name') . ' - Your Client Portal Credentials',
+            subject: 'Welcome to '.config('app.name').' - Your Client Portal Credentials',
         );
     }
 
@@ -67,4 +69,3 @@ class ClientCredentialsMail extends Mailable
         return [];
     }
 }
-

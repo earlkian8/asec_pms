@@ -68,6 +68,7 @@ class Billing extends Model
         if ($this->billing_amount == 0) {
             return 0;
         }
+
         return ($this->total_paid / $this->billing_amount) * 100;
     }
 
@@ -75,7 +76,7 @@ class Billing extends Model
     public function updateStatus()
     {
         $totalPaid = $this->total_paid;
-        
+
         if ($totalPaid == 0) {
             $this->status = 'unpaid';
         } elseif ($totalPaid >= $this->billing_amount) {
@@ -83,8 +84,7 @@ class Billing extends Model
         } else {
             $this->status = 'partial';
         }
-        
+
         $this->save();
     }
 }
-

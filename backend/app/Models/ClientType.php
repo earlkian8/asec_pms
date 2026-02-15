@@ -24,4 +24,3 @@ class ClientType extends Model
         return $this->hasMany(Client::class, 'client_type_id');
     }
 }
-

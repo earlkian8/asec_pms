@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProgressUpdate;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
-use App\Models\ProgressUpdate;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
@@ -22,8 +21,8 @@ class ProgressUpdatesController extends Controller
     {
         $data = $request->validate([
             'project_task_id' => 'required|exists:project_tasks,id',
-            'description'    => 'required|string',
-            'file'            => 'nullable|file|max:20480', // 20MB max
+            'description' => 'required|string',
+            'file' => 'nullable|file|max:20480', // 20MB max
         ]);
 
         $task = ProjectTask::with('milestone.project')->findOrFail($data['project_task_id']);
@@ -38,9 +37,9 @@ class ProgressUpdatesController extends Controller
             $file = $request->file('file');
             $disk = env('FILESYSTEM_DISK', 'public');
             $directory = "progress_updates/{$task->id}";
-            
+
             $filename = basename($file->store($directory, $disk));
-            $filePath = $directory . '/' . $filename;
+            $filePath = $directory.'/'.$filename;
             $originalName = $file->getClientOriginalName();
             $fileType = $file->getMimeType();
             $fileSize = $file->getSize();
@@ -48,18 +47,18 @@ class ProgressUpdatesController extends Controller
 
         $progressUpdate = ProgressUpdate::create([
             'project_task_id' => $data['project_task_id'],
-            'description'    => $data['description'] ?? null,
-            'file_path'      => $filePath,
-            'original_name'  => $originalName,
-            'file_type'      => $fileType,
-            'file_size'      => $fileSize,
-            'created_by'     => auth()->id(),
+            'description' => $data['description'] ?? null,
+            'file_path' => $filePath,
+            'original_name' => $originalName,
+            'file_type' => $fileType,
+            'file_size' => $fileSize,
+            'created_by' => auth()->id(),
         ]);
 
         $this->adminActivityLogs(
             'Progress Update',
             'Created',
-            'Created progress update for task "' . $task->title . '" in milestone "' . $milestone->name . '"'
+            'Created progress update for task "'.$task->title.'" in milestone "'.$milestone->name.'"'
         );
 
         // Create notification for client
@@ -87,13 +86,13 @@ class ProgressUpdatesController extends Controller
         if ($progressUpdate->project_task_id !== $task->id || $task->project_milestone_id !== $milestone->id) {
             abort(404);
         }
-        
+
         // Load project relationship
         $milestone->load('project');
 
         $data = $request->validate([
             'description' => 'required|string',
-            'file'       => 'nullable|file|max:20480',
+            'file' => 'nullable|file|max:20480',
         ]);
 
         // Handle file update
@@ -107,9 +106,9 @@ class ProgressUpdatesController extends Controller
             $file = $request->file('file');
             $disk = env('FILESYSTEM_DISK', 'public');
             $directory = "progress_updates/{$task->id}";
-            
+
             $filename = basename($file->store($directory, $disk));
-            $data['file_path'] = $directory . '/' . $filename;
+            $data['file_path'] = $directory.'/'.$filename;
             $data['original_name'] = $file->getClientOriginalName();
             $data['file_type'] = $file->getMimeType();
             $data['file_size'] = $file->getSize();
@@ -120,7 +119,7 @@ class ProgressUpdatesController extends Controller
         $this->adminActivityLogs(
             'Progress Update',
             'Updated',
-            'Updated progress update for task "' . $task->title . '" in milestone "' . $milestone->name . '"'
+            'Updated progress update for task "'.$task->title.'" in milestone "'.$milestone->name.'"'
         );
 
         // System-wide notification for progress update
@@ -156,7 +155,7 @@ class ProgressUpdatesController extends Controller
         $this->adminActivityLogs(
             'Progress Update',
             'Deleted',
-            'Deleted progress update for task "' . $task->title . '" in milestone "' . $milestone->name . '"'
+            'Deleted progress update for task "'.$task->title.'" in milestone "'.$milestone->name.'"'
         );
 
         // System-wide notification for progress update deletion
@@ -181,13 +180,13 @@ class ProgressUpdatesController extends Controller
             abort(404);
         }
 
-        if (!$progressUpdate->file_path) {
+        if (! $progressUpdate->file_path) {
             return redirect()->back()->with('error', 'No file attached to this progress update.');
         }
 
         $disk = env('FILESYSTEM_DISK', 'public');
 
-        if (!Storage::disk($disk)->exists($progressUpdate->file_path)) {
+        if (! Storage::disk($disk)->exists($progressUpdate->file_path)) {
             return redirect()->back()->with('error', 'File not found on server.');
         }
 
@@ -195,7 +194,7 @@ class ProgressUpdatesController extends Controller
         $this->adminActivityLogs(
             'Progress Update',
             'Download',
-            'Downloaded file "' . $progressUpdate->original_name . '" from progress update for task "' . $task->title . '"'
+            'Downloaded file "'.$progressUpdate->original_name.'" from progress update for task "'.$task->title.'"'
         );
 
         // Return the file as a download with original name

@@ -24,4 +24,3 @@ class ProjectType extends Model
         return $this->hasMany(Project::class, 'project_type_id');
     }
 }
-

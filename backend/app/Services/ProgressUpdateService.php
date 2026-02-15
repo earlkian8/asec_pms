@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\ProgressUpdate;
 use App\Models\Project;
 use App\Models\ProjectTask;
-use App\Models\ProgressUpdate;
 
 class ProgressUpdateService
 {
@@ -15,7 +15,7 @@ class ProgressUpdateService
         // Get all tasks for this project through milestones
         $tasks = ProjectTask::with([
             'milestone',
-            'assignedUser'
+            'assignedUser',
         ])
             ->whereHas('milestone', function ($query) use ($project) {
                 $query->where('project_id', $project->id);
@@ -27,7 +27,7 @@ class ProgressUpdateService
         foreach ($tasks as $task) {
             $progressUpdates = ProgressUpdate::with([
                 'createdBy',
-                'task.milestone'
+                'task.milestone',
             ])
                 ->where('project_task_id', $task->id)
                 ->when($search, function ($query, $search) {

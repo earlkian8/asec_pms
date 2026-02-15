@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\MessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\Chat;
-use App\Models\Message;
 use App\Models\Client;
-use App\Events\MessageSent;
+use App\Models\Message;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -24,7 +24,7 @@ class ChatController extends Controller
 
         // Validate sort column
         $allowedSortColumns = ['last_message_at', 'client_name', 'created_at'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
+        if (! in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'last_message_at';
         }
 
@@ -35,8 +35,8 @@ class ChatController extends Controller
             ->when($search, function ($query, $search) {
                 return $query->whereHas('client', function ($q) use ($search) {
                     $q->where('client_name', 'like', "%{$search}%")
-                      ->orWhere('client_code', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('client_code', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
                 });
             })
             ->when($sortBy === 'client_name', function ($query) use ($sortOrder) {
@@ -52,6 +52,7 @@ class ChatController extends Controller
         // Add unread count to each chat
         $chats->getCollection()->transform(function ($chat) {
             $chat->unread_count = $chat->unreadMessagesCount();
+
             return $chat;
         });
 
@@ -91,6 +92,7 @@ class ChatController extends Controller
             ->get()
             ->map(function ($c) {
                 $c->unread_count = $c->unreadMessagesCount();
+
                 return $c;
             });
 
@@ -114,7 +116,7 @@ class ChatController extends Controller
         $chat = Chat::findOrFail($chatId);
 
         // Assign chat to current user if not assigned
-        if (!$chat->user_id) {
+        if (! $chat->user_id) {
             $chat->update(['user_id' => $user->id]);
         }
 
@@ -190,4 +192,3 @@ class ChatController extends Controller
         ]);
     }
 }
-

@@ -57,7 +57,132 @@ class PayMongoService
     }
 
     /**
-     * Create a payment intent for a billing
+     * Create a Checkout Session (hosted payment page - like Stripe Checkout)
+     * User is redirected to PayMongo's page to enter card details.
+     */
+    public function createCheckoutSession(
+        float $amount,
+        string $description,
+        array $billing,
+        string $successUrl,
+        string $cancelUrl,
+        array $metadata = []
+    ) {
+        try {
+            $amountInCentavos = (int)($amount * 100);
+
+            $attributes = [
+                'line_items' => [
+                    [
+                        'amount' => $amountInCentavos,
+                        'currency' => 'PHP',
+                        'name' => $description,
+                        'quantity' => 1,
+                        'description' => $description,
+                    ],
+                ],
+                'payment_method_types' => ['card'],
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+            ];
+
+            if (!empty($billing)) {
+                $attributes['billing'] = array_filter([
+                    'name' => $billing['name'] ?? null,
+                    'email' => $billing['email'] ?? null,
+                    'phone' => $billing['phone'] ?? null,
+                ]);
+            }
+
+            if (!empty($metadata)) {
+                $attributes['metadata'] = $this->flattenMetadata($metadata);
+            }
+
+            $response = $this->request('POST', 'checkout_sessions', [
+                'data' => ['attributes' => $attributes],
+            ]);
+
+            if (isset($response['data'])) {
+                $attrs = $response['data']['attributes'] ?? [];
+                return [
+                    'success' => true,
+                    'checkout_session_id' => $response['data']['id'],
+                    'checkout_url' => $attrs['checkout_url'] ?? null,
+                    'data' => $response['data'],
+                ];
+            }
+
+            $errorMessage = $response['errors'][0]['detail'] ?? 'Unknown error';
+            Log::error('PayMongo Checkout Session Creation Failed', [
+                'error' => $errorMessage,
+                'response' => $response,
+                'amount' => $amount,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PayMongo Checkout Session Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'An unexpected error occurred while creating checkout session',
+            ];
+        }
+    }
+
+    /**
+     * Retrieve Checkout Session from PayMongo
+     */
+    public function getCheckoutSession(string $checkoutSessionId)
+    {
+        try {
+            $response = $this->request('GET', "checkout_sessions/{$checkoutSessionId}");
+
+            if (isset($response['data'])) {
+                $attrs = $response['data']['attributes'] ?? [];
+                $payments = $attrs['payments'] ?? [];
+                $status = $attrs['status'] ?? 'unknown';
+                $isPaid = $status === 'paid' || !empty(array_filter($payments, fn ($p) => ($p['attributes']['status'] ?? '') === 'paid'));
+
+                return [
+                    'success' => true,
+                    'data' => $response['data'],
+                    'status' => $status,
+                    'is_paid' => $isPaid,
+                ];
+            }
+
+            $errorMessage = $response['errors'][0]['detail'] ?? 'Unknown error';
+            Log::error('PayMongo Checkout Session Retrieval Failed', [
+                'error' => $errorMessage,
+                'checkout_session_id' => $checkoutSessionId,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PayMongo Get Checkout Session Error', [
+                'error' => $e->getMessage(),
+                'checkout_session_id' => $checkoutSessionId,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'An unexpected error occurred while retrieving checkout session',
+            ];
+        }
+    }
+
+    /**
+     * Create a payment intent for a billing (legacy - used for Source/GCash flow)
      */
     public function createPaymentIntent(float $amount, string $currency = 'PHP', array $metadata = [])
     {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,13 @@ import {
   Modal,
   TextInput,
   Alert,
-  Platform,
+  Linking,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService } from '@/services/api';
 import { Billing } from '@/hooks/useBillings';
-import CardPaymentForm from '@/components/CardPaymentForm';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -29,7 +28,6 @@ import {
   Receipt,
 } from 'lucide-react-native';
 import { useDialog } from '@/contexts/DialogContext';
-import { useAuth } from '@/contexts/AuthContext';
 
 import { AppColors } from '@/constants/colors';
 import { formatCurrency } from '@/utils/formatCurrency';
@@ -39,21 +37,13 @@ export default function BillingDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
-  const { user } = useAuth();
 
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [show3DSecureModal, setShow3DSecureModal] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'checking' | 'processing_card'>('idle');
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [clientKey, setClientKey] = useState<string | null>(null);
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [threeDSecureUrl, setThreeDSecureUrl] = useState<string | null>(null);
-  const [cardFormError, setCardFormError] = useState<string | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [amountTouched, setAmountTouched] = useState(false);
   const [showPaymentDetailModal, setShowPaymentDetailModal] = useState(false);
@@ -63,37 +53,18 @@ export default function BillingDetailScreen() {
     fetchBilling();
   }, [id]);
 
-  useEffect(() => {
-    // Poll payment status if there's a pending or checking payment
-    if ((paymentStatus === 'pending' || paymentStatus === 'checking') && id) {
-      const interval = setInterval(() => {
-        checkPaymentStatus();
-      }, 3000); // Check every 3 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [paymentStatus, id]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchBilling();
+    }, [id])
+  );
 
   useEffect(() => {
-    // Reset all payment state when modal closes
     if (!showPaymentModal) {
-      console.log('Modal closed, resetting payment state');
-      setPaymentIntentId(null);
-      setClientKey(null);
-      setPublicKey(null);
-      setCardFormError(null);
       setCustomAmount('');
       setAmountError(null);
       setAmountTouched(false);
-      setPaymentStatus('idle');
       setProcessing(false);
-      setThreeDSecureUrl(null);
-    } else {
-      console.log('Modal opened, current state:', {
-        paymentIntentId,
-        paymentStatus,
-        processing,
-      });
     }
   }, [showPaymentModal]);
 
@@ -111,76 +82,6 @@ export default function BillingDetailScreen() {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const checkPaymentStatus = async (retryCount = 0) => {
-    if (!id) return;
-
-    try {
-      const response = await apiService.checkPaymentStatus(Number(id));
-      
-      if (response.success && response.data) {
-        const status = response.data.status;
-        
-        if (status === 'paid') {
-          // Backend confirmed payment is paid - safe to show success
-          setPaymentStatus('idle');
-          setShowPaymentModal(false);
-          dialog.showSuccess('Payment completed successfully!', 'Payment Success');
-          fetchBilling(); // Refresh billing data
-          router.replace(`/billing-detail?id=${id}`); // Refresh the page
-        } else if (status === 'failed' || status === 'cancelled') {
-          // Payment failed or was cancelled
-          setPaymentStatus('idle');
-          setShowPaymentModal(false);
-          const errorMsg = status === 'failed' 
-            ? 'Payment failed. Please try again or use a different payment method.'
-            : 'Payment was cancelled. Please try again if you wish to proceed.';
-          dialog.showError(errorMsg, 'Payment Failed');
-        } else if (status === 'pending') {
-          // Still pending - continue checking with exponential backoff (max 5 retries)
-          if (retryCount < 5) {
-            setPaymentStatus('checking');
-            const delay = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s, 10s, 10s
-            setTimeout(async () => {
-              await checkPaymentStatus(retryCount + 1);
-            }, delay);
-          } else {
-            // Max retries reached - show message but keep checking
-            console.warn('Max retries reached for payment status check, payment still pending');
-            setPaymentStatus('checking');
-            // Continue checking but with longer intervals
-            setTimeout(async () => {
-              await checkPaymentStatus(0); // Reset retry count for extended checking
-            }, 10000);
-          }
-        } else if (status === 'no_pending_payment') {
-          // No pending payment found - might already be paid or doesn't exist
-          setPaymentStatus('idle');
-          fetchBilling(); // Refresh to see current state
-        }
-      } else {
-        // API call succeeded but no data - log and retry
-        console.warn('Payment status check returned no data, retrying...');
-        if (retryCount < 3) {
-          setTimeout(async () => {
-            await checkPaymentStatus(retryCount + 1);
-          }, 2000);
-        }
-      }
-    } catch (err) {
-      console.error('Error checking payment status:', err);
-      // Retry on error (network issues, etc.) - but limit retries
-      if (retryCount < 3) {
-        setTimeout(async () => {
-          await checkPaymentStatus(retryCount + 1);
-        }, 2000);
-      } else {
-        // Max retries reached - show error
-        setPaymentStatus('idle');
-        dialog.showError('Unable to verify payment status. Please check your connection and try again.', 'Status Check Failed');
-      }
     }
   };
 
@@ -236,15 +137,11 @@ export default function BillingDetailScreen() {
   };
 
   const handleInitiatePayment = async () => {
-    console.log('handleInitiatePayment called');
-    
     if (!billing) {
-      console.error('Billing is null, cannot initiate payment');
       dialog.showError('Billing information not available. Please refresh the page.');
       return;
     }
 
-    // Validate amount before proceeding
     if (customAmount && customAmount.trim() !== '') {
       const validationError = validateAmount(customAmount);
       if (validationError) {
@@ -256,10 +153,8 @@ export default function BillingDetailScreen() {
     }
 
     const amount = customAmount ? parseFloat(customAmount) : billing.remaining_amount;
-    console.log('Payment amount:', amount);
 
     if (isNaN(amount) || amount <= 0) {
-      console.error('Invalid amount:', amount);
       const errorMsg = 'Please enter a valid amount';
       setAmountError(errorMsg);
       setAmountTouched(true);
@@ -268,7 +163,6 @@ export default function BillingDetailScreen() {
     }
 
     if (amount > billing.remaining_amount) {
-      console.error('Amount exceeds remaining:', amount, '>', billing.remaining_amount);
       const errorMsg = `Amount cannot exceed remaining amount of ${formatCurrency(billing.remaining_amount)}`;
       setAmountError(errorMsg);
       setAmountTouched(true);
@@ -277,325 +171,41 @@ export default function BillingDetailScreen() {
     }
 
     setProcessing(true);
-    setCardFormError(null);
 
     try {
-      console.log('Creating payment intent for billing:', id, 'amount:', amount);
-      
-      // Step 1: Create Payment Intent on backend
-      const response = await apiService.initiatePayment(Number(id), {
-        amount,
-        payment_method_type: 'card',
-      });
-
-      console.log('Payment intent response:', response);
+      const response = await apiService.initiatePayment(Number(id), { amount });
 
       if (!response.success) {
-        // Extract error message from API response
         let errorMessage = response.message || 'Failed to initiate payment';
-        
-        // Parse error message to make it more user-friendly
-        if (errorMessage.includes('amount cannot be greater than 999999999')) {
+        if (errorMessage.includes('amount') || errorMessage.includes('999999999')) {
           errorMessage = 'Payment amount exceeds the maximum limit. Maximum payment amount is ₱9,999,999.99. Please contact support for larger payments.';
-          // Also set it as an amount error to highlight the input field
-          setAmountError(errorMessage);
-          setAmountTouched(true);
-        } else if (errorMessage.includes('amount')) {
-          // Extract the specific amount-related error
-          errorMessage = `Payment amount error: ${errorMessage.replace(/Failed to create payment intent: /gi, '')}`;
           setAmountError(errorMessage);
           setAmountTouched(true);
         }
-        
-        console.error('Payment intent creation failed:', errorMessage, response);
         dialog.showError(errorMessage);
         setProcessing(false);
         return;
       }
 
-      if (response.success && response.data) {
-        const { payment_intent_id, client_key, public_key } = response.data;
-
-        console.log('Payment intent created:', {
-          payment_intent_id,
-          has_client_key: !!client_key,
-          has_public_key: !!public_key,
-        });
-
-        if (!payment_intent_id || !client_key || !public_key) {
-          console.error('Missing payment intent data:', {
-            payment_intent_id,
-            client_key,
-            public_key,
-          });
-          const errorMsg = 'Failed to initialize payment. Missing required payment information. Please try again.';
-          dialog.showError(errorMsg);
-          setProcessing(false);
-          return;
-        }
-
-        // Store payment intent details
-        setPaymentIntentId(payment_intent_id);
-        setClientKey(client_key);
-        setPublicKey(public_key);
-
-        console.log('Payment intent initialized successfully, showing card form');
-        
-        // Clear any previous amount errors since payment intent was created successfully
-        setAmountError(null);
-        
-        // Payment form will be shown in modal, user will enter card details
-        setPaymentStatus('idle');
-        setProcessing(false);
-      } else {
-        const errorMessage = response.message || 'Failed to initiate payment';
-        console.error('Payment intent creation failed:', errorMessage, response);
-        dialog.showError(errorMessage);
-        setProcessing(false);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      console.error('Error in handleInitiatePayment:', err);
-      
-      // Try to parse error message if it contains amount-related information
-      let displayMessage = errorMessage;
-      if (errorMessage.includes('amount') || errorMessage.includes('999999999')) {
-        displayMessage = 'Payment amount exceeds the maximum limit. Maximum payment amount is ₱9,999,999.99. Please contact support for larger payments.';
-        setAmountError(displayMessage);
-        setAmountTouched(true);
-      }
-      
-      dialog.showError(`Payment initialization failed: ${displayMessage}. Please try again.`);
-      setProcessing(false);
-    }
-  };
-
-  const handleCardSubmit = async (cardData: {
-    cardNumber: string;
-    expMonth: number;
-    expYear: number;
-    cvc: string;
-    cardholderName: string;
-    name: string;
-    phone: string;
-  }) => {
-    console.log('handleCardSubmit called');
-    console.log('Card data received (masked):', {
-      cardNumber: `${cardData.cardNumber.slice(0, 4)}****${cardData.cardNumber.slice(-4)}`,
-      expMonth: cardData.expMonth,
-      expYear: cardData.expYear,
-      cvc: '***',
-      cardholderName: cardData.cardholderName,
-    });
-
-    if (!billing || !paymentIntentId || !clientKey || !publicKey) {
-      console.error('handleCardSubmit: Missing required data:', {
-        hasBilling: !!billing,
-        paymentIntentId,
-        clientKey,
-        publicKey,
-      });
-      dialog.showError('Payment not initialized. Please try again.');
-      return;
-    }
-
-    console.log('handleCardSubmit: All required data present, proceeding with payment');
-    setProcessing(true);
-    setCardFormError(null);
-
-    try {
-      // Step 2: Create Payment Method via Backend API
-      console.log('Step 2: Creating payment method via backend...');
-      
-      if (!billing?.id) {
-        console.error('Billing ID not available');
-        setCardFormError('Billing information is missing. Please refresh and try again.');
-        setProcessing(false);
-        return;
-      }
-
-      const paymentMethodResult = await apiService.createPaymentMethod(
-        billing.id,
-        {
-          cardNumber: cardData.cardNumber,
-          expMonth: cardData.expMonth,
-          expYear: cardData.expYear,
-          cvc: cardData.cvc,
-          cardholderName: cardData.cardholderName,
-          name: cardData.name,
-          phone: cardData.phone,
-        }
-      );
-
-      console.log('Payment method creation result:', {
-        success: paymentMethodResult.success,
-        hasData: !!paymentMethodResult.data,
-        error: paymentMethodResult.message,
-        paymentMethodId: paymentMethodResult.data?.payment_method_id,
-      });
-
-      if (!paymentMethodResult.success || !paymentMethodResult.data?.payment_method_id) {
-        const errorMsg = paymentMethodResult.message || 'Failed to process card details';
-        console.error('Payment method creation failed:', errorMsg);
-        setCardFormError(errorMsg);
-        setProcessing(false);
-        return;
-      }
-
-      const paymentMethodId = paymentMethodResult.data.payment_method_id;
-      console.log('Payment method created successfully:', paymentMethodId);
-
-      // Step 3: Attach Payment Method to Payment Intent (via backend - uses server's return_url for live 3DS)
-      console.log('Step 3: Attaching payment method via backend...');
-
-      const attachResult = await apiService.attachPaymentMethod(
-        billing.id,
-        paymentMethodId,
-        paymentIntentId
-      );
-
-      console.log('Payment method attachment result:', {
-        success: attachResult.success,
-        hasData: !!attachResult.data,
-        message: attachResult.message,
-        status: attachResult.data?.attributes?.status,
-        hasNextAction: !!attachResult.data?.attributes?.next_action,
-      });
-
-      if (!attachResult.success || !attachResult.data) {
-        const errorMsg = attachResult.message || 'Failed to process payment';
-        console.error('Payment method attachment failed:', errorMsg);
-        setCardFormError(errorMsg);
-        setProcessing(false);
-        return;
-      }
-
-      // Handle payment status directly from attachment result
-      // PayMongo completes payment when attachment succeeds - no separate confirmation needed
-      const status = attachResult.data.attributes?.status;
-      const nextAction = attachResult.data.attributes?.next_action;
-
-      // Log full nextAction object for debugging
-      console.log('Full nextAction object after attachment:', JSON.stringify(nextAction, null, 2));
-
-      // Extract redirect URL - only use if next_action.type === 'redirect' AND redirect.url exists
-      const redirectUrl = (nextAction?.type === 'redirect' && nextAction?.redirect?.url) 
-        ? nextAction.redirect.url 
-        : null;
-
-      console.log('Handling payment status after attachment:', {
-        status,
-        hasNextAction: !!nextAction,
-        nextActionType: nextAction?.type,
-        redirectUrl,
-        nextActionKeys: nextAction ? Object.keys(nextAction) : [],
-      });
-
-      // Handle payment status based on attachment result
-      // CRITICAL: Always verify with backend before showing success to ensure data integrity
-      if (status === 'succeeded') {
-        console.log('Payment attachment returned succeeded - verifying with backend before confirming...');
-        // Don't show success yet - verify with backend first
-        // Backend will only mark as 'paid' if PayMongo confirms 'succeeded'
-        setPaymentStatus('checking');
+      if (response.success && response.data?.checkout_url) {
         setShowPaymentModal(false);
-        // Check immediately to verify payment status with backend
-        setTimeout(async () => {
-          await checkPaymentStatus();
-        }, 1000);
-      } else if (status === 'awaiting_next_action') {
-        // Only redirect if next_action.type === 'redirect' AND redirect.url !== null
-        if (nextAction?.type === 'redirect' && redirectUrl) {
-          console.log('3D Secure required, opening WebView:', redirectUrl);
-          // 3D Secure required - redirect URL is available
-          setThreeDSecureUrl(redirectUrl);
-          setShow3DSecureModal(true);
-          setPaymentStatus('pending');
+        const canOpen = await Linking.canOpenURL(response.data.checkout_url);
+        if (canOpen) {
+          await Linking.openURL(response.data.checkout_url);
+          dialog.showSuccess('You will be redirected to complete payment. Return here when done.', 'Payment');
         } else {
-          // redirect.url is null - PayMongo did not provide 3DS challenge URL (often due to invalid return_url)
-          console.error('awaiting_next_action but redirect.url is null or invalid. PayMongo rejected payment setup.');
-          console.error('nextAction:', JSON.stringify(nextAction, null, 2));
-          
-          const errorMsg = '3D Secure redirect URL was not provided. Please ensure the payment return URL is configured correctly. Contact support if this persists.';
-          setCardFormError(errorMsg);
-          dialog.showError(errorMsg, 'Payment Setup Failed');
-          setProcessing(false);
-          
-          // Reset payment intent state to allow retry
-          setPaymentIntentId(null);
-          setClientKey(null);
-          setPublicKey(null);
+          dialog.showError('Unable to open payment page. Please try again.');
         }
-      } else if (status === 'processing' || status === 'awaiting_capture') {
-        console.log(`Payment is ${status} after attachment, will check status with backend`);
-        // Payment is processing or awaiting capture - check status with backend
-        setPaymentStatus('checking');
-        setShowPaymentModal(false);
-        // Use exponential backoff for processing status (2s, then 4s, then 8s max)
-        setTimeout(async () => {
-          await checkPaymentStatus();
-        }, 2000);
-      } else if (status === 'awaiting_payment_method') {
-        // Payment method issue - show specific error
-        const errorMsg = 'Payment method validation failed. Please check your card details and try again.';
-        console.error('Payment method validation failed:', status);
-        setCardFormError(errorMsg);
-        dialog.showError(errorMsg, 'Payment Method Error');
-        setProcessing(false);
-      } else if (status === 'failed' || status === 'cancelled' || status === 'void') {
-        // Payment failed or was cancelled/voided
-        const errorMsg = status === 'failed' 
-          ? 'Payment failed. Please try again or use a different payment method.'
-          : 'Payment was cancelled. Please try again if you wish to proceed.';
-        console.error(`Payment ${status} after attachment`);
-        setCardFormError(errorMsg);
-        dialog.showError(errorMsg, 'Payment Failed');
-        setProcessing(false);
-        setPaymentStatus('idle');
       } else {
-        // Unknown or unhandled status
-        const errorMsg = `Payment status is unclear (${status}). Please check your payment status or contact support.`;
-        console.error('Unexpected payment status after attachment:', status);
-        setCardFormError(errorMsg);
-        dialog.showError(errorMsg, 'Payment Status Unknown');
-        setProcessing(false);
-        // Set to checking to allow backend to determine actual status
-        setPaymentStatus('checking');
-        setTimeout(async () => {
-          await checkPaymentStatus();
-        }, 2000);
+        dialog.showError(response.message || 'Failed to get payment link.');
       }
+      setProcessing(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      console.error('Error in handleCardSubmit:', err);
-      console.error('Error details:', {
-        message: errorMessage,
-        stack: err instanceof Error ? err.stack : undefined,
-      });
-      setCardFormError(`Payment processing failed: ${errorMessage}. Please try again.`);
-      dialog.showError(`Payment processing failed: ${errorMessage}`);
+      dialog.showError(`Payment failed: ${errorMessage}. Please try again.`);
       setProcessing(false);
     }
   };
-
-  const handle3DSecureNavigation = (navState: any) => {
-    // Check if we've been redirected back (3D Secure complete)
-    // PayMongo redirects to our return URL after authentication
-    const url = navState.url;
-    
-    // Close WebView and check payment status when we land on return/success/failed
-    if (url && (url.includes('payment/return') || url.includes('return_url') || url.includes('success') || url.includes('failed'))) {
-      setShow3DSecureModal(false);
-      setThreeDSecureUrl(null);
-      setPaymentStatus('checking');
-      
-      // Wait a moment for backend to process, then check status
-      setTimeout(async () => {
-        await checkPaymentStatus();
-      }, 2000);
-    }
-  };
-
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -810,32 +420,13 @@ export default function BillingDetailScreen() {
             style={[
               styles.payButton,
               {
-                backgroundColor: processing || paymentStatus !== 'idle' 
-                  ? AppColors.textSecondary 
-                  : AppColors.primary,
-                opacity: processing || paymentStatus !== 'idle' ? 0.6 : 1,
+                backgroundColor: processing ? AppColors.textSecondary : AppColors.primary,
+                opacity: processing ? 0.6 : 1,
               }
             ]}
-            onPress={() => {
-              console.log('Pay Now button clicked');
-              console.log('Current state:', {
-                processing,
-                paymentStatus,
-                showPaymentModal,
-                billingId: id,
-                remainingAmount: billing.remaining_amount,
-              });
-              
-              if (processing || paymentStatus !== 'idle') {
-                console.warn('Button click ignored - button is disabled');
-                return;
-              }
-              
-              setShowPaymentModal(true);
-              console.log('Modal should now be open');
-            }}
-            disabled={processing || paymentStatus !== 'idle'}>
-            {processing || paymentStatus !== 'idle' ? (
+            onPress={() => setShowPaymentModal(true)}
+            disabled={processing}>
+            {processing ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <>
@@ -852,263 +443,100 @@ export default function BillingDetailScreen() {
         visible={showPaymentModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => {
-          if (paymentStatus === 'idle') {
-            setShowPaymentModal(false);
-          }
-        }}>
+        onRequestClose={() => setShowPaymentModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: AppColors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: AppColors.text }]}>Pay Billing</Text>
-              {paymentStatus === 'idle' && (
-                <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
-                  <XCircle size={24} color={AppColors.text} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                <XCircle size={24} color={AppColors.text} />
+              </TouchableOpacity>
             </View>
 
-            {paymentStatus === 'pending' ? (
-              <View style={styles.paymentPendingContainer}>
-                <Clock size={48} color={AppColors.warning} />
-                <Text style={[styles.paymentPendingText, { color: AppColors.text }]}>
-                  Processing Payment...
-                </Text>
-                <Text style={[styles.paymentPendingSubtext, { color: AppColors.textSecondary }]}>
-                  Please wait while we process your payment.
-                </Text>
-                <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
-              </View>
-            ) : paymentStatus === 'checking' ? (
-              <View style={styles.paymentPendingContainer}>
-                <Clock size={48} color={AppColors.primary} />
-                <Text style={[styles.paymentPendingText, { color: AppColors.text }]}>
-                  Verifying Payment...
-                </Text>
-                <Text style={[styles.paymentPendingSubtext, { color: AppColors.textSecondary }]}>
-                  Please wait while we verify your payment status.
-                </Text>
-                <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
-              </View>
-            ) : paymentStatus === 'processing_card' ? (
-              <View style={styles.paymentPendingContainer}>
-                <Clock size={48} color={AppColors.primary} />
-                <Text style={[styles.paymentPendingText, { color: AppColors.text }]}>
-                  Processing Card Payment...
-                </Text>
-                <Text style={[styles.paymentPendingSubtext, { color: AppColors.textSecondary }]}>
-                  Please wait while we process your card details.
-                </Text>
-                <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
-              </View>
-            ) : (
-              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                {/* Step Indicators */}
-                <View style={styles.stepIndicatorContainer}>
-                  <View style={styles.stepIndicator}>
-                    <View style={[styles.stepCircle, { backgroundColor: !paymentIntentId ? AppColors.primary : AppColors.success }]}>
-                      {!paymentIntentId ? (
-                        <Text style={styles.stepNumber}>1</Text>
-                      ) : (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                      )}
-                    </View>
-                    <Text style={[styles.stepLabel, { color: !paymentIntentId ? AppColors.text : AppColors.textSecondary }]}>
-                      Amount
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <View style={[styles.amountCard, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
+                <View style={styles.amountCardHeader}>
+                  <View style={styles.amountCardHeaderLeft}>
+                    <Text style={[styles.amountCardLabel, { color: AppColors.textSecondary }]}>
+                      Remaining Balance
+                    </Text>
+                    <Text style={[styles.amountCardValue, { color: AppColors.text }]}>
+                      {formatCurrency(billing.remaining_amount)}
                     </Text>
                   </View>
-                  <View style={[styles.stepLine, { backgroundColor: !paymentIntentId ? AppColors.border : AppColors.primary }]} />
-                  <View style={styles.stepIndicator}>
-                    <View style={[styles.stepCircle, { backgroundColor: paymentIntentId ? AppColors.primary : AppColors.border }]}>
-                      <Text style={[styles.stepNumber, { color: paymentIntentId ? '#FFFFFF' : AppColors.textSecondary }]}>2</Text>
-                    </View>
-                    <Text style={[styles.stepLabel, { color: paymentIntentId ? AppColors.text : AppColors.textSecondary }]}>
-                      Payment
-                    </Text>
+                  <View style={[styles.amountBadge, { backgroundColor: `${AppColors.primary}15` }]}>
+                    <Text style={[styles.amountBadgeText, { color: AppColors.primary }]}>Due</Text>
                   </View>
                 </View>
 
-                {!paymentIntentId ? (
-                  <>
-                    {/* Step 1: Amount Section */}
-                    <View style={[styles.amountCard, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
-                      <View style={styles.amountCardHeader}>
-                        <View style={styles.amountCardHeaderLeft}>
-                          <Text style={[styles.amountCardLabel, { color: AppColors.textSecondary }]}>
-                            Remaining Balance
-                          </Text>
-                          <Text style={[styles.amountCardValue, { color: AppColors.text }]}>
-                            {formatCurrency(billing.remaining_amount)}
-                          </Text>
-                        </View>
-                        <View style={[styles.amountBadge, { backgroundColor: `${AppColors.primary}15` }]}>
-                          <Text style={[styles.amountBadgeText, { color: AppColors.primary }]}>
-                            Due
-                          </Text>
-                        </View>
-                      </View>
+                <View style={[styles.divider, { backgroundColor: AppColors.border, marginVertical: 20 }]} />
 
-                      <View style={[styles.divider, { backgroundColor: AppColors.border, marginVertical: 20 }]} />
-
-                      <View>
-                        <Text style={[styles.customAmountLabel, { color: AppColors.text, marginBottom: 4 }]}>
-                          Enter Amount to Pay
-                        </Text>
-                        <Text style={[styles.customAmountHint, { color: AppColors.textSecondary, marginBottom: 8 }]}>
-                          Leave empty to pay the full remaining balance
-                        </Text>
-                        <View style={[styles.maxAmountInfo, { backgroundColor: `${AppColors.warning}10`, borderColor: `${AppColors.warning}30` }]}>
-                          <Ionicons name="information-circle-outline" size={16} color={AppColors.warning} />
-                          <Text style={[styles.maxAmountText, { color: AppColors.textSecondary }]}>
-                            Maximum amount per transaction: <Text style={{ fontWeight: '700', color: AppColors.text }}>{formatCurrency(9999999.99)}</Text>
-                          </Text>
-                        </View>
-                        <View style={styles.amountInputWrapper}>
-                          <Text style={[styles.amountInputPrefix, { color: AppColors.textSecondary }]}>₱</Text>
-                          <TextInput
-                            style={[
-                              styles.customAmountInput,
-                              {
-                                backgroundColor: AppColors.card,
-                                borderColor: amountError ? AppColors.error : AppColors.border,
-                                borderWidth: amountError ? 2 : 1,
-                                color: AppColors.text,
-                              },
-                            ]}
-                            placeholder="0.00"
-                            placeholderTextColor={AppColors.textSecondary}
-                            value={customAmount}
-                            onChangeText={handleAmountChange}
-                            onBlur={() => setAmountTouched(true)}
-                            keyboardType="decimal-pad"
-                            editable={!paymentIntentId}
-                          />
-                        </View>
-                        {amountError && amountTouched && (
-                          <View style={styles.errorContainer}>
-                            <Ionicons name="alert-circle" size={16} color={AppColors.error} />
-                            <Text style={[styles.errorText, { color: AppColors.error, marginLeft: 6 }]}>
-                              {amountError}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
+                <View>
+                  <Text style={[styles.customAmountLabel, { color: AppColors.text, marginBottom: 4 }]}>
+                    Enter Amount to Pay
+                  </Text>
+                  <Text style={[styles.customAmountHint, { color: AppColors.textSecondary, marginBottom: 8 }]}>
+                    Leave empty to pay the full remaining balance
+                  </Text>
+                  <View style={[styles.maxAmountInfo, { backgroundColor: `${AppColors.warning}10`, borderColor: `${AppColors.warning}30` }]}>
+                    <Ionicons name="information-circle-outline" size={16} color={AppColors.warning} />
+                    <Text style={[styles.maxAmountText, { color: AppColors.textSecondary }]}>
+                      Maximum amount per transaction: <Text style={{ fontWeight: '700', color: AppColors.text }}>{formatCurrency(9999999.99)}</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.amountInputWrapper}>
+                    <Text style={[styles.amountInputPrefix, { color: AppColors.textSecondary }]}>₱</Text>
+                    <TextInput
                       style={[
-                        styles.confirmButton,
+                        styles.customAmountInput,
                         {
-                          backgroundColor: processing || amountError ? AppColors.textSecondary : AppColors.primary,
-                          opacity: processing || amountError ? 0.6 : 1,
-                        }
+                          backgroundColor: AppColors.card,
+                          borderColor: amountError ? AppColors.error : AppColors.border,
+                          borderWidth: amountError ? 2 : 1,
+                          color: AppColors.text,
+                        },
                       ]}
-                      onPress={() => {
-                        console.log('Continue to Payment button clicked');
-                        console.log('Button state:', { 
-                          processing, 
-                          paymentIntentId,
-                          billing: !!billing,
-                          amount: customAmount || billing?.remaining_amount,
-                          amountError,
-                        });
-                        
-                        if (processing || amountError) {
-                          console.warn('Button click ignored - already processing or validation error');
-                          return;
-                        }
-                        
-                        handleInitiatePayment();
-                      }}
-                      disabled={processing || !!amountError}>
-                      {processing ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Text style={styles.confirmButtonText}>Continue to Payment Details</Text>
-                          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    {/* Step 2: Payment Details Section */}
-                    <View style={[styles.paymentDetailsCard, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
-                      <View style={styles.paymentDetailsHeader}>
-                        <View style={styles.paymentDetailsHeaderLeft}>
-                          <CreditCard size={20} color={AppColors.primary} />
-                          <Text style={[styles.paymentDetailsTitle, { color: AppColors.text }]}>
-                            Payment Details
-                          </Text>
-                        </View>
-                        <View style={[styles.securityBadge, { backgroundColor: `${AppColors.success}15` }]}>
-                          <Ionicons name="lock-closed" size={14} color={AppColors.success} />
-                          <Text style={[styles.securityBadgeText, { color: AppColors.success }]}>
-                            Secure
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={[styles.paymentDetailsSubtitle, { color: AppColors.textSecondary }]}>
-                        Enter your card information to complete the payment
+                      placeholder="0.00"
+                      placeholderTextColor={AppColors.textSecondary}
+                      value={customAmount}
+                      onChangeText={handleAmountChange}
+                      onBlur={() => setAmountTouched(true)}
+                      keyboardType="decimal-pad"
+                      editable={!processing}
+                    />
+                  </View>
+                  {amountError && amountTouched && (
+                    <View style={styles.errorContainer}>
+                      <Ionicons name="alert-circle" size={16} color={AppColors.error} />
+                      <Text style={[styles.errorText, { color: AppColors.error, marginLeft: 6 }]}>
+                        {amountError}
                       </Text>
                     </View>
+                  )}
+                </View>
+              </View>
 
-                    <CardPaymentForm
-                      initialPhone={user?.phone_number || ''}
-                      initialName={user?.name || ''}
-                      onSubmit={handleCardSubmit}
-                      onCancel={() => {
-                        setPaymentIntentId(null);
-                        setClientKey(null);
-                        setPublicKey(null);
-                        setCardFormError(null);
-                      }}
-                      loading={processing}
-                      error={cardFormError || undefined}
-                    />
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  {
+                    backgroundColor: processing || amountError ? AppColors.textSecondary : AppColors.primary,
+                    opacity: processing || amountError ? 0.6 : 1,
+                  }
+                ]}
+                onPress={handleInitiatePayment}
+                disabled={processing || !!amountError}>
+                {processing ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <CreditCard size={20} color="#FFFFFF" />
+                    <Text style={[styles.confirmButtonText, { marginLeft: 8 }]}>Pay with Card</Text>
                   </>
                 )}
-              </ScrollView>
-            )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
-      </Modal>
-
-      {/* 3D Secure Modal */}
-      <Modal
-        visible={show3DSecureModal}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => {
-          // Don't allow closing during 3D Secure
-        }}>
-        <View style={styles.webViewContainer}>
-          <View style={styles.webViewHeader}>
-            <Text style={[styles.webViewTitle, { color: AppColors.text }]}>Complete Authentication</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShow3DSecureModal(false);
-                setThreeDSecureUrl(null);
-                setPaymentStatus('idle');
-                dialog.showError('3D Secure authentication was cancelled');
-              }}>
-              <XCircle size={24} color={AppColors.text} />
-            </TouchableOpacity>
-          </View>
-          {threeDSecureUrl && (
-            <WebView
-              source={{ uri: threeDSecureUrl }}
-              onNavigationStateChange={handle3DSecureNavigation}
-              style={styles.webView}
-              startInLoadingState={true}
-              renderLoading={() => (
-                <View style={styles.webViewLoading}>
-                  <ActivityIndicator size="large" color={AppColors.primary} />
-                </View>
-              )}
-            />
-          )}
         </View>
       </Modal>
 

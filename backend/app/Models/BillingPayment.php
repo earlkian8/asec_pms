@@ -19,6 +19,7 @@ class BillingPayment extends Model
         'notes',
         'created_by',
         'paymongo_payment_intent_id',
+        'paymongo_checkout_session_id',
         'paymongo_payment_method_id',
         'payment_status',
         'paymongo_source_id',

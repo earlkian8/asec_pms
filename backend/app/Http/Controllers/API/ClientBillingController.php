@@ -483,6 +483,76 @@ class ClientBillingController extends Controller
     }
 
     /**
+     * Attach payment method to payment intent (server-side)
+     * Uses backend's return_url from config - fixes redirect.url null in live mode.
+     * PayMongo requires a valid return_url for 3D Secure; client-side URL can be wrong.
+     */
+    public function attachPaymentMethod(Request $request, $id)
+    {
+        if (!is_numeric($id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid billing ID',
+            ], 400);
+        }
+
+        $client = $request->user();
+        $billing = Billing::with('project')->findOrFail($id);
+
+        if ($billing->project->client_id !== $client->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to this billing',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'payment_method_id' => ['required', 'string'],
+            'payment_intent_id' => ['required', 'string'],
+        ]);
+
+        $paymentMethodId = $validated['payment_method_id'];
+        $paymentIntentId = $validated['payment_intent_id'];
+
+        $payment = BillingPayment::where('billing_id', $billing->id)
+            ->where('paymongo_payment_intent_id', $paymentIntentId)
+            ->first();
+        $paymentCode = $payment?->payment_code ?? '';
+
+        // Use backend config for return_url - guaranteed correct in production
+        $baseReturnUrl = config('services.paymongo.return_url')
+            ?? rtrim(config('app.url'), '/') . '/api/client/payment/return';
+        $returnUrl = $baseReturnUrl . '?payment_intent_id=' . urlencode($paymentIntentId) . '&payment_code=' . urlencode($paymentCode);
+
+        try {
+            $result = $this->payMongoService->attachPaymentMethod($paymentIntentId, $paymentMethodId, $returnUrl);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['error'] ?? 'Failed to attach payment method',
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $result['data'],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Attach Payment Method Failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'billing_id' => $billing->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while attaching payment method',
+            ], 500);
+        }
+    }
+
+    /**
      * Confirm payment intent (DEPRECATED - Not needed for PayMongo)
      * 
      * @deprecated This endpoint is deprecated. PayMongo does not require a separate confirmation step.

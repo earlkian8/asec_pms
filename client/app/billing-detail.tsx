@@ -15,7 +15,6 @@ import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService } from '@/services/api';
-import { paymongoClient } from '@/services/paymongoClient';
 import { Billing } from '@/hooks/useBillings';
 import CardPaymentForm from '@/components/CardPaymentForm';
 import { Ionicons } from '@expo/vector-icons';
@@ -339,7 +338,6 @@ export default function BillingDetailScreen() {
         setPaymentIntentId(payment_intent_id);
         setClientKey(client_key);
         setPublicKey(public_key);
-        paymongoClient.setPublicKey(public_key);
 
         console.log('Payment intent initialized successfully, showing card form');
         
@@ -447,44 +445,25 @@ export default function BillingDetailScreen() {
       const paymentMethodId = paymentMethodResult.data.payment_method_id;
       console.log('Payment method created successfully:', paymentMethodId);
 
-      // Step 3: Attach Payment Method to Payment Intent
-      console.log('Step 3: Attaching payment method to payment intent...');
-      
-      // Generate return URL for 3D Secure redirect
-      // PayMongo requires HTTPS public URL for live keys (not localhost or local IP)
-      // Use environment variable for public HTTPS URL, or fallback to API base URL
-      const PAYMONGO_RETURN_URL = process.env.EXPO_PUBLIC_PAYMONGO_RETURN_URL;
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-inqqb.ondigitalocean.app/api';
-      
-      // Use configured return URL if available, otherwise construct from API base URL
-      const baseReturnUrl = PAYMONGO_RETURN_URL || `${API_BASE_URL}/client/payment/return`;
-      const returnUrl = `${baseReturnUrl}?payment_intent_id=${paymentIntentId}&payment_code=${billing?.payments?.[0]?.payment_code || ''}`;
-      console.log('Return URL generated:', returnUrl);
-      
-      console.log('Attachment details:', {
-        paymentIntentId,
-        paymentMethodId,
-        hasClientKey: !!clientKey,
-        returnUrl,
-      });
+      // Step 3: Attach Payment Method to Payment Intent (via backend - uses server's return_url for live 3DS)
+      console.log('Step 3: Attaching payment method via backend...');
 
-      const attachResult = await paymongoClient.attachPaymentMethod(
-        paymentIntentId,
+      const attachResult = await apiService.attachPaymentMethod(
+        billing.id,
         paymentMethodId,
-        clientKey,
-        returnUrl
+        paymentIntentId
       );
 
       console.log('Payment method attachment result:', {
         success: attachResult.success,
         hasData: !!attachResult.data,
-        error: attachResult.error,
+        message: attachResult.message,
         status: attachResult.data?.attributes?.status,
         hasNextAction: !!attachResult.data?.attributes?.next_action,
       });
 
       if (!attachResult.success || !attachResult.data) {
-        const errorMsg = attachResult.error || 'Failed to process payment';
+        const errorMsg = attachResult.message || 'Failed to process payment';
         console.error('Payment method attachment failed:', errorMsg);
         setCardFormError(errorMsg);
         setProcessing(false);

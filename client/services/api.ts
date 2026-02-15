@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
 // export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
 interface ApiResponse<T> {
   success: boolean;
@@ -208,6 +208,17 @@ class ApiService {
       cardholder_name: cardData.cardholderName,
       name: cardData.name,
       phone: cardData.phone,
+    });
+  }
+
+  async attachPaymentMethod(
+    billingId: number,
+    paymentMethodId: string,
+    paymentIntentId: string
+  ): Promise<ApiResponse<any>> {
+    return this.post(`/client/billings/${billingId}/attach-payment-method`, {
+      payment_method_id: paymentMethodId,
+      payment_intent_id: paymentIntentId,
     });
   }
 

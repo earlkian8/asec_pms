@@ -86,6 +86,7 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::get('/billings/{id}', [ClientBillingController::class, 'show']);
     Route::post('/billings/{id}/pay', [ClientBillingController::class, 'initiatePayment']);
     Route::post('/billings/{id}/payment-method', [ClientBillingController::class, 'createPaymentMethod']);
+    Route::post('/billings/{id}/attach-payment-method', [ClientBillingController::class, 'attachPaymentMethod']);
     Route::post('/billings/{id}/payment-intent/confirm', [ClientBillingController::class, 'confirmPaymentIntent']);
     Route::get('/billings/{id}/payment-status', [ClientBillingController::class, 'checkPaymentStatus']);
 });

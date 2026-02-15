@@ -184,61 +184,12 @@ class ApiService {
     return result as ApiResponse<any>;
   }
 
-  async initiatePayment(billingId: number, data: { amount?: number; payment_method_type?: 'card' }): Promise<ApiResponse<any>> {
-    return this.post(`/client/billings/${billingId}/pay`, data);
-  }
-
-  async createPaymentMethod(
-    billingId: number,
-    cardData: {
-      cardNumber: string;
-      expMonth: number;
-      expYear: number;
-      cvc: string;
-      cardholderName: string;
-      name: string;
-      phone: string;
-    }
-  ): Promise<ApiResponse<any>> {
-    return this.post(`/client/billings/${billingId}/payment-method`, {
-      card_number: cardData.cardNumber,
-      exp_month: cardData.expMonth,
-      exp_year: cardData.expYear,
-      cvc: cardData.cvc,
-      cardholder_name: cardData.cardholderName,
-      name: cardData.name,
-      phone: cardData.phone,
-    });
-  }
-
-  async attachPaymentMethod(
-    billingId: number,
-    paymentMethodId: string,
-    paymentIntentId: string
-  ): Promise<ApiResponse<any>> {
-    return this.post(`/client/billings/${billingId}/attach-payment-method`, {
-      payment_method_id: paymentMethodId,
-      payment_intent_id: paymentIntentId,
-    });
-  }
-
   /**
-   * Confirm Payment Intent (DEPRECATED - Not needed for PayMongo)
-   * 
-   * @deprecated This method is deprecated. PayMongo does not require a separate confirmation step.
-   * When attaching a payment method, the payment is automatically confirmed if successful.
-   * The attachment response already contains the final status and next_action.
-   * This method is kept for backward compatibility but should not be used in new code.
+   * Initiate payment via PayMongo Checkout (hosted payment page).
+   * Returns checkout_url - open this URL in browser/WebView for user to complete payment.
    */
-  async confirmPaymentIntent(
-    billingId: number,
-    paymentIntentId: string,
-    returnUrl: string
-  ): Promise<ApiResponse<any>> {
-    return this.post(`/client/billings/${billingId}/payment-intent/confirm`, {
-      payment_intent_id: paymentIntentId,
-      return_url: returnUrl,
-    });
+  async initiatePayment(billingId: number, data: { amount?: number }): Promise<ApiResponse<any>> {
+    return this.post(`/client/billings/${billingId}/pay`, data);
   }
 
   async checkPaymentStatus(billingId: number): Promise<ApiResponse<any>> {

@@ -8,9 +8,13 @@ use App\Http\Controllers\API\ClientDashboardController;
 use App\Http\Controllers\API\ClientNotificationController;
 use App\Http\Controllers\API\ClientBillingController;
 use App\Http\Controllers\API\ChatController;
+use App\Http\Controllers\API\WebhookController;
 use App\Http\Controllers\API\TaskManagementAuthController;
 use App\Http\Controllers\API\TaskManagementDashboardController;
 use App\Http\Controllers\API\TaskManagementTaskController;
+
+// PayMongo webhook (public - verify signature in production)
+Route::post('/webhooks/paymongo', [WebhookController::class, 'handlePayMongo']);
 
 // Public routes
 Route::prefix('client')->group(function () {
@@ -85,14 +89,13 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::get('/billings', [ClientBillingController::class, 'index']);
     Route::get('/billings/{id}', [ClientBillingController::class, 'show']);
     Route::post('/billings/{id}/pay', [ClientBillingController::class, 'initiatePayment']);
-    Route::post('/billings/{id}/payment-method', [ClientBillingController::class, 'createPaymentMethod']);
-    Route::post('/billings/{id}/attach-payment-method', [ClientBillingController::class, 'attachPaymentMethod']);
-    Route::post('/billings/{id}/payment-intent/confirm', [ClientBillingController::class, 'confirmPaymentIntent']);
     Route::get('/billings/{id}/payment-status', [ClientBillingController::class, 'checkPaymentStatus']);
 });
 
 // Payment redirect handlers (public routes for PayMongo redirects)
 Route::prefix('client')->group(function () {
+    Route::get('/payment/checkout-success', [ClientBillingController::class, 'checkoutSuccess']);
+    Route::get('/payment/checkout-cancel', [ClientBillingController::class, 'checkoutCancel']);
     Route::get('/payment/return', [ClientBillingController::class, 'paymentReturn']);
     Route::get('/payment/success', [ClientBillingController::class, 'paymentSuccess']);
     Route::get('/payment/failed', [ClientBillingController::class, 'paymentFailed']);

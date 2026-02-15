@@ -230,15 +230,24 @@ class PayMongoService
 
     /**
      * Attach payment method to payment intent
+     * Server-side attach uses secret key - no client_key needed.
+     * return_url is REQUIRED for 3D Secure card flow in live mode.
      */
-    public function attachPaymentMethod(string $paymentIntentId, string $paymentMethodId)
+    public function attachPaymentMethod(string $paymentIntentId, string $paymentMethodId, ?string $returnUrl = null)
     {
         try {
+            $attributes = [
+                'payment_method' => $paymentMethodId,
+            ];
+
+            // return_url is required for 3D Secure - PayMongo will not include redirect.url without it
+            if ($returnUrl) {
+                $attributes['return_url'] = $returnUrl;
+            }
+
             $response = $this->request('POST', "payment_intents/{$paymentIntentId}/attach", [
                 'data' => [
-                    'attributes' => [
-                        'payment_method' => $paymentMethodId,
-                    ],
+                    'attributes' => $attributes,
                 ],
             ]);
 
@@ -247,6 +256,7 @@ class PayMongoService
                     'success' => true,
                     'data' => $response['data'],
                     'status' => $response['data']['attributes']['status'] ?? 'unknown',
+                    'next_action' => $response['data']['attributes']['next_action'] ?? null,
                 ];
             }
 

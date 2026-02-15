@@ -533,12 +533,11 @@ export default function BillingDetailScreen() {
           setShow3DSecureModal(true);
           setPaymentStatus('pending');
         } else {
-          // redirect.url is null or next_action.type is not 'redirect'
-          // This typically means incomplete billing information or payment method issue
+          // redirect.url is null - PayMongo did not provide 3DS challenge URL (often due to invalid return_url)
           console.error('awaiting_next_action but redirect.url is null or invalid. PayMongo rejected payment setup.');
           console.error('nextAction:', JSON.stringify(nextAction, null, 2));
           
-          const errorMsg = 'Payment setup incomplete. Please ensure all billing information (name, email, phone) is provided and try again.';
+          const errorMsg = '3D Secure redirect URL was not provided. Please ensure the payment return URL is configured correctly. Contact support if this persists.';
           setCardFormError(errorMsg);
           dialog.showError(errorMsg, 'Payment Setup Failed');
           setProcessing(false);
@@ -602,11 +601,11 @@ export default function BillingDetailScreen() {
 
   const handle3DSecureNavigation = (navState: any) => {
     // Check if we've been redirected back (3D Secure complete)
-    // PayMongo typically redirects to a return URL after authentication
+    // PayMongo redirects to our return URL after authentication
     const url = navState.url;
     
-    // Close WebView and check payment status
-    if (url && (url.includes('return_url') || url.includes('success') || url.includes('failed'))) {
+    // Close WebView and check payment status when we land on return/success/failed
+    if (url && (url.includes('payment/return') || url.includes('return_url') || url.includes('success') || url.includes('failed'))) {
       setShow3DSecureModal(false);
       setThreeDSecureUrl(null);
       setPaymentStatus('checking');

@@ -924,6 +924,56 @@ class ClientBillingController extends Controller
     }
 
     /**
+     * Handle 3D Secure return redirect from PayMongo (Payment Intent card flow).
+     * PayMongo redirects here after the user completes 3DS authentication.
+     * This route must return 200 OK so PayMongo validates return_url before providing redirect.url.
+     */
+    public function paymentReturn(Request $request)
+    {
+        $paymentIntentId = $request->get('payment_intent_id');
+        $paymentCode = $request->get('payment_code');
+
+        try {
+            if ($paymentIntentId) {
+                $payment = BillingPayment::where('paymongo_payment_intent_id', $paymentIntentId)->first();
+            } elseif ($paymentCode) {
+                $payment = BillingPayment::where('payment_code', $paymentCode)->first();
+            } else {
+                $payment = null;
+            }
+
+            if ($payment && $payment->paymongo_payment_intent_id) {
+                $billing = $payment->billing;
+
+                if ($billing) {
+                    $client = $billing->project?->client;
+                    $payMongoResult = $this->payMongoService->getPaymentIntent($payment->paymongo_payment_intent_id);
+
+                    if ($payMongoResult['success']) {
+                        $payMongoStatus = $payMongoResult['status'];
+                        $newPaymentStatus = $this->mapPayMongoStatusToPaymentStatus($payMongoStatus);
+                        $this->updatePaymentStatus($payment, $newPaymentStatus, $payMongoStatus, $billing, $client);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Payment Return Handler Error', [
+                'error' => $e->getMessage(),
+                'payment_intent_id' => $paymentIntentId,
+                'payment_code' => $paymentCode,
+            ]);
+        }
+
+        $deepLink = 'client://payment/return?payment_intent_id=' . urlencode($paymentIntentId ?? '') . '&payment_code=' . urlencode($paymentCode ?? '');
+
+        return response()->view('payment-redirect', [
+            'deepLink' => $deepLink,
+            'paymentCode' => $paymentCode ?? '',
+            'status' => 'return',
+        ])->header('Content-Type', 'text/html');
+    }
+
+    /**
      * Handle successful payment redirect from PayMongo
      */
     public function paymentSuccess(Request $request)

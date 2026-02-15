@@ -92,6 +92,7 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
 
 // Payment redirect handlers (public routes for PayMongo redirects)
 Route::prefix('client')->group(function () {
+    Route::get('/payment/return', [ClientBillingController::class, 'paymentReturn']);
     Route::get('/payment/success', [ClientBillingController::class, 'paymentSuccess']);
     Route::get('/payment/failed', [ClientBillingController::class, 'paymentFailed']);
 });

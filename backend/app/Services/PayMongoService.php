@@ -252,10 +252,21 @@ class PayMongoService
             ]);
 
             if (isset($response['data'])) {
+                $status = $response['data']['attributes']['status'] ?? 'unknown';
+                if ($status === 'awaiting_next_action') {
+                    $redirectUrl = $response['data']['attributes']['next_action']['redirect']['url'] ?? null;
+                    if ($redirectUrl === null) {
+                        Log::warning('PayMongo returned null redirect.url', [
+                            'payment_intent_id' => $paymentIntentId,
+                            'return_url_sent' => $returnUrl,
+                        ]);
+                    }
+                }
+
                 return [
                     'success' => true,
                     'data' => $response['data'],
-                    'status' => $response['data']['attributes']['status'] ?? 'unknown',
+                    'status' => $status,
                     'next_action' => $response['data']['attributes']['next_action'] ?? null,
                 ];
             }

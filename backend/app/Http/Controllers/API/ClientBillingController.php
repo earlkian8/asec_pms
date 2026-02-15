@@ -514,15 +514,22 @@ class ClientBillingController extends Controller
         $paymentMethodId = $validated['payment_method_id'];
         $paymentIntentId = $validated['payment_intent_id'];
 
-        $payment = BillingPayment::where('billing_id', $billing->id)
-            ->where('paymongo_payment_intent_id', $paymentIntentId)
-            ->first();
-        $paymentCode = $payment?->payment_code ?? '';
-
-        // Use backend config for return_url - guaranteed correct in production
-        $baseReturnUrl = config('services.paymongo.return_url')
+        // PayMongo appends payment_intent_id when redirecting - send base URL only
+        // Some validators reject URLs with query params
+        $returnUrl = config('services.paymongo.return_url')
             ?? rtrim(config('app.url'), '/') . '/api/client/payment/return';
-        $returnUrl = $baseReturnUrl . '?payment_intent_id=' . urlencode($paymentIntentId) . '&payment_code=' . urlencode($paymentCode);
+        // Do NOT append query params - PayMongo appends them
+
+        // Live mode requires HTTPS - force if APP_URL was http
+        if (!str_starts_with($returnUrl, 'https://')) {
+            $returnUrl = 'https://' . substr($returnUrl, 7);
+        }
+
+        Log::info('PayMongo attach request', [
+            'return_url' => $returnUrl,
+            'payment_intent_id' => $paymentIntentId,
+            'is_https' => str_starts_with($returnUrl, 'https://'),
+        ]);
 
         try {
             $result = $this->payMongoService->attachPaymentMethod($paymentIntentId, $paymentMethodId, $returnUrl);

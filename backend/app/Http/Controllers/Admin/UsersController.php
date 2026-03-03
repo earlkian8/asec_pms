@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 
@@ -33,36 +34,39 @@ class UsersController extends Controller
             });
         }
 
-        // Filter by role
         if ($roleFilter) {
             $query->whereHas('roles', function ($q) use ($roleFilter) {
                 $q->where('name', $roleFilter);
             });
         }
 
-        // Validate sort_by to prevent SQL injection
         $allowedSortColumns = ['name', 'email', 'created_at'];
         if (!in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
 
-        // Validate sort_order
         $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
 
         $users = $query
-                      ->with('roles')
-                      ->orderBy($sortBy, $sortOrder)
-                      ->when($sortBy !== 'created_at', function ($query) {
-                          // Add created_at as secondary sort to maintain stable position when sorting by other fields
-                          $query->orderBy('created_at', 'desc');
-                      })
-                      ->paginate(10);
+            ->with('roles')
+            ->orderBy($sortBy, $sortOrder)
+            ->when($sortBy !== 'created_at', function ($query) {
+                $query->orderBy('created_at', 'desc');
+            })
+            ->paginate(10);
 
-        // Get all roles for the dropdowns
         $roles = Role::all(['id', 'name']);
-
-        // Get unique roles for filter options
         $roleNames = Role::distinct()->pluck('name')->sort()->values();
+
+        // Real stats — always based on ALL users, not the current page
+        $now = now();
+        $stats = [
+            'total_users'     => User::count(),
+            'active_roles'    => Role::whereHas('users')->count(),
+            'new_this_month'  => User::whereMonth('created_at', $now->month)
+                                     ->whereYear('created_at', $now->year)
+                                     ->count(),
+        ];
 
         return Inertia::render('UserManagement/Users/index', [
             'users' => $users,
@@ -76,16 +80,30 @@ class UsersController extends Controller
             'filterOptions' => [
                 'roles' => $roleNames,
             ],
+            'stats' => $stats,
         ]);
     }
 
+    // ... rest of your methods unchanged
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|string|exists:roles,name',
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|max:254|unique:users',
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(8)->max(254)->mixedCase()->numbers()->symbols(),
+            ],
+            'role'     => 'required|string|exists:roles,name',
+        ], [
+            'password.min'      => 'Password must be at least 8 characters.',
+            'password.max'      => 'Password is too long (max 254 characters).',
+            'password.mixed'    => 'Must include an uppercase and lowercase letter.',
+            'password.numbers'  => 'Must include a number.',
+            'password.symbols'  => 'Must include a special character.',
+            'password.confirmed'=> 'Passwords do not match.',
         ]);
 
         $user = User::create([
@@ -95,38 +113,36 @@ class UsersController extends Controller
             'email_verified_at' => now(),
         ]);
 
-        // Assign role to user
         $user->assignRole($validated['role']);
 
-        $this->adminActivityLogs(
-            'User',
-            'Add',
-            'Created User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']
-        );
+        $this->adminActivityLogs('User', 'Add', 'Created User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']);
 
-        // System-wide notification for new user
         $this->createSystemNotification(
-            'general',
-            'New User Created',
+            'general', 'New User Created',
             "A new user '{$user->name}' ({$user->email}) has been created with role '{$validated['role']}'.",
-            null,
-            route('user-management.users.index')
+            null, route('user-management.users.index')
         );
     }
 
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => [
-                'required',
+            'name'     => 'required|string|max:255',
+            'email'    => ['required', 'string', 'email', 'max:254', Rule::unique('users')->ignore($user->id)],
+            'password' => [
+                'nullable',
                 'string',
-                'email',
-                'max:255',
-                Rule::unique('users')->ignore($user->id),
+                'confirmed',
+                Password::min(8)->max(254)->mixedCase()->numbers()->symbols(),
             ],
-            'password' => 'nullable|string|min:8|confirmed',
-            'role' => 'required|string|exists:roles,name',
+            'role'     => 'required|string|exists:roles,name',
+        ], [
+            'password.min'      => 'Password must be at least 8 characters.',
+            'password.max'      => 'Password is too long (max 254 characters).',
+            'password.mixed'    => 'Must include an uppercase and lowercase letter.',
+            'password.numbers'  => 'Must include a number.',
+            'password.symbols'  => 'Must include a special character.',
+            'password.confirmed'=> 'Passwords do not match.',
         ]);
 
         $updateData = [
@@ -134,94 +150,60 @@ class UsersController extends Controller
             'email' => $validated['email'],
         ];
 
-        // Only update password if provided
         if (!empty($validated['password'])) {
             $updateData['password'] = Hash::make($validated['password']);
         }
 
         $user->update($updateData);
-
-        // Update user role - remove all roles and assign new one
         $user->syncRoles([$validated['role']]);
 
-        $oldRole = $user->roles->first()?->name;
+        $this->adminActivityLogs('User', 'Update', 'Updated User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']);
 
-        $this->adminActivityLogs(
-            'User',
-            'Update',
-            'Updated User ' . $user->name . ' (' . $user->email . ') with role: ' . $validated['role']
-        );
-
-        // System-wide notification for user update
         $this->createSystemNotification(
-            'general',
-            'User Updated',
+            'general', 'User Updated',
             "User '{$user->name}' ({$user->email}) has been updated.",
-            null,
-            route('user-management.users.index')
+            null, route('user-management.users.index')
         );
     }
 
     public function resetPassword(User $user)
     {
-        // Prevent resetting password of the current user
         if ($user->id === Auth::id()) {
             return back()->withErrors(['error' => 'You cannot reset your own password.']);
         }
 
-        $defaultPassword = 'asecpassword';
-        
-        $user->update([
-            'password' => Hash::make($defaultPassword),
-        ]);
+        $user->update(['password' => Hash::make('asecpassword')]);
 
-        $this->adminActivityLogs(
-            'User',
-            'Reset Password',
-            'Reset password for User ' . $user->name . ' (' . $user->email . ')'
-        );
+        $this->adminActivityLogs('User', 'Reset Password', 'Reset password for User ' . $user->name . ' (' . $user->email . ')');
 
-        // System-wide notification for password reset
         $this->createSystemNotification(
-            'general',
-            'User Password Reset',
+            'general', 'User Password Reset',
             "Password for user '{$user->name}' ({$user->email}) has been reset.",
-            null,
-            route('user-management.users.index')
+            null, route('user-management.users.index')
         );
     }
 
     public function destroy(User $user)
     {
-        // Prevent deletion of the current user
         if ($user->id === Auth::id()) {
             return redirect()->back()->with('error', 'You cannot delete your own account.');
         }
 
-        // Prevent deletion if there's only 1 user in the system
-        $totalUsers = User::count();
-        if ($totalUsers <= 1) {
+        if (User::count() <= 1) {
             return redirect()->back()->with('error', 'Cannot delete user. There must be at least one user in the system.');
         }
 
-        $userName = $user->name;
+        $userName  = $user->name;
         $userEmail = $user->email;
 
-        $this->adminActivityLogs(
-            'User',
-            'Delete',
-            'Deleted User ' . $userName . ' (' . $userEmail . ')'
-        );
+        $this->adminActivityLogs('User', 'Delete', 'Deleted User ' . $userName . ' (' . $userEmail . ')');
 
         $user->delete();
 
-        // System-wide notification for user deletion
         $this->createSystemNotification(
-            'general',
-            'User Deleted',
+            'general', 'User Deleted',
             "User '{$userName}' ({$userEmail}) has been deleted.",
-            null,
-            route('user-management.users.index')
+            null, route('user-management.users.index')
         );
 
         return back()->with('success', 'User deleted successfully.');

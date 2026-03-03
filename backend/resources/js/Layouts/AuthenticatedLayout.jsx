@@ -124,29 +124,26 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'User Management',
-            type: 'section',
-            items: [
-                {
-                    title: 'Roles & Permissions',
-                    href: route('user-management.roles-and-permissions.index'),
-                    routeName: 'user-management.roles-and-permissions.*',
-                    icon: BadgeDollarSign
-                },
-                {
-                    title: 'Users',
-                    href: route('user-management.users.index'),
-                    routeName: 'user-management.users.*',
-                    icon: User
-                },
-                {
-                    title: 'Activity Logs',
-                    href: route('user-management.activity-logs.index'),
-                    routeName: 'user-management.activity-logs.*',
-                    icon: FileText
-                }
-            ]
-        }
+            title: 'Roles & Permissions',
+            href: route('user-management.roles-and-permissions.index'),
+            routeName: 'user-management.roles-and-permissions.*',
+            icon: BadgeDollarSign,
+            type: 'single'
+        },
+        {
+            title: 'Users',
+            href: route('user-management.users.index'),
+            routeName: 'user-management.users.*',
+            icon: User,
+            type: 'single'
+        },
+        {
+            title: 'Activity Logs',
+            href: route('user-management.activity-logs.index'),
+            routeName: 'user-management.activity-logs.*',
+            icon: FileText,
+            type: 'single'
+        },
     ];
 
     // Filter navigation modules based on permissions

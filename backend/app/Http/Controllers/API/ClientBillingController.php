@@ -421,7 +421,7 @@ class ClientBillingController extends Controller
             }
         }
 
-        $deepLink = 'client://payment/success?billing_id=' . $billing->id;
+        $deepLink = 'client://billings';
         return response()->view('payment-redirect', [
             'deepLink' => $deepLink,
             'status' => 'success',

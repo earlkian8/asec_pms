@@ -11,32 +11,51 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            'email' => ['required', 'string', 'max:254', 'email'],
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'max:254',
+                'regex:/[A-Z]/',
+                'regex:/[a-z]/',
+                'regex:/[0-9]/',
+                'regex:/[^A-Za-z0-9]/',
+            ],
         ];
     }
 
-    /**
-     * Attempt to authenticate the request's credentials.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
+    public function messages(): array
+    {
+        return [
+            'email.required'          => 'Email is required.',
+            'email.email'             => 'Invalid email format.',
+            'email.max'               => 'Email is too long (max 254 characters).',
+
+            'password.required'       => 'Password is required.',
+            'password.min'            => 'Password must be at least 8 characters.',
+            'password.max'            => 'Password is too long (max 254 characters).',
+            'password.regex'          => 'Invalid password format.',
+        ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // Treat whitespace-only values as empty so 'required' catches them
+        $this->merge([
+            'email'    => trim($this->email ?? ''),
+            'password' => $this->password && !trim($this->password) ? '' : $this->password,
+        ]);
+    }
+
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
@@ -45,18 +64,13 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'Invalid Email or Password.',
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
     }
 
-    /**
-     * Ensure the login request is not rate limited.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
     public function ensureIsNotRateLimited(): void
     {
         if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
@@ -75,9 +89,6 @@ class LoginRequest extends FormRequest
         ]);
     }
 
-    /**
-     * Get the rate limiting throttle key for the request.
-     */
     public function throttleKey(): string
     {
         return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());

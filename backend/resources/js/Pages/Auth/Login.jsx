@@ -12,9 +12,40 @@ export default function Login({ status }) {
     });
 
     const [showPassword, setShowPassword] = useState(false);
+    const [clientErrors, setClientErrors] = useState({ email: '', password: '' });
+
+    const validateEmail = (value) => {
+        const trimmed = value.trim();
+        if (!trimmed) return 'Email is required.';
+        if (trimmed.length > 254) return 'Email is too long (max 254 characters).';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return 'Invalid email format.';
+        return '';
+    };
+
+    const validatePassword = (value) => {
+        if (!value || !value.trim()) return 'Password is required.';
+        if (value.length < 8) return 'Password must be at least 8 characters.';
+        if (value.length > 254) return 'Password is too long (max 254 characters).';
+        if (!/[A-Z]/.test(value)) return 'Must include an uppercase letter.';
+        if (!/[a-z]/.test(value)) return 'Must include a lowercase letter.';
+        if (!/[0-9]/.test(value)) return 'Must include a number.';
+        if (!/[^A-Za-z0-9]/.test(value)) return 'Must include a special character.';
+        return '';
+    };
+
+    const handleBlur = (field, value) => {
+        const error = field === 'email' ? validateEmail(value) : validatePassword(value);
+        setClientErrors(prev => ({ ...prev, [field]: error }));
+    };
 
     const submit = (e) => {
         e.preventDefault();
+
+        const emailErr = validateEmail(data.email);
+        const passwordErr = validatePassword(data.password);
+        setClientErrors({ email: emailErr, password: passwordErr });
+
+        if (emailErr || passwordErr) return;
 
         post(route('login'), {
             onFinish: () => reset('password'),
@@ -73,13 +104,18 @@ export default function Login({ status }) {
                                 type="email"
                                 name="email"
                                 value={data.email}
-                                className="mt-1 block w-full border-gray-300 rounded-lg focus:border-gray-600 focus:ring-gray-600 transition-colors"
+                                className={`mt-1 block w-full rounded-lg transition-colors ${
+                                    clientErrors.email || errors.email
+                                        ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500 focus:ring-red-500'
+                                        : 'border-gray-300 focus:border-gray-600 focus:ring-gray-600'
+                                }`}
                                 autoComplete="username"
                                 isFocused={true}
                                 onChange={(e) => setData('email', e.target.value)}
+                                onBlur={(e) => handleBlur('email', e.target.value)}
                             />
 
-                            <InputError message={errors.email} className="mt-2" />
+                            <InputError message={clientErrors.email || errors.email} className="mt-2" />
                         </div>
 
                         {/* Password Field */}
@@ -92,9 +128,14 @@ export default function Login({ status }) {
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={data.password}
-                                    className="mt-1 block w-full pr-10 border-gray-300 rounded-lg focus:border-gray-600 focus:ring-gray-600 transition-colors"
+                                    className={`mt-1 block w-full pr-10 rounded-lg transition-colors ${
+                                        clientErrors.password || errors.password
+                                            ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500 focus:ring-red-500'
+                                            : 'border-gray-300 focus:border-gray-600 focus:ring-gray-600'
+                                    }`}
                                     autoComplete="current-password"
                                     onChange={(e) => setData('password', e.target.value)}
+                                    onBlur={(e) => handleBlur('password', e.target.value)}
                                 />
                                 <button
                                     type="button"
@@ -109,7 +150,7 @@ export default function Login({ status }) {
                                 </button>
                             </div>
 
-                            <InputError message={errors.password} className="mt-2" />
+                            <InputError message={clientErrors.password || errors.password} className="mt-2" />
                         </div>
 
                         {/* Login Button */}

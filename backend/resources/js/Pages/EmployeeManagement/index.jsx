@@ -25,7 +25,7 @@ import DeleteEmployee from './delete';
 
 export default function EmployeesIndex() {
   const { has } = usePermission();
-  
+  const { flash } = usePage().props;
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
     { title: "Employee Management" },
@@ -48,6 +48,24 @@ export default function EmployeesIndex() {
   const filterOptions = usePage().props.filterOptions || {};
   const initialSearch = usePage().props.search || '';
   const pageProps = usePage().props;
+
+  useEffect(() => {
+    if (flash?.success) {
+      toast.success(flash.success);
+    }
+
+    if (flash?.error) {
+      toast.error(flash.error);
+    }
+
+    if (flash?.warning) {
+      toast.warning(flash.warning);
+    }
+
+    if (flash?.info) {
+      toast.info(flash.info);
+    }
+  }, [flash]);
 
   // States
   const [searchInput, setSearchInput] = useState(initialSearch);
@@ -175,15 +193,17 @@ export default function EmployeesIndex() {
   };
 
   const handleStatusChange = (employee, newStatus) => {
-    router.put(route('employee-management.update-status', employee.id), {
-      is_active: newStatus,
-    }, {
-      preserveScroll: true,
-      preserveState: true,
-      only: ['employees'],
-      onSuccess: () => toast.success('Employee status updated successfully!'),
-      onError: () => toast.error('Failed to update status.'),
-    });
+    router.put(
+      route('employee-management.update-status', employee.id),
+      {
+        is_active: newStatus,
+      },
+      {
+        preserveScroll: true,
+        preserveState: true,
+        only: ['employees', 'flash'], // important
+      }
+    );
   };
 
   if (!has('employees.view')) {

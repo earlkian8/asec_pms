@@ -1,3 +1,5 @@
+// NOTE: The delete button in the table is hidden when employee.project_teams_count > 0
+// so this modal only ever renders for employees with no project team assignments.
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from "sonner";
@@ -10,42 +12,97 @@ import {
   DialogFooter
 } from "@/Components/ui/dialog"
 import { Button } from '@/Components/ui/button';
-import { Loader2, AlertTriangle, Trash2 } from 'lucide-react';
+import { Loader2, AlertTriangle, Trash2, ShieldAlert, Users } from 'lucide-react';
 
-const DeleteBilling = ({ setShowDeleteModal, billing }) => {
+const DeleteEmployee = ({ setShowDeleteModal, employee }) => {
   const [processing, setProcessing] = useState(false);
+
+  const isAssignedToProject = employee.project_teams_count > 0 || employee.projectTeams?.length > 0;
 
   const handleDelete = (e) => {
     e.preventDefault();
+
+    if (isAssignedToProject) {
+      toast.error(`Cannot delete an employee who is still assigned to a project team.`);
+      return;
+    }
+
     setProcessing(true);
 
     router.delete(
-      route('billing-management.destroy', billing.id),
+      route('employee-management.destroy', employee.id),
       {
         preserveScroll: true,
         onSuccess: (page) => {
-          setShowDeleteModal(false);
           setProcessing(false);
           const flash = page.props.flash;
           if (flash && flash.error) {
             toast.error(flash.error);
           } else {
-            toast.success(`Billing "${billing.billing_code}" deleted successfully`);
+            setShowDeleteModal(false);
+            toast.success(`Employee "${employee.first_name} ${employee.last_name}" deleted successfully`);
           }
         },
         onError: (errors) => {
-          setShowDeleteModal(false);
           setProcessing(false);
-          if (errors.error) {
-            toast.error(errors.error);
+          if (errors.message) {
+            toast.error(errors.message);
           } else {
-            toast.error('Failed to delete billing. Please try again.');
+            toast.error('Failed to delete employee. Please try again.');
           }
         }
       }
     );
   };
 
+  const fullName = `${employee.first_name} ${employee.last_name}`;
+  const teamCount = employee.project_teams_count ?? employee.projectTeams?.length ?? 0;
+
+  // Blocked state — employee is still assigned to one or more project teams
+  if (isAssignedToProject) {
+    return (
+      <Dialog open onOpenChange={setShowDeleteModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="bg-amber-100 rounded-full p-2">
+                <ShieldAlert className="h-6 w-6 text-amber-600" />
+              </div>
+              <DialogTitle className="text-amber-900">Cannot Delete Employee</DialogTitle>
+            </div>
+            <DialogDescription className="text-gray-600 pt-2 space-y-3">
+              <p>
+                <span className="font-semibold text-gray-900">{fullName}</span> cannot be
+                deleted because they are still assigned to an active project team.
+              </p>
+              <div className="flex items-center gap-2 rounded-lg border bg-amber-50 border-amber-200 px-3 py-2">
+                <Users className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                <span className="text-sm font-semibold text-amber-700">
+                  Assigned to {teamCount} project team{teamCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500">
+                Please <span className="font-medium text-gray-700">remove this employee from all project teams</span> before
+                attempting to delete their record.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteModal(false)}
+              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Normal deletion confirmation — only shown when employee has no project assignments
   return (
     <Dialog open onOpenChange={setShowDeleteModal}>
       <DialogContent className="max-w-md">
@@ -54,22 +111,19 @@ const DeleteBilling = ({ setShowDeleteModal, billing }) => {
             <div className="bg-red-100 rounded-full p-2">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <DialogTitle className="text-red-900">Delete Billing</DialogTitle>
+            <DialogTitle className="text-red-900">Delete Employee</DialogTitle>
           </div>
           <DialogDescription className="text-gray-600 pt-2">
-            Are you sure you want to delete the billing{" "}
-            <span className="font-semibold text-gray-900">{billing.billing_code}</span>? 
+            Are you sure you want to delete the employee{" "}
+            <span className="font-semibold text-gray-900">{fullName}</span>?
             <br /><br />
             This action <span className="font-semibold text-red-600">cannot be undone</span> and all associated data including:
             <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-              <li>Payment records</li>
-              <li>Transaction history</li>
+              <li>Employee profile and information</li>
+              <li>Project team assignments</li>
+              <li>Labor cost records</li>
             </ul>
-            {billing.payments_count > 0 && (
-              <span className="block mt-2 text-amber-600 font-medium">
-                Note: This billing has {billing.payments_count} transaction(s). The billing will be deleted but transaction records will be preserved.
-              </span>
-            )}
+            will be permanently removed.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleDelete} className="flex flex-col gap-4">
@@ -97,7 +151,7 @@ const DeleteBilling = ({ setShowDeleteModal, billing }) => {
               ) : (
                 <>
                   <Trash2 size={16} />
-                  Delete Billing
+                  Delete Employee
                 </>
               )}
             </Button>
@@ -108,4 +162,4 @@ const DeleteBilling = ({ setShowDeleteModal, billing }) => {
   );
 };
 
-export default DeleteBilling;
+export default DeleteEmployee;

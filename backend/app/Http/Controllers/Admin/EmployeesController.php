@@ -32,7 +32,8 @@ class EmployeesController extends Controller
         // Validate sort order
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
-        $employees = Employee::when($search, function ($query, $search) {
+        $employees = Employee::withCount('projectTeams')
+            ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'ilike', "%{$search}%")
                       ->orWhere('last_name', 'ilike', "%{$search}%")
@@ -95,7 +96,6 @@ class EmployeesController extends Controller
 
         $this->adminActivityLogs('Employee', 'Add', 'Added Employee ' . $employee->first_name . ' ' . $employee->last_name);
 
-        // System-wide notification for new employee
         $this->createSystemNotification(
             'general',
             'New Employee Added',
@@ -113,11 +113,10 @@ class EmployeesController extends Controller
             'first_name' => ['required', 'max:100'],
             'last_name'  => ['required', 'max:100'],
             'email' => [
-                    'required',
-                    'email',
-                    Rule::unique('employees', 'email')->ignore($employee->id, $employee->getKeyName())
-
-                ],
+                'required',
+                'email',
+                Rule::unique('employees', 'email')->ignore($employee->id, $employee->getKeyName()),
+            ],
             'phone'      => ['nullable', 'string', 'max:20'],
             'position'   => ['nullable', 'string', 'max:100'],
             'is_active' => ['required', 'boolean'],
@@ -129,7 +128,6 @@ class EmployeesController extends Controller
 
         $this->adminActivityLogs('Employee', 'Update', 'Updated Employee ' . $oldName . ' to ' . $validated['first_name'] . ' ' . $validated['last_name']);
 
-        // System-wide notification for employee update
         $this->createSystemNotification(
             'general',
             'Employee Updated',
@@ -158,7 +156,6 @@ class EmployeesController extends Controller
 
             $this->adminActivityLogs('Employee', 'Delete', 'Deleted Employee ' . $name);
 
-            // System-wide notification for employee deletion
             $this->createSystemNotification(
                 'general',
                 'Employee Deleted',
@@ -169,7 +166,6 @@ class EmployeesController extends Controller
 
             return redirect()->back()->with('success', 'Employee deleted successfully.');
         } catch (\Illuminate\Database\QueryException $e) {
-            // Fallback: catch any remaining FK violations (Postgres: 23503)
             if ($e->getCode() == "23503") {
                 return redirect()->back()->with('error', "Cannot delete employee {$name} because they are still assigned to a project team.");
             }
@@ -178,14 +174,12 @@ class EmployeesController extends Controller
         }
     }
 
-
     public function handleStatus(Request $request, Employee $employee)
     {
         $request->validate([
             'is_active' => ['required'],
         ]);
 
-        // ✅ Check if employee is assigned to any project team
         if ($employee->projectTeams()->exists()) {
             return redirect()->back()->with(
                 'error',
@@ -204,7 +198,6 @@ class EmployeesController extends Controller
             ' status to ' . ($employee->is_active ? 'Active' : 'Inactive')
         );
 
-        // System-wide notification for employee status change
         $status = $employee->is_active ? 'Active' : 'Inactive';
         $this->createSystemNotification(
             'status_change',

@@ -28,8 +28,7 @@ export default function EmployeesIndex() {
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Employee Management", href: route('employee-management.index') },
-    { title: "Employees" },
+    { title: "Employee Management" },
   ];
 
   const columns = [

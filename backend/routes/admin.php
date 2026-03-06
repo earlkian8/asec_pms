@@ -44,7 +44,8 @@ Route::middleware('auth')->group(function () {
         Route::put('/update/{project}', [ProjectsController::class, 'update'])->middleware('permission:projects.update')->name('update');
         Route::delete('/delete/{project}', [ProjectsController::class, 'destroy'])->middleware('permission:projects.delete')->name('destroy');
         Route::get('/view/{project}', [ProjectsController::class, 'show'])->middleware('permission:projects.view')->name('view');
-        
+        Route::get('/document/{project}/{field}', [ProjectsController::class, 'serveDocument'])->middleware('permission:projects.view')->name('document'); 
+
         // Project Teams
         Route::prefix('project-teams')->name('project-teams.')->group(function(){
             Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])->middleware('permission:project-teams.create')->name('store');
@@ -209,9 +210,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [BillingsController::class, 'index'])->middleware('permission:billing.view')->name('index');
         Route::post('/store', [BillingsController::class, 'store'])->middleware('permission:billing.create')->name('store');
         Route::put('/update/{billing}', [BillingsController::class, 'update'])->middleware('permission:billing.update')->name('update');
-        Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->middleware('permission:billing.delete')->name('destroy');
+        // Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->middleware('permission:billing.delete')->name('destroy');
         Route::get('/view/{billing}', [BillingsController::class, 'show'])->middleware('permission:billing.view')->name('show');
         Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->middleware('permission:billing.add-payment')->name('add-payment');
+        Route::post('/archive/{billing}', [BillingsController::class, 'archive'])->middleware('permission:billing.update')->name('archive');
+        Route::post('/unarchive/{billing}', [BillingsController::class, 'unarchive'])->middleware('permission:billing.update')->name('unarchive');
+        Route::get('/archived', [BillingsController::class, 'archived'])->middleware('permission:billing.view')->name('archived');
     });
 
     // Notifications

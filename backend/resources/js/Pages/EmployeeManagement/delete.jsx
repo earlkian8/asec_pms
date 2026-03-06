@@ -24,17 +24,17 @@ const DeleteEmployee = ({ setShowDeleteModal, employee }) => {
       {
         preserveScroll: true,
         onSuccess: (page) => {
-          setShowDeleteModal(false);
           setProcessing(false);
           const flash = page.props.flash;
           if (flash && flash.error) {
+            // Do NOT close the modal — employee was not deleted
             toast.error(flash.error);
           } else {
+            setShowDeleteModal(false);
             toast.success(`Employee "${employee.first_name} ${employee.last_name}" deleted successfully`);
           }
         },
         onError: (errors) => {
-          setShowDeleteModal(false);
           setProcessing(false);
           if (errors.message) {
             toast.error(errors.message);

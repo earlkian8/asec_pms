@@ -38,7 +38,8 @@ class EmployeesController extends Controller
                       ->orWhere('last_name', 'ilike', "%{$search}%")
                       ->orWhere('email', 'ilike', "%{$search}%")
                       ->orWhere('phone', 'ilike', "%{$search}%")
-                      ->orWhere('position', 'ilike', "%{$search}%");
+                      ->orWhere('position', 'ilike', "%{$search}%")
+                      ->orWhereRaw("CONCAT(first_name, ' ', last_name) ILIKE ?", ["%{$search}%"]);
                 });
             })
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
@@ -49,10 +50,16 @@ class EmployeesController extends Controller
             })
             ->orderBy($sortBy, $sortOrder)
             ->when($sortBy !== 'created_at', function ($query) {
-                // Add created_at as secondary sort to maintain stable position when sorting by other fields
                 $query->orderBy('created_at', 'desc');
             })
             ->paginate(10);
+
+        // Overall stats — always based on ALL employees, never filtered
+        $stats = [
+            'total'    => Employee::count(),
+            'active'   => Employee::where('is_active', true)->count(),
+            'inactive' => Employee::where('is_active', false)->count(),
+        ];
 
         // Get unique values for filter options
         $positions = Employee::distinct()->whereNotNull('position')->pluck('position')->sort()->values();
@@ -69,6 +76,7 @@ class EmployeesController extends Controller
             ],
             'sort_by' => $sortBy,
             'sort_order' => $sortOrder,
+            'stats' => $stats,
         ]);
     }
 
@@ -137,6 +145,14 @@ class EmployeesController extends Controller
     {
         $name = $employee->first_name . ' ' . $employee->last_name;
 
+        // Actively block deletion if employee is assigned to any project team
+        if ($employee->projectTeams()->exists()) {
+            return redirect()->back()->with(
+                'error',
+                "Cannot delete employee {$name} because they are still assigned to a project team."
+            );
+        }
+
         try {
             $employee->delete();
 
@@ -153,7 +169,7 @@ class EmployeesController extends Controller
 
             return redirect()->back()->with('success', 'Employee deleted successfully.');
         } catch (\Illuminate\Database\QueryException $e) {
-            // Check for foreign key violation (Postgres: 23503)
+            // Fallback: catch any remaining FK violations (Postgres: 23503)
             if ($e->getCode() == "23503") {
                 return redirect()->back()->with('error', "Cannot delete employee {$name} because they are still assigned to a project team.");
             }
@@ -170,12 +186,12 @@ class EmployeesController extends Controller
         ]);
 
         // ✅ Check if employee is assigned to any project team
-        // if ($employee->projectTeams()->exists()) {
-        //     return redirect()->back()->with(
-        //         'error',
-        //         "Cannot update status. Employee {$employee->first_name} {$employee->last_name} is still assigned to a project team."
-        //     );
-        // }
+        if ($employee->projectTeams()->exists()) {
+            return redirect()->back()->with(
+                'error',
+                "Cannot update status. Employee {$employee->first_name} {$employee->last_name} is still assigned to a project team."
+            );
+        }
 
         $employee->update([
             'is_active' => $request->boolean('is_active'),

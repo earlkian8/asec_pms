@@ -60,7 +60,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
 
           {/* First Name */}
           <div>
-            <Label className="text-zinc-800">First Name *</Label>
+            <Label className="text-zinc-800">First Name <span className='text-red-600'>*</span></Label>
             <Input
               type="text"
               value={data.first_name}
@@ -73,7 +73,7 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
 
           {/* Last Name */}
           <div>
-            <Label className="text-zinc-800">Last Name *</Label>
+            <Label className="text-zinc-800">Last Name <span className='text-red-600'>*</span></Label>
             <Input
               type="text"
               value={data.last_name}
@@ -84,11 +84,11 @@ const EditEmployee = ({ employee, setShowEditModal }) => {
             <InputError message={errors.last_name} />
           </div>
 
-          {/* Email */}
+          {/* Email — type="text" to rely on backend validation, not browser's built-in */}
           <div>
-            <Label className="text-zinc-800">Email *</Label>
+            <Label className="text-zinc-800">Email <span className='text-red-600'>*</span></Label>
             <Input
-              type="email"
+              type="text"
               value={data.email}
               onChange={e => setData('email', e.target.value)}
               placeholder="Email"

@@ -28,8 +28,7 @@ export default function ProjectTypesIndex() {
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Project Type Management", href: route('project-type-management.index') },
-    { title: "Project Types" },
+    { title: "Project Type Management" },
   ];
 
   const columns = [

@@ -28,8 +28,7 @@ export default function BillingManagement() {
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Billing Management", href: route('billing-management.index') },
-    { title: "Billings" },
+    { title: "Billing Management" },
   ];
 
   const columns = [

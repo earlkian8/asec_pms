@@ -26,8 +26,7 @@ export default function UsersIndex() {
 
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "User Management", href: route('user-management.users.index') },
-    { title: "Users" },
+    { title: "User Management" },
   ];
 
   const columns = [

@@ -75,7 +75,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Project Type',
+            title: 'Project Type Management',
             href: route('project-type-management.index'),
             routeName: 'project-type-management.*',
             icon: FolderOpen,
@@ -96,7 +96,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Client Type',
+            title: 'Client Type Management',
             href: route('client-type-management.index'),
             routeName: 'client-type-management.*',
             icon: FolderOpen,
@@ -131,7 +131,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Users',
+            title: 'User Management',
             href: route('user-management.users.index'),
             routeName: 'user-management.users.*',
             icon: User,
@@ -165,7 +165,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
                 ]) ? module : null;
             }
-            if (module.title === 'Project Type') {
+            if (module.title === 'Project Type Management') {
                 return hasModuleAccess([
                     'projects.view', 'projects.create', 'projects.update', 'projects.delete'
                 ]) ? module : null;
@@ -180,7 +180,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
                 ]) ? module : null;
             }
-            if (module.title === 'Client Type') {
+            if (module.title === 'Client Type Management') {
                 return hasModuleAccess([
                     'clients.view', 'clients.create', 'clients.update', 'clients.delete'
                 ]) ? module : null;
@@ -203,7 +203,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             if (module.title === 'Roles & Permissions') {
                 return hasModuleAccess(['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign']) ? module : null;
             }
-            if (module.title === 'Users') {
+            if (module.title === 'User Management') {
                 return hasModuleAccess(['users.view', 'users.create', 'users.update', 'users.delete', 'users.reset-password']) ? module : null;
             }
             if (module.title === 'Activity Logs') {

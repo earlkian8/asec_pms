@@ -28,8 +28,7 @@ export default function ClientTypesIndex() {
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Client Type Management", href: route('client-type-management.index') },
-    { title: "Client Types" },
+    { title: "Client Type Management" },
   ];
 
   const columns = [

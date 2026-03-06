@@ -200,33 +200,16 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget'
                 ]) ? module : null;
             }
-            if (module.title === 'Chat Management') {
-                // Chat is available to all authenticated users (no specific permission check needed)
-                return module;
+            if (module.title === 'Roles & Permissions') {
+                return hasModuleAccess(['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign']) ? module : null;
             }
-            if (module.title === 'User Management') {
-                // For collapsible items, check if user has access to any sub-item
-                const filteredItems = module.items.filter(item => {
-                    if (item.title === 'Roles & Permissions') {
-                        return hasModuleAccess(['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign']);
-                    }
-                    if (item.title === 'Users') {
-                        return hasModuleAccess(['users.view', 'users.create', 'users.update', 'users.delete', 'users.reset-password']);
-                    }
-                    if (item.title === 'Activity Logs') {
-                        return hasModuleAccess(['activity-logs.view', 'activity-logs.export']);
-                    }
-                    return false;
-                });
-                
-                // If user has access to any sub-item, return module with filtered items
-                if (filteredItems.length > 0) {
-                    return { ...module, items: filteredItems };
-                }
-                
-                return null;
+            if (module.title === 'Users') {
+                return hasModuleAccess(['users.view', 'users.create', 'users.update', 'users.delete', 'users.reset-password']) ? module : null;
             }
-            return module; // Default to showing if no permission check is defined
+            if (module.title === 'Activity Logs') {
+                return hasModuleAccess(['activity-logs.view', 'activity-logs.export']) ? module : null;
+            }
+            return module;
         }).filter(module => module !== null);
     }, [has, hasAny]);
 

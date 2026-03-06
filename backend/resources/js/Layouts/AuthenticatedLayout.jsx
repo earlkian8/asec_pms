@@ -380,7 +380,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                         </nav>
 
                         {/* Sidebar footer */}
-                        <div className="py-2 flex justify-center items-center border-t border-zinc-400">
+                        <div className="py-2 flex justify-center items-center border-t border-zinc-400 mx-3">
                             {!sidebarCollapsed ? (
                                 <span>{user.email}</span>
                             ) : (
@@ -442,7 +442,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     </div>
 
                     {/* Footer */}
-                    <footer className="bg-white border-t border-zinc-400 px-4 py-[14px] sm:px-6">
+                    <footer className="bg-white border-t border-gray-200 px-4 py-[14px] sm:px-6">
                         <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600">
                             <p>&copy; 2025 Abdurauf Sawadjaan Engineering Consultancy. All rights reserved.</p>
                         </div>

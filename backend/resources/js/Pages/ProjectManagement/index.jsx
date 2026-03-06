@@ -50,41 +50,41 @@ export default function ProjectsIndex() {
     { key: 'notice_to_proceed',        label: 'Notice to Proceed'        },
   ];
 
-  const pagination    = usePage().props.projects;
-  const projects      = pagination?.data || [];
+  const pagination     = usePage().props.projects;
+  const projects       = pagination?.data || [];
   const paginationLinks = pagination?.links || [];
-  const clients       = usePage().props.clients || [];
-  const users         = usePage().props.users || [];
+  const clients        = usePage().props.clients || [];
+  const users          = usePage().props.users || [];
   const inventoryItems = usePage().props.inventoryItems || [];
-  const projectTypes  = usePage().props.projectTypes || [];
-  const filters       = usePage().props.filters || {};
-  const filterOptions = usePage().props.filterOptions || {};
-  const initialSearch = usePage().props.search || '';
-  const clientTypes   = usePage().props.clientTypes || [];
-  const pageProps     = usePage().props;
-  const stats         = pageProps.stats || { total: 0, active: 0, completed: 0, total_value: 0 };
+  const projectTypes   = usePage().props.projectTypes || [];
+  const filters        = usePage().props.filters || {};
+  const filterOptions  = usePage().props.filterOptions || {};
+  const initialSearch  = usePage().props.search || '';
+  const clientTypes    = usePage().props.clientTypes || [];
+  const pageProps      = usePage().props;
+  const stats          = pageProps.stats || { total: 0, active: 0, completed: 0, total_value: 0 };
 
-  const [searchInput, setSearchInput] = useState(initialSearch);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editProject, setEditProject] = useState(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteProject, setDeleteProject] = useState(null);
-  const [showFilterCard, setShowFilterCard] = useState(false);
-  const [showSortCard, setShowSortCard] = useState(false);
+  const [searchInput,      setSearchInput]     = useState(initialSearch);
+  const [showAddModal,     setShowAddModal]     = useState(false);
+  const [showEditModal,    setShowEditModal]    = useState(false);
+  const [editProject,      setEditProject]      = useState(null);
+  const [showDeleteModal,  setShowDeleteModal]  = useState(false);
+  const [deleteProject,    setDeleteProject]    = useState(null);
+  const [showFilterCard,   setShowFilterCard]   = useState(false);
+  const [showSortCard,     setShowSortCard]     = useState(false);
 
   const initializeFilters = (fp) => ({
-    client_id:      fp?.client_id      || '',
-    status:         fp?.status         || '',
-    priority:       fp?.priority       || '',
-    project_type_id:fp?.project_type_id|| '',
-    start_date:     fp?.start_date     || '',
-    end_date:       fp?.end_date       || '',
+    client_id:       fp?.client_id       || '',
+    status:          fp?.status          || '',
+    priority:        fp?.priority        || '',
+    project_type_id: fp?.project_type_id || '',
+    start_date:      fp?.start_date      || '',
+    end_date:        fp?.end_date        || '',
   });
 
   const [localFilters, setLocalFilters] = useState(() => initializeFilters(filters));
-  const [sortBy, setSortBy]       = useState(pageProps.sort_by    || 'created_at');
-  const [sortOrder, setSortOrder] = useState(pageProps.sort_order || 'desc');
+  const [sortBy,       setSortBy]       = useState(pageProps.sort_by    || 'created_at');
+  const [sortOrder,    setSortOrder]    = useState(pageProps.sort_order || 'desc');
   const debounceTimer = useRef(null);
 
   useEffect(() => {
@@ -97,24 +97,17 @@ export default function ProjectsIndex() {
     if (pageProps.sort_order) setSortOrder(pageProps.sort_order);
   }, [pageProps.sort_by, pageProps.sort_order]);
 
-  const typeColors = {
-    design: 'bg-purple-100 text-purple-800 border border-purple-200',
-    construction: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    consultancy: 'bg-blue-100 text-blue-800 border border-blue-200',
-    maintenance: 'bg-green-100 text-green-800 border border-green-200',
-  };
-
   const statusColors = {
-    active: 'bg-blue-100 text-blue-800 border border-blue-200',
-    on_hold: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    active:    'bg-blue-100 text-blue-800 border border-blue-200',
+    on_hold:   'bg-yellow-100 text-yellow-800 border border-yellow-200',
     completed: 'bg-green-100 text-green-800 border border-green-200',
     cancelled: 'bg-red-100 text-red-800 border border-red-200',
   };
 
   const priorityColors = {
-    low: 'bg-green-100 text-green-800 border border-green-200',
+    low:    'bg-green-100 text-green-800 border border-green-200',
     medium: 'bg-blue-100 text-blue-800 border border-blue-200',
-    high: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    high:   'bg-yellow-100 text-yellow-800 border border-yellow-200',
   };
 
   const capitalizeText = (text) => {
@@ -140,13 +133,13 @@ export default function ProjectsIndex() {
   const buildParams = (overrides = {}) => ({
     sort_by: sortBy,
     sort_order: sortOrder,
-    ...(searchInput?.trim()           && { search:          searchInput          }),
-    ...(localFilters.client_id        && { client_id:       localFilters.client_id }),
-    ...(localFilters.status           && { status:          localFilters.status  }),
-    ...(localFilters.priority         && { priority:        localFilters.priority }),
+    ...(searchInput?.trim()           && { search:          searchInput                  }),
+    ...(localFilters.client_id        && { client_id:       localFilters.client_id       }),
+    ...(localFilters.status           && { status:          localFilters.status          }),
+    ...(localFilters.priority         && { priority:        localFilters.priority        }),
     ...(localFilters.project_type_id  && { project_type_id: localFilters.project_type_id }),
-    ...(localFilters.start_date       && { start_date:      localFilters.start_date }),
-    ...(localFilters.end_date         && { end_date:        localFilters.end_date }),
+    ...(localFilters.start_date       && { start_date:      localFilters.start_date      }),
+    ...(localFilters.end_date         && { end_date:        localFilters.end_date        }),
     ...overrides,
   });
 
@@ -166,7 +159,7 @@ export default function ProjectsIndex() {
   };
 
   const resetFilters = () => {
-    setLocalFilters({ client_id:'', status:'', priority:'', project_type_id:'', start_date:'', end_date:'' });
+    setLocalFilters({ client_id: '', status: '', priority: '', project_type_id: '', start_date: '', end_date: '' });
     setSortBy('created_at'); setSortOrder('desc');
     router.get(route('project-management.index'), { ...(searchInput?.trim() && { search: searchInput }) }, {
       preserveState: true, preserveScroll: true, replace: true,
@@ -210,14 +203,28 @@ export default function ProjectsIndex() {
 
   return (
     <>
-      {showAddModal && (
-        <AddProject setShowAddModal={setShowAddModal} clients={clients} users={users}
-          inventoryItems={inventoryItems} projectTypes={projectTypes} clientTypes={clientTypes} />
+      {/* Always mounted — open prop controls visibility, preserving form state on close */}
+      <AddProject
+        open={showAddModal}
+        setShowAddModal={setShowAddModal}
+        clients={clients}
+        users={users}
+        inventoryItems={inventoryItems}
+        projectTypes={projectTypes}
+        clientTypes={clientTypes}
+      />
+
+      {/* Keep editProject guard so form reinitializes when switching between projects */}
+      {editProject && (
+        <EditProject
+          open={showEditModal}
+          setShowEditModal={setShowEditModal}
+          project={editProject}
+          clients={clients}
+          projectTypes={projectTypes}
+        />
       )}
-      {showEditModal && editProject && (
-        <EditProject setShowEditModal={setShowEditModal} project={editProject}
-          clients={clients} projectTypes={projectTypes} />
-      )}
+
       {showDeleteModal && deleteProject && (
         <DeleteProject setShowDeleteModal={setShowDeleteModal} project={deleteProject} />
       )}
@@ -344,7 +351,7 @@ export default function ProjectsIndex() {
                                   <SelectTrigger className="w-full h-9"><SelectValue placeholder="All Statuses" /></SelectTrigger>
                                   <SelectContent style={{ zIndex: 50 }}>
                                     <SelectItem value="all">All Statuses</SelectItem>
-                                    {filterOptions.statuses.map(s => <SelectItem key={s} value={s}>{s.replace('_',' ').replace(/\b\w/g,l=>l.toUpperCase())}</SelectItem>)}
+                                    {filterOptions.statuses.map(s => <SelectItem key={s} value={s}>{s.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -357,7 +364,7 @@ export default function ProjectsIndex() {
                                   <SelectTrigger className="w-full h-9"><SelectValue placeholder="All Priorities" /></SelectTrigger>
                                   <SelectContent style={{ zIndex: 50 }}>
                                     <SelectItem value="all">All Priorities</SelectItem>
-                                    {filterOptions.priorities.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</SelectItem>)}
+                                    {filterOptions.priorities.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -495,7 +502,7 @@ export default function ProjectsIndex() {
                 <TableBody>
                   {projects.length > 0 ? (
                     projects.map((project, index) => {
-                      const progress = project.progress_percentage || 0;
+                      const progress    = project.progress_percentage || 0;
                       const uploadedDocs = docCount(project);
                       return (
                         <TableRow key={project.id}
@@ -525,8 +532,8 @@ export default function ProjectsIndex() {
                                 <div
                                   className={`h-2.5 rounded-full transition-all duration-700 ${
                                     progress === 100 ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                                    progress >= 50  ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
-                                    progress > 0    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 'bg-gray-300'
+                                    progress >= 50   ? 'bg-gradient-to-r from-blue-500 to-blue-600'  :
+                                    progress > 0     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 'bg-gray-300'
                                   }`}
                                   style={{ width: `${Math.min(progress, 100)}%` }}
                                 />
@@ -538,7 +545,7 @@ export default function ProjectsIndex() {
                           </TableCell>
                           <TableCell className="px-3 sm:px-4 py-3 text-sm">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[project.status] || 'bg-gray-100 text-gray-800 border border-gray-200'}`}>
-                              {capitalizeText(project.status?.replace('_',' ') || '')}
+                              {capitalizeText(project.status?.replace('_', ' ') || '')}
                             </span>
                           </TableCell>
                           <TableCell className="px-3 sm:px-4 py-3 text-sm">
@@ -546,7 +553,6 @@ export default function ProjectsIndex() {
                               {capitalizeText(project.priority || '')}
                             </span>
                           </TableCell>
-                          {/* Documents badge */}
                           <TableCell className="px-3 sm:px-4 py-3 text-sm">
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border ${
                               uploadedDocs === DOCUMENT_FIELDS.length
@@ -569,14 +575,18 @@ export default function ProjectsIndex() {
                                 </Link>
                               )}
                               {has('projects.update') && (
-                                <button onClick={() => { setEditProject(project); setShowEditModal(true); }}
-                                  className="p-1.5 rounded-lg hover:bg-indigo-100 text-indigo-600 transition-all border border-indigo-200 hover:border-indigo-300" title="Edit">
+                                <button
+                                  onClick={() => { setEditProject(project); setShowEditModal(true); }}
+                                  className="p-1.5 rounded-lg hover:bg-indigo-100 text-indigo-600 transition-all border border-indigo-200 hover:border-indigo-300"
+                                  title="Edit">
                                   <SquarePen size={14} />
                                 </button>
                               )}
                               {has('projects.delete') && (
-                                <button onClick={() => { setDeleteProject(project); setShowDeleteModal(true); }}
-                                  className="p-1.5 rounded-lg hover:bg-red-100 text-red-600 transition-all border border-red-200 hover:border-red-300" title="Delete">
+                                <button
+                                  onClick={() => { setDeleteProject(project); setShowDeleteModal(true); }}
+                                  className="p-1.5 rounded-lg hover:bg-red-100 text-red-600 transition-all border border-red-200 hover:border-red-300"
+                                  title="Delete">
                                   <Trash2 size={14} />
                                 </button>
                               )}

@@ -24,24 +24,23 @@ const DOCUMENT_FIELDS = [
   { key: 'notice_to_proceed',        label: 'Notice to Proceed'        },
 ];
 
-const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
-  const hasBillings = project.has_billings ?? (project.billings_count > 0) ?? false;
+const EditProject = ({ open, setShowEditModal, clients, projectTypes, project }) => {
+  const hasBillings = project?.has_billings ?? (project?.billings_count > 0) ?? false;
 
   const { data, setData, post, errors, processing } = useForm({
     _method: 'PUT',
-    project_name:     project.project_name     || "",
-    client_id:        project.client_id?.toString() || "",
-    project_type_id:  project.project_type_id?.toString() || "",
-    status:           project.status           || "active",
-    priority:         project.priority         || "medium",
-    contract_amount:  project.contract_amount  || "",
-    start_date:       project.start_date       || "",
-    planned_end_date: project.planned_end_date || "",
-    actual_end_date:  project.actual_end_date  || "",
-    location:         project.location         || "",
-    description:      project.description      || "",
-    billing_type:     project.billing_type     || "fixed_price",
-    // Documents — null means "keep existing", File means "replace"
+    project_name:     project?.project_name     || "",
+    client_id:        project?.client_id?.toString() || "",
+    project_type_id:  project?.project_type_id?.toString() || "",
+    status:           project?.status           || "active",
+    priority:         project?.priority         || "medium",
+    contract_amount:  project?.contract_amount  || "",
+    start_date:       project?.start_date       || "",
+    planned_end_date: project?.planned_end_date || "",
+    actual_end_date:  project?.actual_end_date  || "",
+    location:         project?.location         || "",
+    description:      project?.description      || "",
+    billing_type:     project?.billing_type     || "fixed_price",
     building_permit:          null,
     business_permit:          null,
     environmental_compliance: null,
@@ -54,7 +53,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
   const [showAddClient, setShowAddClient] = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
-  // Track selected file names for display
   const [selectedFiles, setSelectedFiles] = useState({});
   const fileRefs = useRef({});
 
@@ -66,8 +64,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const allErrors = { ...validationErrors, ...errors };
 
   const getFieldError = (f) => validationErrors[f] || errors[f];
 
@@ -92,7 +88,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
       return;
     }
 
-    // Use post with _method: PUT so files are sent as multipart
     post(route("project-management.update", project.id), {
       forceFormData: true,
       preserveScroll: true,
@@ -124,13 +119,16 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
     if (fileRefs.current[fieldKey]) fileRefs.current[fieldKey].value = '';
   };
 
-  const getExistingFilename = (fieldKey) => project[fieldKey] || null;
+  const getExistingFilename = (fieldKey) => project?.[fieldKey] || null;
+
+  // Don't render form content if no project selected yet
+  if (!project) return null;
 
   return (
     <>
       {showAddClient && <AddClient setShowAddModal={setShowAddClient} />}
 
-      <Dialog open onOpenChange={setShowEditModal}>
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) setShowEditModal(false); }}>
         <DialogContent className="w-[95vw] max-w-[750px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-zinc-800">Edit Project</DialogTitle>
@@ -219,7 +217,7 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
                   <InputError message={errors.priority} />
                 </div>
 
-                {/* Contract Amount — locked if has billings */}
+                {/* Contract Amount */}
                 <div>
                   <Label className="text-zinc-800 flex items-center gap-1.5">
                     Contract Amount <span className="text-red-500">*</span>
@@ -335,7 +333,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
                   return (
                     <div key={key} className="flex flex-col gap-1">
                       <Label className="text-zinc-700 text-xs font-semibold">{label}</Label>
-                      {/* Portrait card: fixed width, taller than wide */}
                       <div
                         className={`relative rounded-xl border-2 overflow-hidden transition-all duration-200 cursor-pointer group
                           ${hasFile
@@ -349,7 +346,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
                       >
                         {hasFile ? (
                           <>
-                            {/* File preview area */}
                             {isImage ? (
                               <img
                                 src={selectedFile
@@ -360,7 +356,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
                               />
                             ) : isPdf ? (
                               <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 gap-2 px-2">
-                                {/* PDF icon */}
                                 <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
                                   <svg viewBox="0 0 24 24" className="w-7 h-7 text-red-600" fill="currentColor">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v5h5v11H6z"/>
@@ -387,7 +382,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
                               </div>
                             )}
 
-                            {/* Overlay: replace/clear buttons */}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                               <button type="button"
                                 onClick={(e) => { e.stopPropagation(); fileRefs.current[key]?.click(); }}
@@ -403,7 +397,6 @@ const EditProject = ({ setShowEditModal, clients, projectTypes, project }) => {
                               </button>
                             </div>
 
-                            {/* Status badge */}
                             <div className={`absolute top-1.5 right-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full ${
                               selectedFile ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
                             }`}>

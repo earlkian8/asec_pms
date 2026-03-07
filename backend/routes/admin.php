@@ -203,6 +203,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->middleware('permission:inventory.stock-in')->name('stock-in');
         Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->middleware('permission:inventory.stock-out')->name('stock-out');
         Route::put('/update-status/{inventoryItem}', [InventoryItemsController::class, 'updateStatus'])->middleware('permission:inventory.update')->name('update-status');
+        Route::get('/archived', [InventoryItemsController::class, 'archived'])->middleware('permission:inventory.archive')->name('archived');
+        Route::put('/{inventoryItem}/archive', [InventoryItemsController::class, 'archive'])->middleware('permission:inventory.archive')->name('archive');
+        Route::put('/{inventoryItem}/restore', [InventoryItemsController::class, 'restore'])->middleware('permission:inventory.update')->name('restore');
     });
 
     // Billing Management
@@ -213,8 +216,8 @@ Route::middleware('auth')->group(function () {
         // Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->middleware('permission:billing.delete')->name('destroy');
         Route::get('/view/{billing}', [BillingsController::class, 'show'])->middleware('permission:billing.view')->name('show');
         Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->middleware('permission:billing.add-payment')->name('add-payment');
-        Route::post('/archive/{billing}', [BillingsController::class, 'archive'])->middleware('permission:billing.update')->name('archive');
-        Route::post('/unarchive/{billing}', [BillingsController::class, 'unarchive'])->middleware('permission:billing.update')->name('unarchive');
+        Route::post('/archive/{billing}', [BillingsController::class, 'archive'])->middleware('permission:billing.archive')->name('archive');
+        Route::post('/unarchive/{billing}', [BillingsController::class, 'unarchive'])->middleware('permission:billing.archive')->name('unarchive');
         Route::get('/archived', [BillingsController::class, 'archived'])->middleware('permission:billing.view')->name('archived');
     });
 

@@ -102,6 +102,7 @@ class PermissionSeeder extends Seeder
             'inventory.stock-in',
             'inventory.stock-out',
             'inventory.allocate',
+            'inventory.archive',
 
             // Billing
             'billing.view',
@@ -110,6 +111,7 @@ class PermissionSeeder extends Seeder
             'billing.delete',
             'billing.add-payment',
             'billing.view-payments',
+            'billing.archive',
 
             // Reports
             'reports.view',

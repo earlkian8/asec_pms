@@ -393,14 +393,16 @@ export default function BillingManagement() {
                       </DropdownMenu>
 
                       {/* ── Archive page link ── */}
-                      <Button
-                        variant="outline"
-                        onClick={() => router.visit(route('billing-management.archived'))}
-                        className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-amber-50 hover:border-amber-400 hover:text-amber-700 transition-colors"
-                        title="View archived billings"
-                      >
-                        <Archive className="h-4 w-4" />
-                      </Button>
+                      {has('billing.archive') && (
+                        <Button
+                          variant="outline"
+                          onClick={() => router.visit(route('billing-management.archived'))}
+                          className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-amber-50 hover:border-amber-400 hover:text-amber-700 transition-colors"
+                          title="View archived billings"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -487,7 +489,7 @@ export default function BillingManagement() {
                                 )}
 
                                 {/* paid only: Archive */}
-                                {billing.status === 'paid' && has('billing.update') && (
+                                {billing.status === 'paid' && has('billing.archive') && (
                                   <button onClick={() => handleArchive(billing)}
                                     className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-all border border-amber-200 hover:border-amber-300"
                                     title="Archive billing">

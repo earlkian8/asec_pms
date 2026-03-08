@@ -308,18 +308,6 @@ class ReportsController extends Controller
 
         $projects = $query
             ->with(['client:id,client_name', 'milestones', 'projectType:id,name'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('planned_end_date', [$startDate, $endDate])
-                  ->orWhere(function ($q2) use ($startDate, $endDate) {
-                      // Projects spanning the range
-                      $q2->where('start_date', '<=', $startDate)
-                         ->where(function ($q3) use ($endDate) {
-                             $q3->whereNull('actual_end_date')
-                                ->orWhere('actual_end_date', '>=', $endDate);
-                         });
-                  });
-            })
             ->get()
             ->map(function ($project) {
                 $milestones       = $project->milestones;

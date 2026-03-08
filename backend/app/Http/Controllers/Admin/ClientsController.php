@@ -39,6 +39,10 @@ class ClientsController extends Controller
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $clients = Client::with('clientType')
+            ->withCount([
+                // Count active + on_hold projects so the frontend can block deletion
+                'projects as active_projects_count' => fn ($q) => $q->whereIn('status', ['active', 'on_hold']),
+            ])
             ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('client_code', 'like', "%{$search}%")
@@ -64,10 +68,17 @@ class ClientsController extends Controller
             })
             ->orderBy($sortBy, $sortOrder)
             ->when($sortBy !== 'created_at', function ($query) {
-                // Add created_at as secondary sort to maintain stable position when sorting by other fields
                 $query->orderBy('created_at', 'desc');
             })
             ->paginate(10);
+
+        // ── Global stats (always across ALL clients, not just the current page) ──
+        $stats = [
+            'total_clients'      => Client::count(),
+            'active_clients'     => Client::where('is_active', true)->count(),
+            'inactive_clients'   => Client::where('is_active', false)->count(),
+            'total_corporations' => Client::whereHas('clientType', fn ($q) => $q->where('name', 'like', '%corporation%'))->count(),
+        ];
 
         // Get unique values for filter options
         $clientTypes = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
@@ -90,6 +101,7 @@ class ClientsController extends Controller
             ],
             'sort_by' => $sortBy,
             'sort_order' => $sortOrder,
+            'stats' => $stats,
         ]);
     }
 
@@ -114,7 +126,6 @@ class ClientsController extends Controller
             'notes'           => ['nullable', 'string'],
         ]);
 
-        // If null, remove keys so DB default applies
         if (is_null($validated['credit_limit'] ?? null)) {
             unset($validated['credit_limit']);
         }
@@ -123,19 +134,17 @@ class ClientsController extends Controller
         }
 
         // Auto-generate a secure random password
-        $plainPassword = bin2hex(random_bytes(6)); // Generates a 12-character random password
+        $plainPassword = bin2hex(random_bytes(6)); // 12-character random password
 
-        // Hash the auto-generated password
         $validated['password'] = Hash::make($plainPassword);
 
         // Generate unique client code
         do {
-            $random = str_pad(rand(1, 999999), 3, '0', STR_PAD_LEFT); // 001–999
+            $random = str_pad(rand(1, 999999), 3, '0', STR_PAD_LEFT);
             $clientCode = 'CLT-' . $random;
         } while (Client::where('client_code', $clientCode)->exists());
 
         $validated['client_code'] = $clientCode;
-        // Set password_changed_at to null so client must change password on first login
         $validated['password_changed_at'] = null;
 
         $client = Client::create($validated);
@@ -144,19 +153,15 @@ class ClientsController extends Controller
         if ($client->email && $plainPassword) {
             try {
                 $loginUrl = config('app.client_portal_url', url('/client/login'));
-                
-                // Send email using Brevo SMTP
                 Mail::to($client->email)
                     ->send(new ClientCredentialsMail($client, $plainPassword, $loginUrl));
             } catch (\Exception $e) {
-                // Re-throw the exception so user knows email failed
                 throw new \Exception('Client created but failed to send credentials email: ' . $e->getMessage());
             }
         }
 
         $this->adminActivityLogs('Client', 'Add', 'Added Client ' . $client->client_name);
 
-        // System-wide notification for new client
         $this->createSystemNotification(
             'general',
             'New Client Added',
@@ -189,7 +194,7 @@ class ClientsController extends Controller
             'is_active'       => ['required', 'boolean'],
             'notes'           => ['nullable', 'string'],
         ]);
-        // If null, remove keys so DB default applies
+
         if (is_null($validated['credit_limit'] ?? null)) {
             unset($validated['credit_limit']);
         }
@@ -198,12 +203,10 @@ class ClientsController extends Controller
         }
 
         $oldName = $client->client_name;
-
         $client->update($validated);
 
         $this->adminActivityLogs('Client', 'Update', 'Updated Client ' . $oldName);
 
-        // System-wide notification for client update
         $this->createSystemNotification(
             'general',
             'Client Updated',
@@ -219,7 +222,6 @@ class ClientsController extends Controller
     {
         $name = $client->client_name;
 
-        // Prevent deletion if client has active projects
         $activeProjects = $client->projects()
             ->whereIn('status', ['active', 'on_hold'])
             ->count();
@@ -234,7 +236,6 @@ class ClientsController extends Controller
         $client->delete();
         $this->adminActivityLogs('Client', 'Delete', 'Deleted Client ' . $name);
 
-        // System-wide notification for client deletion
         $this->createSystemNotification(
             'general',
             'Client Deleted',
@@ -262,7 +263,6 @@ class ClientsController extends Controller
             'Updated Client ' . $client->client_name . ' status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
 
-        // System-wide notification for client status change
         $status = $request->boolean('is_active') ? 'Active' : 'Inactive';
         $this->createSystemNotification(
             'status_change',
@@ -281,7 +281,7 @@ class ClientsController extends Controller
         
         $client->update([
             'password' => Hash::make($defaultPassword),
-            'password_changed_at' => null, // Force password change on next login
+            'password_changed_at' => null,
         ]);
 
         $this->adminActivityLogs(

@@ -37,7 +37,6 @@ class ProjectsController extends Controller
 {
     use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
-    // All document field names
     const DOCUMENT_FIELDS = [
         'building_permit',
         'business_permit',
@@ -105,7 +104,9 @@ class ProjectsController extends Controller
                     $q->where('project_code', 'like', "%{$search}%")
                       ->orWhere('project_name', 'like', "%{$search}%")
                       ->orWhere('status', 'like', "%{$search}%")
-                      ->orWhere('priority', 'like', "%{$search}%");
+                      ->orWhere('priority', 'like', "%{$search}%")
+                      ->orWhereHas('client', fn ($cq) => $cq->where('client_name', 'like', "%{$search}%"))
+                      ->orWhereHas('projectType', fn ($tq) => $tq->where('name', 'like', "%{$search}%"));
                 });
             })
             ->when($clientId,    fn ($q, $v) => $q->where('client_id', $v))
@@ -118,7 +119,7 @@ class ProjectsController extends Controller
             ->when($sortBy !== 'created_at', fn ($q) => $q->orderBy('created_at', 'desc'))
             ->paginate(10);
 
-        // Calculate progress percentage from tasks
+        // Calculate progress + expose billing flag per project
         $projects->getCollection()->transform(function ($project) {
             $allTasks = collect();
             foreach ($project->milestones as $milestone) {
@@ -126,15 +127,18 @@ class ProjectsController extends Controller
                     $allTasks = $allTasks->merge($milestone->tasks);
                 }
             }
-            $totalTasks = $allTasks->count();
+            $totalTasks     = $allTasks->count();
             $completedTasks = $allTasks->where('status', 'completed')->count();
             $project->progress_percentage = $totalTasks > 0
                 ? round(($completedTasks / $totalTasks) * 100, 2)
                 : 0;
+
+            // Frontend uses this to show/hide the delete button
+            $project->has_billings = $project->billings()->exists();
+
             return $project;
         });
 
-        // Global stats (not page-bound, excludes archived)
         $stats = [
             'total'       => Project::whereNull('archived_at')->count(),
             'active'      => Project::whereNull('archived_at')->where('status', 'active')->count(),
@@ -257,6 +261,29 @@ class ProjectsController extends Controller
         return redirect()->back()->with('success', 'Project restored successfully.');
     }
 
+    /**
+     * Permanently delete a project — only allowed when it has no billing records.
+     */
+    public function destroy(Project $project)
+    {
+        $projectName = $project->project_name;
+
+        $project->delete();
+
+        $this->adminActivityLogs('Project', 'Delete', 'Deleted Project ' . $projectName);
+
+        // System-wide notification for project deletion
+        $this->createSystemNotification(
+            'general',
+            'Project Deleted',
+            "Project '{$projectName}' has been deleted.",
+            null,
+            route('project-management.index')
+        );
+
+        return redirect()->back()->with('success', 'Project deleted successfully.');
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -272,7 +299,6 @@ class ProjectsController extends Controller
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
             'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
-            // Documents
             'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
@@ -280,7 +306,6 @@ class ProjectsController extends Controller
             'surety_bond'              => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'signed_contract'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            // Relations
             'team_members'                             => ['nullable', 'array'],
             'team_members.*.id'                        => ['required', 'integer'],
             'team_members.*.type'                      => ['required', 'in:user,employee'],
@@ -311,7 +336,6 @@ class ProjectsController extends Controller
 
         DB::beginTransaction();
         try {
-            // Generate project code
             do {
                 $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
                 $projectCode = 'PRJ-' . $random;
@@ -319,7 +343,6 @@ class ProjectsController extends Controller
 
             $validated['project_code'] = $projectCode;
 
-            // Handle document uploads
             foreach (self::DOCUMENT_FIELDS as $fieldName) {
                 if ($request->hasFile($fieldName)) {
                     $directory = 'projects/documents/' . $projectCode;
@@ -331,7 +354,6 @@ class ProjectsController extends Controller
 
             $project = Project::create($validated);
 
-            // Team members
             if (!empty($validated['team_members'])) {
                 foreach ($validated['team_members'] as $index => $member) {
                     if ($member['type'] === 'user' && !\App\Models\User::where('id', $member['id'])->exists()) {
@@ -356,7 +378,6 @@ class ProjectsController extends Controller
                 }
             }
 
-            // Milestones
             if (!empty($validated['milestones'])) {
                 foreach ($validated['milestones'] as $milestone) {
                     ProjectMilestone::create([
@@ -371,7 +392,6 @@ class ProjectsController extends Controller
                 }
             }
 
-            // Material allocations
             if (!empty($validated['material_allocations'])) {
                 foreach ($validated['material_allocations'] as $allocation) {
                     ProjectMaterialAllocation::create([
@@ -387,7 +407,6 @@ class ProjectsController extends Controller
                 }
             }
 
-            // Labor costs
             if (!empty($validated['labor_costs'])) {
                 foreach ($validated['labor_costs'] as $index => $laborCost) {
                     if ($laborCost['assignable_type'] === 'user' && !\App\Models\User::where('id', $laborCost['assignable_id'])->exists()) {
@@ -435,7 +454,6 @@ class ProjectsController extends Controller
             'project_type_id'  => ['required', 'exists:project_types,id'],
             'status'           => ['nullable', 'in:active,on_hold,completed,cancelled'],
             'priority'         => ['nullable', 'in:low,medium,high'],
-            // contract_amount only editable when no billings
             'contract_amount'  => $hasBillings ? ['sometimes'] : ['required', 'numeric'],
             'start_date'       => ['nullable', 'date'],
             'planned_end_date' => ['nullable', 'date'],
@@ -443,7 +461,6 @@ class ProjectsController extends Controller
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
             'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
-            // Documents
             'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
@@ -453,7 +470,6 @@ class ProjectsController extends Controller
             'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
         ]);
 
-        // Handle document uploads — always delete old file first, then store new one
         $directory = 'projects/documents/' . $project->project_code;
         foreach (self::DOCUMENT_FIELDS as $fieldName) {
             if ($request->hasFile($fieldName)) {
@@ -468,7 +484,6 @@ class ProjectsController extends Controller
             }
         }
 
-        // Preserve contract_amount if locked
         if ($hasBillings) {
             $validated['contract_amount'] = $project->contract_amount;
         }
@@ -517,9 +532,6 @@ class ProjectsController extends Controller
         return redirect()->back()->with('success', 'Request update deleted successfully.');
     }
 
-    /**
-     * Serve a private document file (streaming download/view).
-     */
     public function serveDocument(Project $project, string $field)
     {
         if (!in_array($field, self::DOCUMENT_FIELDS)) {

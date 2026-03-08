@@ -9,7 +9,7 @@ import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import {
   Archive, SquarePen, Eye, Filter, X, Search, Calendar,
-  TrendingUp, Users, DollarSign, ArrowUpDown, FolderOpen,
+  TrendingUp, Users, DollarSign, ArrowUpDown, FolderOpen, Trash2,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 import AddProject from './add';
 import EditProject from './edit';
+import DeleteProject from './delete';
 
 export default function ProjectsIndex() {
   const { has } = usePermission();
@@ -64,12 +65,14 @@ export default function ProjectsIndex() {
   const pageProps       = usePage().props;
   const stats           = pageProps.stats || { total: 0, active: 0, completed: 0, total_value: 0 };
 
-  const [searchInput,    setSearchInput]    = useState(initialSearch);
-  const [showAddModal,   setShowAddModal]   = useState(false);
-  const [showEditModal,  setShowEditModal]  = useState(false);
-  const [editProject,    setEditProject]    = useState(null);
-  const [showFilterCard, setShowFilterCard] = useState(false);
-  const [showSortCard,   setShowSortCard]   = useState(false);
+  const [searchInput,     setSearchInput]     = useState(initialSearch);
+  const [showAddModal,    setShowAddModal]    = useState(false);
+  const [showEditModal,   setShowEditModal]   = useState(false);
+  const [editProject,     setEditProject]     = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteProject,   setDeleteProject]   = useState(null);
+  const [showFilterCard,  setShowFilterCard]  = useState(false);
+  const [showSortCard,    setShowSortCard]    = useState(false);
 
   const initializeFilters = (fp) => ({
     client_id:       fp?.client_id       || '',
@@ -213,7 +216,6 @@ export default function ProjectsIndex() {
 
   return (
     <>
-      {/* Always mounted — open prop controls visibility, preserving form state on close */}
       <AddProject
         open={showAddModal}
         setShowAddModal={setShowAddModal}
@@ -231,6 +233,17 @@ export default function ProjectsIndex() {
           project={editProject}
           clients={clients}
           projectTypes={projectTypes}
+        />
+      )}
+
+      {/* Delete modal — only mounted when a target project is selected */}
+      {showDeleteModal && deleteProject && (
+        <DeleteProject
+          project={deleteProject}
+          setShowDeleteModal={(val) => {
+            setShowDeleteModal(val);
+            if (!val) setDeleteProject(null);
+          }}
         />
       )}
 
@@ -295,7 +308,6 @@ export default function ProjectsIndex() {
             {/* Search + Filter Bar */}
             <div className="flex flex-col gap-3 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full">
-                {/* Left: Search + Filter + Sort + Archive */}
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -336,7 +348,6 @@ export default function ProjectsIndex() {
                           <button onClick={() => setShowFilterCard(false)} className="text-white hover:bg-zinc-900 rounded-lg p-1"><X className="h-4 w-4" /></button>
                         </div>
                         <div className="p-4 space-y-3 overflow-y-auto max-h-[380px]">
-                          {/* Client */}
                           <div>
                             <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Client</Label>
                             <Select value={localFilters.client_id || 'all'} onValueChange={(v) => handleFilterChange('client_id', v)}>
@@ -347,7 +358,6 @@ export default function ProjectsIndex() {
                               </SelectContent>
                             </Select>
                           </div>
-                          {/* Status */}
                           {filterOptions.statuses?.length > 0 && (
                             <div>
                               <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Status</Label>
@@ -360,7 +370,6 @@ export default function ProjectsIndex() {
                               </Select>
                             </div>
                           )}
-                          {/* Priority */}
                           {filterOptions.priorities?.length > 0 && (
                             <div>
                               <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Priority</Label>
@@ -373,7 +382,6 @@ export default function ProjectsIndex() {
                               </Select>
                             </div>
                           )}
-                          {/* Project Type */}
                           {filterOptions.projectTypes?.length > 0 && (
                             <div>
                               <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Project Type</Label>
@@ -386,7 +394,6 @@ export default function ProjectsIndex() {
                               </Select>
                             </div>
                           )}
-                          {/* Date Range */}
                           <div>
                             <Label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5 block">
                               <Calendar className="h-3 w-3" /> Date Range
@@ -488,7 +495,7 @@ export default function ProjectsIndex() {
                   </div>
                 </div>
 
-                {/* Right: Add Button */}
+                {/* Add Button */}
                 {has('projects.create') && (
                   <Button onClick={() => setShowAddModal(true)}
                     className="w-full sm:w-auto bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md h-11 px-5 whitespace-nowrap text-sm flex items-center justify-center gap-2">
@@ -518,6 +525,8 @@ export default function ProjectsIndex() {
                     projects.map((project, index) => {
                       const progress     = project.progress_percentage || 0;
                       const uploadedDocs = docCount(project);
+                      // Delete button shown only when permitted AND project has no billing records
+                      const canDelete    = has('projects.delete') && !project.has_billings;
                       return (
                         <TableRow key={project.id}
                           className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
@@ -602,6 +611,17 @@ export default function ProjectsIndex() {
                                   className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 transition-all border border-amber-200 hover:border-amber-300"
                                   title="Archive">
                                   <Archive size={14} />
+                                </button>
+                              )}
+                              {/* Delete — only visible when project has no billing records */}
+                              {canDelete && (
+                                <button
+                                  onClick={() => { setDeleteProject(project); setShowDeleteModal(true); }}
+                                  className="p-1.5 rounded-lg hover:bg-red-100 text-red-600 transition-all border border-red-200 hover:border-red-300"
+                                  title="Delete"
+                                  >
+                        
+                                  <Trash2 size={14} />
                                 </button>
                               )}
                             </div>

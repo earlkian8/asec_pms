@@ -316,4 +316,30 @@ class BillingsController extends Controller
 
         return back()->with('success', 'Payment recorded successfully.');
     }
+
+    public function destroy(Billing $billing)
+{
+    // Prevent deleting if not unpaid
+    if ($billing->status !== 'unpaid') {
+        return back()->with('error', 'Only unpaid billings can be deleted.');
+    }
+
+    // Safety check if payments exist
+    if ($billing->payments()->exists()) {
+        return back()->with('error', 'Cannot delete billing that already has payments.');
+    }
+
+    $billingCode = $billing->billing_code;
+    $projectName = $billing->project?->project_name;
+
+    $billing->delete();
+
+    $this->adminActivityLogs(
+        'Billing',
+        'Deleted',
+        'Deleted billing "' . $billingCode . '"' . ($projectName ? ' from project "' . $projectName . '"' : '')
+    );
+
+    return back()->with('success', 'Billing "' . $billingCode . '" deleted successfully.');
+}
 }

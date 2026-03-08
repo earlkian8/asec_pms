@@ -37,7 +37,6 @@ export default function Step3Milestones() {
 
   const handleChange = (field, value) => {
     setNewMilestone(prev => ({ ...prev, [field]: value }));
-    // Clear error for this field
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -54,17 +53,19 @@ export default function Step3Milestones() {
       validationErrors.name = 'The milestone name field is required.';
     }
 
-    // Validate dates
-    if (newMilestone.start_date && newMilestone.due_date) {
-      if (newMilestone.due_date < newMilestone.start_date) {
-        validationErrors.due_date = 'Due date cannot be before start date.';
-      }
-    }
-
-    // Validate dates against project dates
+    // Validate start date against project dates
     if (newMilestone.start_date && projectData.start_date && newMilestone.start_date < projectData.start_date) {
       validationErrors.start_date = `Start date cannot be before project start date (${projectData.start_date}).`;
     }
+
+    // Validate due date: must be after or equal to start date
+    if (newMilestone.due_date && newMilestone.start_date) {
+      if (newMilestone.due_date < newMilestone.start_date) {
+        validationErrors.due_date = 'Due date must be after or equal to start date.';
+      }
+    }
+
+    // Validate due date against project end date
     if (newMilestone.due_date && projectData.planned_end_date && newMilestone.due_date > projectData.planned_end_date) {
       validationErrors.due_date = `Due date cannot be after project end date (${projectData.planned_end_date}).`;
     }
@@ -89,7 +90,6 @@ export default function Step3Milestones() {
       billing_percentage: newMilestone.billing_percentage ? parseFloat(newMilestone.billing_percentage) : null,
     });
 
-    // Reset form
     setNewMilestone({
       name: "",
       description: "",

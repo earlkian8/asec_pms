@@ -18,7 +18,7 @@ import { usePermission } from '@/utils/permissions';
 
 import AddBilling   from './add';
 import EditBilling  from './edit';
-// import DeleteBilling from './delete';
+import DeleteBilling from './delete';
 import AddPayment   from './add-payment';
 import Transactions from './Transactions';
 
@@ -58,8 +58,8 @@ export default function BillingManagement() {
   const [showAddModal,     setShowAddModal]      = useState(false);
   const [showEditModal,    setShowEditModal]     = useState(false);
   const [editBilling,      setEditBilling]       = useState(null);
-  // const [showDeleteModal,  setShowDeleteModal]   = useState(false);
-  // const [deleteBilling,    setDeleteBilling]     = useState(null);
+  const [showDeleteModal,  setShowDeleteModal]   = useState(false);
+  const [deleteBilling,    setDeleteBilling]     = useState(null);
   const [showPaymentModal, setShowPaymentModal]  = useState(false);
   const [paymentBilling,   setPaymentBilling]    = useState(null);
   const [showFilterCard,   setShowFilterCard]    = useState(false);
@@ -196,7 +196,7 @@ export default function BillingManagement() {
     <>
       {showAddModal    && <AddBilling    setShowAddModal={setShowAddModal}       projects={projects} />}
       {showEditModal   && <EditBilling   setShowEditModal={setShowEditModal}     billing={editBilling} />}
-      {/* {showDeleteModal && <DeleteBilling setShowDeleteModal={setShowDeleteModal} billing={deleteBilling} />} */}
+      {showDeleteModal && <DeleteBilling setShowDeleteModal={setShowDeleteModal} billing={deleteBilling} />}
       {showPaymentModal && <AddPayment   setShowPaymentModal={setShowPaymentModal} billing={paymentBilling} />}
 
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
@@ -479,6 +479,8 @@ export default function BillingManagement() {
                                   </button>
                                 )}
 
+                        
+
                                 {/* unpaid + partial: Edit */}
                                 {billing.status !== 'paid' && has('billing.update') && (
                                   <button onClick={() => { setEditBilling(billing); setShowEditModal(true); }}
@@ -494,6 +496,19 @@ export default function BillingManagement() {
                                     className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-all border border-amber-200 hover:border-amber-300"
                                     title="Archive billing">
                                     <Archive size={14} />
+                                  </button>
+                                )}
+                                {/* unpaid only: Delete */}
+                                {billing.status === 'unpaid' && has('billing.delete') && (
+                                  <button
+                                    onClick={() => {
+                                      setDeleteBilling(billing);
+                                      setShowDeleteModal(true);
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-red-100 text-red-600 hover:text-red-700 transition-all border border-red-200 hover:border-red-300"
+                                    title="Delete billing"
+                                  >
+                                    <Trash2 size={14} />
                                   </button>
                                 )}
                               </div>

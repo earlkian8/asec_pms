@@ -427,10 +427,10 @@ class ProjectsController extends Controller
         $projectName = $project->project_name;
 
         // Delete all billing payments first, then billings
-        foreach ($project->billings as $billing) {
-            $billing->payments()->delete();
-        }
-        $project->billings()->delete();
+        // foreach ($project->billings as $billing) {
+        //     $billing->payments()->delete();
+        // }
+        // $project->billings()->delete();
 
         $project->delete();
 

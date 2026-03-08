@@ -28,6 +28,8 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
   const [showAddProjectType, setShowAddProjectType] = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
   const [selectedFiles, setSelectedFiles] = useState({});
+  // FIX #3: Local validation errors for frontend-only checks (e.g. max length)
+  const [localErrors, setLocalErrors] = useState({});
   const fileRefs = useRef({});
 
   useEffect(() => {
@@ -60,6 +62,26 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
     if (fileRefs.current[fieldKey]) fileRefs.current[fieldKey].value = '';
   };
 
+  // FIX #3: Handle project name change with live max-length validation
+  const handleProjectNameChange = (value) => {
+    updateProjectData({ project_name: value });
+    if (value.length > 255) {
+      setLocalErrors(prev => ({
+        ...prev,
+        project_name: 'Project name must not exceed 255 characters.',
+      }));
+    } else {
+      setLocalErrors(prev => {
+        const next = { ...prev };
+        delete next.project_name;
+        return next;
+      });
+    }
+  };
+
+  // Merge server errors with local frontend errors (local takes priority for project_name)
+  const mergedErrors = { ...errors, ...localErrors };
+
   return (
     <>
       {showAddClient && <AddClient setShowAddModal={setShowAddClient} clientTypes={clientTypes} />}
@@ -74,12 +96,23 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Project Name */}
             <div className="md:col-span-2">
-              <Label className="text-zinc-800">Project Name <span className="text-red-500">*</span></Label>
-              <Input type="text" value={projectData.project_name}
-                onChange={(e) => updateProjectData({ project_name: e.target.value })}
+              {/* FIX #3: Show character counter next to label */}
+              <div className="flex justify-between items-center mb-1">
+                <Label className="text-zinc-800">Project Name <span className="text-red-500">*</span></Label>
+                <span className={`text-xs ${(projectData.project_name?.length || 0) > 255 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                  {projectData.project_name?.length || 0}/255
+                </span>
+              </div>
+              <Input
+                type="text"
+                value={projectData.project_name}
+                onChange={(e) => handleProjectNameChange(e.target.value)}
                 placeholder="Enter project name"
-                className={inputClass(errors.project_name)} />
-              <InputError message={errors.project_name} />
+                className={inputClass(mergedErrors.project_name)}
+                // Allow typing past 255 so the error can show, but cap at 300 to prevent runaway input
+                maxLength={300}
+              />
+              <InputError message={mergedErrors.project_name} />
             </div>
 
             {/* Client */}

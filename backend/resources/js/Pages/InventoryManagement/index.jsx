@@ -429,7 +429,7 @@ export default function InventoryManagement() {
                 </div>
 
                 {/* Search + Filter Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6 relative z-50">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6 relative">
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-72">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />

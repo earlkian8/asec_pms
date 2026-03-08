@@ -30,14 +30,12 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
   const availableItems = safeItems.filter((item) => {
     if (!item || !item.id) return false;
     
-    // Check if item is already allocated
     const isAlreadyAllocated = materialAllocations.some(
       allocation => allocation.inventory_item_id === item.id.toString()
     );
     
     if (isAlreadyAllocated) return false;
     
-    // Apply search filter
     const itemCode = `${item.item_code || ''}`.toLowerCase();
     const itemName = `${item.item_name || ''}`.toLowerCase();
     const searchLower = search.toLowerCase();
@@ -53,7 +51,6 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       setSelectedItemIds(availableItems.map((item) => item.id.toString()));
     } else {
       setSelectedItemIds([]);
-      // Clear form data when deselecting all
       setFormData({});
     }
   };
@@ -62,13 +59,11 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
     const itemIdStr = itemId.toString();
     if (selectedItemIds.includes(itemIdStr)) {
       setSelectedItemIds(selectedItemIds.filter((id) => id !== itemIdStr));
-      // Clear form data for deselected item
       setFormData((prev) => {
         const newData = { ...prev };
         delete newData[itemIdStr];
         return newData;
       });
-      // Clear errors for deselected item
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[`${itemIdStr}_quantity_allocated`];
@@ -88,7 +83,6 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
         [field]: value,
       },
     }));
-    // Clear error for this field
     if (errors[`${itemIdStr}_${field}`]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -110,7 +104,6 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       return;
     }
 
-    // Validate required fields
     const validationErrors = {};
     for (const itemIdStr of selectedItemIds) {
       const item = availableItems.find(i => i.id.toString() === itemIdStr);
@@ -118,15 +111,21 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       if (!item) continue;
       
       const itemName = item.item_name || 'Item';
-      
-      // Validate quantity is required when item is selected
-      if (!formData[itemIdStr]?.quantity_allocated || parseFloat(formData[itemIdStr]?.quantity_allocated) <= 0) {
+      const enteredQty = formData[itemIdStr]?.quantity_allocated;
+
+      // Validate quantity is required and > 0
+      if (!enteredQty || parseFloat(enteredQty) <= 0) {
         validationErrors[`${itemIdStr}_quantity_allocated`] = `Please enter a valid quantity for ${itemName}`;
       } else {
-        // Validate quantity doesn't exceed available stock
-        const quantity = parseFloat(formData[itemIdStr].quantity_allocated);
-        if (item.current_stock !== null && quantity > item.current_stock) {
-          validationErrors[`${itemIdStr}_quantity_allocated`] = `Quantity cannot exceed available stock (${item.current_stock} ${item.unit_of_measure})`;
+        const quantity = parseFloat(enteredQty);
+
+        // FIX #2: Use parseFloat to safely coerce current_stock regardless of whether
+        // it comes in as a number, string, null, or undefined from the backend.
+        const availableStock = parseFloat(item.current_stock);
+
+        if (!isNaN(availableStock) && quantity > availableStock) {
+          validationErrors[`${itemIdStr}_quantity_allocated`] =
+            `Quantity cannot exceed available stock (${availableStock} ${item.unit_of_measure || ''})`.trim();
         }
       }
     }
@@ -137,14 +136,12 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       return;
     }
 
-    // Add all selected items
     let addedCount = 0;
     for (const itemIdStr of selectedItemIds) {
       const item = availableItems.find(i => i.id.toString() === itemIdStr);
       
       if (!item) continue;
 
-      // Check if item is already allocated (double-check)
       const isAlreadyAllocated = materialAllocations.some(
         allocation => allocation.inventory_item_id === itemIdStr
       );
@@ -164,7 +161,6 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
 
     if (addedCount > 0) {
       toast.success(`${addedCount} material allocation(s) added successfully`);
-      // Clear selections and form data
       setSelectedItemIds([]);
       setFormData({});
       setErrors({});
@@ -226,6 +222,10 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                   quantity_allocated: errors[`${itemIdStr}_quantity_allocated`],
                 };
 
+                // FIX #2: Safely parse available stock for display and max attr
+                const availableStock = parseFloat(item.current_stock);
+                const hasStock = !isNaN(availableStock);
+
                 return (
                   <TableRow
                     key={itemIdStr}
@@ -247,9 +247,9 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                     <TableCell className="font-medium text-gray-900">{item.item_code || '---'}</TableCell>
                     <TableCell className="text-gray-700">{item.item_name || '---'}</TableCell>
                     <TableCell className="text-gray-700">
-                      {item.current_stock !== null ? (
-                        <span className={item.current_stock > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                          {item.current_stock}
+                      {hasStock ? (
+                        <span className={availableStock > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                          {availableStock}
                         </span>
                       ) : (
                         '---'
@@ -261,6 +261,8 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                         type="number"
                         step="0.01"
                         min="0.01"
+                        // FIX #2: Set max to available stock so browser also hints the limit
+                        max={hasStock ? availableStock : undefined}
                         placeholder="0.00"
                         value={formData[itemIdStr]?.quantity_allocated || ""}
                         onChange={(e) => handleChange(item.id, "quantity_allocated", e.target.value)}

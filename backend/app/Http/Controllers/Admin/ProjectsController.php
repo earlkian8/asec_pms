@@ -170,7 +170,8 @@ class ProjectsController extends Controller
 
         $allAssignables = $users->concat($employees)->sortBy('name')->values();
 
-        $inventoryItems = InventoryItem::where('is_active', true)->orderBy('item_name')->get(['id', 'item_code', 'item_name']);
+        // AFTER
+        $inventoryItems = InventoryItem::where('is_active', true)->orderBy('item_name')->get(['id', 'item_code', 'item_name', 'current_stock', 'unit_of_measure']);
         $statuses       = Project::whereNull('archived_at')->distinct()->whereNotNull('status')->pluck('status')->sort()->values();
         $priorities     = Project::whereNull('archived_at')->distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
 

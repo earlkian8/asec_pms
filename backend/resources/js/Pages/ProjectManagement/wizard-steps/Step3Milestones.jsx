@@ -51,6 +51,9 @@ export default function Step3Milestones() {
 
     if (!newMilestone.name || newMilestone.name.trim() === '') {
       validationErrors.name = 'The milestone name field is required.';
+    } else if (newMilestone.name.trim().length > 255) {
+      // FIX #1: Validate max 255 characters for milestone name
+      validationErrors.name = 'Milestone name must not exceed 255 characters.';
     }
 
     // Validate start date against project dates
@@ -109,12 +112,19 @@ export default function Step3Milestones() {
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="md:col-span-2">
-            <Label>Milestone Name <span className="text-red-500">*</span></Label>
+            <div className="flex justify-between items-center mb-1">
+              <Label>Milestone Name <span className="text-red-500">*</span></Label>
+              {/* FIX #1: Live character counter */}
+              <span className={`text-xs ${newMilestone.name.length > 255 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                {newMilestone.name.length}/255
+              </span>
+            </div>
             <Input
               placeholder="e.g. Phase 1: Design"
               value={newMilestone.name}
               onChange={(e) => handleChange('name', e.target.value)}
               className={inputClass(errors.name)}
+              maxLength={300}
             />
             <InputError message={errors.name} />
           </div>

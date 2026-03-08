@@ -78,9 +78,18 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
     return errs;
   };
 
+  // Turn the server errors object into one readable toast message
+  const buildErrorSummary = (errs) => {
+    const messages = Object.values(errs).flat().filter(Boolean);
+    if (messages.length === 0) return "Failed to update project. Please try again.";
+    if (messages.length === 1) return messages[0];
+    return `${messages.length} fields have errors — please review the highlighted fields.`;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setValidationErrors({});
+
     const errs = validateForm();
     if (Object.keys(errs).length > 0) {
       setValidationErrors(errs);
@@ -98,7 +107,9 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
         if (flash?.error) toast.error(flash.error);
         else toast.success("Project updated successfully!");
       },
-      onError: () => toast.error("Please check the form for errors"),
+      onError: (errs) => {
+        toast.error(buildErrorSummary(errs));
+      },
     });
   };
 
@@ -121,7 +132,6 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
 
   const getExistingFilename = (fieldKey) => project?.[fieldKey] || null;
 
-  // Don't render form content if no project selected yet
   if (!project) return null;
 
   return (

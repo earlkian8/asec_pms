@@ -28,6 +28,12 @@ class Project extends Model
         'surety_bond',
         'signed_contract',
         'notice_to_proceed',
+        // Archive
+        'archived_at',
+    ];
+
+    protected $casts = [
+        'archived_at' => 'datetime',
     ];
 
     protected $appends = ['has_billings'];

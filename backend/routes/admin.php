@@ -45,7 +45,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/delete/{project}', [ProjectsController::class, 'destroy'])->middleware('permission:projects.delete')->name('destroy');
         Route::get('/view/{project}', [ProjectsController::class, 'show'])->middleware('permission:projects.view')->name('view');
         Route::get('/document/{project}/{field}', [ProjectsController::class, 'serveDocument'])->middleware('permission:projects.view')->name('document'); 
-
+        Route::get('/project-management/archived', [ProjectsController::class, 'archived'])->middleware('permission:projects.archive')->name('archived');
+        Route::post('/project-management/{project}/archive', [ProjectsController::class, 'archive'])->middleware('permission:projects.archive')->name('archive');
+        Route::post('/project-management/{project}/unarchive', [ProjectsController::class, 'unarchive'])->middleware('permission:projects.archive')->name('unarchive');
         // Project Teams
         Route::prefix('project-teams')->name('project-teams.')->group(function(){
             Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])->middleware('permission:project-teams.create')->name('store');

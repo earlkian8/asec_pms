@@ -99,6 +99,7 @@ class ProjectsController extends Controller
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $projects = Project::with(['client', 'projectType:id,name', 'milestones.tasks'])
+            ->whereNull('archived_at')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('project_code', 'like', "%{$search}%")
@@ -133,15 +134,15 @@ class ProjectsController extends Controller
             return $project;
         });
 
-        // Global stats (not page-bound)
+        // Global stats (not page-bound, excludes archived)
         $stats = [
-            'total'           => Project::count(),
-            'active'          => Project::where('status', 'active')->count(),
-            'completed'       => Project::where('status', 'completed')->count(),
-            'total_value'     => Project::sum('contract_amount'),
+            'total'       => Project::whereNull('archived_at')->count(),
+            'active'      => Project::whereNull('archived_at')->where('status', 'active')->count(),
+            'completed'   => Project::whereNull('archived_at')->where('status', 'completed')->count(),
+            'total_value' => Project::whereNull('archived_at')->sum('contract_amount'),
         ];
 
-        $clients     = Client::orderBy('client_name')->where('is_active', true)->get();
+        $clients      = Client::orderBy('client_name')->where('is_active', true)->get();
         $projectTypes = ProjectType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $clientTypes  = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
@@ -166,19 +167,19 @@ class ProjectsController extends Controller
         $allAssignables = $users->concat($employees)->sortBy('name')->values();
 
         $inventoryItems = InventoryItem::where('is_active', true)->orderBy('item_name')->get(['id', 'item_code', 'item_name']);
-        $statuses       = Project::distinct()->whereNotNull('status')->pluck('status')->sort()->values();
-        $priorities     = Project::distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
+        $statuses       = Project::whereNull('archived_at')->distinct()->whereNotNull('status')->pluck('status')->sort()->values();
+        $priorities     = Project::whereNull('archived_at')->distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
 
         return Inertia::render('ProjectManagement/index', [
-            'projects'      => $projects,
-            'search'        => $search,
-            'clients'       => $clients,
-            'users'         => $allAssignables,
-            'inventoryItems'=> $inventoryItems,
-            'projectTypes'  => $projectTypes,
-            'clientTypes'   => $clientTypes,
-            'stats'         => $stats,
-            'filters' => [
+            'projects'       => $projects,
+            'search'         => $search,
+            'clients'        => $clients,
+            'users'          => $allAssignables,
+            'inventoryItems' => $inventoryItems,
+            'projectTypes'   => $projectTypes,
+            'clientTypes'    => $clientTypes,
+            'stats'          => $stats,
+            'filters'        => [
                 'client_id'       => $clientId,
                 'status'          => $status,
                 'priority'        => $priority,
@@ -194,6 +195,66 @@ class ProjectsController extends Controller
             'sort_by'    => $sortBy,
             'sort_order' => $sortOrder,
         ]);
+    }
+
+    public function archived(Request $request)
+    {
+        $search    = $request->input('search');
+        $sortBy    = $request->input('sort_by', 'archived_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        $allowedSortColumns = ['archived_at', 'project_name', 'project_code', 'status', 'contract_amount', 'start_date'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'archived_at';
+        }
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
+
+        $projects = Project::with(['client', 'projectType:id,name'])
+            ->whereNotNull('archived_at')
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('project_code', 'like', "%{$search}%")
+                      ->orWhere('project_name', 'like', "%{$search}%")
+                      ->orWhere('status', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy($sortBy, $sortOrder)
+            ->paginate(10);
+
+        return Inertia::render('ProjectManagement/archived', [
+            'projects'   => $projects,
+            'search'     => $search,
+            'sort_by'    => $sortBy,
+            'sort_order' => $sortOrder,
+        ]);
+    }
+
+    public function archive(Project $project)
+    {
+        if ($project->archived_at) {
+            return redirect()->back()->with('error', 'Project is already archived.');
+        }
+
+        $project->update(['archived_at' => now()]);
+
+        $this->adminActivityLogs('Project', 'Archive', 'Archived Project ' . $project->project_name);
+        $this->createSystemNotification('general', 'Project Archived', "Project '{$project->project_name}' has been archived.", $project, route('project-management.archived'));
+
+        return redirect()->back()->with('success', 'Project archived successfully.');
+    }
+
+    public function unarchive(Project $project)
+    {
+        if (!$project->archived_at) {
+            return redirect()->back()->with('error', 'Project is not archived.');
+        }
+
+        $project->update(['archived_at' => null]);
+
+        $this->adminActivityLogs('Project', 'Unarchive', 'Restored Project ' . $project->project_name);
+        $this->createSystemNotification('general', 'Project Restored', "Project '{$project->project_name}' has been restored.", $project, route('project-management.view', $project->id));
+
+        return redirect()->back()->with('success', 'Project restored successfully.');
     }
 
     public function store(Request $request)
@@ -220,32 +281,32 @@ class ProjectsController extends Controller
             'signed_contract'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
             // Relations
-            'team_members'                         => ['nullable', 'array'],
-            'team_members.*.id'                    => ['required', 'integer'],
-            'team_members.*.type'                  => ['required', 'in:user,employee'],
-            'team_members.*.role'                  => ['required', 'string', 'max:50'],
-            'team_members.*.hourly_rate'           => ['required', 'numeric', 'min:0'],
-            'team_members.*.start_date'            => ['required', 'date'],
-            'team_members.*.end_date'              => ['nullable', 'date', 'after_or_equal:team_members.*.start_date'],
-            'milestones'                           => ['nullable', 'array'],
-            'milestones.*.name'                    => ['required', 'string', 'max:255'],
-            'milestones.*.description'             => ['nullable', 'string'],
-            'milestones.*.start_date'              => ['nullable', 'date'],
-            'milestones.*.due_date'                => ['nullable', 'date', 'after_or_equal:milestones.*.start_date'],
-            'milestones.*.billing_percentage'      => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'milestones.*.status'                  => ['nullable', 'in:pending,in_progress,completed'],
-            'material_allocations'                 => ['nullable', 'array'],
+            'team_members'                             => ['nullable', 'array'],
+            'team_members.*.id'                        => ['required', 'integer'],
+            'team_members.*.type'                      => ['required', 'in:user,employee'],
+            'team_members.*.role'                      => ['required', 'string', 'max:50'],
+            'team_members.*.hourly_rate'               => ['required', 'numeric', 'min:0'],
+            'team_members.*.start_date'                => ['required', 'date'],
+            'team_members.*.end_date'                  => ['nullable', 'date', 'after_or_equal:team_members.*.start_date'],
+            'milestones'                               => ['nullable', 'array'],
+            'milestones.*.name'                        => ['required', 'string', 'max:255'],
+            'milestones.*.description'                 => ['nullable', 'string'],
+            'milestones.*.start_date'                  => ['nullable', 'date'],
+            'milestones.*.due_date'                    => ['nullable', 'date', 'after_or_equal:milestones.*.start_date'],
+            'milestones.*.billing_percentage'          => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'milestones.*.status'                      => ['nullable', 'in:pending,in_progress,completed'],
+            'material_allocations'                     => ['nullable', 'array'],
             'material_allocations.*.inventory_item_id' => ['required', 'exists:inventory_items,id'],
-            'material_allocations.*.quantity_allocated'=> ['required', 'numeric', 'min:0.01'],
-            'material_allocations.*.notes'         => ['nullable', 'string'],
-            'labor_costs'                          => ['nullable', 'array'],
-            'labor_costs.*.assignable_id'          => ['required', 'integer'],
-            'labor_costs.*.assignable_type'        => ['required', 'in:user,employee'],
-            'labor_costs.*.work_date'              => ['required', 'date'],
-            'labor_costs.*.hours_worked'           => ['required', 'numeric', 'min:0.01'],
-            'labor_costs.*.hourly_rate'            => ['required', 'numeric', 'min:0'],
-            'labor_costs.*.description'            => ['nullable', 'string', 'max:500'],
-            'labor_costs.*.notes'                  => ['nullable', 'string'],
+            'material_allocations.*.quantity_allocated' => ['required', 'numeric', 'min:0.01'],
+            'material_allocations.*.notes'             => ['nullable', 'string'],
+            'labor_costs'                              => ['nullable', 'array'],
+            'labor_costs.*.assignable_id'              => ['required', 'integer'],
+            'labor_costs.*.assignable_type'            => ['required', 'in:user,employee'],
+            'labor_costs.*.work_date'                  => ['required', 'date'],
+            'labor_costs.*.hours_worked'               => ['required', 'numeric', 'min:0.01'],
+            'labor_costs.*.hourly_rate'                => ['required', 'numeric', 'min:0'],
+            'labor_costs.*.description'                => ['nullable', 'string', 'max:500'],
+            'labor_costs.*.notes'                      => ['nullable', 'string'],
         ]);
 
         DB::beginTransaction();
@@ -375,7 +436,7 @@ class ProjectsController extends Controller
             'status'           => ['nullable', 'in:active,on_hold,completed,cancelled'],
             'priority'         => ['nullable', 'in:low,medium,high'],
             // contract_amount only editable when no billings
-            'contract_amount'  => $hasBillings ? ['prohibited'] : ['required', 'numeric'],
+            'contract_amount'  => $hasBillings ? ['sometimes'] : ['required', 'numeric'],
             'start_date'       => ['nullable', 'date'],
             'planned_end_date' => ['nullable', 'date'],
             'actual_end_date'  => ['nullable', 'date'],
@@ -396,7 +457,6 @@ class ProjectsController extends Controller
         $directory = 'projects/documents/' . $project->project_code;
         foreach (self::DOCUMENT_FIELDS as $fieldName) {
             if ($request->hasFile($fieldName)) {
-                // Delete old file unconditionally before storing the new one
                 if ($project->{$fieldName}) {
                     Storage::disk(env('FILESYSTEM_DISK', 'public'))->delete($directory . '/' . $project->{$fieldName});
                 }
@@ -404,7 +464,6 @@ class ProjectsController extends Controller
                     $request->file($fieldName)->store($directory, env('FILESYSTEM_DISK', 'public'))
                 );
             } else {
-                // No new file uploaded — keep the existing value, don't overwrite
                 unset($validated[$fieldName]);
             }
         }
@@ -420,24 +479,6 @@ class ProjectsController extends Controller
         $this->createSystemNotification('general', 'Project Updated', "Project '{$project->project_name}' has been updated.", $project, route('project-management.view', $project->id));
 
         return redirect()->back()->with('success', 'Project updated successfully.');
-    }
-
-    public function destroy(Project $project)
-    {
-        $projectName = $project->project_name;
-
-        // Delete all billing payments first, then billings
-        // foreach ($project->billings as $billing) {
-        //     $billing->payments()->delete();
-        // }
-        // $project->billings()->delete();
-
-        $project->delete();
-
-        $this->adminActivityLogs('Project', 'Delete', 'Deleted Project ' . $projectName);
-        $this->createSystemNotification('general', 'Project Deleted', "Project '{$projectName}' has been deleted.", null, route('project-management.index'));
-
-        return redirect()->back()->with('success', 'Project deleted successfully.');
     }
 
     public function show(Project $project, Request $request)

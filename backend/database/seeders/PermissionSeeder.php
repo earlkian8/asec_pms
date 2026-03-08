@@ -22,6 +22,7 @@ class PermissionSeeder extends Seeder
             'projects.update',
             'projects.delete',
             'projects.view-all',
+            'projects.archive',
 
             // Project Teams
             'project-teams.view',

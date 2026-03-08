@@ -597,7 +597,7 @@ export default function TeamTab({ project, teamData }) {
                 <TableHead className="text-left font-bold px-4 py-4 text-xs sm:text-sm text-gray-700 uppercase tracking-wider" style={{ width: '3%' }}>
                   <div
                     onClick={toggleSelectAll}
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
+                    className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center cursor-pointer transition ${
                       selectedIds.length === projectTeams.length && projectTeams.length > 0
                         ? 'border-zinc-800 bg-zinc-800'
                         : 'border-gray-300 hover:border-gray-400'
@@ -634,7 +634,7 @@ export default function TeamTab({ project, teamData }) {
                     <TableCell className="text-left px-4 py-4">
                       <div
                         onClick={() => toggleSelect(team.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition ${
+                        className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center cursor-pointer transition ${
                           isSelected ? 'border-zinc-800 bg-zinc-800' : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >

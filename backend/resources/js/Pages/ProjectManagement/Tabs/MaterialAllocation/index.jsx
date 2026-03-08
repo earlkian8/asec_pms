@@ -670,7 +670,8 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                             <Eye size={16} />
                           </button>
                         )}
-                        {has('material-allocations.delete') && (
+                        {has('material-allocations.delete') &&
+                          (allocation.receiving_reports_count ?? allocation.receivingReports?.length ?? 0) === 0 && (
                           <button
                             onClick={() => {
                               setDeleteAllocation(allocation);

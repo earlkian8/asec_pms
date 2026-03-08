@@ -33,6 +33,7 @@ class MaterialAllocationService
                     $query->with('receivedBy')->orderBy('received_at', 'desc');
                 }
             ])
+            ->withCount('receivingReports') 
             ->orderBy('allocated_at', 'desc')
             ->paginate(10)
             ->withQueryString();

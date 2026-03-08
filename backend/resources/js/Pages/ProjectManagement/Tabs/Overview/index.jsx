@@ -168,7 +168,7 @@ export default function OverviewTab({ project, overviewData }) {
             <div className="p-2 bg-blue-500 rounded-lg group-hover:scale-110 transition-transform">
               <DollarSign className="text-white" size={18} />
             </div>
-            <span className="text-xs font-semibold text-blue-700 bg-blue-200 px-2 py-0.5 rounded">Contract</span>
+            <span className="text-xs font-semibold text-blue-700 bg-blue-200 px-2 py-0.5 rounded">Contract Amount</span>
           </div>
           <p className="text-xl font-bold text-gray-900">{formatCurrency(budget.contract_amount)}</p>
         </div>

@@ -34,6 +34,7 @@ class ProjectMilestonesService
                     $q->where('name', 'like', "%{$search}%")
                       ->orWhere('description', 'like', "%{$search}%")
                       ->orWhere('status', 'like', "%{$search}%")
+                      // FIX 1: also search by task title / description
                       ->orWhereHas('tasks', function ($tq) use ($search) {
                           $tq->where('title', 'like', "%{$search}%")
                              ->orWhere('description', 'like', "%{$search}%");
@@ -44,7 +45,7 @@ class ProjectMilestonesService
             ->when($statusFilter && $statusFilter !== 'all', function ($query) use ($statusFilter) {
                 $query->where('status', $statusFilter);
             })
-            // ── Date range filter ─────────────────────────────────────────
+            // ── FIX 2: Date range filter ─────────────────────────────────────────
             ->when($startDate, fn ($q) => $q->whereDate('start_date', '>=', $startDate))
             ->when($endDate,   fn ($q) => $q->whereDate('due_date',   '<=', $endDate))
             // ── Eager loads ──────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ class ProjectMilestonesService
                     $q->with(['reportedBy', 'assignedTo', 'task'])->orderBy('created_at', 'desc');
                 },
             ])
-            // ── Dynamic sort ────────────────────────────────────────────
+            // ── FIX 3–5: Dynamic sort ────────────────────────────────────────────
             ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
             ->withQueryString();
@@ -80,14 +81,8 @@ class ProjectMilestonesService
                 }
 
                 $task->progressUpdates->each(function ($update) {
-                    // FIX: Use asset() instead of Storage::disk('public')->url()
-                    // so the full absolute URL is returned consistently for both
-                    // the admin web interface and the mobile API.
-                    // Storage::disk()->url() relies on APP_URL being correct and
-                    // can return a relative or localhost URL when misconfigured,
-                    // whereas asset() always resolves against the live request host.
                     if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                        $update->file_url = asset('storage/' . $update->file_path);
+                        $update->file_url = Storage::disk('public')->url($update->file_path);
                     }
                     if (!$update->relationLoaded('createdBy') && $update->created_by) {
                         $update->load('createdBy');

@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ChatController;
+use App\Http\Controllers\Admin\TrashBinController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
 use Illuminate\Foundation\Application;
@@ -192,6 +193,13 @@ Route::middleware('auth')->group(function () {
         // Activity Logs
         Route::prefix('activity-logs')->name('activity-logs.')->group(function(){
             Route::get('/', [ActivityLogsController::class, 'index'])->middleware('permission:activity-logs.view')->name('index');
+        });
+
+        // Trash Bin
+        Route::prefix('trash-bin')->name('trash-bin.')->group(function () {
+            Route::get('/', [TrashBinController::class, 'index'])->middleware('permission:trash-bin.view')->name('index');
+            Route::post('/restore', [TrashBinController::class, 'restore'])->middleware('permission:trash-bin.restore')->name('restore');
+            Route::delete('/force-delete', [TrashBinController::class, 'forceDelete'])->middleware('permission:trash-bin.force-delete')->name('force-delete');
         });
     });
 

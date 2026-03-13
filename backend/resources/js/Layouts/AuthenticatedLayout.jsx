@@ -18,7 +18,8 @@ import {
     FileText,
     X,
     MessageCircle,
-    ChevronDown 
+    ChevronDown,
+    Trash2,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -144,6 +145,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             icon: FileText,
             type: 'single'
         },
+        {
+            title: 'Trash Bin',
+            href: route('user-management.trash-bin.index'),
+            routeName: 'user-management.trash-bin.*',
+            icon: Trash2,
+            type: 'single'
+        },
     ];
 
     // Filter navigation modules based on permissions
@@ -208,6 +216,9 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             }
             if (module.title === 'Activity Logs') {
                 return hasModuleAccess(['activity-logs.view', 'activity-logs.export']) ? module : null;
+            }
+            if (module.title === 'Trash Bin') {
+                return hasModuleAccess(['trash-bin.view']) ? module : null;
             }
             return module;
         }).filter(module => module !== null);

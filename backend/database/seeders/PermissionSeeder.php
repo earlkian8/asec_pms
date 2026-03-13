@@ -140,6 +140,11 @@ class PermissionSeeder extends Seeder
             // Activity Logs
             'activity-logs.view',
             'activity-logs.export',
+
+            // Trash Bin
+            'trash-bin.view',
+            'trash-bin.restore',
+            'trash-bin.force-delete',
         ];
 
         foreach ($permissions as $permission) {

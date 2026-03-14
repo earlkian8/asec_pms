@@ -273,7 +273,7 @@ export default function ClientsIndex() {
             
             {/* Quick Stats — uses backend totals, not current page slice */}
             <div className="mb-6 pb-6 border-b border-gray-200">
-              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-2">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div>
@@ -307,7 +307,7 @@ export default function ClientsIndex() {
                     </div>
                   </div>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 sm:p-4 border border-purple-200">
+                {/* <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 sm:p-4 border border-purple-200">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Corporations</p>
@@ -317,7 +317,7 @@ export default function ClientsIndex() {
                       <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-700" />
                     </div>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
 

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiService } from '@/services/api';
 import { initializePusher, disconnectPusher } from '@/services/pusher';
@@ -19,9 +20,10 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  displayBillingModule: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
+  checkAuth: (silent?: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,15 +31,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [displayBillingModule, setDisplayBillingModule] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const response = await apiService.get<{
         id: number;
         client_code: string;
@@ -60,6 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone_number: response.data.phone_number,
           is_active: response.data.is_active,
         });
+        const config = (response as { config?: { display_billing_module?: boolean } }).config;
+        setDisplayBillingModule(config?.display_billing_module ?? true);
         // Initialize Pusher if user is authenticated and we have a token
         const token = apiService.getToken();
         if (token) {
@@ -67,15 +68,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUser(null);
+        setDisplayBillingModule(true);
         apiService.setToken(null);
       }
     } catch (error) {
       setUser(null);
+      setDisplayBillingModule(true);
       apiService.setToken(null);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Refresh config (e.g. display_billing_module) when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active' && apiService.getToken()) {
+        checkAuth(true);
+      }
+    });
+    return () => subscription.remove();
+  }, [checkAuth]);
 
   const login = async (
     email: string,
@@ -118,6 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           apiService.setToken(response.data.token);
           initializePusher(response.data.token);
         }
+
+        // Refresh /me to get config (e.g. display_billing_module)
+        await checkAuth();
 
         return { 
           success: true, 
@@ -162,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
+        displayBillingModule,
         login,
         logout,
         checkAuth,

@@ -28,6 +28,7 @@ import {
   Receipt,
 } from 'lucide-react-native';
 import { useDialog } from '@/contexts/DialogContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { AppColors } from '@/constants/colors';
 import { formatCurrency } from '@/utils/formatCurrency';
@@ -37,6 +38,7 @@ export default function BillingDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { displayBillingModule } = useAuth();
 
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,12 @@ export default function BillingDetailScreen() {
   const [amountTouched, setAmountTouched] = useState(false);
   const [showPaymentDetailModal, setShowPaymentDetailModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Billing['payments'][0] | null>(null);
+
+  useEffect(() => {
+    if (!displayBillingModule) {
+      router.replace('/(tabs)');
+    }
+  }, [displayBillingModule, router]);
 
   useEffect(() => {
     fetchBilling();

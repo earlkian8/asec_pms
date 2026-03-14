@@ -339,7 +339,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
-                                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                                <div>
                                     <User size={16} />
                                 </div>
                                 <span className="hidden sm:block text-sm font-medium">{user.name}</span>
@@ -352,12 +352,12 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                             <DropdownMenuItem asChild>
                                 <Link href={route('profile.edit')}>Profile</Link>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
-                                <Link href={route('logout')} method="post" as="button">
+                                <Link href={route('logout')} method="post" as="button" className='w-full'>
                                     Log Out
                                 </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

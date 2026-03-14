@@ -338,12 +338,20 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     {/* User dropdown using shadcn */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
-                                <div>
-                                    <User size={16} />
+                            <button className="flex items-center space-x-2 focus:outline-none">
+                                <div className="h-8 w-8 rounded-full overflow-hidden bg-zinc-700 flex items-center justify-center flex-shrink-0 ring-2 ring-zinc-300 hover:ring-zinc-500 transition-all">
+                                    {user.profile_image_url ? (
+                                        <img
+                                            src={user.profile_image_url}
+                                            alt={user.name}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="text-sm font-bold text-white uppercase">
+                                            {user.name?.charAt(0) ?? '?'}
+                                        </span>
+                                    )}
                                 </div>
-                                <span className="hidden sm:block text-sm font-medium">{user.name}</span>
-                                <ChevronDown size={16} />
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
@@ -360,6 +368,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                             <DropdownMenuSeparator />
                         </DropdownMenuContent>
                     </DropdownMenu>
+ 
                 </div>
             </header>
 

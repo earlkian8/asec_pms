@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, RefreshControl,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
@@ -16,27 +12,85 @@ import { useDashboard, DashboardProject } from '@/hooks/useDashboard';
 import { useBillings } from '@/hooks/useBillings';
 import { FIRM_CONTACT } from '@/constants/contact';
 import {
-  Briefcase,
-  Wallet,
-  CheckCircle,
-  Clock,
-  Receipt,
-  AlertCircle,
-  Bell,
+  Briefcase, CheckCircle, Clock, Receipt,
+  AlertCircle, Bell, ArrowRight,
 } from 'lucide-react-native';
 import RequestUpdateModal from '@/components/RequestUpdateModal';
 import NotificationCenter from '@/components/NotificationCenter';
-import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
-import StatBox from '@/components/ui/StatBox';
 import ProjectCard from '@/components/cards/ProjectCard';
 import BillingCard from '@/components/cards/BillingCard';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { AppColors } from '@/constants/colors';
 import { useDialog } from '@/contexts/DialogContext';
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const D = {
+  ink:      '#0F0F0E',
+  inkMid:   '#4A4845',
+  inkLight: '#9A9691',
+  chalk:    '#FAFAF8',
+  surface:  '#FFFFFF',
+  hairline: '#E8E5DF',
+  green:    '#2D7D52',
+  greenBg:  '#EDF7F2',
+  red:      '#C0392B',
+  redBg:    '#FDF1F0',
+  blue:     '#1D4ED8',
+  blueBg:   '#EEF2FF',
+  amber:    '#B45309',
+  amberBg:  '#FFFBEB',
+};
+
+// ── Stat chip ─────────────────────────────────────────────────────────────────
+function StatChip({ icon: Icon, value, label, accent }: {
+  icon: any; value: string | number; label: string; accent: string;
+}) {
+  return (
+    <View style={[styles.statChip, { borderLeftColor: accent }]}>
+      <View style={[styles.statChipIcon, { backgroundColor: accent + '18' }]}>
+        <Icon size={13} color={accent} strokeWidth={2.5} />
+      </View>
+      <View>
+        <Text style={styles.statChipValue}>{value}</Text>
+        <Text style={[styles.statChipLabel, { color: D.inkLight }]}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderLeft}>
+        <View style={styles.sectionBar} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {onSeeAll && (
+        <TouchableOpacity onPress={onSeeAll} style={styles.seeAllBtn}>
+          <Text style={styles.seeAllText}>See all</Text>
+          <ArrowRight size={12} color={D.ink} strokeWidth={2.5} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ── Billing pill ──────────────────────────────────────────────────────────────
+function BillingPill({ label, count, color, bg }: {
+  label: string; count: number; color: string; bg: string;
+}) {
+  return (
+    <View style={[styles.billingPill, { backgroundColor: bg }]}>
+      <Text style={[styles.billingPillCount, { color }]}>{count}</Text>
+      <Text style={[styles.billingPillLabel, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { user, displayBillingModule } = useAuth();
   const { unreadCount, refreshNotifications } = useApp();
@@ -45,49 +99,45 @@ export default function HomeScreen() {
     sortBy: 'created_at',
     sortOrder: 'desc',
   });
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const dialog = useDialog();
-  const [refreshing, setRefreshing] = useState(false);
-  const [showRequestUpdate, setShowRequestUpdate] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<DashboardProject | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const router   = useRouter();
+  const insets   = useSafeAreaInsets();
+  const dialog   = useDialog();
 
-  const activeProjects = projects.filter((p) => p.status === 'active');
-  const recentProjects = activeProjects.slice(0, 3);
-  const recentBillings = billings.slice(0, 5);
+  const [refreshing,       setRefreshing]       = useState(false);
+  const [showRequestUpdate,setShowRequestUpdate] = useState(false);
+  const [selectedProject,  setSelectedProject]  = useState<DashboardProject | null>(null);
+  const [showNotifications,setShowNotifications] = useState(false);
 
-  // Calculate billing statistics
+  const activeProjects  = projects.filter((p) => p.status === 'active');
+  const recentProjects  = activeProjects.slice(0, 3);
+  const recentBillings  = billings.slice(0, 5);
+
   const billingStats = React.useMemo(() => {
-    const unpaid = billings.filter((b) => b.status === 'unpaid').length;
+    const unpaid  = billings.filter((b) => b.status === 'unpaid').length;
     const partial = billings.filter((b) => b.status === 'partial').length;
-    const paid = billings.filter((b) => b.status === 'paid').length;
+    const paid    = billings.filter((b) => b.status === 'paid').length;
     const totalUnpaid = billings
       .filter((b) => b.status === 'unpaid' || b.status === 'partial')
       .reduce((sum, b) => sum + b.remaining_amount, 0);
     const overdue = billings.filter((b) => {
       if (!b.due_date) return false;
       const dueDate = new Date(b.due_date);
-      const today = new Date();
+      const today   = new Date();
       today.setHours(0, 0, 0, 0);
       return (b.status === 'unpaid' || b.status === 'partial') && dueDate < today;
     }).length;
-
     return { unpaid, partial, paid, totalUnpaid, overdue };
   }, [billings]);
 
-  // Get payment status for a project
   const getProjectPaymentStatus = (projectId: string) => {
     const projectBillings = billings.filter((b) => b.project.id.toString() === projectId.toString());
     if (projectBillings.length === 0) return null;
-    
-    const hasUnpaid = projectBillings.some((b) => b.status === 'unpaid');
+    const hasUnpaid  = projectBillings.some((b) => b.status === 'unpaid');
     const hasPartial = projectBillings.some((b) => b.status === 'partial');
     const totalUnpaid = projectBillings
       .filter((b) => b.status === 'unpaid' || b.status === 'partial')
       .reduce((sum, b) => sum + b.remaining_amount, 0);
-
-    if (hasUnpaid) return { status: 'unpaid' as const, amount: totalUnpaid };
+    if (hasUnpaid)  return { status: 'unpaid'  as const, amount: totalUnpaid };
     if (hasPartial) return { status: 'partial' as const, amount: totalUnpaid };
     return { status: 'paid' as const, amount: 0 };
   };
@@ -100,25 +150,16 @@ export default function HomeScreen() {
 
   const handleContact = async (project: DashboardProject) => {
     const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-    
     dialog.showConfirm(
       `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
       async () => {
         try {
           const canOpen = await Linking.canOpenURL(emailUrl);
-          if (canOpen) {
-            await Linking.openURL(emailUrl);
-          } else {
-            dialog.showError('Unable to open email client');
-          }
-        } catch (error) {
-          dialog.showError('Failed to open email client');
-          console.error('Error opening email:', error);
-        }
+          if (canOpen) await Linking.openURL(emailUrl);
+          else dialog.showError('Unable to open email client');
+        } catch { dialog.showError('Failed to open email client'); }
       },
-      'Contact Project Manager',
-      'Email',
-      'Cancel'
+      'Contact Project Manager', 'Email', 'Cancel'
     );
   };
 
@@ -128,159 +169,74 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: AppColors.background }]}>
+    <View style={styles.root}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + 20 },
-        ]}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppColors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />
         }>
-        {/* Header */}
+
+        {/* ── Header ───────────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: AppColors.textSecondary }]}>Welcome back,</Text>
-            <Text style={[styles.userName, { color: AppColors.text }]}>
-              {user?.name || 'Client'}
-            </Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerGreeting}>Good day,</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{user?.name || 'Client'}</Text>
+            <Text style={styles.headerCompany} numberOfLines={1}>{user?.company || ''}</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.notificationButton, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}
-            onPress={() => setShowNotifications(true)}>
-            <Bell size={20} color={AppColors.text} />
+          <TouchableOpacity style={styles.notifBtn} onPress={() => setShowNotifications(true)}>
+            <Bell size={19} color={D.ink} strokeWidth={1.8} />
             {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Statistics Grid */}
+        {loading && !statistics && <LoadingState message="Loading dashboard..." />}
+
         {statistics && (
           <>
-            <AnimatedView delay={100}>
-              <View style={styles.statsGrid}>
-              {/* Row 1: Active Projects and On Time - 2 Columns */}
-              <View style={styles.twoColumnRow}>
-                <View style={styles.halfWidthCard}>
-                  <StatBox
-                    title="Active Projects"
-                    value={statistics.activeProjects}
-                    Icon={Briefcase}
-                    color={AppColors.primary}
-                    gradient={['#3B82F6', '#2563EB']}
-                  />
-                </View>
-                <View style={styles.halfWidthCard}>
-                  <StatBox
-                    title="On Time"
-                    value={statistics.onTimeProjects}
-                    Icon={Clock}
-                    color={AppColors.warning}
-                    gradient={['#F59E0B', '#D97706']}
-                  />
-                </View>
+            {/* ── Project stat chips — counts only, no financials ─────────── */}
+            <AnimatedView delay={80}>
+              <View style={styles.statsRow}>
+                <StatChip icon={Briefcase}   value={statistics.activeProjects}    label="Active"    accent={D.blue}  />
+                <View style={styles.statDiv} />
+                <StatChip icon={CheckCircle} value={statistics.completedProjects} label="Completed" accent={D.green} />
+                <View style={styles.statDiv} />
+                <StatChip icon={Clock}       value={statistics.onTimeProjects}    label="On Time"   accent={D.amber} />
               </View>
-              
-              {/* Row 2: Total Budget - Full Width */}
-              <View style={styles.fullWidthCard}>
-                <StatBox
-                  title="Total Budget"
-                  value={formatCurrency(statistics.totalBudget)}
-                  Icon={Wallet}
-                  color={AppColors.success}
-                  gradient={['#10B981', '#059669']}
-                />
-              </View>
-              
-              {/* Row 3: Completed - Full Width */}
-              <View style={styles.fullWidthCard}>
-                <StatBox
-                  title="Completed"
-                  value={statistics.completedProjects}
-                  Icon={CheckCircle}
-                  color="#8B5CF6"
-                  gradient={['#8B5CF6', '#7C3AED']}
-                />
-              </View>
-            </View>
             </AnimatedView>
 
-            {/* Budget Overview */}
-            <AnimatedView delay={200}>
-              <View style={[styles.budgetCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
-              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Budget Overview</Text>
-              <View style={styles.budgetInfo}>
-                <View style={styles.budgetRow}>
-                  <Text style={[styles.budgetLabel, { color: AppColors.textSecondary }]}>Total Spent</Text>
-                  <Text style={[styles.budgetValue, { color: AppColors.text }]}>
-                    {formatCurrency(statistics.totalSpent)}
-                  </Text>
-                </View>
-                <View style={styles.budgetRow}>
-                  <Text style={[styles.budgetLabel, { color: AppColors.textSecondary }]}>Remaining</Text>
-                  <Text style={[styles.budgetValue, { color: AppColors.success }]}>
-                    {formatCurrency(statistics.totalBudget - statistics.totalSpent)}
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.budgetBar, { backgroundColor: AppColors.border }]}>
-                <View
-                  style={[
-                    styles.budgetFill,
-                    {
-                      width: `${statistics.totalBudget > 0 ? (statistics.totalSpent / statistics.totalBudget) * 100 : 0}%`,
-                      backgroundColor: AppColors.primary,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.budgetPercent, { color: AppColors.textSecondary }]}>
-                {statistics.totalBudget > 0 ? Math.round((statistics.totalSpent / statistics.totalBudget) * 100) : 0}% of budget used
-              </Text>
-            </View>
-            </AnimatedView>
-
-            {/* Billing Summary - only when billing module is enabled */}
+            {/* ── Billing summary ──────────────────────────────────────────── */}
             {displayBillingModule && (
-              <AnimatedView delay={250}>
-                <View style={[styles.billingSummaryCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
-                  <View style={styles.billingSummaryHeader}>
-                    <Receipt size={20} color={AppColors.text} />
-                    <Text style={[styles.sectionTitle, { color: AppColors.text, marginLeft: 8 }]}>Billing Summary</Text>
-                  </View>
-                  <View style={styles.billingStatsGrid}>
-                    <View style={styles.billingStatItem}>
-                      <View style={[styles.billingStatDot, { backgroundColor: AppColors.error }]} />
-                      <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.unpaid}</Text>
-                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Unpaid</Text>
-                    </View>
-                    <View style={styles.billingStatItem}>
-                      <View style={[styles.billingStatDot, { backgroundColor: AppColors.warning }]} />
-                      <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.partial}</Text>
-                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Partial</Text>
-                    </View>
-                    <View style={styles.billingStatItem}>
-                      <View style={[styles.billingStatDot, { backgroundColor: AppColors.success }]} />
-                      <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.paid}</Text>
-                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Paid</Text>
+              <AnimatedView delay={140}>
+                <View style={styles.billingCard}>
+                  <View style={styles.billingCardHeader}>
+                    <View style={styles.billingCardTitleRow}>
+                      <Receipt size={14} color={D.inkMid} strokeWidth={2} />
+                      <Text style={styles.billingCardTitle}>Billing Summary</Text>
                     </View>
                     {billingStats.overdue > 0 && (
-                      <View style={styles.billingStatItem}>
-                        <AlertCircle size={16} color={AppColors.error} />
-                        <Text style={[styles.billingStatValue, { color: AppColors.error }]}>{billingStats.overdue}</Text>
-                        <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Overdue</Text>
+                      <View style={styles.overdueChip}>
+                        <AlertCircle size={11} color={D.red} strokeWidth={2.5} />
+                        <Text style={styles.overdueText}>{billingStats.overdue} overdue</Text>
                       </View>
                     )}
                   </View>
+
+                  <View style={styles.billingPillsRow}>
+                    <BillingPill label="Unpaid"  count={billingStats.unpaid}  color={D.red}   bg={D.redBg}   />
+                    <BillingPill label="Partial" count={billingStats.partial} color={D.amber} bg={D.amberBg} />
+                    <BillingPill label="Paid"    count={billingStats.paid}    color={D.green} bg={D.greenBg} />
+                  </View>
+
                   {billingStats.totalUnpaid > 0 && (
-                    <View style={styles.totalUnpaidSection}>
-                      <Text style={[styles.totalUnpaidLabel, { color: AppColors.textSecondary }]}>Total Outstanding</Text>
-                      <Text style={[styles.totalUnpaidValue, { color: AppColors.error }]}>
+                    <View style={styles.billingOutstanding}>
+                      <Text style={styles.billingOutstandingLabel}>Outstanding</Text>
+                      <Text style={styles.billingOutstandingValue}>
                         {formatCurrency(billingStats.totalUnpaid)}
                       </Text>
                     </View>
@@ -288,101 +244,74 @@ export default function HomeScreen() {
                 </View>
               </AnimatedView>
             )}
+
+            {/* ── Recent billings ──────────────────────────────────────────── */}
+            {displayBillingModule && (
+              <AnimatedView delay={200}>
+                <View style={styles.section}>
+                  <SectionHeader title="Recent Billings" onSeeAll={() => router.push('/(tabs)/billings')} />
+                  {billingsLoading ? (
+                    <LoadingState message="Loading billings..." />
+                  ) : recentBillings.length > 0 ? (
+                    recentBillings.map((billing, index) => (
+                      <BillingCard
+                        key={billing.id}
+                        billing={billing}
+                        index={index}
+                        onPress={() => router.push(`/billing-detail?id=${billing.id}`)}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState icon={Receipt} title="No recent billings" iconSize={40} />
+                  )}
+                </View>
+              </AnimatedView>
+            )}
+
+            {/* ── Active projects ──────────────────────────────────────────── */}
+            <AnimatedView delay={260}>
+              <View style={styles.section}>
+                <SectionHeader title="Active Projects" onSeeAll={() => router.push('/(tabs)/projects')} />
+                {recentProjects.length > 0 ? (
+                  recentProjects.map((project, index) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={{
+                        id: project.id,
+                        name: project.name,
+                        location: project.location,
+                        status: project.status,
+                        progress: project.progress,
+                        expectedCompletion: project.expectedCompletion,
+                        budget: project.budget,
+                        spent: project.spent,
+                        projectManager: project.projectManager,
+                      }}
+                      index={index}
+                      onPress={() => router.push(`/project/${project.id}`)}
+                      onContact={(p) => handleContact(project)}
+                      onRequestUpdate={(p) => handleRequestUpdate(project)}
+                      paymentStatus={getProjectPaymentStatus(project.id)}
+                    />
+                  ))
+                ) : (
+                  <EmptyState icon={Briefcase} title="No active projects" iconSize={40} />
+                )}
+              </View>
+            </AnimatedView>
           </>
         )}
-
-        {loading && !statistics && (
-          <LoadingState message="Loading dashboard..." />
-        )}
-
-        {/* Recent Billings - only when billing module is enabled in client app */}
-        {displayBillingModule && (
-          <AnimatedView delay={300}>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Recent Billings</Text>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/billings')}>
-                  <Text style={[styles.seeAll, { color: AppColors.primary }]}>See All</Text>
-                </TouchableOpacity>
-              </View>
-              {billingsLoading ? (
-                <LoadingState message="Loading billings..." />
-              ) : recentBillings.length > 0 ? (
-                recentBillings.map((billing, index) => (
-                  <BillingCard
-                    key={billing.id}
-                    billing={billing}
-                    index={index}
-                    onPress={() => router.push(`/billing-detail?id=${billing.id}`)}
-                  />
-                ))
-              ) : (
-                <EmptyState
-                  icon={Receipt}
-                  title="No recent billings"
-                  iconSize={48}
-                />
-              )}
-            </View>
-          </AnimatedView>
-        )}
-
-        {/* Recent Projects */}
-        <AnimatedView delay={400}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Active Projects</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/projects')}>
-              <Text style={[styles.seeAll, { color: AppColors.primary }]}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          {recentProjects.length > 0 ? (
-            recentProjects.map((project, index) => (
-              <ProjectCard
-                key={project.id}
-                project={{
-                  id: project.id,
-                  name: project.name,
-                  location: project.location,
-                  status: project.status,
-                  progress: project.progress,
-                  expectedCompletion: project.expectedCompletion,
-                  budget: project.budget,
-                  spent: project.spent,
-                  projectManager: project.projectManager,
-                }}
-                index={index}
-                onPress={() => router.push(`/project/${project.id}`)}
-                onContact={(p) => handleContact(project)}
-                onRequestUpdate={(p) => handleRequestUpdate(project)}
-                paymentStatus={getProjectPaymentStatus(project.id)}
-              />
-            ))
-          ) : (
-            <EmptyState
-              icon={Briefcase}
-              title="No active projects"
-              iconSize={48}
-            />
-          )}
-          </View>
-        </AnimatedView>
       </ScrollView>
 
-      {/* Modals */}
       {selectedProject && (
         <RequestUpdateModal
           visible={showRequestUpdate}
-          onClose={() => {
-            setShowRequestUpdate(false);
-            setSelectedProject(null);
-          }}
+          onClose={() => { setShowRequestUpdate(false); setSelectedProject(null); }}
           projectId={selectedProject.id}
           projectName={selectedProject.name}
           projectManager={selectedProject.projectManager}
         />
       )}
-
       <NotificationCenter
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
@@ -391,179 +320,74 @@ export default function HomeScreen() {
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  root:          { flex: 1, backgroundColor: D.chalk },
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 48 },
+
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  headerLeft:    { flex: 1, marginRight: 12 },
+  headerGreeting:{ fontSize: 12, color: D.inkLight, fontWeight: '500', letterSpacing: 0.3, marginBottom: 2 },
+  headerName:    { fontSize: 24, fontWeight: '700', color: D.ink, letterSpacing: -0.5, lineHeight: 28 },
+  headerCompany: { fontSize: 12, color: D.inkMid, marginTop: 2 },
+  notifBtn: {
+    width: 40, height: 40, borderRadius: 10,
+    backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline,
+    justifyContent: 'center', alignItems: 'center',
   },
-  scrollView: {
-    flex: 1,
+  notifBadge: {
+    position: 'absolute', top: -3, right: -3,
+    backgroundColor: D.red, borderRadius: 8,
+    minWidth: 17, height: 17,
+    justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5, borderColor: D.chalk,
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+  notifBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
+
+  statsRow: {
+    flexDirection: 'row', backgroundColor: D.surface,
+    borderWidth: 1, borderColor: D.hairline,
+    borderRadius: 12, paddingVertical: 14, paddingHorizontal: 12,
+    marginBottom: 14, alignItems: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
+  statChip: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    borderLeftWidth: 3, paddingLeft: 10, gap: 8,
   },
-  notificationButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    position: 'relative',
+  statChipIcon: { width: 28, height: 28, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  statChipValue: { fontSize: 17, fontWeight: '700', color: D.ink, lineHeight: 20 },
+  statChipLabel: { fontSize: 10, fontWeight: '500' },
+  statDiv: { width: 1, height: 32, backgroundColor: D.hairline, marginHorizontal: 8 },
+
+  billingCard: {
+    backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline,
+    borderRadius: 12, padding: 14, marginBottom: 22,
   },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
+  billingCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  billingCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  billingCardTitle:    { fontSize: 13, fontWeight: '700', color: D.ink },
+  overdueChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: D.redBg, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
   },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
+  overdueText: { fontSize: 10, fontWeight: '600', color: D.red },
+  billingPillsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  billingPill: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8 },
+  billingPillCount: { fontSize: 20, fontWeight: '700', lineHeight: 24 },
+  billingPillLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3, marginTop: 1 },
+  billingOutstanding: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: D.hairline, paddingTop: 10,
   },
-  greeting: {
-    fontSize: 14,
-    fontWeight: '400',
-    marginBottom: 4,
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  statsGrid: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  twoColumnRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidthCard: {
-    flex: 1,
-  },
-  fullWidthCard: {
-    width: '100%',
-  },
-  budgetCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  budgetInfo: {
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  budgetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  budgetLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  budgetValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  budgetBar: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  budgetFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  budgetPercent: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  seeAll: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  billingSummaryCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  billingSummaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  billingStatsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-  },
-  billingStatItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  billingStatDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  billingStatValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  billingStatLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  totalUnpaidSection: {
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalUnpaidLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  totalUnpaidValue: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
+  billingOutstandingLabel: { fontSize: 12, fontWeight: '600', color: D.inkMid },
+  billingOutstandingValue: { fontSize: 15, fontWeight: '700', color: D.red },
+
+  section: { marginBottom: 8 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionBar:   { width: 3, height: 16, backgroundColor: D.ink, borderRadius: 2 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: D.ink },
+  seeAllBtn:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  seeAllText:   { fontSize: 12, fontWeight: '600', color: D.ink },
 });

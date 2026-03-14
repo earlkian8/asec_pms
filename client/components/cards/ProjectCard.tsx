@@ -1,12 +1,26 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Calendar, Mail, AlertCircle, CreditCard, Coins } from 'lucide-react-native';
+import { Calendar, Mail, AlertCircle, CreditCard, ArrowRight } from 'lucide-react-native';
 import AnimatedCard from '@/components/AnimatedCard';
-import ProgressBar from '@/components/ui/ProgressBar';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { AppColors } from '@/constants/colors';
-import { getProjectStatusColors, getBillingStatusColors } from '@/utils/statusHelpers';
+import { getBillingStatusColors } from '@/utils/statusHelpers';
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const D = {
+  ink:      '#0F0F0E',
+  inkMid:   '#4A4845',
+  inkLight: '#9A9691',
+  chalk:    '#FAFAF8',
+  surface:  '#FFFFFF',
+  hairline: '#E8E5DF',
+  blue:     '#1D4ED8',
+  green:    '#2D7D52',
+  red:      '#C0392B',
+  redBg:    '#FDF1F0',
+  amber:    '#B45309',
+  amberBg:  '#FFFBEB',
+};
 
 export interface ProjectCardProject {
   id: string;
@@ -16,7 +30,7 @@ export interface ProjectCardProject {
   progress: number;
   expectedCompletion: string;
   budget: number;
-  spent: number;
+  spent: number;       // kept in interface for API compatibility, not displayed
   projectManager: string;
   description?: string;
   startDate?: string;
@@ -32,153 +46,94 @@ interface ProjectCardProps {
 }
 
 export default function ProjectCard({
-  project,
-  index,
-  onPress,
-  onContact,
-  onRequestUpdate,
-  paymentStatus,
+  project, index, onPress, onContact, onRequestUpdate, paymentStatus,
 }: ProjectCardProps) {
-  const status = getProjectStatusColors(project.status);
-  const paymentColor = paymentStatus && paymentStatus.status !== 'paid'
-    ? getBillingStatusColors(paymentStatus.status)
-    : null;
-
-  const budgetPercent = (project.spent / project.budget) * 100;
-  const budgetBarColor =
-    budgetPercent > 90
-      ? '#EF4444'
-      : budgetPercent > 75
-      ? '#F59E0B'
-      : '#10B981';
+  const hasPaymentAlert = paymentStatus && paymentStatus.status !== 'paid';
 
   return (
     <AnimatedCard
       index={index}
       delay={400}
       onPress={onPress}
-      style={StyleSheet.flatten([styles.card, { backgroundColor: AppColors.card, borderColor: AppColors.border }])}>
-      <View>
-        <View style={styles.header}>
-          <View style={styles.titleContainer}>
-            <Text style={[styles.name, { color: AppColors.text }]} numberOfLines={1}>
-              {project.name}
-            </Text>
-            <Text style={[styles.location, { color: AppColors.textSecondary }]} numberOfLines={1}>
-              {project.location || 'No location specified'}
-            </Text>
-          </View>
-          <View style={styles.badgeContainer}>
-            <StatusBadge status={project.status} type="project" />
-            {paymentStatus && paymentStatus.status !== 'paid' && paymentColor && (
-              <View style={[styles.paymentBadge, { backgroundColor: paymentColor.bg }]}>
-                <CreditCard size={10} color={paymentColor.text} />
-                <Text style={[styles.paymentBadgeText, { color: paymentColor.text }]}>
-                  {paymentStatus.status === 'unpaid' ? 'UNPAID' : 'PARTIAL'}
-                </Text>
-              </View>
-            )}
-          </View>
+      style={StyleSheet.flatten([styles.card])}>
+
+      {/* ── Name + status ─────────────────────────────────────────────────── */}
+      <View style={styles.topRow}>
+        <View style={styles.titleBlock}>
+          <Text style={styles.name} numberOfLines={1}>{project.name}</Text>
+          {project.location ? (
+            <Text style={styles.location} numberOfLines={1}>{project.location}</Text>
+          ) : null}
         </View>
-
-        <ProgressBar
-          progress={project.progress}
-          height={8}
-          showLabel
-          style={styles.progressContainer}
-        />
-
-        <View style={styles.footer}>
-          <View style={styles.info}>
-            <Calendar size={14} color={AppColors.textSecondary} />
-            <Text style={[styles.infoText, { color: AppColors.textSecondary }]}>
-              Due: {new Date(project.expectedCompletion).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
-          </View>
-          {paymentStatus && paymentStatus.status !== 'paid' && (
-            <View style={styles.paymentInfo}>
-              <AlertCircle
-                size={14}
-                color={paymentStatus.status === 'unpaid' ? AppColors.error : AppColors.warning}
-              />
-              <Text
-                style={[
-                  styles.paymentInfoText,
-                  {
-                    color: paymentStatus.status === 'unpaid' ? AppColors.error : AppColors.warning,
-                  },
-                ]}>
-                {formatCurrency(paymentStatus.amount)}{' '}
-                {paymentStatus.status === 'unpaid' ? 'unpaid' : 'remaining'}
+        <View style={styles.badgeStack}>
+          <StatusBadge status={project.status} type="project" />
+          {hasPaymentAlert && (
+            <View style={[
+              styles.payBadge,
+              { backgroundColor: paymentStatus!.status === 'unpaid' ? D.redBg : D.amberBg },
+            ]}>
+              <CreditCard size={9} color={paymentStatus!.status === 'unpaid' ? D.red : D.amber} strokeWidth={2.5} />
+              <Text style={[
+                styles.payBadgeText,
+                { color: paymentStatus!.status === 'unpaid' ? D.red : D.amber },
+              ]}>
+                {paymentStatus!.status === 'unpaid' ? 'UNPAID' : 'PARTIAL'}
               </Text>
             </View>
           )}
         </View>
+      </View>
 
-        {/* Budget Section */}
-        <View style={styles.budgetSection}>
-          <View style={styles.budgetHeader}>
-            <View style={styles.budgetInfoRow}>
-              <Coins size={16} color={AppColors.textSecondary} />
-              <Text style={[styles.budgetLabel, { color: AppColors.textSecondary }]}>
-                Budget Usage
-              </Text>
-            </View>
-            <Text style={[styles.budgetPercent, { color: AppColors.text }]}>
-              {Math.round(budgetPercent)}%
+      {/* ── Progress strip — % only ────────────────────────────────────────── */}
+      <View style={styles.progressRow}>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${project.progress}%` }]} />
+        </View>
+        <Text style={styles.progressPct}>{project.progress}%</Text>
+      </View>
+
+      {/* ── Meta: due date + payment alert ────────────────────────────────── */}
+      <View style={styles.metaRow}>
+        <View style={styles.metaItem}>
+          <Calendar size={12} color={D.inkLight} strokeWidth={2} />
+          <Text style={styles.metaText}>
+            Due {new Date(project.expectedCompletion).toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric',
+            })}
+          </Text>
+        </View>
+        {hasPaymentAlert && (
+          <View style={styles.metaItem}>
+            <AlertCircle size={12} color={paymentStatus!.status === 'unpaid' ? D.red : D.amber} strokeWidth={2} />
+            <Text style={[
+              styles.metaText,
+              { color: paymentStatus!.status === 'unpaid' ? D.red : D.amber, fontWeight: '600' },
+            ]}>
+              {formatCurrency(paymentStatus!.amount)} {paymentStatus!.status === 'unpaid' ? 'unpaid' : 'remaining'}
             </Text>
           </View>
-          <View style={styles.budgetDetails}>
-            <View style={styles.budgetDetailItem}>
-              <Text style={[styles.budgetDetailLabel, { color: AppColors.textSecondary }]}>
-                Spent
-              </Text>
-              <Text style={[styles.budgetDetailValue, { color: AppColors.text }]}>
-                {formatCurrency(project.spent)}
-              </Text>
-            </View>
-            <View style={styles.budgetDivider} />
-            <View style={styles.budgetDetailItem}>
-              <Text style={[styles.budgetDetailLabel, { color: AppColors.textSecondary }]}>
-                Total Budget
-              </Text>
-              <Text style={[styles.budgetDetailValue, { color: AppColors.text }]}>
-                {formatCurrency(project.budget)}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.budgetBar, { backgroundColor: AppColors.border }]}>
-            <View
-              style={[
-                styles.budgetBarFill,
-                {
-                  width: `${Math.min(budgetPercent, 100)}%`,
-                  backgroundColor: budgetBarColor,
-                },
-              ]}
-            />
-          </View>
-        </View>
+        )}
+      </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSmall]}
-            onPress={() => onContact(project)}>
-            <Mail size={16} color={AppColors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonText]}
-            onPress={() => onRequestUpdate(project)}>
-            <Text style={[styles.actionButtonTextLabel, { color: AppColors.primary }]}>
-              Request Update
-            </Text>
-          </TouchableOpacity>
-        </View>
+      {/* ── Contract value ────────────────────────────────────────────────── */}
+      <View style={styles.contractRow}>
+        <Text style={styles.contractLabel}>Contract Value</Text>
+        <Text style={styles.contractValue}>{formatCurrency(project.budget)}</Text>
+      </View>
+
+      {/* ── Actions ──────────────────────────────────────────────────────── */}
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.mailBtn}
+          onPress={() => onContact(project)}>
+          <Mail size={15} color={D.inkMid} strokeWidth={2} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.updateBtn}
+          onPress={() => onRequestUpdate(project)}>
+          <Text style={styles.updateBtnText}>Request Update</Text>
+          <ArrowRight size={13} color="#FFF" strokeWidth={2.5} />
+        </TouchableOpacity>
       </View>
     </AnimatedCard>
   );
@@ -186,161 +141,53 @@ export default function ProjectCard({
 
 const styles = StyleSheet.create({
   card: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 12,
+    backgroundColor: D.surface,
+    borderWidth: 1, borderColor: D.hairline,
+    borderRadius: 12, padding: 16, marginBottom: 12,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+
+  topRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-start', marginBottom: 14, gap: 10,
   },
-  titleContainer: {
-    flex: 1,
-    marginRight: 12,
+  titleBlock: { flex: 1 },
+  name:       { fontSize: 16, fontWeight: '700', color: D.ink, letterSpacing: -0.2, marginBottom: 2 },
+  location:   { fontSize: 12, color: D.inkLight },
+  badgeStack: { flexDirection: 'column', alignItems: 'flex-end', gap: 5 },
+  payBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+  payBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
+
+  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  progressTrack:{ flex: 1, height: 4, backgroundColor: D.hairline, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: D.blue },
+  progressPct:  { fontSize: 11, fontWeight: '700', color: D.ink, minWidth: 28, textAlign: 'right' },
+
+  metaRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 14 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 11, color: D.inkLight, fontWeight: '500' },
+
+  // Contract value row — replaces the budget/spent breakdown
+  contractRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: D.hairline,
+    paddingTop: 12, marginBottom: 14,
   },
-  name: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  location: {
-    fontSize: 13,
-    fontWeight: '400',
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  paymentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  paymentBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  info: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  paymentInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  paymentInfoText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  budgetSection: {
-    marginTop: 16,
-    marginBottom: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: AppColors.border,
-  },
-  budgetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  budgetInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  budgetLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  budgetPercent: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  budgetDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 12,
-  },
-  budgetDetailItem: {
-    flex: 1,
-  },
-  budgetDetailLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  budgetDetailValue: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  budgetDivider: {
-    width: 1,
-    backgroundColor: AppColors.border,
-  },
-  budgetBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  budgetBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
+  contractLabel: { fontSize: 11, color: D.inkLight, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.3 },
+  contractValue: { fontSize: 14, fontWeight: '700', color: D.ink },
+
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: AppColors.border,
-    gap: 8,
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderTopWidth: 1, borderTopColor: D.hairline, paddingTop: 12,
   },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  mailBtn: {
+    width: 36, height: 36, borderRadius: 8,
+    backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline,
+    justifyContent: 'center', alignItems: 'center',
   },
-  actionButtonSmall: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#EFF6FF',
+  updateBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 6, height: 36,
+    backgroundColor: D.ink, borderRadius: 8,
   },
-  actionButtonText: {
-    flex: 1,
-    backgroundColor: '#EFF6FF',
-  },
-  actionButtonTextLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  updateBtnText: { fontSize: 13, fontWeight: '600', color: '#FFF' },
 });

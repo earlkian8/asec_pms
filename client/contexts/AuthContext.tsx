@@ -61,7 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         const config = (response as { config?: { display_billing_module?: boolean } }).config;
         setDisplayBillingModule(config?.display_billing_module ?? true);
-        // Initialize Pusher if user is authenticated and we have a token
         const token = apiService.getToken();
         if (token) {
           initializePusher(token);
@@ -84,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [checkAuth]);
 
-  // Refresh config (e.g. display_billing_module) when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active' && apiService.getToken()) {
@@ -113,13 +111,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         token: string;
         must_change_password?: boolean;
+        config?: { display_billing_module?: boolean };
       }>('/client/login', { email, password });
 
       if (response.success && response.data) {
-        // Store token
         apiService.setToken(response.data.token);
 
-        // Set user
         setUser({
           id: response.data.client.id,
           client_code: response.data.client.client_code,
@@ -131,20 +128,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           is_active: response.data.client.is_active,
         });
 
+        // Set billing module from login response directly — no checkAuth() call
+        const config = (response as unknown as { config?: { display_billing_module?: boolean } }).config
+          ?? response.data.config;
+        setDisplayBillingModule(config?.display_billing_module ?? true);
+
         if (response.data.token) {
-          apiService.setToken(response.data.token);
           initializePusher(response.data.token);
         }
 
-        // Refresh /me to get config (e.g. display_billing_module)
-        await checkAuth();
+        // Done — do NOT call checkAuth() here, it causes isLoading flicker & remount
+        setIsLoading(false);
 
-        return { 
-          success: true, 
-          mustChangePassword: response.data.must_change_password || false 
+        return {
+          success: true,
+          mustChangePassword: response.data.must_change_password || false,
         };
       } else {
-        // Return error message and validation errors if available
         return {
           success: false,
           message: response.message || 'Login failed. Please check your credentials.',
@@ -163,12 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      // Call logout API
       await apiService.post('/client/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local state regardless of API call result
       setUser(null);
       apiService.setToken(null);
       router.replace('/login');
@@ -199,4 +197,3 @@ export function useAuth() {
   }
   return context;
 }
-

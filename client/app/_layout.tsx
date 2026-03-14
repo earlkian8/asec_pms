@@ -1,7 +1,7 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
@@ -19,15 +19,22 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Track whether the very first auth check has completed.
+  // After that, isLoading changes (e.g. during login()) must NOT
+  // trigger a full remount of the screen stack.
+  const initialCheckDone = useRef(false);
+  if (!isLoading) {
+    initialCheckDone.current = true;
+  }
+
   useEffect(() => {
-    // Don't redirect while loading
-    if (isLoading) return;
+    // Don't redirect until the initial auth check is done
+    if (!initialCheckDone.current) return;
 
     const inAuthGroup = segments[0] === '(tabs)';
     const isChangePasswordPage = segments[0] === 'change-password';
     const isLoginPage = segments[0] === 'login';
 
-    // Allow change-password page only if authenticated
     if (isChangePasswordPage && !isAuthenticated) {
       router.replace('/login');
       return;
@@ -36,16 +43,16 @@ function RootLayoutNav() {
     if (!isAuthenticated && inAuthGroup) {
       router.replace('/login');
     } else if (isAuthenticated && isLoginPage) {
-      // Don't redirect from login if user needs to change password
-      // The login handler will handle the redirect
+      // Login screen handles its own redirect after success
     }
   }, [isAuthenticated, isLoading, segments]);
 
-  // Show loading screen while checking authentication
-  if (isLoading) {
+  // Only show the full-screen spinner on the very first load,
+  // not on subsequent isLoading toggles (e.g. during login/logout).
+  if (!initialCheckDone.current) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAFAF9' }}>
+        <ActivityIndicator size="large" color="#1A1A1A" />
       </View>
     );
   }

@@ -33,11 +33,20 @@ import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import { AppColors } from '@/constants/colors';
 import { useDialog } from '@/contexts/DialogContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 type SortOption = 'created_at' | 'billing_code' | 'billing_date' | 'due_date' | 'billing_amount' | 'status';
 
 export default function BillingsScreen() {
+  const { displayBillingModule } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'billings' | 'transactions'>('billings');
+
+  useEffect(() => {
+    if (!displayBillingModule) {
+      router.replace('/(tabs)');
+    }
+  }, [displayBillingModule, router]);
 
   // Refresh transactions when switching to transactions tab
   useEffect(() => {
@@ -52,7 +61,6 @@ export default function BillingsScreen() {
   const [showSortModal, setShowSortModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
 

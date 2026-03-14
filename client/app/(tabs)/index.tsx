@@ -38,7 +38,7 @@ import { AppColors } from '@/constants/colors';
 import { useDialog } from '@/contexts/DialogContext';
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, displayBillingModule } = useAuth();
   const { unreadCount, refreshNotifications } = useApp();
   const { statistics, projects, loading, refresh } = useDashboard();
   const { billings, loading: billingsLoading, refresh: refreshBillings } = useBillings({
@@ -245,47 +245,49 @@ export default function HomeScreen() {
             </View>
             </AnimatedView>
 
-            {/* Billing Summary */}
-            <AnimatedView delay={250}>
-              <View style={[styles.billingSummaryCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
-                <View style={styles.billingSummaryHeader}>
-                  <Receipt size={20} color={AppColors.text} />
-                  <Text style={[styles.sectionTitle, { color: AppColors.text, marginLeft: 8 }]}>Billing Summary</Text>
-                </View>
-                <View style={styles.billingStatsGrid}>
-                  <View style={styles.billingStatItem}>
-                    <View style={[styles.billingStatDot, { backgroundColor: AppColors.error }]} />
-                    <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.unpaid}</Text>
-                    <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Unpaid</Text>
+            {/* Billing Summary - only when billing module is enabled */}
+            {displayBillingModule && (
+              <AnimatedView delay={250}>
+                <View style={[styles.billingSummaryCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+                  <View style={styles.billingSummaryHeader}>
+                    <Receipt size={20} color={AppColors.text} />
+                    <Text style={[styles.sectionTitle, { color: AppColors.text, marginLeft: 8 }]}>Billing Summary</Text>
                   </View>
-                  <View style={styles.billingStatItem}>
-                    <View style={[styles.billingStatDot, { backgroundColor: AppColors.warning }]} />
-                    <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.partial}</Text>
-                    <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Partial</Text>
-                  </View>
-                  <View style={styles.billingStatItem}>
-                    <View style={[styles.billingStatDot, { backgroundColor: AppColors.success }]} />
-                    <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.paid}</Text>
-                    <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Paid</Text>
-                  </View>
-                  {billingStats.overdue > 0 && (
+                  <View style={styles.billingStatsGrid}>
                     <View style={styles.billingStatItem}>
-                      <AlertCircle size={16} color={AppColors.error} />
-                      <Text style={[styles.billingStatValue, { color: AppColors.error }]}>{billingStats.overdue}</Text>
-                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Overdue</Text>
+                      <View style={[styles.billingStatDot, { backgroundColor: AppColors.error }]} />
+                      <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.unpaid}</Text>
+                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Unpaid</Text>
+                    </View>
+                    <View style={styles.billingStatItem}>
+                      <View style={[styles.billingStatDot, { backgroundColor: AppColors.warning }]} />
+                      <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.partial}</Text>
+                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Partial</Text>
+                    </View>
+                    <View style={styles.billingStatItem}>
+                      <View style={[styles.billingStatDot, { backgroundColor: AppColors.success }]} />
+                      <Text style={[styles.billingStatValue, { color: AppColors.text }]}>{billingStats.paid}</Text>
+                      <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Paid</Text>
+                    </View>
+                    {billingStats.overdue > 0 && (
+                      <View style={styles.billingStatItem}>
+                        <AlertCircle size={16} color={AppColors.error} />
+                        <Text style={[styles.billingStatValue, { color: AppColors.error }]}>{billingStats.overdue}</Text>
+                        <Text style={[styles.billingStatLabel, { color: AppColors.textSecondary }]}>Overdue</Text>
+                      </View>
+                    )}
+                  </View>
+                  {billingStats.totalUnpaid > 0 && (
+                    <View style={styles.totalUnpaidSection}>
+                      <Text style={[styles.totalUnpaidLabel, { color: AppColors.textSecondary }]}>Total Outstanding</Text>
+                      <Text style={[styles.totalUnpaidValue, { color: AppColors.error }]}>
+                        {formatCurrency(billingStats.totalUnpaid)}
+                      </Text>
                     </View>
                   )}
                 </View>
-                {billingStats.totalUnpaid > 0 && (
-                  <View style={styles.totalUnpaidSection}>
-                    <Text style={[styles.totalUnpaidLabel, { color: AppColors.textSecondary }]}>Total Outstanding</Text>
-                    <Text style={[styles.totalUnpaidValue, { color: AppColors.error }]}>
-                      {formatCurrency(billingStats.totalUnpaid)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </AnimatedView>
+              </AnimatedView>
+            )}
           </>
         )}
 
@@ -293,35 +295,37 @@ export default function HomeScreen() {
           <LoadingState message="Loading dashboard..." />
         )}
 
-        {/* Recent Billings */}
-        <AnimatedView delay={300}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Recent Billings</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/billings')}>
-                <Text style={[styles.seeAll, { color: AppColors.primary }]}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {billingsLoading ? (
-              <LoadingState message="Loading billings..." />
-            ) : recentBillings.length > 0 ? (
-              recentBillings.map((billing, index) => (
-                <BillingCard
-                  key={billing.id}
-                  billing={billing}
-                  index={index}
-                  onPress={() => router.push(`/billing-detail?id=${billing.id}`)}
+        {/* Recent Billings - only when billing module is enabled in client app */}
+        {displayBillingModule && (
+          <AnimatedView delay={300}>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Recent Billings</Text>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/billings')}>
+                  <Text style={[styles.seeAll, { color: AppColors.primary }]}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              {billingsLoading ? (
+                <LoadingState message="Loading billings..." />
+              ) : recentBillings.length > 0 ? (
+                recentBillings.map((billing, index) => (
+                  <BillingCard
+                    key={billing.id}
+                    billing={billing}
+                    index={index}
+                    onPress={() => router.push(`/billing-detail?id=${billing.id}`)}
+                  />
+                ))
+              ) : (
+                <EmptyState
+                  icon={Receipt}
+                  title="No recent billings"
+                  iconSize={48}
                 />
-              ))
-            ) : (
-              <EmptyState
-                icon={Receipt}
-                title="No recent billings"
-                iconSize={48}
-              />
-            )}
-          </View>
-        </AnimatedView>
+              )}
+            </View>
+          </AnimatedView>
+        )}
 
         {/* Recent Projects */}
         <AnimatedView delay={400}>

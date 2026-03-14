@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Billing;
 use App\Models\BillingPayment;
+use App\Models\ClientPortalSetting;
 use App\Models\Project;
 use App\Services\BillingService;
 use App\Services\PayMongoService;
@@ -139,10 +140,25 @@ class ClientBillingController extends Controller
     }
 
     /**
+     * Return 403 when billing module is disabled in client portal.
+     */
+    private function billingModuleDisabledResponse()
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Billing module is not available.',
+        ], 403);
+    }
+
+    /**
      * Get all billings for the authenticated client
      */
     public function index(Request $request)
     {
+        if (! ClientPortalSetting::displayBillingModule()) {
+            return $this->billingModuleDisabledResponse();
+        }
+
         $client = $request->user();
         
         $search = $request->get('search');
@@ -195,6 +211,10 @@ class ClientBillingController extends Controller
      */
     public function show(Request $request, $id)
     {
+        if (! ClientPortalSetting::displayBillingModule()) {
+            return $this->billingModuleDisabledResponse();
+        }
+
         $client = $request->user();
 
         // Validate ID is numeric to prevent route conflicts
@@ -237,6 +257,10 @@ class ClientBillingController extends Controller
      */
     public function initiatePayment(Request $request, $id)
     {
+        if (! ClientPortalSetting::displayBillingModule()) {
+            return $this->billingModuleDisabledResponse();
+        }
+
         if (!is_numeric($id)) {
             return response()->json([
                 'success' => false,
@@ -443,6 +467,10 @@ class ClientBillingController extends Controller
      */
     public function checkPaymentStatus(Request $request, $id)
     {
+        if (! ClientPortalSetting::displayBillingModule()) {
+            return $this->billingModuleDisabledResponse();
+        }
+
         // Validate ID is numeric to prevent route conflicts
         if (!is_numeric($id)) {
             return response()->json([
@@ -638,6 +666,10 @@ class ClientBillingController extends Controller
      */
     public function transactions(Request $request)
     {
+        if (! ClientPortalSetting::displayBillingModule()) {
+            return $this->billingModuleDisabledResponse();
+        }
+
         try {
             $client = $request->user();
 

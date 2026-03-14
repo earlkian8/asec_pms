@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Billing;
 use App\Models\BillingPayment;
+use App\Models\ClientPortalSetting;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Models\User;
@@ -61,8 +62,29 @@ class BillingsController extends Controller
 
         $data['projects'] = $projects;
         $data['tab'] = $tab;
+        $data['display_billing_in_client_app'] = ClientPortalSetting::displayBillingModule();
 
         return Inertia::render('BillingManagement/index', $data);
+    }
+
+    /**
+     * Update whether the billing module is displayed in the client app.
+     */
+    public function updateClientPortalBillingDisplay(Request $request)
+    {
+        $request->validate([
+            'display_billing_module' => ['required', 'boolean'],
+        ]);
+
+        ClientPortalSetting::setDisplayBillingModule((bool) $request->display_billing_module);
+
+        $this->adminActivityLogs(
+            'Billing',
+            'Updated Client Portal Billing Display',
+            'Client portal billing display was set to ' . ($request->display_billing_module ? 'enabled' : 'disabled') . '.'
+        );
+
+        return redirect()->back()->with('success', 'Client portal billing setting updated successfully.');
     }
 
     // ── Archived index ───────────────────────────────────────────────────────

@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { displayBillingModule } = useAuth();
 
   return (
     <Tabs
@@ -49,12 +51,21 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="billings"
-        options={{
-          title: 'Billings',
-          tabBarIcon: ({ color, size }) => (
-            <Receipt size={size || 24} color={color} />
-          ),
-        }}
+        options={
+          displayBillingModule
+            ? {
+                title: 'Billings',
+                href: '/(tabs)/billings',
+                tabBarIcon: ({ color, size }) => (
+                  <Receipt size={size || 24} color={color} />
+                ),
+              }
+            : {
+                title: 'Billings',
+                href: null,
+                tabBarItemStyle: { display: 'none', width: 0, minWidth: 0, overflow: 'hidden' },
+              }
+        }
       />
       {/* <Tabs.Screen
         name="chat"

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientPortalSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -84,6 +85,9 @@ class ClientAuthController extends Controller
                 'company' => $client->client_name,
                 'phone_number' => $client->phone_number,
                 'is_active' => $client->is_active,
+            ],
+            'config' => [
+                'display_billing_module' => ClientPortalSetting::displayBillingModule(),
             ],
         ]);
     }

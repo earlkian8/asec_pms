@@ -10,10 +10,19 @@ import { Label } from "@/Components/ui/label";
 import { toast } from 'sonner';
 import {
   Trash2, SquarePen, DollarSign, CreditCard, Filter, X, Search,
-  Calendar, TrendingUp, ArrowUpDown, Archive,
+  Calendar, TrendingUp, ArrowUpDown, Archive, Smartphone,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/Components/ui/dialog";
+import { Switch } from "@/Components/ui/switch";
 import { usePermission } from '@/utils/permissions';
 
 import AddBilling   from './add';
@@ -53,6 +62,7 @@ export default function BillingManagement() {
   const initialSearch   = usePage().props.search || '';
   const initialTab      = usePage().props.tab || 'billings';
   const transactionsData = usePage().props.transactions;
+  const displayBillingInClientApp = usePage().props.display_billing_in_client_app ?? true;
 
   const [searchInput,      setSearchInput]      = useState(initialSearch);
   const [showAddModal,     setShowAddModal]      = useState(false);
@@ -64,6 +74,9 @@ export default function BillingManagement() {
   const [paymentBilling,   setPaymentBilling]    = useState(null);
   const [showFilterCard,   setShowFilterCard]    = useState(false);
   const [showSortCard,     setShowSortCard]      = useState(false);
+  const [showClientPortalBillingModal, setShowClientPortalBillingModal] = useState(false);
+  const [clientPortalBillingValue, setClientPortalBillingValue] = useState(displayBillingInClientApp);
+  const [clientPortalBillingSaving, setClientPortalBillingSaving] = useState(false);
   const [activeTab,        setActiveTab]         = useState(initialTab);
 
   const initFilters = (fp) => ({
@@ -88,6 +101,27 @@ export default function BillingManagement() {
     if (pageProps.sort_by)    setSortBy(pageProps.sort_by);
     if (pageProps.sort_order) setSortOrder(pageProps.sort_order);
   }, [pageProps.sort_by, pageProps.sort_order]);
+
+  useEffect(() => {
+    if (showClientPortalBillingModal) {
+      setClientPortalBillingValue(displayBillingInClientApp);
+    }
+  }, [showClientPortalBillingModal, displayBillingInClientApp]);
+
+  const handleSaveClientPortalBilling = () => {
+    setClientPortalBillingSaving(true);
+    router.put(route('billing-management.client-portal-billing-display'), {
+      display_billing_module: clientPortalBillingValue,
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setShowClientPortalBillingModal(false);
+        toast.success('Client portal billing setting updated successfully.');
+      },
+      onError: () => toast.error('Failed to update setting.'),
+      onFinish: () => setClientPortalBillingSaving(false),
+    });
+  };
 
   const statusColors = {
     unpaid:  'bg-red-100 text-red-800 border border-red-200',
@@ -198,6 +232,36 @@ export default function BillingManagement() {
       {showEditModal   && <EditBilling   setShowEditModal={setShowEditModal}     billing={editBilling} />}
       {showDeleteModal && <DeleteBilling setShowDeleteModal={setShowDeleteModal} billing={deleteBilling} />}
       {showPaymentModal && <AddPayment   setShowPaymentModal={setShowPaymentModal} billing={paymentBilling} />}
+
+      {/* Client portal billing display modal */}
+      <Dialog open={showClientPortalBillingModal} onOpenChange={setShowClientPortalBillingModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Display billing in client app</DialogTitle>
+            <DialogDescription>
+              When enabled, clients see the Billings tab and can view and pay. When disabled, the tab is hidden and the billing API is unavailable.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-between space-x-4 py-4">
+            <Label htmlFor="client-portal-billing-switch" className="flex-1 text-sm font-medium">
+              Show billing module in client app
+            </Label>
+            <Switch
+              id="client-portal-billing-switch"
+              checked={clientPortalBillingValue}
+              onCheckedChange={setClientPortalBillingValue}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClientPortalBillingModal(false)} disabled={clientPortalBillingSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveClientPortalBilling} disabled={clientPortalBillingSaving}>
+              {clientPortalBillingSaving ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
         <Head title="Billing Management" />
@@ -401,6 +465,18 @@ export default function BillingManagement() {
                           title="View archived billings"
                         >
                           <Archive className="h-4 w-4" />
+                        </Button>
+                      )}
+
+                      {/* ── Client portal billing toggle ── */}
+                      {has('billing.update') && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowClientPortalBillingModal(true)}
+                          className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-indigo-50 hover:border-indigo-400 hover:text-indigo-700 transition-colors"
+                          title="Display billing in client app"
+                        >
+                          <Smartphone className="h-4 w-4" />
                         </Button>
                       )}
                     </div>

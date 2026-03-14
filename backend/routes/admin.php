@@ -229,6 +229,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/archive/{billing}', [BillingsController::class, 'archive'])->middleware('permission:billing.archive')->name('archive');
         Route::post('/unarchive/{billing}', [BillingsController::class, 'unarchive'])->middleware('permission:billing.archive')->name('unarchive');
         Route::get('/archived', [BillingsController::class, 'archived'])->middleware('permission:billing.view')->name('archived');
+        Route::put('/client-portal-billing-display', [BillingsController::class, 'updateClientPortalBillingDisplay'])->middleware('permission:billing.update')->name('client-portal-billing-display');
     });
 
     // Notifications

@@ -40,12 +40,6 @@ export default function ProjectDetail() {
             permission: 'project-teams.view'
         },
         { 
-            key: "milestones", 
-            label: "Milestones", 
-            component: <MilestonesTab project={project} milestoneData={milestoneData}/>,
-            permission: 'project-milestones.view'
-        },
-        { 
             key: "material-allocation", 
             label: "Material Allocation", 
             component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} />,
@@ -62,6 +56,12 @@ export default function ProjectDetail() {
             label: "Miscellaneous", 
             component: <MiscellaneousExpenseTab project={project} miscellaneousExpenseData={miscellaneousExpenseData} />,
             permission: 'miscellaneous-expenses.view'
+        },
+                { 
+            key: "milestones", 
+            label: "Milestones", 
+            component: <MilestonesTab project={project} milestoneData={milestoneData}/>,
+            permission: 'project-milestones.view'
         },
         { 
             key: "request-updates", 

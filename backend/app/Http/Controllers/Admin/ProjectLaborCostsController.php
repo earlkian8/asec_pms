@@ -252,6 +252,54 @@ class ProjectLaborCostsController extends Controller
             return back()->with('error', 'This payroll entry is already submitted.');
         }
 
+        // ── Guard: period must still fall within the worker's assignment dates ──
+        $teamMember = $this->getTeamMember(
+            $project,
+            $laborCost->assignable_type,
+            $laborCost->user_id,
+            $laborCost->employee_id
+        );
+
+        $boundaryError = $this->validateAssignmentBoundary([
+            'period_start'    => $laborCost->period_start->format('Y-m-d'),
+            'period_end'      => $laborCost->period_end->format('Y-m-d'),
+            'assignable_type' => $laborCost->assignable_type,
+        ], $teamMember);
+
+        if ($boundaryError) {
+            return back()->with('error', array_values($boundaryError)[0]);
+        }
+
+        // ── Guard: no overlap with other already-submitted entries ───────────────
+        $overlap = ProjectLaborCost::where('project_id', $project->id)
+            ->where('id', '!=', $laborCost->id)
+            ->where('status', 'submitted')
+            ->where('assignable_type', $laborCost->assignable_type)
+            ->where(function ($q) use ($laborCost) {
+                if ($laborCost->assignable_type === 'user') {
+                    $q->where('user_id', $laborCost->user_id);
+                } else {
+                    $q->where('employee_id', $laborCost->employee_id);
+                }
+            })
+            ->where(function ($q) use ($laborCost) {
+                $start = $laborCost->period_start->format('Y-m-d');
+                $end   = $laborCost->period_end->format('Y-m-d');
+                $q->whereBetween('period_start', [$start, $end])
+                ->orWhereBetween('period_end',  [$start, $end])
+                ->orWhere(function ($q2) use ($start, $end) {
+                    $q2->where('period_start', '<=', $start)
+                        ->where('period_end',   '>=', $end);
+                });
+            })
+            ->exists();
+
+        if ($overlap) {
+            return back()->with('error',
+                'Cannot submit. Another submitted payroll entry already covers an overlapping period for this worker.'
+            );
+        }
+
         $laborCost->update(['status' => 'submitted']);
         $laborCost->load(['user', 'employee']);
 

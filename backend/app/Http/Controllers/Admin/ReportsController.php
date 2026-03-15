@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\ProjectType;
 use App\Models\Client;
 use App\Models\Billing;
 use App\Models\BillingPayment;
@@ -39,10 +40,10 @@ class ReportsController extends Controller
 
         [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
 
-        $financialReport    = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
-        $inventoryReport    = $this->getInventoryReport();
-        $projectReport      = $this->getProjectReport($dateStart, $dateEnd, $projectId, $clientId);
-        $trends             = $this->getTrendsData($dateStart, $dateEnd);
+        $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
+        $inventoryReport = $this->getInventoryReport();
+        $projectReport   = $this->getProjectReport($dateStart, $dateEnd, $projectId, $clientId);
+        $trends          = $this->getTrendsData($dateStart, $dateEnd);
 
         $projects = Project::orderBy('project_name')->get(['id', 'project_code', 'project_name']);
         $clients  = Client::orderBy('client_name')->get(['id', 'client_code', 'client_name']);
@@ -77,19 +78,19 @@ class ReportsController extends Controller
         }
 
         return match ($range) {
-            'today'         => [now()->startOfDay(), now()->endOfDay()],
-            'this_week'     => [now()->startOfWeek(), now()->endOfWeek()],
-            'this_month'    => [now()->startOfMonth(), now()->endOfMonth()],
-            'last_month'    => [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()],
-            'this_quarter'  => [now()->startOfQuarter(), now()->endOfQuarter()],
-            'this_year'     => [now()->startOfYear(), now()->endOfYear()],
-            'last_year'     => [now()->subYear()->startOfYear(), now()->subYear()->endOfYear()],
-            default         => [now()->subMonths(6), now()],
+            'today'         => [now()->startOfDay(),                  now()->endOfDay()],
+            'this_week'     => [now()->startOfWeek(),                 now()->endOfWeek()],
+            'this_month'    => [now()->startOfMonth(),                now()->endOfMonth()],
+            'last_month'    => [now()->subMonth()->startOfMonth(),    now()->subMonth()->endOfMonth()],
+            'this_quarter'  => [now()->startOfQuarter(),              now()->endOfQuarter()],
+            'this_year'     => [now()->startOfYear(),                 now()->endOfYear()],
+            'last_year'     => [now()->subYear()->startOfYear(),      now()->subYear()->endOfYear()],
+            default         => [now()->subMonths(6),                  now()],
         };
     }
 
     // -------------------------------------------------------------------------
-    // Financial Report (Revenue, Expenses: Labor + Materials + Misc, Profit)
+    // Financial Report
     // -------------------------------------------------------------------------
 
     private function getFinancialReport($startDate, $endDate, $projectId, $clientId)
@@ -106,9 +107,7 @@ class ReportsController extends Controller
 
         $totalRevenue = $paymentQuery->sum('payment_amount');
 
-        // Total billed (for collection rate)
         $billingQuery = Billing::whereBetween('billing_date', [$startDate, $endDate]);
-
         if ($projectId) {
             $billingQuery->where('project_id', $projectId);
         } elseif ($clientId) {
@@ -118,18 +117,16 @@ class ReportsController extends Controller
         $totalBilled      = $billingQuery->sum('billing_amount');
         $totalOutstanding = $totalBilled - $totalRevenue;
 
-        // ── Expenses ─────────────────────────────────────────────────────────
-
-        // Labor
-        $laborQuery = ProjectLaborCost::whereBetween('work_date', [$startDate, $endDate]);
+        // ── Labor ─────────────────────────────────────────────────────────────
+        $laborQuery = ProjectLaborCost::whereBetween('period_start', [$startDate, $endDate]);
         if ($projectId) {
             $laborQuery->where('project_id', $projectId);
         } elseif ($clientId) {
             $laborQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId));
         }
-        $totalLaborCost = $laborQuery->sum('total_cost');
+        $totalLaborCost = (float) $laborQuery->sum('gross_pay');
 
-        // Materials
+        // ── Materials ─────────────────────────────────────────────────────────
         $materialQuery = ProjectMaterialAllocation::whereBetween('allocated_at', [$startDate, $endDate])
             ->with('inventoryItem');
         if ($projectId) {
@@ -143,16 +140,15 @@ class ReportsController extends Controller
                 : 0;
         });
 
-        // Miscellaneous
+        // ── Miscellaneous ─────────────────────────────────────────────────────
         $miscQuery = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate]);
         if ($projectId) {
             $miscQuery->where('project_id', $projectId);
         } elseif ($clientId) {
             $miscQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId));
         }
-        $totalMiscCost = $miscQuery->sum('amount');
+        $totalMiscCost = (float) $miscQuery->sum('amount');
 
-        // Misc breakdown by type
         $miscByType = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate])
             ->when($projectId, fn($q) => $q->where('project_id', $projectId))
             ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)))
@@ -165,7 +161,6 @@ class ReportsController extends Controller
         $netProfit     = $totalRevenue - $totalExpenses;
         $profitMargin  = $totalRevenue > 0 ? ($netProfit / $totalRevenue) * 100 : 0;
 
-        // ── Billing status breakdown ─────────────────────────────────────────
         $billingStatus = Billing::whereBetween('billing_date', [$startDate, $endDate])
             ->when($projectId, fn($q) => $q->where('project_id', $projectId))
             ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)))
@@ -174,7 +169,6 @@ class ReportsController extends Controller
             ->get()
             ->keyBy('status');
 
-        // ── Monthly expense breakdown (for charts) ───────────────────────────
         $monthlyExpenses = $this->getMonthlyExpenseBreakdown($startDate, $endDate, $projectId, $clientId);
 
         return [
@@ -185,18 +179,18 @@ class ReportsController extends Controller
                 'collection_rate' => $totalBilled > 0 ? round(($totalRevenue / $totalBilled) * 100, 2) : 0,
             ],
             'expenses' => [
-                'labor'        => $totalLaborCost,
-                'materials'    => $totalMaterialCost,
-                'miscellaneous'=> $totalMiscCost,
-                'total'        => $totalExpenses,
-                'misc_by_type' => $miscByType,
+                'labor'         => $totalLaborCost,
+                'materials'     => $totalMaterialCost,
+                'miscellaneous' => $totalMiscCost,
+                'total'         => $totalExpenses,
+                'misc_by_type'  => $miscByType,
             ],
             'profit' => [
                 'net'    => $netProfit,
                 'margin' => round($profitMargin, 2),
             ],
-            'billing_status'  => $billingStatus,
-            'monthly_expenses'=> $monthlyExpenses,
+            'billing_status'   => $billingStatus,
+            'monthly_expenses' => $monthlyExpenses,
         ];
     }
 
@@ -211,7 +205,8 @@ class ReportsController extends Controller
                 $monthEnd = $endDate->copy();
             }
 
-            $laborQ = ProjectLaborCost::whereBetween('work_date', [$current, $monthEnd]);
+            // Labor — filter by period_start
+            $laborQ = ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd]);
             $matQ   = ProjectMaterialAllocation::whereBetween('allocated_at', [$current, $monthEnd])->with('inventoryItem');
             $miscQ  = ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd]);
 
@@ -225,10 +220,10 @@ class ReportsController extends Controller
                 $miscQ->whereHas('project', fn($q) => $q->where('client_id', $clientId));
             }
 
-            $labor    = $laborQ->sum('total_cost');
+            $labor    = (float) $laborQ->sum('gross_pay');
             $material = $matQ->get()->sum(fn($a) => $a->inventoryItem
                 ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
-            $misc     = $miscQ->sum('amount');
+            $misc     = (float) $miscQ->sum('amount');
 
             $months->push([
                 'month'     => $current->format('M Y'),
@@ -253,20 +248,16 @@ class ReportsController extends Controller
     {
         $totalItems  = InventoryItem::count();
         $activeItems = InventoryItem::where('is_active', true)->count();
-
-        $allActive = InventoryItem::where('is_active', true)->get();
+        $allActive   = InventoryItem::where('is_active', true)->get();
 
         $lowStockItems = $allActive->filter(fn($item) => $item->isLowStock());
+        $totalValue    = $allActive->sum(fn($item) => (float) $item->current_stock * (float) ($item->unit_price ?? 0));
 
-        $totalValue = $allActive->sum(fn($item) => (float) $item->current_stock * (float) ($item->unit_price ?? 0));
-
-        // By category: count + value
         $byCategory = InventoryItem::where('is_active', true)
             ->select('category', DB::raw('count(*) as count'), DB::raw('sum(current_stock * unit_price) as total_value'))
             ->groupBy('category')
             ->get();
 
-        // Most used items
         $mostUsed = ProjectMaterialAllocation::select('inventory_item_id', DB::raw('sum(quantity_received) as total_used'))
             ->groupBy('inventory_item_id')
             ->orderByDesc('total_used')
@@ -274,10 +265,9 @@ class ReportsController extends Controller
             ->with('inventoryItem:id,item_code,item_name,unit_of_measure,unit_price')
             ->get();
 
-        // Stock health distribution
         $stockHealth = [
-            'healthy'   => $allActive->filter(fn($i) => !$i->isLowStock() && $i->current_stock > 0)->count(),
-            'low_stock' => $lowStockItems->count(),
+            'healthy'      => $allActive->filter(fn($i) => !$i->isLowStock() && $i->current_stock > 0)->count(),
+            'low_stock'    => $lowStockItems->count(),
             'out_of_stock' => $allActive->filter(fn($i) => $i->current_stock <= 0)->count(),
         ];
 
@@ -296,13 +286,12 @@ class ReportsController extends Controller
     }
 
     // -------------------------------------------------------------------------
-    // Project Report (Performance + Budget combined)
+    // Project Report
     // -------------------------------------------------------------------------
 
     private function getProjectReport($startDate, $endDate, $projectId, $clientId)
     {
         $query = Project::query();
-
         if ($projectId) $query->where('id', $projectId);
         if ($clientId)  $query->where('client_id', $clientId);
 
@@ -310,26 +299,28 @@ class ReportsController extends Controller
             ->with(['client:id,client_name', 'milestones', 'projectType:id,name'])
             ->get()
             ->map(function ($project) {
-                $milestones       = $project->milestones;
-                $total            = $milestones->count();
-                $completed        = $milestones->where('status', 'completed')->count();
-                $completionPct    = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+                $milestones    = $project->milestones;
+                $total         = $milestones->count();
+                $completed     = $milestones->where('status', 'completed')->count();
+                $completionPct = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
 
-                // Actual costs
-                $laborCost = ProjectLaborCost::where('project_id', $project->id)->sum('total_cost');
+                // Use new schema — sum gross_pay
+                $laborCost = (float) ProjectLaborCost::where('project_id', $project->id)
+                    ->sum('gross_pay');
+
                 $materialCost = ProjectMaterialAllocation::where('project_id', $project->id)
                     ->with('inventoryItem')
                     ->get()
                     ->sum(fn($a) => $a->inventoryItem
                         ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
-                $miscCost = ProjectMiscellaneousExpense::where('project_id', $project->id)->sum('amount');
+
+                $miscCost   = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)->sum('amount');
                 $totalSpent = $laborCost + $materialCost + $miscCost;
 
-                $budget          = (float) $project->contract_amount;
-                $variance        = $budget - $totalSpent;
-                $variancePct     = $budget > 0 ? ($variance / $budget) * 100 : 0;
+                $budget      = (float) $project->contract_amount;
+                $variance    = $budget - $totalSpent;
+                $variancePct = $budget > 0 ? ($variance / $budget) * 100 : 0;
 
-                // Timeline status
                 $isOverdue = $project->status !== 'completed'
                     && $project->status !== 'cancelled'
                     && $project->planned_end_date
@@ -351,7 +342,6 @@ class ReportsController extends Controller
                 ]);
             });
 
-        // Summary
         $totalProjects     = $projects->count();
         $completedProjects = $projects->where('status', 'completed')->count();
         $activeProjects    = $projects->where('status', 'active')->count();
@@ -361,38 +351,33 @@ class ReportsController extends Controller
         $totalBudget       = $projects->sum('contract_amount');
         $totalSpent        = $projects->sum('total_spent');
 
-        // By status
-        $byStatus = $projects->groupBy('status')
-            ->map(fn($g) => $g->count());
-
-        // By type
-        $byType = $projects->groupBy('project_type_name')
-            ->map(fn($g) => $g->count());
-
-        // Top projects by contract value
+        $byStatus    = $projects->groupBy('status')->map(fn($g) => $g->count());
+        $byType      = $projects->groupBy('project_type_name')->map(fn($g) => $g->count());
         $topProjects = $projects->sortByDesc('contract_amount')->take(10)->values();
 
         return [
             'summary' => [
-                'total'              => $totalProjects,
-                'completed'          => $completedProjects,
-                'active'             => $activeProjects,
-                'on_hold'            => $onHoldProjects,
-                'overdue'            => $overdueProjects,
-                'avg_completion'     => round($avgCompletion, 2),
-                'total_budget'       => $totalBudget,
-                'total_spent'        => $totalSpent,
-                'total_variance'     => $totalBudget - $totalSpent,
-                'variance_percentage'=> $totalBudget > 0 ? round((($totalBudget - $totalSpent) / $totalBudget) * 100, 2) : 0,
+                'total'               => $totalProjects,
+                'completed'           => $completedProjects,
+                'active'              => $activeProjects,
+                'on_hold'             => $onHoldProjects,
+                'overdue'             => $overdueProjects,
+                'avg_completion'      => round($avgCompletion, 2),
+                'total_budget'        => $totalBudget,
+                'total_spent'         => $totalSpent,
+                'total_variance'      => $totalBudget - $totalSpent,
+                'variance_percentage' => $totalBudget > 0
+                    ? round((($totalBudget - $totalSpent) / $totalBudget) * 100, 2)
+                    : 0,
             ],
-            'by_status'   => $byStatus,
-            'by_type'     => $byType,
-            'projects'    => $topProjects,
+            'by_status'  => $byStatus,
+            'by_type'    => $byType,
+            'projects'   => $topProjects,
         ];
     }
 
     // -------------------------------------------------------------------------
-    // Trend data (monthly revenue + expenses for charts)
+    // Trends
     // -------------------------------------------------------------------------
 
     private function getTrendsData($startDate, $endDate)
@@ -408,8 +393,9 @@ class ReportsController extends Controller
                 ->whereBetween('payment_date', [$current, $monthEnd])
                 ->sum('payment_amount');
 
-            $laborCost = ProjectLaborCost::whereBetween('work_date', [$current, $monthEnd])
-                ->sum('total_cost');
+            // Labor — use period_start + gross_pay
+            $laborCost = (float) ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd])
+                ->sum('gross_pay');
 
             $materialCost = ProjectMaterialAllocation::whereBetween('allocated_at', [$current, $monthEnd])
                 ->with('inventoryItem')
@@ -417,7 +403,7 @@ class ReportsController extends Controller
                 ->sum(fn($a) => $a->inventoryItem
                     ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
 
-            $miscCost = ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
+            $miscCost = (float) ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
                 ->sum('amount');
 
             $projectsStarted   = Project::whereBetween('start_date', [$current, $monthEnd])->count();
@@ -430,12 +416,12 @@ class ReportsController extends Controller
             $months->push([
                 'month'              => $current->format('M Y'),
                 'month_key'          => $current->format('Y-m'),
-                'revenue'            => $revenue,
+                'revenue'            => (float) $revenue,
                 'labor_cost'         => $laborCost,
                 'material_cost'      => $materialCost,
                 'misc_cost'          => $miscCost,
                 'total_expenses'     => $totalExpenses,
-                'net_profit'         => $revenue - $totalExpenses,
+                'net_profit'         => (float) $revenue - $totalExpenses,
                 'projects_started'   => $projectsStarted,
                 'projects_completed' => $projectsCompleted,
             ]);
@@ -447,7 +433,7 @@ class ReportsController extends Controller
     }
 
     // =========================================================================
-    // Export methods
+    // Exports
     // =========================================================================
 
     public function exportProjectPerformance(Request $request)
@@ -570,7 +556,7 @@ class ReportsController extends Controller
     }
 
     // -------------------------------------------------------------------------
-    // Legacy helpers (kept for backward compat with existing export classes)
+    // Legacy helpers
     // -------------------------------------------------------------------------
 
     private function getClientReport($startDate, $endDate, $clientId)
@@ -579,12 +565,15 @@ class ReportsController extends Controller
         if ($clientId) $query->where('id', $clientId);
 
         $clients = $query->withCount(['projects' => function ($q) use ($startDate, $endDate) {
-            $q->where(fn($q2) => $q2->whereBetween('start_date', [$startDate, $endDate])
-                ->orWhereBetween('planned_end_date', [$startDate, $endDate]));
+            $q->where(fn($q2) => $q2
+                ->whereBetween('start_date', [$startDate, $endDate])
+                ->orWhereBetween('planned_end_date', [$startDate, $endDate])
+            );
         }])->with(['projects' => function ($q) use ($startDate, $endDate) {
-            $q->where(fn($q2) => $q2->whereBetween('start_date', [$startDate, $endDate])
-                ->orWhereBetween('planned_end_date', [$startDate, $endDate]))
-              ->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
+            $q->where(fn($q2) => $q2
+                ->whereBetween('start_date', [$startDate, $endDate])
+                ->orWhereBetween('planned_end_date', [$startDate, $endDate])
+            )->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
         }])->get();
 
         $topClients = $clients->map(function ($client) {
@@ -609,31 +598,34 @@ class ReportsController extends Controller
 
     private function getTeamProductivityReport($startDate, $endDate, $projectId)
     {
-        $query = ProjectLaborCost::whereBetween('work_date', [$startDate, $endDate]);
+        $query = ProjectLaborCost::whereBetween('period_start', [$startDate, $endDate]);
         if ($projectId) $query->where('project_id', $projectId);
 
-        $laborCosts = $query->with(['user:id,name', 'project:id,project_name'])->get();
+        $entries = $query->with(['user:id,name', 'employee', 'project:id,project_name'])->get();
 
-        $byUser = $laborCosts->groupBy('user_id')->map(function ($costs, $userId) {
+        $byWorker = $entries->groupBy(function ($entry) {
+            return $entry->assignable_type . '-' . ($entry->user_id ?? $entry->employee_id);
+        })->map(function ($costs) {
+            $first = $costs->first();
             return [
-                'user_id'        => $userId,
-                'user_name'      => $costs->first()->user->name ?? 'Unknown',
-                'total_hours'    => round($costs->sum('hours_worked'), 2),
-                'total_cost'     => $costs->sum('total_cost'),
-                'avg_hourly_rate'=> round($costs->avg('hourly_rate'), 2),
-                'work_days'      => $costs->count(),
+                'worker_name'    => $first->assignable_name,
+                'worker_type'    => $first->assignable_type_label,
+                'total_days'     => round($costs->sum('days_present'), 2),
+                'total_cost'     => round($costs->sum('gross_pay'), 2),
+                'avg_daily_rate' => round($costs->avg('daily_rate'), 2),
+                'periods'        => $costs->count(),
             ];
-        })->sortByDesc('total_hours')->take(10)->values();
+        })->sortByDesc('total_cost')->take(10)->values();
 
         return [
             'summary' => [
-                'total_hours'    => round($laborCosts->sum('hours_worked'), 2),
-                'total_cost'     => $laborCosts->sum('total_cost'),
-                'avg_hourly_rate'=> $laborCosts->sum('hours_worked') > 0
-                    ? round($laborCosts->sum('total_cost') / $laborCosts->sum('hours_worked'), 2)
+                'total_days'     => round($entries->sum('days_present'), 2),
+                'total_cost'     => round($entries->sum('gross_pay'), 2),
+                'avg_daily_rate' => $entries->count() > 0
+                    ? round($entries->avg('daily_rate'), 2)
                     : 0,
             ],
-            'by_user' => $byUser,
+            'by_worker' => $byWorker,
         ];
     }
 

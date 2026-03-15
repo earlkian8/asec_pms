@@ -7,241 +7,210 @@ use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectMiscellaneousExpense;
 use App\Models\Billing;
-use App\Models\BillingPayment;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTeam;
 use App\Models\ProjectTask;
 
 class ProjectOverviewService
 {
-    public function getProjectOverviewData(Project $project)
+    public function getProjectOverviewData(Project $project): array
     {
-        // Load project with relationships
         $project->load(['client', 'projectType']);
 
-        // Calculate Labor Costs
-        $laborCosts = ProjectLaborCost::where('project_id', $project->id)->get();
-        $totalLaborHours = $laborCosts->sum('hours_worked');
-        $totalLaborCost = $laborCosts->sum(function ($cost) {
-            return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-        });
+        // ── Labor Costs ───────────────────────────────────────────────────────
+        $laborCosts      = ProjectLaborCost::where('project_id', $project->id)->get();
+        $totalLaborCost  = (float) $laborCosts->sum('gross_pay');
+        $totalLaborDays  = (float) $laborCosts->sum('days_present');
 
-        // Calculate Material Costs
+        // ── Material Costs ────────────────────────────────────────────────────
         $materialAllocations = ProjectMaterialAllocation::where('project_id', $project->id)
             ->with('inventoryItem')
             ->get();
-        
-        $totalMaterialCost = $materialAllocations->sum(function ($allocation) {
-            if ($allocation->inventoryItem) {
-                return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-            }
-            return 0;
+
+        $totalMaterialCost     = $materialAllocations->sum(function ($a) {
+            return $a->inventoryItem
+                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price
+                : 0;
         });
+        $totalMaterialQuantity = (float) $materialAllocations->sum('quantity_received');
 
-        $totalMaterialQuantity = $materialAllocations->sum('quantity_received');
+        // ── Miscellaneous Expenses ────────────────────────────────────────────
+        $miscExpenses               = ProjectMiscellaneousExpense::where('project_id', $project->id)->get();
+        $totalMiscellaneousExpenses = (float) $miscExpenses->sum('amount');
 
-        // Calculate Miscellaneous Expenses
-        $miscellaneousExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)->get();
-        $totalMiscellaneousExpenses = $miscellaneousExpenses->sum('amount');
+        // ── Budget Summary ────────────────────────────────────────────────────
+        $totalBudgetUsed            = $totalLaborCost + $totalMaterialCost + $totalMiscellaneousExpenses;
+        $contractAmount             = (float) $project->contract_amount;
+        $budgetRemaining            = $contractAmount - $totalBudgetUsed;
+        $budgetUtilizationPct       = $contractAmount > 0 ? ($totalBudgetUsed / $contractAmount) * 100 : 0;
 
-        // Total Budget Used
-        $totalBudgetUsed = $totalLaborCost + $totalMaterialCost + $totalMiscellaneousExpenses;
-        $contractAmount = (float) $project->contract_amount;
-        $budgetRemaining = $contractAmount - $totalBudgetUsed;
-        $budgetUtilizationPercentage = $contractAmount > 0 ? ($totalBudgetUsed / $contractAmount) * 100 : 0;
+        // ── Billing ───────────────────────────────────────────────────────────
+        $billings     = Billing::where('project_id', $project->id)->with(['payments', 'milestone'])->get();
+        $totalBilled  = (float) $billings->sum('billing_amount');
+        $totalPaid    = (float) $billings->sum(fn ($b) => $b->total_paid);
+        $totalRemaining     = $totalBilled - $totalPaid;
+        $paymentPercentage  = $totalBilled > 0 ? ($totalPaid / $totalBilled) * 100 : 0;
 
-        // Billing Information
-        $billings = Billing::where('project_id', $project->id)
-            ->with(['payments', 'milestone'])
-            ->get();
-        
-        $totalBilled = $billings->sum('billing_amount');
-        // Use the billing model's total_paid attribute which filters by payment_status='paid'
-        // This ensures data integrity and consistency across the system
-        $totalPaid = $billings->sum(function ($billing) {
-            return $billing->total_paid;
-        });
-        $totalRemaining = $totalBilled - $totalPaid;
-        $paymentPercentage = $totalBilled > 0 ? ($totalPaid / $totalBilled) * 100 : 0;
-
-        // Billing breakdown by status
         $billingStatusCounts = [
-            'unpaid' => $billings->where('status', 'unpaid')->count(),
+            'unpaid'  => $billings->where('status', 'unpaid')->count(),
             'partial' => $billings->where('status', 'partial')->count(),
-            'paid' => $billings->where('status', 'paid')->count(),
+            'paid'    => $billings->where('status', 'paid')->count(),
         ];
 
-        // Recent billings (last 5)
         $recentBillings = $billings->sortByDesc('billing_date')->take(5)->values();
 
-        // Team Statistics
-        $teamMembers = ProjectTeam::where('project_id', $project->id)
-            ->active()
-            ->current()
+        // ── Team ──────────────────────────────────────────────────────────────
+        $teamMembers      = ProjectTeam::where('project_id', $project->id)
+            ->active()->current()
             ->with(['user', 'employee'])
             ->get();
-        
-        $totalTeamMembers = $teamMembers->count();
+        $totalTeamMembers  = $teamMembers->count();
         $activeTeamMembers = $teamMembers->where('is_active', true)->count();
 
-        // Milestone Statistics
-        $milestones = ProjectMilestone::where('project_id', $project->id)->get();
-        $totalMilestones = $milestones->count();
+        // ── Milestones ────────────────────────────────────────────────────────
+        $milestones          = ProjectMilestone::where('project_id', $project->id)->get();
+        $totalMilestones     = $milestones->count();
         $completedMilestones = $milestones->where('status', 'completed')->count();
-        $inProgressMilestones = $milestones->where('status', 'in_progress')->count();
-        $pendingMilestones = $milestones->where('status', 'pending')->count();
+        $inProgressMilestones= $milestones->where('status', 'in_progress')->count();
+        $pendingMilestones   = $milestones->where('status', 'pending')->count();
 
-        // Task Statistics
-        $tasks = ProjectTask::whereHas('milestone', function ($query) use ($project) {
-            $query->where('project_id', $project->id);
-        })->get();
-        
-        $totalTasks = $tasks->count();
+        // ── Tasks ─────────────────────────────────────────────────────────────
+        $tasks          = ProjectTask::whereHas('milestone', fn ($q) => $q->where('project_id', $project->id))->get();
+        $totalTasks     = $tasks->count();
         $completedTasks = $tasks->where('status', 'completed')->count();
-        $inProgressTasks = $tasks->where('status', 'in_progress')->count();
-        $pendingTasks = $tasks->where('status', 'pending')->count();
+        $inProgressTasks= $tasks->where('status', 'in_progress')->count();
+        $pendingTasks   = $tasks->where('status', 'pending')->count();
 
-        // Budget breakdown by month (last 6 months)
+        // ── Monthly Breakdown (last 6 months) ─────────────────────────────────
+
+        // Labor — group by period_start month, sum gross_pay
         $monthlyLaborCosts = ProjectLaborCost::where('project_id', $project->id)
-            ->where('work_date', '>=', now()->subMonths(6))
+            ->where('period_start', '>=', now()->subMonths(6))
             ->get()
-            ->groupBy(function ($cost) {
-                return $cost->work_date->format('Y-m');
-            })
-            ->map(function ($costs) {
-                return $costs->sum(function ($cost) {
-                    return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-                });
-            });
+            ->groupBy(fn ($c) => $c->period_start->format('Y-m'))
+            ->map(fn ($costs) => (float) $costs->sum('gross_pay'));
 
+        // Materials
         $monthlyMaterialCosts = ProjectMaterialAllocation::where('project_id', $project->id)
             ->where('allocated_at', '>=', now()->subMonths(6))
             ->with('inventoryItem')
             ->get()
-            ->groupBy(function ($allocation) {
-                return $allocation->allocated_at->format('Y-m');
-            })
-            ->map(function ($allocations) {
-                return $allocations->sum(function ($allocation) {
-                    if ($allocation->inventoryItem) {
-                        return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-                    }
-                    return 0;
-                });
-            });
+            ->groupBy(fn ($a) => $a->allocated_at->format('Y-m'))
+            ->map(fn ($allocations) => $allocations->sum(fn ($a) => $a->inventoryItem
+                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price
+                : 0
+            ));
 
-        $monthlyMiscellaneousExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)
+        // Misc
+        $monthlyMiscExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)
             ->where('expense_date', '>=', now()->subMonths(6))
             ->get()
-            ->groupBy(function ($expense) {
-                return $expense->expense_date->format('Y-m');
-            })
-            ->map(function ($expenses) {
-                return $expenses->sum('amount');
-            });
+            ->groupBy(fn ($e) => $e->expense_date->format('Y-m'))
+            ->map(fn ($expenses) => (float) $expenses->sum('amount'));
 
-        // Generate last 6 months array
         $last6Months = [];
         for ($i = 5; $i >= 0; $i--) {
-            $month = now()->subMonths($i);
+            $month    = now()->subMonths($i);
             $monthKey = $month->format('Y-m');
             $last6Months[] = [
-                'month' => $month->format('M Y'),
-                'month_key' => $monthKey,
-                'labor_cost' => $monthlyLaborCosts->get($monthKey, 0),
-                'material_cost' => $monthlyMaterialCosts->get($monthKey, 0),
-                'miscellaneous_expenses' => $monthlyMiscellaneousExpenses->get($monthKey, 0),
+                'month'                   => $month->format('M Y'),
+                'month_key'               => $monthKey,
+                'labor_cost'              => $monthlyLaborCosts->get($monthKey, 0),
+                'material_cost'           => $monthlyMaterialCosts->get($monthKey, 0),
+                'miscellaneous_expenses'  => $monthlyMiscExpenses->get($monthKey, 0),
             ];
         }
 
-        // Project timeline information
-        $daysElapsed = $project->start_date ? (int) now()->diffInDays($project->start_date) : 0;
-        $daysRemaining = $project->planned_end_date ? max(0, (int) now()->diffInDays($project->planned_end_date, false)) : null;
-        $isOverdue = $project->planned_end_date && now()->greaterThan($project->planned_end_date) && $project->status !== 'completed';
+        // ── Timeline ──────────────────────────────────────────────────────────
+        $daysElapsed   = $project->start_date ? (int) now()->diffInDays($project->start_date) : 0;
+        $daysRemaining = $project->planned_end_date
+            ? max(0, (int) now()->diffInDays($project->planned_end_date, false))
+            : null;
+        $isOverdue = $project->planned_end_date
+            && now()->greaterThan($project->planned_end_date)
+            && $project->status !== 'completed';
 
         return [
             'project' => $project,
-            'budget' => [
-                'contract_amount' => $contractAmount,
-                'total_labor_cost' => $totalLaborCost,
-                'total_material_cost' => $totalMaterialCost,
-                'total_miscellaneous_expenses' => $totalMiscellaneousExpenses,
-                'total_budget_used' => $totalBudgetUsed,
-                'budget_remaining' => $budgetRemaining,
-                'budget_utilization_percentage' => round($budgetUtilizationPercentage, 2),
-                'total_labor_hours' => round($totalLaborHours, 2),
-                'total_material_quantity' => round($totalMaterialQuantity, 2),
-                'monthly_breakdown' => $last6Months,
+            'budget'  => [
+                'contract_amount'               => $contractAmount,
+                'total_labor_cost'              => $totalLaborCost,
+                'total_material_cost'           => $totalMaterialCost,
+                'total_miscellaneous_expenses'  => $totalMiscellaneousExpenses,
+                'total_budget_used'             => $totalBudgetUsed,
+                'budget_remaining'              => $budgetRemaining,
+                'budget_utilization_percentage' => round($budgetUtilizationPct, 2),
+                'total_labor_days'              => $totalLaborDays,   // replaces total_labor_hours
+                'total_material_quantity'       => round($totalMaterialQuantity, 2),
+                'monthly_breakdown'             => $last6Months,
             ],
             'billing' => [
-                'total_billed' => $totalBilled,
-                'total_paid' => $totalPaid,
-                'total_remaining' => $totalRemaining,
+                'total_billed'       => $totalBilled,
+                'total_paid'         => $totalPaid,
+                'total_remaining'    => $totalRemaining,
                 'payment_percentage' => round($paymentPercentage, 2),
-                'status_counts' => $billingStatusCounts,
-                'recent_billings' => $recentBillings->map(function ($billing) {
-                    return [
-                        'id' => $billing->id,
-                        'billing_code' => $billing->billing_code,
-                        'billing_amount' => $billing->billing_amount,
-                        'billing_date' => $billing->billing_date,
-                        'status' => $billing->status,
-                        'total_paid' => $billing->total_paid,
-                        'remaining_amount' => $billing->remaining_amount,
-                        'milestone' => $billing->milestone ? [
-                            'id' => $billing->milestone->id,
-                            'name' => $billing->milestone->name,
-                        ] : null,
-                    ];
-                }),
+                'status_counts'      => $billingStatusCounts,
+                'recent_billings'    => $recentBillings->map(fn ($b) => [
+                    'id'               => $b->id,
+                    'billing_code'     => $b->billing_code,
+                    'billing_amount'   => $b->billing_amount,
+                    'billing_date'     => $b->billing_date,
+                    'status'           => $b->status,
+                    'total_paid'       => $b->total_paid,
+                    'remaining_amount' => $b->remaining_amount,
+                    'milestone'        => $b->milestone
+                        ? ['id' => $b->milestone->id, 'name' => $b->milestone->name]
+                        : null,
+                ]),
             ],
             'team' => [
-                'total_members' => $totalTeamMembers,
+                'total_members'  => $totalTeamMembers,
                 'active_members' => $activeTeamMembers,
-                'members' => $teamMembers->map(function ($member) {
-                    return [
-                        'id' => $member->id,
-                        'assignable_name' => $member->assignable_name,
-                        'assignable_type' => $member->assignable_type,
-                        'user' => $member->user ? [
-                            'id' => $member->user->id,
-                            'name' => $member->user->name,
-                            'email' => $member->user->email,
-                        ] : null,
-                        'employee' => $member->employee ? [
-                            'id' => $member->employee->id,
-                            'first_name' => $member->employee->first_name,
-                            'last_name' => $member->employee->last_name,
-                            'email' => $member->employee->email,
-                        ] : null,
-                        'role' => $member->role,
-                        'status' => $member->is_active ? 'active' : 'inactive',
-                    ];
-                }),
+                'members'        => $teamMembers->map(fn ($m) => [
+                    'id'              => $m->id,
+                    'assignable_name' => $m->assignable_name,
+                    'assignable_type' => $m->assignable_type,
+                    'user'            => $m->user ? [
+                        'id'    => $m->user->id,
+                        'name'  => $m->user->name,
+                        'email' => $m->user->email,
+                    ] : null,
+                    'employee'        => $m->employee ? [
+                        'id'         => $m->employee->id,
+                        'first_name' => $m->employee->first_name,
+                        'last_name'  => $m->employee->last_name,
+                        'email'      => $m->employee->email,
+                    ] : null,
+                    'role'   => $m->role,
+                    'status' => $m->is_active ? 'active' : 'inactive',
+                ]),
             ],
             'milestones' => [
-                'total' => $totalMilestones,
-                'completed' => $completedMilestones,
-                'in_progress' => $inProgressMilestones,
-                'pending' => $pendingMilestones,
-                'completion_percentage' => $totalMilestones > 0 ? round(($completedMilestones / $totalMilestones) * 100, 2) : 0,
+                'total'                => $totalMilestones,
+                'completed'            => $completedMilestones,
+                'in_progress'          => $inProgressMilestones,
+                'pending'              => $pendingMilestones,
+                'completion_percentage'=> $totalMilestones > 0
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2)
+                    : 0,
             ],
             'tasks' => [
-                'total' => $totalTasks,
-                'completed' => $completedTasks,
-                'in_progress' => $inProgressTasks,
-                'pending' => $pendingTasks,
-                'completion_percentage' => $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 2) : 0,
+                'total'                => $totalTasks,
+                'completed'            => $completedTasks,
+                'in_progress'          => $inProgressTasks,
+                'pending'              => $pendingTasks,
+                'completion_percentage'=> $totalTasks > 0
+                    ? round(($completedTasks / $totalTasks) * 100, 2)
+                    : 0,
             ],
             'timeline' => [
-                'days_elapsed' => $daysElapsed,
-                'days_remaining' => $daysRemaining,
-                'is_overdue' => $isOverdue,
-                'start_date' => $project->start_date,
+                'days_elapsed'     => $daysElapsed,
+                'days_remaining'   => $daysRemaining,
+                'is_overdue'       => $isOverdue,
+                'start_date'       => $project->start_date,
                 'planned_end_date' => $project->planned_end_date,
-                'actual_end_date' => $project->actual_end_date,
+                'actual_end_date'  => $project->actual_end_date,
             ],
         ];
     }
 }
-

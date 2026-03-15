@@ -109,6 +109,7 @@ Route::middleware('auth')->group(function () {
         Route::prefix('labor-costs')->name('labor-costs.')->group(function(){
             Route::post('/store/{project}', [ProjectLaborCostsController::class, 'store'])->middleware('permission:labor-costs.create')->name('store');
             Route::put('/update/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'update'])->middleware('permission:labor-costs.update')->name('update');
+            Route::put('/submit/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'submit'])->middleware('permission:labor-costs.update')->name('submit');
             Route::delete('/destroy/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'destroy'])->middleware('permission:labor-costs.delete')->name('destroy');
         });
 

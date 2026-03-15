@@ -50,10 +50,10 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
     notice_to_proceed:        null,
   });
 
-  const [showAddClient, setShowAddClient] = useState(false);
+  const [showAddClient, setShowAddClient]           = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
-  const [validationErrors, setValidationErrors] = useState({});
-  const [selectedFiles, setSelectedFiles] = useState({});
+  const [validationErrors, setValidationErrors]     = useState({});
+  const [selectedFiles, setSelectedFiles]           = useState({});
   const fileRefs = useRef({});
 
   useEffect(() => {
@@ -65,25 +65,67 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Unified error getter — local validation takes priority over server errors
   const getFieldError = (f) => validationErrors[f] || errors[f];
 
   const validateForm = () => {
     const errs = {};
-    if (!data.project_name?.trim()) errs.project_name = 'The project name field is required.';
-    if (!data.client_id)            errs.client_id    = 'The client field is required.';
-    if (!data.project_type_id)      errs.project_type_id = 'The project type field is required.';
+
+    if (!data.project_name?.trim()) {
+      errs.project_name = 'The project name field is required.';
+    }
+    if (!data.client_id) {
+      errs.client_id = 'The client field is required.';
+    }
+    if (!data.project_type_id) {
+      errs.project_type_id = 'The project type field is required.';
+    }
     if (!hasBillings && (!data.contract_amount || parseFloat(data.contract_amount) <= 0)) {
       errs.contract_amount = 'The contract amount field is required and must be greater than 0.';
     }
+    if (!data.start_date) {
+      errs.start_date = 'The start date field is required.';
+    }
+    if (!data.planned_end_date) {
+      errs.planned_end_date = 'The planned end date field is required.';
+    } else if (data.start_date && data.planned_end_date < data.start_date) {
+      errs.planned_end_date = 'Planned end date must not be before the start date.';
+    }
+
     return errs;
   };
 
-  // Turn the server errors object into one readable toast message
   const buildErrorSummary = (errs) => {
     const messages = Object.values(errs).flat().filter(Boolean);
     if (messages.length === 0) return "Failed to update project. Please try again.";
     if (messages.length === 1) return messages[0];
     return `${messages.length} fields have errors — please review the highlighted fields.`;
+  };
+
+  // Start date — re-validate planned end date whenever start date changes
+  const handleStartDateChange = (value) => {
+    setData("start_date", value);
+    if (data.planned_end_date && data.planned_end_date < value) {
+      setValidationErrors(prev => ({
+        ...prev,
+        planned_end_date: 'Planned end date must not be before the start date.',
+      }));
+    } else {
+      setValidationErrors(prev => { const next = { ...prev }; delete next.planned_end_date; return next; });
+    }
+  };
+
+  // Planned end date — validate against start date live
+  const handlePlannedEndDateChange = (value) => {
+    setData("planned_end_date", value);
+    if (data.start_date && value < data.start_date) {
+      setValidationErrors(prev => ({
+        ...prev,
+        planned_end_date: 'Planned end date must not be before the start date.',
+      }));
+    } else {
+      setValidationErrors(prev => { const next = { ...prev }; delete next.planned_end_date; return next; });
+    }
   };
 
   const handleSubmit = (e) => {
@@ -155,13 +197,17 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
                 Project Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                 {/* Project Name */}
                 <div className="md:col-span-2">
                   <Label className="text-zinc-800">Project Name <span className="text-red-500">*</span></Label>
-                  <Input type="text" value={data.project_name}
+                  <Input
+                    type="text"
+                    value={data.project_name}
                     onChange={(e) => setData("project_name", e.target.value)}
                     placeholder="Enter project name"
-                    className={inputClass(getFieldError('project_name'))} />
+                    className={inputClass(getFieldError('project_name'))}
+                  />
                   <InputError message={getFieldError('project_name')} />
                 </div>
 
@@ -202,7 +248,9 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
                 <div>
                   <Label className="text-zinc-800">Status</Label>
                   <Select value={data.status} onValueChange={(v) => setData("status", v)}>
-                    <SelectTrigger className={inputClass(errors.status)}><SelectValue placeholder="Select status" /></SelectTrigger>
+                    <SelectTrigger className={inputClass(getFieldError('status'))}>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="on_hold">On Hold</SelectItem>
@@ -210,21 +258,23 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
-                  <InputError message={errors.status} />
+                  <InputError message={getFieldError('status')} />
                 </div>
 
                 {/* Priority */}
                 <div>
                   <Label className="text-zinc-800">Priority</Label>
                   <Select value={data.priority} onValueChange={(v) => setData("priority", v)}>
-                    <SelectTrigger className={inputClass(errors.priority)}><SelectValue placeholder="Select priority" /></SelectTrigger>
+                    <SelectTrigger className={inputClass(getFieldError('priority'))}>
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Low</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
                     </SelectContent>
                   </Select>
-                  <InputError message={errors.priority} />
+                  <InputError message={getFieldError('priority')} />
                 </div>
 
                 {/* Contract Amount */}
@@ -277,48 +327,77 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
                 <div>
                   <Label className="text-zinc-800">Billing Type</Label>
                   <Select value={data.billing_type} onValueChange={(v) => setData("billing_type", v)}>
-                    <SelectTrigger className={inputClass(errors.billing_type)}><SelectValue placeholder="Select billing type" /></SelectTrigger>
+                    <SelectTrigger className={inputClass(getFieldError('billing_type'))}>
+                      <SelectValue placeholder="Select billing type" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="fixed_price">Fixed Price</SelectItem>
                       <SelectItem value="milestone">Milestone</SelectItem>
                     </SelectContent>
                   </Select>
-                  <InputError message={errors.billing_type} />
+                  <InputError message={getFieldError('billing_type')} />
                 </div>
 
                 {/* Start Date */}
                 <div>
-                  <Label className="text-zinc-800">Start Date</Label>
-                  <Input type="date" value={data.start_date || ""} onChange={(e) => setData("start_date", e.target.value)} className={inputClass(errors.start_date)} />
-                  <InputError message={errors.start_date} />
+                  <Label className="text-zinc-800">Start Date <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="date"
+                    value={data.start_date || ""}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    className={inputClass(getFieldError('start_date'))}
+                  />
+                  <InputError message={getFieldError('start_date')} />
                 </div>
 
                 {/* Planned End Date */}
                 <div>
-                  <Label className="text-zinc-800">Planned End Date</Label>
-                  <Input type="date" value={data.planned_end_date || ""} onChange={(e) => setData("planned_end_date", e.target.value)} className={inputClass(errors.planned_end_date)} />
-                  <InputError message={errors.planned_end_date} />
+                  <Label className="text-zinc-800">Planned End Date <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="date"
+                    value={data.planned_end_date || ""}
+                    min={data.start_date || undefined}
+                    onChange={(e) => handlePlannedEndDateChange(e.target.value)}
+                    className={inputClass(getFieldError('planned_end_date'))}
+                  />
+                  <InputError message={getFieldError('planned_end_date')} />
                 </div>
 
                 {/* Actual End Date */}
                 <div>
                   <Label className="text-zinc-800">Actual End Date</Label>
-                  <Input type="date" value={data.actual_end_date || ""} onChange={(e) => setData("actual_end_date", e.target.value)} className={inputClass(errors.actual_end_date)} />
-                  <InputError message={errors.actual_end_date} />
+                  <Input
+                    type="date"
+                    value={data.actual_end_date || ""}
+                    onChange={(e) => setData("actual_end_date", e.target.value)}
+                    className={inputClass(getFieldError('actual_end_date'))}
+                  />
+                  <InputError message={getFieldError('actual_end_date')} />
                 </div>
 
                 {/* Location */}
                 <div className="md:col-span-2">
                   <Label className="text-zinc-800">Location</Label>
-                  <Textarea value={data.location} onChange={(e) => setData("location", e.target.value)} placeholder="Enter project location" className={inputClass(errors.location)} />
-                  <InputError message={errors.location} />
+                  <Textarea
+                    value={data.location}
+                    onChange={(e) => setData("location", e.target.value)}
+                    placeholder="Enter project location"
+                    className={inputClass(getFieldError('location'))}
+                  />
+                  <InputError message={getFieldError('location')} />
                 </div>
 
                 {/* Description */}
                 <div className="md:col-span-2">
                   <Label className="text-zinc-800">Description</Label>
-                  <Textarea value={data.description} onChange={(e) => setData("description", e.target.value)} placeholder="Enter project description" rows={3} className={inputClass(errors.description)} />
-                  <InputError message={errors.description} />
+                  <Textarea
+                    value={data.description}
+                    onChange={(e) => setData("description", e.target.value)}
+                    placeholder="Enter project description"
+                    rows={3}
+                    className={inputClass(getFieldError('description'))}
+                  />
+                  <InputError message={getFieldError('description')} />
                 </div>
               </div>
             </div>
@@ -333,12 +412,12 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
                 {DOCUMENT_FIELDS.map(({ key, label }) => {
                   const existingFile = getExistingFilename(key);
                   const selectedFile = selectedFiles[key];
-                  const hasFile = selectedFile || existingFile;
-                  const displayName = selectedFile || existingFile || '';
-                  const ext = displayName.split('.').pop()?.toLowerCase();
-                  const isImage = ['jpg','jpeg','png','webp'].includes(ext);
-                  const isPdf   = ext === 'pdf';
-                  const isDocx  = ['doc','docx'].includes(ext);
+                  const hasFile      = selectedFile || existingFile;
+                  const displayName  = selectedFile || existingFile || '';
+                  const ext          = displayName.split('.').pop()?.toLowerCase();
+                  const isImage      = ['jpg','jpeg','png','webp'].includes(ext);
+                  const isPdf        = ext === 'pdf';
+                  const isDocx       = ['doc','docx'].includes(ext);
 
                   return (
                     <div key={key} className="flex flex-col gap-1">

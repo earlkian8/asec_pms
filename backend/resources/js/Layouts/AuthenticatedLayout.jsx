@@ -20,6 +20,8 @@ import {
     MessageCircle,
     ChevronDown,
     Trash2,
+    Layers,
+    Tag,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -79,7 +81,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             title: 'Project Type Management',
             href: route('project-type-management.index'),
             routeName: 'project-type-management.*',
-            icon: FolderOpen,
+            icon: Layers,
             type: 'single'
         },
         {
@@ -100,7 +102,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             title: 'Client Type Management',
             href: route('client-type-management.index'),
             routeName: 'client-type-management.*',
-            icon: FolderOpen,
+            icon: Tag,
             type: 'single'
         },
         {

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
-use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
@@ -16,6 +15,23 @@ use Illuminate\Support\Facades\Storage;
 class ProgressUpdatesController extends Controller
 {
     use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
+
+    /**
+     * When a progress update is added, the milestone should move to in_progress
+     * if it was still pending.
+     */
+    private function autoProgressMilestone(ProjectTask $task, ProjectMilestone $milestone): void
+    {
+        // If the task is still pending, a progress update means work has started
+        if ($task->status === 'pending') {
+            $task->update(['status' => 'in_progress']);
+        }
+
+        // Milestone should follow suit
+        if ($milestone->status === 'pending') {
+            $milestone->update(['status' => 'in_progress']);
+        }
+    }
 
     public function store(Request $request)
     {
@@ -51,6 +67,11 @@ class ProgressUpdatesController extends Controller
             'file_size'       => $fileSize,
             'created_by'      => auth()->id(),
         ]);
+
+        // ── Auto-status: progress update added → milestone moves to in_progress ──
+        if ($task && $milestone) {
+            $this->autoProgressMilestone($task, $milestone);
+        }
 
         $this->adminActivityLogs(
             'Progress Update',

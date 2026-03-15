@@ -15,26 +15,61 @@ class ProjectTasksController extends Controller
 {
     use ActivityLogsTrait, NotificationTrait;
 
-    // Store task
+    /**
+     * Sync milestone status based on its current tasks:
+     *
+     * - All tasks completed            → milestone = completed
+     * - Some tasks incomplete          → milestone = in_progress (reverts from completed)
+     * - No tasks + milestone completed → milestone = in_progress (new task was just added)
+     * - Milestone still pending        → leave it (progress update / issue handles that)
+     */
+    private function syncMilestoneStatus(ProjectMilestone $milestone): void
+    {
+        $tasks = $milestone->tasks()->get();
+
+        if ($tasks->isEmpty()) {
+            if ($milestone->status === 'completed') {
+                $milestone->update(['status' => 'in_progress']);
+            }
+            return;
+        }
+
+        $allCompleted = $tasks->every(fn ($t) => $t->status === 'completed');
+        $anyActive    = $tasks->contains(fn ($t) => in_array($t->status, ['in_progress', 'completed']));
+
+        if ($allCompleted) {
+            // Every task done → auto-complete milestone
+            if ($milestone->status !== 'completed') {
+                $milestone->update(['status' => 'completed']);
+            }
+        } elseif ($anyActive) {
+            // At least one task is in_progress or completed but not all done
+            // → milestone must be in_progress regardless of where it was
+            if ($milestone->status !== 'in_progress') {
+                $milestone->update(['status' => 'in_progress']);
+            }
+        }
+        // If no tasks are active at all (all still pending), leave milestone alone
+    }
+
     public function store(Request $request)
     {
-        // Normalize assigned_to before validation
         $requestData = $request->all();
         if (isset($requestData['assigned_to']) && (empty($requestData['assigned_to']) || $requestData['assigned_to'] === 'none' || $requestData['assigned_to'] === 0)) {
-            $requestData['assigned_to'] = null;
             $request->merge(['assigned_to' => null]);
         }
 
         $data = $request->validate([
-            'title'        => 'required|string|max:255',
-            'description'  => 'nullable|string',
+            'title'                => 'required|string|max:255',
+            'description'          => 'nullable|string',
             'project_milestone_id' => 'required|exists:project_milestones,id',
-            'assigned_to'  => 'nullable|exists:users,id',
-            'due_date'     => 'nullable|date',
-            'status'       => ['required', Rule::in(['pending','in_progress','completed'])],
+            'assigned_to'          => 'nullable|exists:users,id',
+            'due_date'             => 'nullable|date',
+            'status'               => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 
         $milestone = ProjectMilestone::with('project')->findOrFail($data['project_milestone_id']);
+
         $task = ProjectTask::create([
             'project_milestone_id' => $data['project_milestone_id'],
             'title'                => $data['title'],
@@ -44,17 +79,17 @@ class ProjectTasksController extends Controller
             'status'               => $data['status'],
         ]);
 
+        // ── Auto-status: new task added → if milestone was completed, revert to in_progress ──
+        $this->syncMilestoneStatus($milestone);
+
         $this->adminActivityLogs(
-            'Task',
-            'Created',
+            'Task', 'Created',
             'Created task "' . $data['title'] . '" for milestone "' . $milestone->name . '"'
         );
 
-        // System-wide notification for new task
         if ($milestone->project) {
             $this->createSystemNotification(
-                'task',
-                'New Task Created',
+                'task', 'New Task Created',
                 "A new task '{$data['title']}' has been created in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
                 $milestone->project,
                 route('project-management.view', $milestone->project->id)
@@ -64,34 +99,28 @@ class ProjectTasksController extends Controller
         return back()->with('success', 'Task created successfully');
     }
 
-    // Update task
     public function update(ProjectMilestone $milestone, ProjectTask $task, Request $request)
     {
-        // Normalize assigned_to before validation
         $requestData = $request->all();
         if (isset($requestData['assigned_to']) && (empty($requestData['assigned_to']) || $requestData['assigned_to'] === 'none' || $requestData['assigned_to'] === 0)) {
-            $requestData['assigned_to'] = null;
             $request->merge(['assigned_to' => null]);
         }
 
         $data = $request->validate([
-            'title'        => 'required|string|max:255',
-            'description'  => 'nullable|string',
-            'assigned_to'  => 'nullable|exists:users,id',
-            'due_date'     => 'nullable|date',
-            'status'       => ['required', Rule::in(['pending','in_progress','completed'])],
+            'title'       => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'assigned_to' => 'nullable|exists:users,id',
+            'due_date'    => 'nullable|date',
+            'status'      => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 
-        // Ensure assigned_to is null if empty
         $data['assigned_to'] = $data['assigned_to'] ?? null;
-
         $oldAssignedTo = $task->assigned_to;
         $milestone->load('project');
 
-        // Validate: Cannot mark as completed without at least 1 progress update
+        // Cannot mark as completed without at least 1 progress update
         if ($data['status'] === 'completed') {
-            $progressUpdatesCount = $task->progressUpdates()->count();
-            if ($progressUpdatesCount === 0) {
+            if ($task->progressUpdates()->count() === 0) {
                 return back()->withErrors([
                     'status' => 'Cannot mark task as completed. Please add at least one progress update first.'
                 ]);
@@ -100,19 +129,19 @@ class ProjectTasksController extends Controller
 
         $task->update($data);
 
+        // ── Auto-status: task status changed → sync milestone ──
+        $this->syncMilestoneStatus($milestone);
+
         $this->adminActivityLogs(
-            'Task',
-            'Updated',
+            'Task', 'Updated',
             'Updated task "' . $task->title . '" for milestone "' . $milestone->name . '"'
         );
 
-        // System-wide notification if assignment changed
         if ($oldAssignedTo !== $data['assigned_to'] && $data['assigned_to'] && $milestone->project) {
             $user = User::find($data['assigned_to']);
             $userName = $user ? $user->name : 'Unknown';
             $this->createSystemNotification(
-                'task',
-                'Task Assignment Updated',
+                'task', 'Task Assignment Updated',
                 "Task '{$task->title}' has been assigned to {$userName} in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
                 $milestone->project,
                 route('project-management.view', $milestone->project->id)
@@ -122,7 +151,6 @@ class ProjectTasksController extends Controller
         return back()->with('success', 'Task updated successfully');
     }
 
-    // Update task status
     public function updateStatus(ProjectMilestone $milestone, ProjectTask $task, Request $request)
     {
         if ($task->project_milestone_id !== $milestone->id) {
@@ -133,10 +161,9 @@ class ProjectTasksController extends Controller
             'status' => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 
-        // Validate: Cannot mark as completed without at least 1 progress update
+        // Cannot mark as completed without at least 1 progress update
         if ($data['status'] === 'completed') {
-            $progressUpdatesCount = $task->progressUpdates()->count();
-            if ($progressUpdatesCount === 0) {
+            if ($task->progressUpdates()->count() === 0) {
                 return back()->withErrors([
                     'status' => 'Cannot mark task as completed. Please add at least one progress update first.'
                 ]);
@@ -147,17 +174,17 @@ class ProjectTasksController extends Controller
         $task->update($data);
         $milestone->load('project');
 
+        // ── Auto-status: task status changed → sync milestone ──
+        $this->syncMilestoneStatus($milestone);
+
         $this->adminActivityLogs(
-            'Task',
-            'Updated Status',
+            'Task', 'Updated Status',
             'Updated task "' . $task->title . '" status from "' . $oldStatus . '" to "' . $data['status'] . '" for milestone "' . $milestone->name . '"'
         );
 
-        // System-wide notification for task status change
         if ($milestone->project) {
             $this->createSystemNotification(
-                'task',
-                'Task Status Updated',
+                'task', 'Task Status Updated',
                 "Task '{$task->title}' status has been changed from " . ucfirst(str_replace('_', ' ', $oldStatus)) . " to " . ucfirst(str_replace('_', ' ', $data['status'])) . " in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
                 $milestone->project,
                 route('project-management.view', $milestone->project->id)
@@ -167,24 +194,25 @@ class ProjectTasksController extends Controller
         return back()->with('success', 'Task status updated successfully');
     }
 
-    // Delete task
     public function destroy(ProjectMilestone $milestone, ProjectTask $task)
     {
         $taskTitle = $task->title;
         $task->delete();
 
+        // ── Auto-status: task deleted → re-sync milestone ──
+        // Re-query milestone so task count is fresh after deletion
+        $milestone->refresh();
+        $this->syncMilestoneStatus($milestone);
+
         $this->adminActivityLogs(
-            'Task',
-            'Deleted',
+            'Task', 'Deleted',
             'Deleted task "' . $taskTitle . '" from milestone "' . $milestone->name . '"'
         );
 
-        // System-wide notification for task deletion
         $milestone->load('project');
         if ($milestone->project) {
             $this->createSystemNotification(
-                'task',
-                'Task Deleted',
+                'task', 'Task Deleted',
                 "Task '{$taskTitle}' has been deleted from milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
                 $milestone->project,
                 route('project-management.view', $milestone->project->id)

@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectIssue;
-use App\Models\User;
+use App\Models\ProjectMilestone;
+use App\Models\ProjectTask;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
@@ -15,6 +16,17 @@ use Illuminate\Validation\Rule;
 class ProjectIssuesController extends Controller
 {
     use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
+
+    /**
+     * When an issue is added to a task, the milestone should move to in_progress
+     * if it was still pending.
+     */
+    private function autoProgressMilestone(ProjectMilestone $milestone): void
+    {
+        if ($milestone->status === 'pending') {
+            $milestone->update(['status' => 'in_progress']);
+        }
+    }
 
     /**
      * Normalise an `assigned_to` value that may arrive as:
@@ -30,20 +42,16 @@ class ProjectIssuesController extends Controller
             return null;
         }
 
-        // Plain integer or numeric string — happy path
         if (is_int($value) || (is_string($value) && ctype_digit(ltrim($value, '-')))) {
             $int = (int) $value;
             return $int > 0 ? $int : null;
         }
 
-        // Associative array — decoded object like { id: 1, name: "...", email: "..." }
         if (is_array($value)) {
-            // Associative: has an 'id' key
             if (array_key_exists('id', $value)) {
                 $id = $value['id'];
                 return is_numeric($id) && (int)$id > 0 ? (int)$id : null;
             }
-            // Indexed/sequential array (object values spread): first numeric element is the id
             foreach ($value as $element) {
                 if (is_int($element) || (is_string($element) && ctype_digit(ltrim((string)$element, '-')))) {
                     $int = (int) $element;
@@ -53,7 +61,6 @@ class ProjectIssuesController extends Controller
             return null;
         }
 
-        // JSON string representing a user object
         if (is_string($value)) {
             $decoded = json_decode($value, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
@@ -65,7 +72,6 @@ class ProjectIssuesController extends Controller
         return null;
     }
 
-    // Store issue
     public function store(Request $request)
     {
         $request->merge([
@@ -97,6 +103,20 @@ class ProjectIssuesController extends Controller
             'due_date'             => $data['due_date']             ?? null,
         ]);
 
+        // ── Auto-status: issue added to a task → milestone moves to in_progress ──
+        if (!empty($data['project_task_id'])) {
+            $task = ProjectTask::with('milestone')->find($data['project_task_id']);
+            if ($task && $task->milestone) {
+                $this->autoProgressMilestone($task->milestone);
+            }
+        } elseif (!empty($data['project_milestone_id'])) {
+            // Issue added directly to a milestone (no task) — same rule applies
+            $milestone = ProjectMilestone::find($data['project_milestone_id']);
+            if ($milestone) {
+                $this->autoProgressMilestone($milestone);
+            }
+        }
+
         $project = Project::findOrFail($data['project_id']);
 
         $this->adminActivityLogs('Project Issue', 'Created', 'Created issue "' . $data['title'] . '" for project "' . $project->project_name . '"');
@@ -108,15 +128,12 @@ class ProjectIssuesController extends Controller
         return back()->with('success', 'Issue created successfully');
     }
 
-    // Update issue
     public function update(Project $project, ProjectIssue $issue, Request $request)
     {
         if ($issue->project_id !== $project->id) {
             abort(404);
         }
 
-        // Normalise assigned_to BEFORE validation — it may arrive as a full user
-        // object, a JSON string, or an indexed array of user-object values.
         $request->merge([
             'assigned_to' => $this->resolveAssignedTo($request->input('assigned_to')),
         ]);
@@ -132,7 +149,6 @@ class ProjectIssuesController extends Controller
             'due_date'             => 'nullable|date',
         ]);
 
-        // Stamp resolved_at when transitioning to resolved / closed
         if (in_array($data['status'], ['resolved', 'closed']) && !$issue->resolved_at) {
             $data['resolved_at'] = now();
         } elseif (!in_array($data['status'], ['resolved', 'closed'])) {
@@ -147,7 +163,6 @@ class ProjectIssuesController extends Controller
         return back()->with('success', 'Issue updated successfully');
     }
 
-    // Delete issue
     public function destroy(Project $project, ProjectIssue $issue)
     {
         if ($issue->project_id !== $project->id) {

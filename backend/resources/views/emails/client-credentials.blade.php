@@ -4,250 +4,159 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Client Portal Credentials</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #1f2937;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 20px;
-            min-height: 100vh;
-        }
-        .email-wrapper {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .container {
-            background-color: #ffffff;
-            border-radius: 16px;
-            padding: 0;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-            color: #ffffff;
-            padding: 40px 40px 30px;
-            text-align: center;
-        }
-        .logo {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-        .title {
-            font-size: 22px;
-            font-weight: 500;
-            color: #e5e7eb;
-            margin-top: 10px;
-        }
-        .content {
-            padding: 40px;
-        }
-        .greeting {
-            font-size: 16px;
-            color: #374151;
-            margin-bottom: 24px;
-        }
-        .intro-text {
-            font-size: 15px;
-            color: #4b5563;
-            margin-bottom: 32px;
-            line-height: 1.7;
-        }
-        .credentials-section {
-            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-            border-radius: 12px;
-            padding: 32px;
-            margin: 32px 0;
-            border: 1px solid #e5e7eb;
-        }
-        .credentials-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 20px;
-        }
-        .credential-item {
-            margin-bottom: 20px;
-        }
-        .credential-item:last-child {
-            margin-bottom: 0;
-        }
-        .credential-label {
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 8px;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .credential-value {
-            font-size: 18px;
-            color: #111827;
-            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-            background-color: #ffffff;
-            padding: 14px 16px;
-            border-radius: 8px;
-            border: 2px solid #e5e7eb;
-            word-break: break-all;
-            font-weight: 500;
-        }
-        .warning-box {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border-left: 4px solid #f59e0b;
-            padding: 20px;
-            margin: 32px 0;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
-        }
-        .warning-title {
-            font-weight: 700;
-            color: #92400e;
-            font-size: 14px;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .warning-text {
-            color: #78350f;
-            font-size: 14px;
-            margin: 0;
-            line-height: 1.6;
-        }
-        .security-box {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            border-left: 4px solid #3b82f6;
-            padding: 20px;
-            margin: 32px 0;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
-        }
-        .security-title {
-            font-weight: 700;
-            color: #1e40af;
-            font-size: 14px;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .security-text {
-            color: #1e3a8a;
-            font-size: 14px;
-            margin: 0;
-            line-height: 1.6;
-        }
-        .closing {
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid #e5e7eb;
-        }
-        .closing-text {
-            font-size: 15px;
-            color: #4b5563;
-            margin-bottom: 12px;
-            line-height: 1.7;
-        }
-        .signature {
-            font-size: 15px;
-            color: #1f2937;
-            margin-top: 16px;
-        }
-        .signature-name {
-            font-weight: 600;
-            color: #111827;
-        }
-        .footer {
-            background-color: #f9fafb;
-            padding: 24px 40px;
-            text-align: center;
-            border-top: 1px solid #e5e7eb;
-        }
-        .footer-text {
-            color: #6b7280;
-            font-size: 12px;
-            line-height: 1.6;
-            margin: 4px 0;
-        }
-        .divider {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
-            margin: 24px 0;
-        }
-    </style>
 </head>
-<body>
-    <div class="email-wrapper">
-        <div class="container">
-            <div class="header">
-                <div class="logo">{{ $appName }}</div>
-                <div class="title">Client Portal Access</div>
-            </div>
+<body style="margin:0;padding:0;background-color:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
 
-            <div class="content">
-                <div class="greeting">
-                    Dear {{ $clientName }},
-                </div>
-
-                <p class="intro-text">
-                    Your client portal account has been successfully created. You can now access your projects, view progress updates, and communicate with our team.
-                </p>
-
-                <div class="credentials-section">
-                    <div class="credentials-title">Login Credentials</div>
-                    
-                    <div class="credential-item">
-                        <div class="credential-label">Email Address</div>
-                        <div class="credential-value">{{ $email }}</div>
-                    </div>
-                    
-                    <div class="divider"></div>
-                    
-                    <div class="credential-item">
-                        <div class="credential-label">Password</div>
-                        <div class="credential-value">{{ $password }}</div>
-                    </div>
-                </div>
-
-                <div class="warning-box">
-                    <div class="warning-title">Important Security Notice</div>
-                    <p class="warning-text">
-                        For security reasons, you will be required to change your password immediately after your first login. Please use these credentials to log in and set a new password of your choice.
-                    </p>
-                </div>
-
-                <div class="security-box">
-                    <div class="security-title">Security Reminder</div>
-                    <p class="security-text">
-                        Please keep your credentials secure and do not share them with anyone. If you did not request this account, please contact our support team immediately.
-                    </p>
-                </div>
-
-                <div class="closing">
-                    <p class="closing-text">
-                        If you have any questions or need assistance accessing your portal, please don't hesitate to contact our support team.
-                    </p>
-                    <div class="signature">
-                        Best regards,<br>
-                        <span class="signature-name">{{ $appName }} Team</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="footer">
-                <p class="footer-text">This is an automated message. Please do not reply to this email.</p>
-                <p class="footer-text">&copy; {{ date('Y') }} {{ $appName }}. All rights reserved.</p>
-            </div>
-        </div>
+    <!-- Preheader (hidden preview text) -->
+    <div style="display:none;max-height:0;overflow:hidden;color:#f5f5f4;">
+        Your client portal access credentials for Abdurauf Sawadjaan Engineering Consultancy.
     </div>
+
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f4;padding:48px 16px;">
+        <tr>
+            <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+
+                    <!-- Brand -->
+                    <tr>
+                        <td style="padding-bottom:28px;text-align:center;">
+                            <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#78716c;">
+                                Abdurauf Sawadjaan Engineering Consultancy
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Card -->
+                    <tr>
+                        <td style="background-color:#ffffff;border-radius:8px;border:1px solid #e7e5e4;overflow:hidden;">
+
+                            <!-- Header band -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="background-color:#1c1917;padding:36px 40px 32px;">
+                                        <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#a8a29e;">
+                                            Client Portal
+                                        </p>
+                                        <h1 style="margin:0;font-size:24px;font-weight:700;color:#fafaf9;line-height:1.2;">
+                                            Your Access Credentials
+                                        </h1>
+                                        <p style="margin:8px 0 0;font-size:13px;color:#a8a29e;line-height:1.6;">
+                                            Welcome aboard. Your account is ready.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Body -->
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="padding:36px 40px 0;">
+
+                                        <!-- Greeting -->
+                                        <p style="margin:0 0 8px;font-size:17px;font-weight:600;color:#1c1917;">
+                                            Dear {{ $clientName }},
+                                        </p>
+                                        <p style="margin:0 0 32px;font-size:14px;color:#57534e;line-height:1.75;">
+                                            We have created your client portal account. You can now log in to view your project progress, access documents, and communicate with our team. Your login details are below.
+                                        </p>
+
+                                        <!-- Divider -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+                                            <tr><td style="height:1px;background-color:#f5f5f4;"></td></tr>
+                                        </table>
+
+                                        <!-- Credentials -->
+                                        <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#a8a29e;">
+                                            Login Credentials
+                                        </p>
+
+                                        <!-- Email field -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
+                                            <tr>
+                                                <td style="background-color:#fafaf9;border:1px solid #e7e5e4;border-radius:6px;padding:16px 20px;">
+                                                    <p style="margin:0 0 4px;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#a8a29e;">
+                                                        Email Address
+                                                    </p>
+                                                    <p style="margin:0;font-size:15px;font-weight:500;color:#1c1917;font-family:'SF Mono','Fira Code','Courier New',monospace;word-break:break-all;">
+                                                        {{ $email }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Password field -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+                                            <tr>
+                                                <td style="background-color:#fafaf9;border:1px solid #e7e5e4;border-radius:6px;padding:16px 20px;">
+                                                    <p style="margin:0 0 4px;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#a8a29e;">
+                                                        Temporary Password
+                                                    </p>
+                                                    <p style="margin:0;font-size:15px;font-weight:500;color:#1c1917;font-family:'SF Mono','Fira Code','Courier New',monospace;word-break:break-all;">
+                                                        {{ $password }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Notice -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+                                            <tr>
+                                                <td style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:16px 20px;">
+                                                    <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#92400e;">
+                                                        Action Required
+                                                    </p>
+                                                    <p style="margin:0;font-size:13px;color:#78350f;line-height:1.65;">
+                                                        You will be prompted to change your password on your first login. Please keep your credentials private and do not share them with anyone.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Closing -->
+                                        <p style="margin:0 0 6px;font-size:14px;color:#57534e;line-height:1.75;">
+                                            If you have any questions or need assistance, please reach out to us directly.
+                                        </p>
+                                        <p style="margin:0 0 32px;font-size:14px;color:#57534e;line-height:1.75;">
+                                            We look forward to working with you.
+                                        </p>
+
+                                        <!-- Signature -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:36px;">
+                                            <tr>
+                                                <td style="border-top:1px solid #f5f5f4;padding-top:24px;">
+                                                    <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#1c1917;">
+                                                        Abdurauf Sawadjaan
+                                                    </p>
+                                                    <p style="margin:0;font-size:13px;color:#a8a29e;">
+                                                        Abdurauf Sawadjaan Engineering Consultancy
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding-top:24px;text-align:center;">
+                            <p style="margin:0 0 4px;font-size:11px;color:#a8a29e;">
+                                This is an automated message — please do not reply to this email.
+                            </p>
+                            <p style="margin:0;font-size:11px;color:#d6d3d1;">
+                                &copy; {{ date('Y') }} Abdurauf Sawadjaan Engineering Consultancy. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>
-

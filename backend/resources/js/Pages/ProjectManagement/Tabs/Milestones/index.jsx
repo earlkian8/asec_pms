@@ -872,7 +872,7 @@ export default function MilestonesTab({ project, milestoneData }) {
       )}
 
       {/* Modals */}
-      {showAddModal && <AddMilestone setShowAddModal={setShowAddModal} project={project} />}
+      {showAddModal && <AddMilestone setShowAddModal={setShowAddModal} project={project} existingBillingTotal={milestones.reduce((sum, m) => sum + (parseFloat(m.billing_percentage) || 0), 0)}/>}
       {showEditModal && editMilestone && <EditMilestone setShowEditModal={setShowEditModal} milestone={editMilestone} project={project} />}
       {showDeleteModal && deleteMilestone && <DeleteMilestone setShowDeleteModal={setShowDeleteModal} milestone={deleteMilestone} project={project} />}
       {showAddTaskModal && <AddTask setShowAddModal={setShowAddTaskModal} project={project} milestones={milestones} users={users} preselectedMilestone={selectedMilestoneForTask} />}

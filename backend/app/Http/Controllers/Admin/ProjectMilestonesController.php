@@ -22,83 +22,106 @@ class ProjectMilestonesController extends Controller
     public function store(Project $project, Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'start_date' => 'nullable|date',
-            'due_date' => 'nullable|date|after_or_equal:start_date',
+            'name'               => 'required|string|max:255',
+            'description'        => 'nullable|string',
+            'start_date'         => 'nullable|date',
+            'due_date'           => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status' => ['required', Rule::in(['pending','in_progress','completed'])],
+            'status'             => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
+
+        // Guard: only enforce billing % cap for milestone billing type
+        if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {
+            $existingTotal = $project->milestones()->sum('billing_percentage');
+            $newTotal = $existingTotal + floatval($data['billing_percentage']);
+
+            if ($newTotal > 100) {
+                $remaining = max(0, 100 - $existingTotal);
+                return back()->withErrors([
+                    'billing_percentage' => "Total billing percentage would exceed 100%. "
+                        . "Current total: {$existingTotal}%. "
+                        . "You can only assign up to " . number_format($remaining, 2) . "% more.",
+                ])->withInput();
+            }
+        }
 
         $milestone = $project->milestones()->create($data);
 
         $this->adminActivityLogs(
-            'Milestone',
-            'Created',
+            'Milestone', 'Created',
             'Created milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
         );
 
-        // Create notification for client
         $this->notifyMilestoneStatusChange($project, $milestone->name, $milestone->status);
 
-        // System-wide notification for new milestone
         $this->createSystemNotification(
-            'milestone',
-            'New Milestone Created',
+            'milestone', 'New Milestone Created',
             "A new milestone '{$milestone->name}' has been created for project '{$project->project_name}'.",
             $project,
             route('project-management.view', $project->id)
         );
 
+        return redirect()->back()->with('success', 'Milestone created successfully.');
     }
 
     // Update milestone
     public function update(Project $project, Request $request, ProjectMilestone $milestone)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'start_date' => 'nullable|date',
-            'due_date' => 'nullable|date|after_or_equal:start_date',
+            'name'               => 'required|string|max:255',
+            'description'        => 'nullable|string',
+            'start_date'         => 'nullable|date',
+            'due_date'           => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status' => ['required', Rule::in(['pending','in_progress','completed'])],
+            'status'             => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
 
-        // Validate: Cannot mark as completed unless all tasks are completed
-        if ($data['status'] === 'completed') {
-            $tasks = $milestone->tasks;
-            $totalTasks = $tasks->count();
-            
-            if ($totalTasks > 0) {
-                $completedTasks = $tasks->where('status', 'completed')->count();
-                $incompleteTasks = $totalTasks - $completedTasks;
-                
-                if ($incompleteTasks > 0) {
-                    return back()->withErrors([
-                        'status' => "Cannot mark milestone as completed. {$incompleteTasks} task(s) still need to be completed."
-                    ]);
-                }
+        // Guard: only enforce billing % cap for milestone billing type
+        if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {
+            // Exclude the current milestone from the sum so editing doesn't self-block
+            $existingTotal = $project->milestones()
+                ->where('id', '!=', $milestone->id)
+                ->sum('billing_percentage');
+
+            $newTotal = $existingTotal + floatval($data['billing_percentage']);
+
+            if ($newTotal > 100) {
+                $remaining = max(0, 100 - $existingTotal);
+                return back()->withErrors([
+                    'billing_percentage' => "Total billing percentage would exceed 100%. "
+                        . "Other milestones total: {$existingTotal}%. "
+                        . "You can only assign up to " . number_format($remaining, 2) . "% to this milestone.",
+                ])->withInput();
             }
         }
 
-        $oldStatus = $milestone->status;
+        // Cannot mark as completed unless all tasks are completed
+        if ($data['status'] === 'completed') {
+            $tasks = $milestone->tasks;
+            $incompleteTasks = $tasks->where('status', '!=', 'completed')->count();
+
+            if ($incompleteTasks > 0) {
+                return back()->withErrors([
+                    'status' => "Cannot mark milestone as completed. {$incompleteTasks} task(s) still need to be completed.",
+                ]);
+            }
+        }
+
         $milestone->update($data);
 
         $this->adminActivityLogs(
-            'Milestone',
-            'Updated',
+            'Milestone', 'Updated',
             'Updated milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
         );
 
-        // System-wide notification for milestone update
         $this->createSystemNotification(
-            'milestone',
-            'Milestone Updated',
+            'milestone', 'Milestone Updated',
             "Milestone '{$milestone->name}' has been updated for project '{$project->project_name}'.",
             $project,
             route('project-management.view', $project->id)
         );
 
+        return redirect()->back()->with('success', 'Milestone updated successfully.');
     }
 
     // Delete milestone

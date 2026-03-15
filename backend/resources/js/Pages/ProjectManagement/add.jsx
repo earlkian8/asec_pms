@@ -48,6 +48,18 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
       errors.contract_amount = 'The contract amount field is required and must be greater than 0.';
     }
 
+    if (!projectData.start_date || projectData.start_date === '') {
+      errors.start_date = 'The start date field is required.';
+    }
+
+    if (!projectData.planned_end_date || projectData.planned_end_date === '') {
+      errors.planned_end_date = 'The planned end date field is required.';
+    }
+     
+    if (projectData.start_date && projectData.planned_end_date < projectData.start_date) {
+      errors.planned_end_date = 'Planned end date must not be before the start date.';
+    }
+
     return errors;
   };
 

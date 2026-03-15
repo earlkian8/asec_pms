@@ -24,12 +24,11 @@ const DOCUMENT_FIELDS = [
 
 export default function Step1ProjectInfo({ clients, projectTypes = [], clientTypes = [], errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
-  const [showAddClient, setShowAddClient]         = useState(false);
+  const [showAddClient, setShowAddClient]           = useState(false);
   const [showAddProjectType, setShowAddProjectType] = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
   const [selectedFiles, setSelectedFiles] = useState({});
-  // FIX #3: Local validation errors for frontend-only checks (e.g. max length)
-  const [localErrors, setLocalErrors] = useState({});
+  const [localErrors, setLocalErrors]     = useState({});
   const fileRefs = useRef({});
 
   useEffect(() => {
@@ -62,24 +61,43 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
     if (fileRefs.current[fieldKey]) fileRefs.current[fieldKey].value = '';
   };
 
-  // FIX #3: Handle project name change with live max-length validation
+  // Project name — live max-length validation
   const handleProjectNameChange = (value) => {
     updateProjectData({ project_name: value });
     if (value.length > 255) {
-      setLocalErrors(prev => ({
-        ...prev,
-        project_name: 'Project name must not exceed 255 characters.',
-      }));
+      setLocalErrors(prev => ({ ...prev, project_name: 'Project name must not exceed 255 characters.' }));
     } else {
-      setLocalErrors(prev => {
-        const next = { ...prev };
-        delete next.project_name;
-        return next;
-      });
+      setLocalErrors(prev => { const next = { ...prev }; delete next.project_name; return next; });
     }
   };
 
-  // Merge server errors with local frontend errors (local takes priority for project_name)
+  // Start date — re-validate planned end date whenever start date changes
+  const handleStartDateChange = (value) => {
+    updateProjectData({ start_date: value });
+    if (projectData.planned_end_date && projectData.planned_end_date < value) {
+      setLocalErrors(prev => ({
+        ...prev,
+        planned_end_date: 'Planned end date must not be before the start date.',
+      }));
+    } else {
+      setLocalErrors(prev => { const next = { ...prev }; delete next.planned_end_date; return next; });
+    }
+  };
+
+  // Planned end date — validate against start date
+  const handlePlannedEndDateChange = (value) => {
+    updateProjectData({ planned_end_date: value });
+    if (projectData.start_date && value < projectData.start_date) {
+      setLocalErrors(prev => ({
+        ...prev,
+        planned_end_date: 'Planned end date must not be before the start date.',
+      }));
+    } else {
+      setLocalErrors(prev => { const next = { ...prev }; delete next.planned_end_date; return next; });
+    }
+  };
+
+  // Merge server errors with local frontend errors (local takes priority)
   const mergedErrors = { ...errors, ...localErrors };
 
   return (
@@ -94,9 +112,9 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
             Project Basic Information
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
             {/* Project Name */}
             <div className="md:col-span-2">
-              {/* FIX #3: Show character counter next to label */}
               <div className="flex justify-between items-center mb-1">
                 <Label className="text-zinc-800">Project Name <span className="text-red-500">*</span></Label>
                 <span className={`text-xs ${(projectData.project_name?.length || 0) > 255 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
@@ -109,7 +127,6 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                 onChange={(e) => handleProjectNameChange(e.target.value)}
                 placeholder="Enter project name"
                 className={inputClass(mergedErrors.project_name)}
-                // Allow typing past 255 so the error can show, but cap at 300 to prevent runaway input
                 maxLength={300}
               />
               <InputError message={mergedErrors.project_name} />
@@ -120,7 +137,7 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
               <Label className="text-zinc-800">Client <span className="text-red-500">*</span></Label>
               <div className="flex gap-2 items-center">
                 <Select value={projectData.client_id} onValueChange={(v) => updateProjectData({ client_id: v })}>
-                  <SelectTrigger className={inputClass(errors.client_id)}>
+                  <SelectTrigger className={inputClass(mergedErrors.client_id)}>
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
@@ -129,7 +146,7 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                 </Select>
                 <Button type="button" variant="outline" className="whitespace-nowrap" onClick={() => setShowAddClient(true)}>New</Button>
               </div>
-              <InputError message={errors.client_id} />
+              <InputError message={mergedErrors.client_id} />
             </div>
 
             {/* Project Type */}
@@ -137,7 +154,7 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
               <Label className="text-zinc-800">Project Type <span className="text-red-500">*</span></Label>
               <div className="flex gap-2 items-center">
                 <Select value={projectData.project_type_id} onValueChange={(v) => updateProjectData({ project_type_id: v })}>
-                  <SelectTrigger className={inputClass(errors.project_type_id)}>
+                  <SelectTrigger className={inputClass(mergedErrors.project_type_id)}>
                     <SelectValue placeholder="Project Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -148,14 +165,16 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                 </Select>
                 <Button type="button" variant="outline" className="whitespace-nowrap" onClick={() => setShowAddProjectType(true)}>New</Button>
               </div>
-              <InputError message={errors.project_type_id} />
+              <InputError message={mergedErrors.project_type_id} />
             </div>
 
             {/* Status */}
             <div>
               <Label className="text-zinc-800">Status</Label>
               <Select value={projectData.status} onValueChange={(v) => updateProjectData({ status: v })}>
-                <SelectTrigger className={inputClass(false)}><SelectValue placeholder="Select status" /></SelectTrigger>
+                <SelectTrigger className={inputClass(false)}>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="on_hold">On Hold</SelectItem>
@@ -169,7 +188,9 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
             <div>
               <Label className="text-zinc-800">Priority</Label>
               <Select value={projectData.priority} onValueChange={(v) => updateProjectData({ priority: v })}>
-                <SelectTrigger className={inputClass(false)}><SelectValue placeholder="Select priority" /></SelectTrigger>
+                <SelectTrigger className={inputClass(false)}>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
@@ -181,7 +202,9 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
             {/* Contract Amount */}
             <div>
               <Label className="text-zinc-800">Contract Amount <span className="text-red-500">*</span></Label>
-              <Input type="text" value={contractAmountDisplay}
+              <Input
+                type="text"
+                value={contractAmountDisplay}
                 onChange={(e) => {
                   let v = e.target.value;
                   if (v === '') { setContractAmountDisplay(''); updateProjectData({ contract_amount: '' }); return; }
@@ -193,29 +216,43 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                   updateProjectData({ contract_amount: parseFormattedNumber(v) });
                 }}
                 placeholder="Enter amount"
-                className={inputClass(errors.contract_amount)} />
-              <InputError message={errors.contract_amount} />
+                className={inputClass(mergedErrors.contract_amount)}
+              />
+              <InputError message={mergedErrors.contract_amount} />
             </div>
 
             {/* Start Date */}
             <div>
-              <Label className="text-zinc-800">Start Date</Label>
-              <Input type="date" value={projectData.start_date}
-                onChange={(e) => updateProjectData({ start_date: e.target.value })} className={inputClass(false)} />
+              <Label className="text-zinc-800">Start Date <span className="text-red-500">*</span></Label>
+              <Input
+                type="date"
+                value={projectData.start_date}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+                className={inputClass(mergedErrors.start_date)}
+              />
+              <InputError message={mergedErrors.start_date} />
             </div>
 
             {/* Planned End Date */}
             <div>
-              <Label className="text-zinc-800">Planned End Date</Label>
-              <Input type="date" value={projectData.planned_end_date}
-                onChange={(e) => updateProjectData({ planned_end_date: e.target.value })} className={inputClass(false)} />
+              <Label className="text-zinc-800">Planned End Date <span className="text-red-500">*</span></Label>
+              <Input
+                type="date"
+                value={projectData.planned_end_date}
+                min={projectData.start_date || undefined}
+                onChange={(e) => handlePlannedEndDateChange(e.target.value)}
+                className={inputClass(mergedErrors.planned_end_date)}
+              />
+              <InputError message={mergedErrors.planned_end_date} />
             </div>
 
             {/* Billing Type */}
             <div>
               <Label className="text-zinc-800">Billing Type</Label>
               <Select value={projectData.billing_type} onValueChange={(v) => updateProjectData({ billing_type: v })}>
-                <SelectTrigger className={inputClass(false)}><SelectValue placeholder="Select billing type" /></SelectTrigger>
+                <SelectTrigger className={inputClass(false)}>
+                  <SelectValue placeholder="Select billing type" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fixed_price">Fixed Price</SelectItem>
                   <SelectItem value="milestone">Milestone</SelectItem>
@@ -226,15 +263,24 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
             {/* Location */}
             <div className="md:col-span-2">
               <Label className="text-zinc-800">Location</Label>
-              <Textarea value={projectData.location} onChange={(e) => updateProjectData({ location: e.target.value })}
-                placeholder="Enter project location" className={inputClass(false)} />
+              <Textarea
+                value={projectData.location}
+                onChange={(e) => updateProjectData({ location: e.target.value })}
+                placeholder="Enter project location"
+                className={inputClass(false)}
+              />
             </div>
 
             {/* Description */}
             <div className="md:col-span-2">
               <Label className="text-zinc-800">Description</Label>
-              <Textarea value={projectData.description} onChange={(e) => updateProjectData({ description: e.target.value })}
-                placeholder="Enter project description" rows={3} className={inputClass(false)} />
+              <Textarea
+                value={projectData.description}
+                onChange={(e) => updateProjectData({ description: e.target.value })}
+                placeholder="Enter project description"
+                rows={3}
+                className={inputClass(false)}
+              />
             </div>
           </div>
         </div>
@@ -248,11 +294,11 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {DOCUMENT_FIELDS.map(({ key, label }) => {
               const selected = selectedFiles[key];
-              const file = projectData[key];
-              const ext = selected?.split('.')?.pop()?.toLowerCase();
-              const isImage = ['jpg','jpeg','png','webp'].includes(ext);
-              const isPdf   = ext === 'pdf';
-              const isDocx  = ['doc','docx'].includes(ext);
+              const file     = projectData[key];
+              const ext      = selected?.split('.')?.pop()?.toLowerCase();
+              const isImage  = ['jpg','jpeg','png','webp'].includes(ext);
+              const isPdf    = ext === 'pdf';
+              const isDocx   = ['doc','docx'].includes(ext);
 
               return (
                 <div key={key} className="flex flex-col gap-1">
@@ -269,11 +315,7 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                     {selected ? (
                       <>
                         {isImage && file ? (
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={label}
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={URL.createObjectURL(file)} alt={label} className="w-full h-full object-cover" />
                         ) : isPdf ? (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 gap-2 px-2">
                             <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">

@@ -313,7 +313,7 @@ class ProjectsController extends Controller
             'team_members.*.role'                      => ['required', 'string', 'max:50'],
             'team_members.*.hourly_rate'               => ['required', 'numeric', 'min:0'],
             'team_members.*.start_date'                => ['required', 'date'],
-            'team_members.*.end_date'                  => ['nullable', 'date', 'after_or_equal:team_members.*.start_date'],
+            'team_members.*.end_date'                  => ['required', 'date', 'after_or_equal:team_members.*.start_date'],
             'milestones'                               => ['nullable', 'array'],
             'milestones.*.name'                        => ['required', 'string', 'max:255'],
             'milestones.*.description'                 => ['nullable', 'string'],

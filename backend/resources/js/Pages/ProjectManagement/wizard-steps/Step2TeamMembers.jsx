@@ -23,10 +23,8 @@ export default function Step2TeamMembers({ users }) {
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
 
-  // Ensure users is always an array
   const safeUsers = Array.isArray(users) ? users : [];
 
-  // Filter available members (not already added)
   const availableMembers = safeUsers.filter((member) => {
     if (!member || !member.id) return false;
     const memberId = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
@@ -52,7 +50,6 @@ export default function Step2TeamMembers({ users }) {
     );
   });
 
-  // Derive the read-only role label for a member
   const getMemberRole = (member) => {
     if (member.type === 'employee') return member.position || 'No Position';
     return member.role || 'No Role';
@@ -97,12 +94,29 @@ export default function Step2TeamMembers({ users }) {
         [field]: value,
       },
     }));
+    // Clear the error for this field on change
     if (errors[`${compositeId}_${field}`]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[`${compositeId}_${field}`];
         return newErrors;
       });
+    }
+    // When start_date changes, re-validate end_date live
+    if (field === 'start_date') {
+      const endDate = formData[compositeId]?.end_date;
+      if (endDate && endDate < value) {
+        setErrors((prev) => ({
+          ...prev,
+          [`${compositeId}_end_date`]: 'End date must be on or after start date.',
+        }));
+      } else if (endDate) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[`${compositeId}_end_date`];
+          return newErrors;
+        });
+      }
     }
   };
 
@@ -119,6 +133,7 @@ export default function Step2TeamMembers({ users }) {
     }
 
     const validationErrors = {};
+
     for (const compositeId of selectedMemberIds) {
       const member = availableMembers.find(m => {
         const mId = typeof m.id === 'number' ? m.id : parseInt(m.id, 10);
@@ -129,30 +144,35 @@ export default function Step2TeamMembers({ users }) {
       if (!member) continue;
 
       const memberName = member.name || 'Team Member';
+      const memberFormData = formData[compositeId] || {};
 
-      // Hourly rate — must be present and >= 0
-      const hourlyRateVal = formData[compositeId]?.hourly_rate;
+      // ── Hourly Rate ──
+      const hourlyRateVal = memberFormData.hourly_rate;
       if (hourlyRateVal === undefined || hourlyRateVal === '' || parseFloat(hourlyRateVal) < 0) {
         validationErrors[`${compositeId}_hourly_rate`] = `Hourly rate for ${memberName} must be at least 0.`;
       }
 
-      // Start date — required
-      if (!formData[compositeId]?.start_date) {
-        validationErrors[`${compositeId}_start_date`] = `Please enter a start date for ${memberName}.`;
+      // ── Start Date — required ──
+      if (!memberFormData.start_date) {
+        validationErrors[`${compositeId}_start_date`] = `Start date is required for ${memberName}.`;
       } else {
-        // Validate against project dates
-        if (projectData.start_date && formData[compositeId].start_date < projectData.start_date) {
+        if (projectData.start_date && memberFormData.start_date < projectData.start_date) {
           validationErrors[`${compositeId}_start_date`] = `Start date cannot be before project start date (${projectData.start_date}).`;
-        }
-        if (projectData.planned_end_date && formData[compositeId].start_date > projectData.planned_end_date) {
+        } else if (projectData.planned_end_date && memberFormData.start_date > projectData.planned_end_date) {
           validationErrors[`${compositeId}_start_date`] = `Start date cannot be after project end date (${projectData.planned_end_date}).`;
         }
       }
 
-      // End date — optional but must be >= start date if provided
-      if (formData[compositeId]?.end_date && formData[compositeId]?.start_date) {
-        if (formData[compositeId].end_date < formData[compositeId].start_date) {
-          validationErrors[`${compositeId}_end_date`] = `End date must be after or equal to start date for ${memberName}.`;
+      // ── End Date — now REQUIRED ──
+      if (!memberFormData.end_date) {
+        validationErrors[`${compositeId}_end_date`] = `End date is required for ${memberName}.`;
+      } else {
+        if (memberFormData.start_date && memberFormData.end_date < memberFormData.start_date) {
+          validationErrors[`${compositeId}_end_date`] = `End date must be on or after start date for ${memberName}.`;
+        } else if (projectData.planned_end_date && memberFormData.end_date > projectData.planned_end_date) {
+          validationErrors[`${compositeId}_end_date`] = `End date cannot be after project end date (${projectData.planned_end_date}).`;
+        } else if (projectData.start_date && memberFormData.end_date < projectData.start_date) {
+          validationErrors[`${compositeId}_end_date`] = `End date cannot be before project start date (${projectData.start_date}).`;
         }
       }
     }
@@ -184,14 +204,14 @@ export default function Step2TeamMembers({ users }) {
 
       if (!isAlreadyAdded) {
         addTeamMember({
-          id: memberIdInt,
-          type: memberType,
-          name: member.name || 'Unknown',
-          email: member.email || '',
-          role: getMemberRole(member),
+          id:          memberIdInt,
+          type:        memberType,
+          name:        member.name || 'Unknown',
+          email:       member.email || '',
+          role:        getMemberRole(member),
           hourly_rate: parseFloat(formData[compositeId]?.hourly_rate) || 0,
-          start_date: formData[compositeId]?.start_date || '',
-          end_date: formData[compositeId]?.end_date || null,
+          start_date:  formData[compositeId]?.start_date || '',
+          end_date:    formData[compositeId]?.end_date || '',
         });
         addedCount++;
       }
@@ -210,6 +230,17 @@ export default function Step2TeamMembers({ users }) {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Assign Team Members</h3>
+
+      {/* Project date context hint */}
+      {(projectData.start_date || projectData.planned_end_date) && (
+        <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <span className="font-semibold text-blue-700">Project dates: </span>
+          <span className="text-blue-600">
+            {projectData.start_date || '—'} → {projectData.planned_end_date || '—'}
+          </span>
+          <span className="ml-2 text-blue-500">· Member dates must fall within this range.</span>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative">
@@ -244,31 +275,32 @@ export default function Step2TeamMembers({ users }) {
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider w-24">Type</TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">Name</TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[180px]">Email</TableHead>
-                {/* Role: read-only, auto-filled from user role / employee position */}
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">Role</TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">
                   Hourly Rate <span className="text-red-500">*</span>
                 </TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">
                   Start Date <span className="text-red-500">*</span>
                 </TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">
-                  End Date
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">
+                  End Date <span className="text-red-500">*</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {availableMembers.map((member) => {
-                const memberId = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
+                const memberId   = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
                 const memberType = member.type || 'user';
                 const compositeId = `${memberType}-${memberId}`;
-                const isSelected = selectedMemberIds.includes(compositeId);
+                const isSelected  = selectedMemberIds.includes(compositeId);
 
                 const memberErrors = {
                   hourly_rate: errors[`${compositeId}_hourly_rate`],
                   start_date:  errors[`${compositeId}_start_date`],
                   end_date:    errors[`${compositeId}_end_date`],
                 };
+
+                const memberStartDate = formData[compositeId]?.start_date;
 
                 return (
                   <TableRow
@@ -301,8 +333,6 @@ export default function Step2TeamMembers({ users }) {
                     </TableCell>
                     <TableCell className="font-medium text-gray-900">{member.name || '---'}</TableCell>
                     <TableCell className="text-gray-700">{member.email || '---'}</TableCell>
-
-                    {/* Role — read-only badge, value comes from member data */}
                     <TableCell>
                       <span className="inline-block px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 whitespace-nowrap">
                         {getMemberRole(member)}
@@ -320,11 +350,8 @@ export default function Step2TeamMembers({ users }) {
                         onChange={(e) => handleChange(compositeId, "hourly_rate", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         className={inputClass(memberErrors.hourly_rate)}
-                        required
                       />
-                      {memberErrors.hourly_rate && (
-                        <InputError message={memberErrors.hourly_rate} className="mt-1" />
-                      )}
+                      <InputError message={memberErrors.hourly_rate} className="mt-1" />
                     </TableCell>
 
                     {/* Start Date */}
@@ -337,31 +364,27 @@ export default function Step2TeamMembers({ users }) {
                         min={projectData.start_date || undefined}
                         max={projectData.planned_end_date || undefined}
                         className={inputClass(memberErrors.start_date)}
-                        required
                       />
-                      {memberErrors.start_date && (
-                        <InputError message={memberErrors.start_date} className="mt-1" />
-                      )}
+                      <InputError message={memberErrors.start_date} className="mt-1" />
                     </TableCell>
 
-                    {/* End Date */}
+                    {/* End Date — now required */}
                     <TableCell>
                       <Input
                         type="date"
                         value={formData[compositeId]?.end_date ?? ""}
                         onChange={(e) => handleChange(compositeId, "end_date", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
-                        min={formData[compositeId]?.start_date || projectData.start_date || undefined}
+                        min={memberStartDate || projectData.start_date || undefined}
                         max={projectData.planned_end_date || undefined}
                         className={inputClass(memberErrors.end_date)}
                       />
-                      {memberErrors.end_date && (
-                        <InputError message={memberErrors.end_date} className="mt-1" />
-                      )}
+                      <InputError message={memberErrors.end_date} className="mt-1" />
                     </TableCell>
                   </TableRow>
                 );
               })}
+
               {availableMembers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12">
@@ -432,9 +455,9 @@ export default function Step2TeamMembers({ users }) {
                     </TableCell>
                     <TableCell>{member.email || '---'}</TableCell>
                     <TableCell>{member.role || '---'}</TableCell>
-                    <TableCell>{member.hourly_rate ? `₱${parseFloat(member.hourly_rate).toFixed(2)}` : "---"}</TableCell>
-                    <TableCell>{member.start_date || "---"}</TableCell>
-                    <TableCell>{member.end_date || "---"}</TableCell>
+                    <TableCell>{member.hourly_rate !== undefined ? `₱${parseFloat(member.hourly_rate).toFixed(2)}` : '---'}</TableCell>
+                    <TableCell>{member.start_date || '---'}</TableCell>
+                    <TableCell>{member.end_date || '---'}</TableCell>
                     <TableCell>
                       <Button
                         type="button"

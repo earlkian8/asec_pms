@@ -13,6 +13,7 @@ class ClientUpdateRequest extends Model
     protected $fillable = [
         'client_id',
         'project_id',
+        'task_id',
         'subject',
         'message',
     ];
@@ -26,5 +27,9 @@ class ClientUpdateRequest extends Model
     {
         return $this->belongsTo(Project::class);
     }
-}
 
+    public function task()
+    {
+        return $this->belongsTo(ProjectTask::class, 'task_id');
+    }
+}

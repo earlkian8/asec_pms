@@ -38,4 +38,9 @@ class ProjectTask extends Model
     {
         return $this->hasMany(ProjectIssue::class, 'project_task_id');
     }
+
+    public function clientUpdateRequests()
+    {
+        return $this->hasMany(ClientUpdateRequest::class, 'task_id');
+    }
 }

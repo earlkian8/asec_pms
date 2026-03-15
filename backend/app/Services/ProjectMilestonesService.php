@@ -7,6 +7,7 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
+use App\Models\ClientUpdateRequest;
 use Illuminate\Support\Facades\Storage;
 
 class ProjectMilestonesService
@@ -20,7 +21,6 @@ class ProjectMilestonesService
         $sortBy       = request('sort_by', 'due_date');
         $sortOrder    = request('sort_order', 'asc');
 
-        // Whitelist allowed sort columns to prevent SQL injection
         $allowedSortColumns = ['due_date', 'start_date', 'created_at', 'name', 'status'];
         if (!in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'due_date';
@@ -28,27 +28,22 @@ class ProjectMilestonesService
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'asc';
 
         $milestones = ProjectMilestone::where('project_id', $project->id)
-            // ── Search ──────────────────────────────────────────────────────────
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                       ->orWhere('description', 'like', "%{$search}%")
                       ->orWhere('status', 'like', "%{$search}%")
-                      // FIX 1: also search by task title / description
                       ->orWhereHas('tasks', function ($tq) use ($search) {
                           $tq->where('title', 'like', "%{$search}%")
                              ->orWhere('description', 'like', "%{$search}%");
                       });
                 });
             })
-            // ── Status filter ────────────────────────────────────────────────────
             ->when($statusFilter && $statusFilter !== 'all', function ($query) use ($statusFilter) {
                 $query->where('status', $statusFilter);
             })
-            // ── FIX 2: Date range filter ─────────────────────────────────────────
             ->when($startDate, fn ($q) => $q->whereDate('start_date', '>=', $startDate))
             ->when($endDate,   fn ($q) => $q->whereDate('due_date',   '<=', $endDate))
-            // ── Eager loads ──────────────────────────────────────────────────────
             ->with([
                 'tasks' => function ($query) {
                     $query->with([
@@ -60,18 +55,20 @@ class ProjectMilestonesService
                         'issues' => function ($q) {
                             $q->with(['reportedBy', 'assignedTo'])->orderBy('created_at', 'desc');
                         },
+                        // ── NEW: load client update requests per task ──
+                        'clientUpdateRequests' => function ($q) {
+                            $q->with('client')->orderBy('created_at', 'desc');
+                        },
                     ])->orderBy('due_date', 'asc');
                 },
                 'issues' => function ($q) {
                     $q->with(['reportedBy', 'assignedTo', 'task'])->orderBy('created_at', 'desc');
                 },
             ])
-            // ── FIX 3–5: Dynamic sort ────────────────────────────────────────────
             ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
             ->withQueryString();
 
-        // Ensure all relationships are properly loaded and accessible
         $milestones->getCollection()->each(function ($milestone) {
             $milestone->tasks->each(function ($task) {
                 if (!$task->relationLoaded('progressUpdates')) {
@@ -108,10 +105,16 @@ class ProjectMilestonesService
                 if (!$task->relationLoaded('assignedUser')) {
                     $task->load('assignedUser');
                 }
+
+                // ── NEW: ensure clientUpdateRequests are loaded ──
+                if (!$task->relationLoaded('clientUpdateRequests')) {
+                    $task->load(['clientUpdateRequests' => function ($q) {
+                        $q->with('client')->orderBy('created_at', 'desc');
+                    }]);
+                }
             });
         });
 
-        // Active project-team users for task assignment
         $users = $project->team()
             ->active()
             ->current()
@@ -126,7 +129,6 @@ class ProjectMilestonesService
             ])
             ->values();
 
-        // All issues for this project
         $issues = ProjectIssue::where('project_id', $project->id)
             ->with(['milestone', 'task', 'reportedBy', 'assignedTo'])
             ->orderBy('created_at', 'desc')
@@ -137,7 +139,6 @@ class ProjectMilestonesService
             'milestones' => $milestones,
             'users'      => $users,
             'issues'     => $issues,
-            // Pass back current params so the frontend can stay in sync
             'search'      => $search,
             'sort_by'     => $sortBy,
             'sort_order'  => $sortOrder,

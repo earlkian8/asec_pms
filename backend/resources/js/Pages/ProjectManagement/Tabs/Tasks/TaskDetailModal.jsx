@@ -10,7 +10,7 @@ import { Button } from "@/Components/ui/button";
 import {
   Plus, Download, SquarePen, Trash2, FileText,
   Image as ImageIcon, Calendar, User, AlertCircle,
-  Flag, CheckCircle2, XCircle,
+  Flag, CheckCircle2, XCircle, MessageSquare, Mail,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import { router } from '@inertiajs/react';
@@ -101,7 +101,7 @@ const TextFilePreview = ({ fileUrl }) => {
 
 // ─── CSV Preview ──────────────────────────────────────────────────────────────
 const CsvPreview = ({ fileUrl }) => {
-  const [data, setData]   = useState([]);
+  const [data, setData]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(false);
 
@@ -120,8 +120,8 @@ const CsvPreview = ({ fileUrl }) => {
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, allTasks, onRefresh }) => {
-  const { has }    = usePermission();
-  const { props }  = usePage();
+  const { has }   = usePermission();
+  const { props } = usePage();
 
   // Progress update modals
   const [showAddProgressModal,    setShowAddProgressModal]    = useState(false);
@@ -159,9 +159,14 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const rawIssues = currentTask.issues || [];
   const issues    = Array.isArray(rawIssues) ? rawIssues : (rawIssues.data || []);
 
+  // ── NEW: client update requests tied to this task ──
+  const rawUpdateRequests = currentTask.clientUpdateRequests || currentTask.client_update_requests || [];
+  const clientUpdateRequests = Array.isArray(rawUpdateRequests) ? rawUpdateRequests : (rawUpdateRequests.data || []);
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
-  const formatFileSize = (b) => { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; };
+  const formatDate      = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+  const formatDateTime  = (d) => d ? new Date(d).toLocaleString('en-US',  { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+  const formatFileSize  = (b) => { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; };
 
   const isImage = (t) => t && (t.startsWith('image/') || ['jpg','jpeg','png','gif','webp','svg'].some(e => t.toLowerCase().includes(e)));
   const isPdf   = (t, n) => t?.includes('pdf') || n?.toLowerCase().endsWith('.pdf');
@@ -197,7 +202,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     );
     if (!update.file_path) return fallback();
     const fileUrl = getFileUrl(update);
-    if (!fileUrl)           return fallback('File unavailable');
+    if (!fileUrl)          return fallback('File unavailable');
 
     const fileType = update.file_type || '';
     const fileName = update.original_name || update.file_path || '';
@@ -221,19 +226,19 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
   // ── Badges ────────────────────────────────────────────────────────────────────
   const statusBadge = (status) => {
-    const map = { pending: 'bg-amber-50 text-amber-700 border-amber-200', in_progress: 'bg-blue-50 text-blue-700 border-blue-200', completed: 'bg-green-50 text-green-700 border-green-200' };
+    const map   = { pending: 'bg-amber-50 text-amber-700 border-amber-200', in_progress: 'bg-blue-50 text-blue-700 border-blue-200', completed: 'bg-green-50 text-green-700 border-green-200' };
     const label = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed' };
     return <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${map[status] || 'bg-gray-50 text-gray-700 border-gray-200'}`}>{label[status] || status}</span>;
   };
 
   const issueStatusBadge = (status) => {
-    const map = { open: 'bg-red-50 text-red-700 border-red-200', in_progress: 'bg-blue-50 text-blue-700 border-blue-200', resolved: 'bg-green-50 text-green-700 border-green-200', closed: 'bg-gray-50 text-gray-700 border-gray-200' };
+    const map   = { open: 'bg-red-50 text-red-700 border-red-200', in_progress: 'bg-blue-50 text-blue-700 border-blue-200', resolved: 'bg-green-50 text-green-700 border-green-200', closed: 'bg-gray-50 text-gray-700 border-gray-200' };
     const label = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed' };
     return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border ${map[status] || 'bg-gray-50 text-gray-700 border-gray-200'}`}>{label[status] || status}</span>;
   };
 
   const priorityBadge = (priority) => {
-    const map = { low: 'bg-gray-50 text-gray-600 border-gray-200', medium: 'bg-amber-50 text-amber-700 border-amber-200', high: 'bg-orange-50 text-orange-700 border-orange-200', critical: 'bg-red-50 text-red-700 border-red-200' };
+    const map   = { low: 'bg-gray-50 text-gray-600 border-gray-200', medium: 'bg-amber-50 text-amber-700 border-amber-200', high: 'bg-orange-50 text-orange-700 border-orange-200', critical: 'bg-red-50 text-red-700 border-red-200' };
     const label = { low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical' };
     return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border ${map[priority] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>{label[priority] || priority}</span>;
   };
@@ -242,28 +247,22 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const handleResolveIssue = (issue) => {
     if (!issue?.id || !project) return;
     const newStatus = issue.status === 'resolved' ? 'open' : 'resolved';
-    // Only send plain scalar fields — never spread the full object because
-    // nested relationships (assignedTo, reportedBy, task …) would be sent as
-    // objects and PostgreSQL would reject them when validating integer columns.
     router.put(
       route('project-management.project-issues.update', [project.id, issue.id]),
       {
-        title:                 issue.title,
-        description:           issue.description           ?? '',
-        priority:              issue.priority              ?? 'medium',
-        status:                newStatus,
-        assigned_to:           issue.assigned_to           ?? null,   // integer ID or null
-        project_milestone_id:  issue.project_milestone_id  ?? null,
-        project_task_id:       issue.project_task_id       ?? null,
-        due_date:              issue.due_date              ?? null,
+        title:                issue.title,
+        description:          issue.description          ?? '',
+        priority:             issue.priority             ?? 'medium',
+        status:               newStatus,
+        assigned_to:          issue.assigned_to          ?? null,
+        project_milestone_id: issue.project_milestone_id ?? null,
+        project_task_id:      issue.project_task_id      ?? null,
+        due_date:             issue.due_date             ?? null,
       },
       {
         preserveScroll: true,
-        onSuccess: () => {
-          toast.success(issue.status === 'resolved' ? 'Issue reopened' : 'Issue resolved');
-          onRefresh?.();
-        },
-        onError: () => toast.error('Failed to update issue status'),
+        onSuccess: () => { toast.success(issue.status === 'resolved' ? 'Issue reopened' : 'Issue resolved'); onRefresh?.(); },
+        onError:   () => toast.error('Failed to update issue status'),
       }
     );
   };
@@ -307,10 +306,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               {/* ── Task Meta Cards ───────────────────────────────────────────── */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { icon: <Calendar size={18} className="text-blue-600" />, bg: 'bg-blue-50', label: 'Due Date',    value: formatDate(currentTask.due_date) },
-                  { icon: <User size={18} className="text-purple-600" />,   bg: 'bg-purple-50', label: 'Assigned To', value: currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned' },
-                  { icon: <Flag size={18} className="text-amber-600" />,    bg: 'bg-amber-50', label: 'Milestone',  value: currentTask.milestone?.name || 'N/A' },
-                  { icon: <CheckCircle2 size={18} className="text-green-600" />, bg: 'bg-green-50', label: 'Status', value: null, badge: statusBadge(currentTask.status) },
+                  { icon: <Calendar size={18} className="text-blue-600" />,      bg: 'bg-blue-50',   label: 'Due Date',    value: formatDate(currentTask.due_date) },
+                  { icon: <User size={18} className="text-purple-600" />,        bg: 'bg-purple-50', label: 'Assigned To', value: currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned' },
+                  { icon: <Flag size={18} className="text-amber-600" />,         bg: 'bg-amber-50',  label: 'Milestone',   value: currentTask.milestone?.name || 'N/A' },
+                  { icon: <CheckCircle2 size={18} className="text-green-600" />, bg: 'bg-green-50',  label: 'Status',      value: null, badge: statusBadge(currentTask.status) },
                 ].map((item, i) => (
                   <div key={i} className="flex items-start gap-3 p-3 bg-card rounded-lg border border-border shadow-sm">
                     <div className={`flex-shrink-0 w-9 h-9 rounded-lg ${item.bg} flex items-center justify-center`}>
@@ -349,8 +348,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       {progressUpdates.map((update) => (
                         <div key={update.id} className="bg-card border border-border rounded-lg hover:border-primary/40 hover:shadow-md transition-all group overflow-hidden">
-
-                          {/* Card top bar: date + actions only — NO avatar */}
                           <div className="px-4 py-2.5 border-b border-border bg-muted/20 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                               <Calendar size={12} />
@@ -359,8 +356,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 <span className="text-foreground font-medium">· {update.created_by_name}</span>
                               )}
                             </div>
-
-                            {/* Action icons */}
                             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               {update.file_path && getDownloadUrl(update) && has('progress-updates.view') && (
                                 <a href={getDownloadUrl(update)} target="_blank" rel="noopener noreferrer"
@@ -382,15 +377,12 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                               )}
                             </div>
                           </div>
-
-                          {/* Card body */}
                           <div className="p-4 space-y-3">
                             {update.description && (
                               <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
                                 {update.description}
                               </p>
                             )}
-
                             {update.file_path && getDownloadUrl(update) && (
                               <div className="space-y-2">
                                 <div className="rounded-lg overflow-hidden border border-border bg-muted/20">
@@ -423,6 +415,73 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                 </div>
               </div>
 
+              {/* ── Client Update Requests ────────────────────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-6 bg-violet-500 rounded-full" />
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">Client Update Requests</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {clientUpdateRequests.length} {clientUpdateRequests.length === 1 ? 'request' : 'requests'} from clients
+                    </p>
+                  </div>
+                </div>
+
+                <div className="max-h-[400px] overflow-y-auto pr-1">
+                  {clientUpdateRequests.length > 0 ? (
+                    <div className="space-y-3">
+                      {clientUpdateRequests.map((request) => (
+                        <div key={request.id}
+                          className="bg-card border border-border rounded-lg hover:border-violet-300 hover:shadow-md transition-all overflow-hidden">
+
+                          {/* Request header */}
+                          <div className="px-4 py-3 bg-violet-50/60 border-b border-border flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                <User size={13} className="text-violet-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-violet-800 truncate">
+                                  {request.client?.client_name || 'Unknown Client'}
+                                </p>
+                                <p className="text-[10px] text-violet-500 flex items-center gap-1">
+                                  <Calendar size={9} />
+                                  {formatDateTime(request.created_at)}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-semibold border border-violet-200">
+                              <Mail size={9} />
+                              Request
+                            </span>
+                          </div>
+
+                          {/* Request body */}
+                          <div className="px-4 py-3 space-y-2">
+                            <p className="text-sm font-semibold text-foreground leading-snug">
+                              {request.subject}
+                            </p>
+                            <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                              {request.message}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 bg-muted/30 rounded-lg border border-dashed border-border">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                          <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">No client requests for this task</p>
+                        <p className="text-xs text-muted-foreground">Client update requests linked to this task will appear here</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* ── Issues ───────────────────────────────────────────────────── */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -446,15 +505,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                     <div className="space-y-2">
                       {issues.map((issue) => (
                         <div key={issue.id} className="bg-card border border-border rounded-lg hover:border-destructive/40 hover:shadow-md transition-all group overflow-hidden">
-
-                          {/* Issue header row */}
                           <div className="px-4 py-3 flex items-start gap-3">
-                            {/* Icon */}
                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center mt-0.5">
                               <AlertCircle size={14} className="text-destructive" />
                             </div>
-
-                            {/* Title + badges */}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-foreground leading-tight mb-1.5">{issue.title}</p>
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -474,10 +528,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 )}
                               </div>
                             </div>
-
-                            {/* Action icons */}
                             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                              {/* Resolve / Reopen toggle */}
                               {has('project-issues.update') && issue.status !== 'closed' && (
                                 <button onClick={() => handleResolveIssue(issue)}
                                   className={`p-1.5 rounded transition-colors ${issue.status === 'resolved' ? 'hover:bg-accent text-muted-foreground hover:text-foreground' : 'hover:bg-green-50 text-muted-foreground hover:text-green-600'}`}
@@ -499,8 +550,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                               )}
                             </div>
                           </div>
-
-                          {/* Description + resolved stamp */}
                           {(issue.description || issue.resolved_at) && (
                             <div className="px-4 pb-3 pt-0 space-y-2">
                               {issue.description && (
@@ -542,56 +591,24 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
       {/* ── Progress Update Modals ──────────────────────────────────────────────── */}
       {showAddProgressModal && (
-        <AddProgressUpdate
-          setShowAddModal={withRefresh(setShowAddProgressModal)}
-          project={project}
-          tasks={allTasks}
-          preselectedTask={currentTask}
-        />
+        <AddProgressUpdate setShowAddModal={withRefresh(setShowAddProgressModal)} project={project} tasks={allTasks} preselectedTask={currentTask} />
       )}
       {showEditProgressModal && editProgressUpdate && (
-        <EditProgressUpdate
-          setShowEditModal={withRefresh(setShowEditProgressModal)}
-          progressUpdate={editProgressUpdate}
-          project={project}
-          tasks={allTasks}
-        />
+        <EditProgressUpdate setShowEditModal={withRefresh(setShowEditProgressModal)} progressUpdate={editProgressUpdate} project={project} tasks={allTasks} />
       )}
       {showDeleteProgressModal && deleteProgressUpdate && (
-        <DeleteProgressUpdate
-          setShowDeleteModal={withRefresh(setShowDeleteProgressModal)}
-          progressUpdate={deleteProgressUpdate}
-          task={deleteProgressUpdate.task || currentTask}
-        />
+        <DeleteProgressUpdate setShowDeleteModal={withRefresh(setShowDeleteProgressModal)} progressUpdate={deleteProgressUpdate} task={deleteProgressUpdate.task || currentTask} />
       )}
 
       {/* ── Issue Modals ────────────────────────────────────────────────────────── */}
       {showAddIssueModal && (
-        <AddIssue
-          setShowAddModal={withRefresh(setShowAddIssueModal)}
-          project={project}
-          milestones={milestones || []}
-          tasks={allTasks || []}
-          users={users || []}
-          preselectedTask={currentTask}
-        />
+        <AddIssue setShowAddModal={withRefresh(setShowAddIssueModal)} project={project} milestones={milestones || []} tasks={allTasks || []} users={users || []} preselectedTask={currentTask} />
       )}
       {showEditIssueModal && editIssue && (
-        <EditIssue
-          setShowEditModal={withRefresh(setShowEditIssueModal)}
-          issue={editIssue}
-          project={project}
-          milestones={milestones || []}
-          tasks={allTasks || []}
-          users={users || []}
-        />
+        <EditIssue setShowEditModal={withRefresh(setShowEditIssueModal)} issue={editIssue} project={project} milestones={milestones || []} tasks={allTasks || []} users={users || []} />
       )}
       {showDeleteIssueModal && deleteIssue && (
-        <DeleteIssue
-          setShowDeleteModal={withRefresh(setShowDeleteIssueModal)}
-          issue={deleteIssue}
-          project={project}
-        />
+        <DeleteIssue setShowDeleteModal={withRefresh(setShowDeleteIssueModal)} issue={deleteIssue} project={project} />
       )}
     </>
   );

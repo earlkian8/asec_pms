@@ -217,4 +217,94 @@ class ProjectMaterialAllocationsController extends Controller
 
         return back()->with('success', 'Material allocation deleted successfully.');
     }
+
+    public function bulkReceivingReport(Project $project, Request $request)
+    {
+        $request->validate([
+            'received_at'                    => ['required', 'date'],
+            'items'                          => ['required', 'array', 'min:1'],
+            'items.*.allocation_id'          => ['required', 'exists:project_material_allocations,id'],
+            'items.*.quantity_received'      => ['required', 'numeric', 'min:0.01'],
+            'items.*.condition'              => ['nullable', 'string', 'max:255'],
+            'items.*.notes'                  => ['nullable', 'string'],
+        ]);
+
+        $created = 0;
+        $errors  = [];
+
+        foreach ($request->items as $index => $item) {
+            $allocation = ProjectMaterialAllocation::with('inventoryItem')
+                ->where('id', $item['allocation_id'])
+                ->where('project_id', $project->id)
+                ->first();
+
+            if (!$allocation) {
+                $errors["items.{$index}.allocation_id"] = 'Allocation not found or does not belong to this project.';
+                continue;
+            }
+
+            $remaining = $allocation->quantity_allocated - $allocation->quantity_received;
+
+            if ($item['quantity_received'] > $remaining) {
+                $errors["items.{$index}.quantity_received"] =
+                    "Quantity cannot exceed remaining ({$remaining} {$allocation->inventoryItem->unit_of_measure}).";
+                continue;
+            }
+
+            $receivingReport = $allocation->receivingReports()->create([
+                'quantity_received' => $item['quantity_received'],
+                'condition'         => $item['condition']  ?? null,
+                'notes'             => $item['notes']      ?? null,
+                'received_at'       => $request->received_at,
+                'received_by'       => auth()->id(),
+            ]);
+
+            $inventoryItem = $allocation->inventoryItem;
+
+            InventoryTransaction::create([
+                'inventory_item_id'              => $inventoryItem->id,
+                'transaction_type'               => 'stock_out',
+                'stock_out_type'                 => 'project_use',
+                'quantity'                       => $item['quantity_received'],
+                'project_id'                     => $project->id,
+                'project_material_allocation_id' => $allocation->id,
+                'notes'                          => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Bulk receiving report'
+                                                . ($item['notes'] ? ' - ' . $item['notes'] : ''),
+                'created_by'                     => auth()->id(),
+                'transaction_date'               => $request->received_at,
+            ]);
+
+            $this->inventoryService->updateItemStock($inventoryItem);
+
+            $allocation->quantity_received += $item['quantity_received'];
+            $allocation->updateStatus();
+
+            $this->adminActivityLogs(
+                'Material Receiving Report',
+                'Bulk Created',
+                'Bulk receiving report for "' . $inventoryItem->item_name . '" - '
+                . $item['quantity_received'] . ' ' . $inventoryItem->unit_of_measure
+                . ' received for project "' . $project->project_name . '"'
+            );
+
+            $created++;
+        }
+
+        if (!empty($errors)) {
+            return back()->withErrors($errors)->with(
+                'error',
+                "Completed {$created} report(s) but encountered errors on some items."
+            );
+        }
+
+        $this->createSystemNotification(
+            'general',
+            'Bulk Materials Received',
+            "{$created} material(s) received in bulk for project '{$project->project_name}'.",
+            $project,
+            route('project-management.view', $project->id)
+        );
+
+        return back()->with('success', "{$created} receiving report(s) created successfully.");
+    }
 }

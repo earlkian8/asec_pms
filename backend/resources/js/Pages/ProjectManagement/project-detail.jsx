@@ -63,12 +63,12 @@ export default function ProjectDetail() {
             component: <MilestonesTab project={project} milestoneData={milestoneData}/>,
             permission: 'project-milestones.view'
         },
-        { 
-            key: "request-updates", 
-            label: "Request Updates", 
-            component: <RequestUpdatesTab project={project} requestUpdatesData={requestUpdatesData} />,
-            permission: 'projects.view'
-        },
+        // { 
+        //     key: "request-updates", 
+        //     label: "Request Updates", 
+        //     component: <RequestUpdatesTab project={project} requestUpdatesData={requestUpdatesData} />,
+        //     permission: 'projects.view'
+        // },
     ];
 
     // Filter tabs based on user permissions

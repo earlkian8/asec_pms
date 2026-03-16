@@ -18,7 +18,10 @@ import {
     FileText,
     X,
     MessageCircle,
-    ChevronDown 
+    ChevronDown,
+    Trash2,
+    Layers,
+    Tag,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -75,10 +78,10 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Project Type',
+            title: 'Project Type Management',
             href: route('project-type-management.index'),
             routeName: 'project-type-management.*',
-            icon: FolderOpen,
+            icon: Layers,
             type: 'single'
         },
         {
@@ -96,10 +99,10 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
-            title: 'Client Type',
+            title: 'Client Type Management',
             href: route('client-type-management.index'),
             routeName: 'client-type-management.*',
-            icon: FolderOpen,
+            icon: Tag,
             type: 'single'
         },
         {
@@ -124,29 +127,33 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
+            title: 'Roles & Permissions',
+            href: route('user-management.roles-and-permissions.index'),
+            routeName: 'user-management.roles-and-permissions.*',
+            icon: BadgeDollarSign,
+            type: 'single'
+        },
+        {
             title: 'User Management',
-            type: 'section',
-            items: [
-                {
-                    title: 'Roles & Permissions',
-                    href: route('user-management.roles-and-permissions.index'),
-                    routeName: 'user-management.roles-and-permissions.*',
-                    icon: BadgeDollarSign
-                },
-                {
-                    title: 'Users',
-                    href: route('user-management.users.index'),
-                    routeName: 'user-management.users.*',
-                    icon: User
-                },
-                {
-                    title: 'Activity Logs',
-                    href: route('user-management.activity-logs.index'),
-                    routeName: 'user-management.activity-logs.*',
-                    icon: FileText
-                }
-            ]
-        }
+            href: route('user-management.users.index'),
+            routeName: 'user-management.users.*',
+            icon: User,
+            type: 'single'
+        },
+        {
+            title: 'Activity Logs',
+            href: route('user-management.activity-logs.index'),
+            routeName: 'user-management.activity-logs.*',
+            icon: FileText,
+            type: 'single'
+        },
+        {
+            title: 'Trash Bin',
+            href: route('user-management.trash-bin.index'),
+            routeName: 'user-management.trash-bin.*',
+            icon: Trash2,
+            type: 'single'
+        },
     ];
 
     // Filter navigation modules based on permissions
@@ -168,7 +175,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete'
                 ]) ? module : null;
             }
-            if (module.title === 'Project Type') {
+            if (module.title === 'Project Type Management') {
                 return hasModuleAccess([
                     'projects.view', 'projects.create', 'projects.update', 'projects.delete'
                 ]) ? module : null;
@@ -183,7 +190,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status'
                 ]) ? module : null;
             }
-            if (module.title === 'Client Type') {
+            if (module.title === 'Client Type Management') {
                 return hasModuleAccess([
                     'clients.view', 'clients.create', 'clients.update', 'clients.delete'
                 ]) ? module : null;
@@ -203,33 +210,19 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget'
                 ]) ? module : null;
             }
-            if (module.title === 'Chat Management') {
-                // Chat is available to all authenticated users (no specific permission check needed)
-                return module;
+            if (module.title === 'Roles & Permissions') {
+                return hasModuleAccess(['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign']) ? module : null;
             }
             if (module.title === 'User Management') {
-                // For collapsible items, check if user has access to any sub-item
-                const filteredItems = module.items.filter(item => {
-                    if (item.title === 'Roles & Permissions') {
-                        return hasModuleAccess(['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign']);
-                    }
-                    if (item.title === 'Users') {
-                        return hasModuleAccess(['users.view', 'users.create', 'users.update', 'users.delete', 'users.reset-password']);
-                    }
-                    if (item.title === 'Activity Logs') {
-                        return hasModuleAccess(['activity-logs.view', 'activity-logs.export']);
-                    }
-                    return false;
-                });
-                
-                // If user has access to any sub-item, return module with filtered items
-                if (filteredItems.length > 0) {
-                    return { ...module, items: filteredItems };
-                }
-                
-                return null;
+                return hasModuleAccess(['users.view', 'users.create', 'users.update', 'users.delete', 'users.reset-password']) ? module : null;
             }
-            return module; // Default to showing if no permission check is defined
+            if (module.title === 'Activity Logs') {
+                return hasModuleAccess(['activity-logs.view', 'activity-logs.export']) ? module : null;
+            }
+            if (module.title === 'Trash Bin') {
+                return hasModuleAccess(['trash-bin.view']) ? module : null;
+            }
+            return module;
         }).filter(module => module !== null);
     }, [has, hasAny]);
 
@@ -347,12 +340,20 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     {/* User dropdown using shadcn */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
-                                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                                    <User size={16} />
+                            <button className="flex items-center space-x-2 focus:outline-none">
+                                <div className="h-8 w-8 rounded-full overflow-hidden bg-zinc-700 flex items-center justify-center flex-shrink-0 ring-2 ring-zinc-300 hover:ring-zinc-500 transition-all">
+                                    {user.profile_image_url ? (
+                                        <img
+                                            src={user.profile_image_url}
+                                            alt={user.name}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="text-sm font-bold text-white uppercase">
+                                            {user.name?.charAt(0) ?? '?'}
+                                        </span>
+                                    )}
                                 </div>
-                                <span className="hidden sm:block text-sm font-medium">{user.name}</span>
-                                <ChevronDown size={16} />
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
@@ -361,14 +362,15 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                             <DropdownMenuItem asChild>
                                 <Link href={route('profile.edit')}>Profile</Link>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
-                                <Link href={route('logout')} method="post" as="button">
+                                <Link href={route('logout')} method="post" as="button" className='w-full'>
                                     Log Out
                                 </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                         </DropdownMenuContent>
                     </DropdownMenu>
+ 
                 </div>
             </header>
 
@@ -400,7 +402,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                         </nav>
 
                         {/* Sidebar footer */}
-                        <div className="py-2 flex justify-center items-center border-t border-zinc-500">
+                        <div className="py-2 flex justify-center items-center border-t border-zinc-400 mx-3">
                             {!sidebarCollapsed ? (
                                 <span>{user.email}</span>
                             ) : (

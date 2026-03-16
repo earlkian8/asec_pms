@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
             ['email' => $adminEmail],
             [
                 'name' => 'Earl Kian',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('Password-12345'),
                 'email_verified_at' => now(),
             ]
         );
@@ -44,10 +44,9 @@ class DatabaseSeeder extends Seeder
         
         // $this->command->info("Super Admin role assigned to: {$adminEmail}");
 
-        // // Seed project data (inventory, clients, projects with all submodules, and additional users)
-        // $this->call([
-        //     InventorySeeder::class,
-        //     ProjectDataSeeder::class,
-        // ]);
+        // Alpha testing data - run standalone: php artisan db:seed --class=AlphaTestingSeeder
+        // (Requires base seeders to run first. AlphaTestingSeeder calls InventorySeeder internally.)
+        // Uncomment to include in default seed:
+        // $this->call(AlphaTestingSeeder::class);
     }
 }

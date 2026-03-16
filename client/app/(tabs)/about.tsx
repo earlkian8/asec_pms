@@ -1,10 +1,6 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,269 +8,266 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { FIRM_CONTACT } from '@/constants/contact';
+import {
+  User, Mail, Building2, Phone, HelpCircle, MessageSquare,
+  LogOut, ChevronRight, Shield,
+} from 'lucide-react-native';
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const D = {
+  ink:       '#0F0F0E',
+  inkMid:    '#4A4845',
+  inkLight:  '#9A9691',
+  chalk:     '#FAFAF8',
+  surface:   '#FFFFFF',
+  hairline:  '#E8E5DF',
+  hairlineMd:'#D4D0C8',
+  red:       '#C0392B',
+  redBg:     '#FDF1F0',
+  blue:      '#1D4ED8',
+  blueBg:    '#EEF2FF',
+};
+
+// ── Avatar initials ───────────────────────────────────────────────────────────
+function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase();
+  return (
+    <View style={styles.avatar}>
+      <Text style={styles.avatarText}>{initials}</Text>
+    </View>
+  );
+}
+
+// ── Section label ─────────────────────────────────────────────────────────────
+function SectionLabel({ title }: { title: string }) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      <Text style={styles.sectionLabel}>{title}</Text>
+      <View style={styles.sectionLabelLine} />
+    </View>
+  );
+}
+
+// ── Info row (non-tappable) ───────────────────────────────────────────────────
+function InfoRow({
+  icon: Icon, label, value,
+}: { icon: any; label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoRowIcon}>
+        <Icon size={15} color={D.inkMid} strokeWidth={1.8} />
+      </View>
+      <View style={styles.infoRowBody}>
+        <Text style={styles.infoRowLabel}>{label}</Text>
+        <Text style={styles.infoRowValue} numberOfLines={1}>{value || '—'}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Action row (tappable) ─────────────────────────────────────────────────────
+function ActionRow({
+  icon: Icon, label, subtitle, onPress, destructive, iconColor,
+}: {
+  icon: any; label: string; subtitle?: string;
+  onPress: () => void; destructive?: boolean; iconColor?: string;
+}) {
+  const color = destructive ? D.red : iconColor ?? D.inkMid;
+  return (
+    <TouchableOpacity style={styles.actionRow} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.actionRowIcon, destructive && { backgroundColor: D.redBg }]}>
+        <Icon size={16} color={color} strokeWidth={1.8} />
+      </View>
+      <View style={styles.actionRowBody}>
+        <Text style={[styles.actionRowLabel, destructive && { color: D.red }]}>{label}</Text>
+        {subtitle && <Text style={styles.actionRowSub}>{subtitle}</Text>}
+      </View>
+      {!destructive && <ChevronRight size={16} color={D.inkLight} strokeWidth={2} />}
+    </TouchableOpacity>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function AboutScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const backgroundColor = '#F3F4F6'; // gray-100
-  const cardBg = '#FFFFFF'; // white
-  const textColor = '#111827'; // gray-900
-  const textSecondary = '#4B5563'; // gray-600
-  const borderColor = '#E5E7EB'; // gray-200
-
-  const InfoCard = ({
-    icon,
-    title,
-    value,
-    onPress,
-  }: {
-    icon: string;
-    title: string;
-    value: string;
-    onPress?: () => void;
-  }) => (
-    <TouchableOpacity
-      style={[styles.infoCard, { backgroundColor: cardBg, borderColor }]}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={onPress ? 0.7 : 1}>
-      <View style={[styles.infoIconContainer, { backgroundColor: '#F3F4F6' }]}>
-        <Ionicons name={icon as any} size={24} color="#3B82F6" />
-      </View>
-      <View style={styles.infoContent}>
-        <Text style={[styles.infoTitle, { color: textSecondary }]}>{title}</Text>
-        <Text style={[styles.infoValue, { color: textColor }]}>{value}</Text>
-      </View>
-      {onPress && <Ionicons name="chevron-forward" size={20} color={textSecondary} />}
-    </TouchableOpacity>
-  );
+  const displayName = user?.name || 'Client';
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <View style={styles.root}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + 20 },
-        ]}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
-        <View style={[styles.profileHeader, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.profileName, { color: textColor }]}>{user?.name || 'Client'}</Text>
-          <Text style={[styles.profileCompany, { color: textSecondary }]}>
-            {user?.company || 'Construction Client'}
-          </Text>
-          <Text style={[styles.profileEmail, { color: textSecondary }]}>
-            {user?.email || 'client@example.com'}
-          </Text>
+
+        {/* ── Profile hero ────────────────────────────────────────────────── */}
+        <View style={styles.hero}>
+          <Avatar name={displayName} />
+          <View style={styles.heroText}>
+            <Text style={styles.heroName}>{displayName}</Text>
+            <Text style={styles.heroCompany} numberOfLines={1}>{user?.company || 'Construction Client'}</Text>
+            {user?.client_code && (
+              <View style={styles.heroCodeBadge}>
+                <Text style={styles.heroCode}>{user.client_code}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Account Information */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Account Information</Text>
-          <InfoCard icon="person-outline" title="Full Name" value={user?.name || 'N/A'} />
-          <InfoCard icon="mail-outline" title="Email Address" value={user?.email || 'N/A'} />
-          <InfoCard icon="business-outline" title="Company" value={user?.company || 'N/A'} />
+        {/* ── Account info ─────────────────────────────────────────────────── */}
+        <SectionLabel title="Account" />
+        <View style={styles.card}>
+          <InfoRow icon={User}     label="Full Name"     value={user?.name    || ''} />
+          <View style={styles.cardDivider} />
+          <InfoRow icon={Mail}     label="Email"         value={user?.email   || ''} />
+          <View style={styles.cardDivider} />
+          <InfoRow icon={Building2} label="Company"      value={user?.company || ''} />
+          {user?.phone_number && <>
+            <View style={styles.cardDivider} />
+            <InfoRow icon={Phone} label="Phone" value={user.phone_number} />
+          </>}
         </View>
 
-        {/* Support */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Support & Resources</Text>
-          <TouchableOpacity
-            style={[styles.helpCenterCard, { backgroundColor: cardBg, borderColor }]}
+        {/* ── Support ──────────────────────────────────────────────────────── */}
+        <SectionLabel title="Support" />
+        <View style={styles.card}>
+          <ActionRow
+            icon={HelpCircle}
+            label="Help Center"
+            subtitle="FAQs and platform guides"
             onPress={() => router.push('/help-center')}
-            activeOpacity={0.7}>
-            <View style={[styles.helpCenterIconContainer, { backgroundColor: '#F3F4F6' }]}>
-              <Ionicons name="help-circle-outline" size={24} color="#3B82F6" />
-            </View>
-            <View style={styles.helpCenterContent}>
-              <Text style={[styles.helpCenterTitle, { color: textColor }]}>Help Center</Text>
-              <Text style={[styles.helpCenterText, { color: textSecondary }]}>
-                Find answers to common questions and learn how to use the platform effectively.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={textSecondary} />
-          </TouchableOpacity>
-          <InfoCard
-            icon="chatbubbles-outline"
-            title="Contact Support"
-            value={`${FIRM_CONTACT.email}`}
+          />
+          <View style={styles.cardDivider} />
+          <ActionRow
+            icon={MessageSquare}
+            label="Contact Support"
+            subtitle={FIRM_CONTACT.email}
             onPress={() => Linking.openURL(`mailto:${FIRM_CONTACT.email}?subject=Support Request`)}
           />
         </View>
 
-        {/* App Information */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>About</Text>
-          <View style={[styles.aboutCard, { backgroundColor: cardBg, borderColor }]}>
-            <Text style={[styles.aboutTitle, { color: textColor }]}>Client Portal</Text>
-            <Text style={[styles.aboutVersion, { color: textSecondary }]}>Version 1.0</Text>
-            <Text style={[styles.aboutDescription, { color: textSecondary }]}>
-              Your comprehensive construction project management portal. Track progress, view milestones, and stay updated on all your projects in one place.
+        {/* ── About ────────────────────────────────────────────────────────── */}
+        <SectionLabel title="About" />
+        <View style={styles.card}>
+          <View style={styles.aboutBlock}>
+            <View style={styles.aboutTop}>
+              <Shield size={18} color={D.inkMid} strokeWidth={1.8} />
+              <Text style={styles.aboutTitle}>Client Portal</Text>
+            </View>
+            <Text style={styles.aboutVersion}>Version 1.0</Text>
+            <Text style={styles.aboutDesc}>
+              Your construction project management portal. Track progress, view milestones, and stay updated on all your projects in one place.
             </Text>
+            <View style={styles.aboutDivider} />
+            <Text style={styles.aboutFirm}>Abdurauf Sawadjaan Engineering Consultancy</Text>
+            <Text style={styles.aboutTagline}>Where Vision meets Precision</Text>
           </View>
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: cardBg, borderColor }]}
-          onPress={logout}>
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text style={[styles.logoutText, { color: '#EF4444' }]}>Sign Out</Text>
-        </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: textSecondary }]}>
-            © Abdurauf Sawadjaan Engineering Consultancy
-          </Text>
+        {/* ── Sign out ─────────────────────────────────────────────────────── */}
+        <View style={[styles.card, styles.logoutCard]}>
+          <ActionRow
+            icon={LogOut}
+            label="Sign Out"
+            onPress={logout}
+            destructive
+          />
         </View>
+
+        <Text style={styles.footer}>© 2026 Abdurauf Sawadjaan Engineering Consultancy</Text>
       </ScrollView>
     </View>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  profileHeader: {
-    alignItems: 'center',
-    padding: 32,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  profileName: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  profileCompany: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  profileEmail: {
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-    letterSpacing: 0.3,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  infoIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  aboutCard: {
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  aboutTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  aboutVersion: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  aboutDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 8,
-    gap: 8,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 32,
-    paddingTop: 24,
-  },
-  footerText: {
-    fontSize: 12,
-    fontWeight: '400',
-  },
-  helpCenterCard: {
-    flexDirection: 'row',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  helpCenterIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  helpCenterContent: {
-    flex: 1,
-  },
-  helpCenterTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  helpCenterText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-});
+  root:   { flex: 1, backgroundColor: D.chalk },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 48 },
 
+  // Hero
+  hero: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: D.surface, borderRadius: 14,
+    borderWidth: 1, borderColor: D.hairline,
+    padding: 18, marginBottom: 24, gap: 16,
+  },
+  avatar: {
+    width: 56, height: 56, borderRadius: 14,
+    backgroundColor: D.ink,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  avatarText: { fontSize: 20, fontWeight: '700', color: '#FFF', letterSpacing: -0.5 },
+  heroText:    { flex: 1 },
+  heroName:    { fontSize: 18, fontWeight: '700', color: D.ink, letterSpacing: -0.3 },
+  heroCompany: { fontSize: 12, color: D.inkMid, marginTop: 2 },
+  heroCodeBadge: {
+    alignSelf: 'flex-start', marginTop: 6,
+    backgroundColor: '#F0EFED', borderRadius: 4,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  heroCode: { fontSize: 10, fontWeight: '700', color: D.inkMid, letterSpacing: 0.5 },
+
+  // Section label
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  sectionLabel:    { fontSize: 11, fontWeight: '700', color: D.inkLight, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionLabelLine:{ flex: 1, height: 1, backgroundColor: D.hairline },
+
+  // Card
+  card: {
+    backgroundColor: D.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: D.hairline, marginBottom: 20,
+    overflow: 'hidden',
+  },
+  cardDivider: { height: 1, backgroundColor: D.hairline, marginLeft: 52 },
+  logoutCard: { marginBottom: 12 },
+
+  // Info row
+  infoRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 13, gap: 0,
+  },
+  infoRowIcon: {
+    width: 36, height: 36, borderRadius: 8,
+    backgroundColor: '#F5F4F2',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  },
+  infoRowBody:  { flex: 1 },
+  infoRowLabel: { fontSize: 10, fontWeight: '600', color: D.inkLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  infoRowValue: { fontSize: 14, fontWeight: '600', color: D.ink },
+
+  // Action row
+  actionRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 14, gap: 0,
+  },
+  actionRowIcon: {
+    width: 36, height: 36, borderRadius: 8,
+    backgroundColor: '#F5F4F2',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  },
+  actionRowBody:  { flex: 1 },
+  actionRowLabel: { fontSize: 14, fontWeight: '600', color: D.ink },
+  actionRowSub:   { fontSize: 12, color: D.inkLight, marginTop: 1 },
+
+  // About block
+  aboutBlock: { padding: 16 },
+  aboutTop:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  aboutTitle: { fontSize: 15, fontWeight: '700', color: D.ink },
+  aboutVersion: { fontSize: 11, color: D.inkLight, marginBottom: 10 },
+  aboutDesc:  { fontSize: 13, color: D.inkMid, lineHeight: 19 },
+  aboutDivider: { height: 1, backgroundColor: D.hairline, marginVertical: 14 },
+  aboutFirm:  { fontSize: 12, fontWeight: '700', color: D.ink },
+  aboutTagline: { fontSize: 11, color: D.inkLight, fontStyle: 'italic', marginTop: 2 },
+
+  // Footer
+  footer: { textAlign: 'center', fontSize: 11, color: D.inkLight, marginTop: 8, marginBottom: 8 },
+});

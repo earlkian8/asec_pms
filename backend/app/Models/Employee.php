@@ -4,43 +4,125 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        // Identity
+        'employee_id',
+        'profile_image',
+
+        // Name & Work
         'first_name',
         'last_name',
         'email',
         'phone',
         'position',
-        'is_active'
+        'is_active',
+
+        // Personal
+        'secondary_phone',
+        'gender',
+        'date_of_birth',
+        'civil_status',
+        'nationality',
+
+        // Address
+        'region',
+        'province',
+        'city_municipality',
+        'barangay',
+        'address',
+        'zip_code',
+
+        // Emergency Contact
+        'emergency_contact_name',
+        'emergency_contact_relationship',
+        'emergency_contact_phone',
+
+        // Government IDs
+        'sss_number',
+        'sss_id_image',
+        'philhealth_number',
+        'philhealth_id_image',
+        'pagibig_number',
+        'pagibig_id_image',
+        'tin_number',
+        'tin_id_image',
+
+        // Notes
+        'notes',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'     => 'boolean',
+        'date_of_birth' => 'date',
     ];
 
-    /**
-     * Get the full name of the employee.
-     */
-    public function getFullNameAttribute()
+    protected $appends = [
+        'full_name',
+        'profile_image_url',
+        'sss_id_image_url',
+        'philhealth_id_image_url',
+        'pagibig_id_image_url',
+        'tin_id_image_url',
+    ];
+
+    // ── Auto-generate employee_id on create ───────────────────────────────────
+
+    protected static function booted(): void
+    {
+        static::created(function (Employee $employee) {
+            if (empty($employee->employee_id)) {
+                $employee->update([
+                    'employee_id' => 'EMP-' . str_pad($employee->id, 5, '0', STR_PAD_LEFT),
+                ]);
+            }
+        });
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────────────
+
+    public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
     }
 
-    /**
-     * Get the project teams that this employee is assigned to.
-     */
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        return $this->profile_image ? asset('storage/' . $this->profile_image) : null;
+    }
+
+    public function getSssIdImageUrlAttribute(): ?string
+    {
+        return $this->sss_id_image ? asset('storage/' . $this->sss_id_image) : null;
+    }
+
+    public function getPhilhealthIdImageUrlAttribute(): ?string
+    {
+        return $this->philhealth_id_image ? asset('storage/' . $this->philhealth_id_image) : null;
+    }
+
+    public function getPagibigIdImageUrlAttribute(): ?string
+    {
+        return $this->pagibig_id_image ? asset('storage/' . $this->pagibig_id_image) : null;
+    }
+
+    public function getTinIdImageUrlAttribute(): ?string
+    {
+        return $this->tin_id_image ? asset('storage/' . $this->tin_id_image) : null;
+    }
+
+    // ── Relationships ─────────────────────────────────────────────────────────
+
     public function projectTeams()
     {
         return $this->hasMany(ProjectTeam::class, 'employee_id');
     }
 
-    /**
-     * Get the labor costs for this employee.
-     */
     public function laborCosts()
     {
         return $this->hasMany(ProjectLaborCost::class, 'employee_id');

@@ -1,1240 +1,614 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/Components/ui/dialog";
+import { Dialog, DialogContent } from "@/Components/ui/dialog";
 import { Button } from "@/Components/ui/button";
-import { Plus, Download, SquarePen, Trash2, FileText, Image as ImageIcon, Calendar, User, AlertCircle, Flag, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Plus, Download, SquarePen, Trash2, FileText,
+  Image as ImageIcon, Calendar, User, AlertCircle,
+  Flag, CheckCircle2, XCircle, MessageSquare, Mail,
+  LayoutGrid, Activity, Clock, X,
+} from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
 import AddProgressUpdate from '../ProgressUpdate/add';
 import EditProgressUpdate from '../ProgressUpdate/edit';
 import DeleteProgressUpdate from '../ProgressUpdate/delete';
+import AddIssue from '../Issues/add';
 import EditIssue from '../Issues/edit';
 import DeleteIssue from '../Issues/delete';
 
-// PDF.js for PDF preview
 import * as pdfjsLib from "pdfjs-dist";
-
-// Use CDN for worker to avoid cross-origin issues in development and production
-// This is the most reliable approach for Laravel + Vite setups
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.mjs`;
-
-// DOCX preview
 import { renderAsync } from "docx-preview";
 
-// PDF Thumbnail Component
+// ─── File preview sub-components (unchanged internals) ────────────────────────
 const PdfThumbnail = ({ url }) => {
   const canvasRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
   useEffect(() => {
-    const renderPdf = async () => {
+    const render = async () => {
       try {
-        // Get CSRF token if available
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        
-        const loadingTask = pdfjsLib.getDocument({
-          url: url,
-          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
-          cMapPacked: true,
-          httpHeaders: csrfToken ? {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken,
-          } : undefined,
-        });
-        const pdf = await loadingTask.promise;
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        const pdf = await pdfjsLib.getDocument({ url, httpHeaders: token ? { 'X-CSRF-TOKEN': token } : undefined }).promise;
         const page = await pdf.getPage(1);
-        
-        const viewport = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: 1 });
+        const scale = Math.min(400 / vp.width, 300 / vp.height);
+        const svp = page.getViewport({ scale });
         const canvas = canvasRef.current;
         if (!canvas) return;
-        
-        const scale = Math.min(
-          280 / viewport.width,
-          200 / viewport.height
-        );
-        
-        const scaledViewport = page.getViewport({ scale });
-        const context = canvas.getContext("2d");
-        canvas.height = scaledViewport.height;
-        canvas.width = scaledViewport.width;
-        
-        await page.render({ 
-          canvasContext: context, 
-          viewport: scaledViewport 
-        }).promise;
-        
+        canvas.height = svp.height;
+        canvas.width = svp.width;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: svp }).promise;
         setLoading(false);
-      } catch (error) {
-        console.error("PDF render error:", error);
-        setError(true);
-        setLoading(false);
-      }
+      } catch { setError(true); setLoading(false); }
     };
-    if (url) {
-      renderPdf();
-    }
+    if (url) render();
   }, [url]);
-
-  if (error) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
-        <FileText className="w-6 h-6 text-destructive mb-1" />
-        <span className="text-[10px] text-muted-foreground">Preview unavailable</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-muted">
-      {loading ? (
-        <FileText className="w-6 h-6 text-muted-foreground animate-pulse" />
-      ) : (
-        <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
-      )}
-    </div>
-  );
+  if (error) return <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-100 rounded"><FileText className="w-6 h-6 text-red-400 mb-1" /><span className="text-[10px] text-zinc-400">Preview unavailable</span></div>;
+  return <div className="w-full h-full flex items-center justify-center bg-zinc-100">{loading ? <FileText className="w-6 h-6 text-zinc-400 animate-pulse" /> : <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />}</div>;
 };
 
-// DOCX Preview Component
 const DocxPreview = ({ fileUrl }) => {
-  const containerRef = useRef(null);
+  const ref = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
   useEffect(() => {
-    const renderDocx = async () => {
+    const render = async () => {
       try {
-        if (!containerRef.current) return;
-        
-        // Clear previous content
-        containerRef.current.innerHTML = '';
-        
-        // Get CSRF token if available for authenticated requests
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        
-        const response = await fetch(fileUrl, {
-          method: 'GET',
-          credentials: 'same-origin',
-          headers: csrfToken ? {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken,
-          } : {},
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch DOCX file');
-        
-        const arrayBuffer = await response.arrayBuffer();
-        
-        await renderAsync(arrayBuffer, containerRef.current, undefined, {
-          className: 'docx-wrapper',
-          inWrapper: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
-          ignoreFonts: false,
-          breakPages: true,
-          experimental: false,
-          trimXmlDeclaration: true,
-          useBase64URL: false,
-          useMathMLPolyfill: true,
-          showChanges: false,
-          showComments: false,
-          showInserted: true,
-          showDeleted: false,
-        });
-        
+        if (!ref.current) return;
+        ref.current.innerHTML = '';
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        const res = await fetch(fileUrl, { credentials: 'same-origin', headers: token ? { 'X-CSRF-TOKEN': token } : {} });
+        if (!res.ok) throw new Error();
+        await renderAsync(await res.arrayBuffer(), ref.current, undefined, { className: 'docx-wrapper', inWrapper: true });
         setLoading(false);
-      } catch (error) {
-        console.error("DOCX render error:", error);
-        setError(true);
-        setLoading(false);
-      }
+      } catch { setError(true); setLoading(false); }
     };
-
-    if (fileUrl) {
-      renderDocx();
-    }
+    if (fileUrl) render();
   }, [fileUrl]);
+  if (error) return <div className="w-full h-40 flex items-center justify-center bg-zinc-100 rounded"><FileText className="w-5 h-5 text-red-400" /></div>;
+  return <div className="w-full overflow-auto bg-white rounded border p-2">{loading && <div className="h-40 flex items-center justify-center"><FileText className="w-5 h-5 text-zinc-400 animate-pulse" /></div>}<div ref={ref} style={{ minHeight: loading ? '160px' : 'auto' }} /></div>;
+};
 
-  if (error) {
-    return (
-      <div className="w-full h-[120px] flex flex-col items-center justify-center bg-muted rounded">
-        <FileText className="w-6 h-6 text-destructive mb-1" />
-        <span className="text-[10px] text-muted-foreground">Preview unavailable</span>
-      </div>
-    );
-  }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmt     = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+const fmtFull = (d) => d ? new Date(d).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+const fmtSize = (b) => { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; };
+const isImg   = (t) => t && ['jpg','jpeg','png','gif','webp','svg'].some(e => t.toLowerCase().includes(e));
+const isPdf   = (t, n) => t?.includes('pdf') || n?.toLowerCase().endsWith('.pdf');
+
+// ─── Status + priority badge helpers ─────────────────────────────────────────
+const taskStatusBadge = (status) => {
+  const map = {
+    pending:     'bg-amber-50 text-amber-700 border-amber-200',
+    in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
+    completed:   'bg-green-50 text-green-700 border-green-200',
+  };
+  const label = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed' };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${map[status] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+      {label[status] || status}
+    </span>
+  );
+};
+
+const issueStatusBadge = (status) => {
+  const map = { open: 'bg-red-50 text-red-700 border-red-200', in_progress: 'bg-blue-50 text-blue-700 border-blue-200', resolved: 'bg-green-50 text-green-700 border-green-200', closed: 'bg-gray-50 text-gray-600 border-gray-200' };
+  const label = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed' };
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${map[status] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>{label[status] || status}</span>;
+};
+
+const priorityBadge = (priority) => {
+  const map = { low: 'bg-gray-50 text-gray-600 border-gray-200', medium: 'bg-amber-50 text-amber-700 border-amber-200', high: 'bg-orange-50 text-orange-700 border-orange-200', critical: 'bg-red-50 text-red-700 border-red-200' };
+  const label = { low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical' };
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${map[priority] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>{label[priority] || priority}</span>;
+};
+
+// ─── Media aspect detection ───────────────────────────────────────────────────
+const useImageAspect = (src) => {
+  const [aspect, setAspect] = useState('landscape');
+  useEffect(() => {
+    if (!src) return;
+    const img = new Image();
+    img.onload = () => setAspect(img.naturalHeight > img.naturalWidth ? 'portrait' : 'landscape');
+    img.src = src;
+  }, [src]);
+  return aspect;
+};
+
+// ─── Update Card ──────────────────────────────────────────────────────────────
+const UpdateCard = ({ update, currentTask, onEdit, onDelete, downloadUrl, isFirst }) => {
+  const fileUrl = update.file_url || (update.file_path ? `${window.location.origin}/storage/${update.file_path.replace(/^\//, '')}` : null);
+  const aspect = useImageAspect(isImg(update.file_type || '') || isImg(update.file_path || '') ? fileUrl : null);
+  const hasImage = fileUrl && (isImg(update.file_type || '') || isImg(update.file_path || ''));
+  const hasPdf   = fileUrl && isPdf(update.file_type || '', update.file_path || '');
+  const hasDocx  = fileUrl && ['docx', 'doc'].includes((update.file_path || '').split('.').pop()?.toLowerCase());
+
+  const mediaClass = hasImage
+    ? aspect === 'portrait'
+      ? 'aspect-[3/4] max-h-[300px]'
+      : 'aspect-video'
+    : 'aspect-video';
 
   return (
-    <div className="w-full h-[120px] overflow-auto bg-card rounded border p-2">
-      {loading && (
-        <div className="flex items-center justify-center h-full">
-          <FileText className="w-6 h-6 text-muted-foreground animate-pulse" />
+    <div className={`group bg-white border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-300 hover:shadow-sm transition-all ${isFirst ? 'col-span-2' : ''}`}>
+      {/* Media */}
+      {(hasImage || hasPdf || hasDocx) && (
+        <div className={`w-full bg-zinc-100 overflow-hidden relative ${mediaClass}`}>
+          {hasImage && (
+            <img
+              src={fileUrl}
+              alt="Update attachment"
+              className="w-full h-full object-cover"
+              onError={e => { e.target.parentElement.classList.add('hidden'); }}
+            />
+          )}
+          {hasPdf && <PdfThumbnail url={fileUrl} />}
+          {hasDocx && <DocxPreview fileUrl={fileUrl} />}
+          {/* Overlay badge */}
+          <span className="absolute top-2 right-2 bg-black/50 text-white text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide">
+            {hasPdf ? 'PDF' : hasDocx ? 'DOCX' : 'Photo'}
+          </span>
         </div>
       )}
-      <div 
-        ref={containerRef} 
-        className="docx-wrapper prose prose-sm max-w-none"
-        style={{ 
-          minHeight: loading ? '120px' : 'auto',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
-        }}
-      />
-    </div>
-  );
-};
 
-// Text File Preview Component
-const TextFilePreview = ({ fileUrl, fileExtension }) => {
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    fetch(fileUrl)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch');
-        return res.text();
-      })
-      .then(text => {
-        // Limit preview to first 2000 characters
-        setContent(text.substring(0, 2000));
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
-  }, [fileUrl]);
-
-  if (loading) {
-    return (
-      <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-        <FileText className="w-6 h-6 text-muted-foreground animate-pulse" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-        <div className="flex flex-col items-center">
-          <FileText className="w-6 h-6 text-destructive mb-1" />
-          <span className="text-[10px] text-muted-foreground">Preview unavailable</span>
+      {/* Body */}
+      <div className="p-3.5">
+        <div className="flex items-center gap-2 mb-2.5 text-xs text-zinc-400">
+          <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-medium text-[10px] flex-shrink-0">
+            {(update.created_by_name || 'U').charAt(0).toUpperCase()}
+          </div>
+          <span className="text-zinc-500 font-medium">{update.created_by_name || 'Unknown'}</span>
+          <span>·</span>
+          <span>{fmt(update.created_at)}</span>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="w-full h-[120px] overflow-auto bg-card border rounded p-2">
-      <pre className="text-[10px] text-foreground font-mono whitespace-pre-wrap break-words">
-        {content}
-        {content.length >= 2000 && <span className="text-muted-foreground">...</span>}
-      </pre>
-    </div>
-  );
-};
-
-// CSV Preview Component
-const CsvPreview = ({ fileUrl }) => {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    fetch(fileUrl)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch');
-        return res.text();
-      })
-      .then(text => {
-        // Simple CSV parsing - split by lines and commas
-        const lines = text.split('\n').filter(line => line.trim()).slice(0, 6);
-        const parsed = lines.map(line => {
-          // Handle quoted values
-          const result = [];
-          let current = '';
-          let inQuotes = false;
-          
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-              inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-              result.push(current.trim());
-              current = '';
-            } else {
-              current += char;
-            }
-          }
-          result.push(current.trim());
-          return result;
-        });
-        
-        setData(parsed);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
-  }, [fileUrl]);
-
-  if (loading) {
-    return (
-      <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-        <FileText className="w-6 h-6 text-muted-foreground animate-pulse" />
-      </div>
-    );
-  }
-
-  if (error || data.length === 0) {
-    return (
-      <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-        <div className="flex flex-col items-center">
-          <FileText className="w-6 h-6 text-destructive mb-1" />
-          <span className="text-[10px] text-muted-foreground">Preview unavailable</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full h-[120px] overflow-auto bg-card rounded border">
-      <table className="min-w-full text-[10px]">
-        {data.length > 0 && (
-          <>
-            <thead className="bg-muted sticky top-0">
-              <tr>
-                {data[0].map((header, i) => (
-                  <th key={i} className="px-1 py-0.5 text-left font-medium text-foreground border-r border-border last:border-r-0">
-                    {header || `Col ${i + 1}`}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.slice(1).map((row, i) => (
-                <tr key={i} className="border-t hover:bg-muted/50">
-                  {row.map((cell, j) => (
-                    <td key={j} className="px-1 py-0.5 border-r border-border last:border-r-0 text-foreground">
-                      {cell || '-'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </>
+        {update.description && (
+          <p className="text-sm text-zinc-700 leading-relaxed line-clamp-4">{update.description}</p>
         )}
-      </table>
+
+        {fileUrl && (
+          <div className="mt-2.5 flex items-center gap-2 text-xs text-zinc-400">
+            <FileText size={12} />
+            <span className="truncate">{update.original_name || 'Attachment'}</span>
+            {update.file_size && <span className="flex-shrink-0 text-zinc-300">· {fmtSize(update.file_size)}</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 px-3.5 py-2.5 border-t border-zinc-100 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+        {downloadUrl && (
+          <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 px-2.5 py-1.5 rounded-lg hover:bg-zinc-100 transition-colors">
+            <Download size={12} /> Download
+          </a>
+        )}
+        <button onClick={onEdit}
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 px-2.5 py-1.5 rounded-lg hover:bg-zinc-100 transition-colors">
+          <SquarePen size={12} /> Edit
+        </button>
+        <button onClick={onDelete}
+          className="inline-flex items-center gap-1.5 text-xs text-red-400 hover:text-red-600 px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+          <Trash2 size={12} /> Delete
+        </button>
+      </div>
     </div>
   );
 };
 
+// ─── Main Modal ───────────────────────────────────────────────────────────────
 const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, allTasks, onRefresh }) => {
-  const { has } = usePermission();
+  const { has }   = usePermission();
   const { props } = usePage();
-  const [showAddProgressModal, setShowAddProgressModal] = useState(false);
-  const [showEditProgressModal, setShowEditProgressModal] = useState(false);
-  const [showDeleteProgressModal, setShowDeleteProgressModal] = useState(false);
-  const [editProgressUpdate, setEditProgressUpdate] = useState(null);
-  const [deleteProgressUpdate, setDeleteProgressUpdate] = useState(null);
-  const [showEditIssueModal, setShowEditIssueModal] = useState(false);
-  const [showDeleteIssueModal, setShowDeleteIssueModal] = useState(false);
-  const [editIssue, setEditIssue] = useState(null);
-  const [deleteIssue, setDeleteIssue] = useState(null);
+  const [activeTab, setActiveTab] = useState('progress');
 
-  // Get fresh task data from milestoneData after reload
+  const [showAddProgressModal,    setShowAddProgressModal]    = useState(false);
+  const [showEditProgressModal,   setShowEditProgressModal]   = useState(false);
+  const [showDeleteProgressModal, setShowDeleteProgressModal] = useState(false);
+  const [editProgressUpdate,      setEditProgressUpdate]      = useState(null);
+  const [deleteProgressUpdate,    setDeleteProgressUpdate]    = useState(null);
+
+  const [showAddIssueModal,    setShowAddIssueModal]    = useState(false);
+  const [showEditIssueModal,   setShowEditIssueModal]   = useState(false);
+  const [showDeleteIssueModal, setShowDeleteIssueModal] = useState(false);
+  const [editIssue,            setEditIssue]            = useState(null);
+  const [deleteIssue,          setDeleteIssue]          = useState(null);
+
   const getFreshTask = () => {
     if (!task?.id) return task;
-    const milestoneData = props.milestoneData;
-    if (!milestoneData) return task;
-    
-    // Handle both paginated and non-paginated milestone data
-    const milestones = Array.isArray(milestoneData.milestones) 
-      ? milestoneData.milestones 
-      : (milestoneData.milestones?.data || []);
-    
-    if (!Array.isArray(milestones) || milestones.length === 0) return task;
-    
-    // Find the task in the fresh milestone data
-    for (const milestone of milestones) {
-      if (milestone.tasks && Array.isArray(milestone.tasks)) {
-        const freshTask = milestone.tasks.find(t => t.id === task.id);
-        if (freshTask) {
-          // Ensure the task has the milestone relationship
-          return { ...freshTask, milestone: milestone };
-        }
-      }
+    const md = props.milestoneData;
+    if (!md) return task;
+    const ms = Array.isArray(md.milestones) ? md.milestones : (md.milestones?.data || []);
+    for (const m of ms) {
+      const found = (m.tasks || []).find(t => t.id === task.id);
+      if (found) return { ...found, milestone: m };
     }
     return task;
   };
 
   const currentTask = getFreshTask();
-
   if (!currentTask) return null;
 
-  // Get progress updates for this task
-  const rawProgressUpdates = currentTask.progressUpdates || currentTask.progress_updates || [];
-  const progressUpdates = Array.isArray(rawProgressUpdates) 
-    ? rawProgressUpdates 
-    : (rawProgressUpdates.data || []);
+  const rawPU = currentTask.progressUpdates || currentTask.progress_updates || [];
+  const progressUpdates = Array.isArray(rawPU) ? rawPU : (rawPU.data || []);
 
-  // Get issues for this task
   const rawIssues = currentTask.issues || [];
-  const issues = Array.isArray(rawIssues) 
-    ? rawIssues 
-    : (rawIssues.data || []);
+  const issues = Array.isArray(rawIssues) ? rawIssues : (rawIssues.data || []);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  };
-
-  const isImage = (fileType) => {
-    if (!fileType) return false;
-    return fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].some(ext => 
-      fileType.toLowerCase().includes(ext)
-    );
-  };
-
-  const isPdf = (fileType, fileName) => {
-    if (fileType?.includes('pdf')) return true;
-    if (fileName?.toLowerCase().endsWith('.pdf')) return true;
-    return false;
-  };
-
-  const getFilePreview = (update) => {
-    if (!update.file_path) {
-      return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-          <div className="flex flex-col items-center">
-            <FileText className="w-6 h-6 text-muted-foreground mb-1" />
-            <span className="text-[10px] text-muted-foreground">No File</span>
-          </div>
-        </div>
-      );
-    }
-
-    // Use storage URL for previews (works for images, videos, etc.)
-    const fileUrl = getFileUrl(update);
-    if (!fileUrl) {
-      return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-          <div className="flex flex-col items-center">
-            <FileText className="w-6 h-6 text-muted-foreground mb-1" />
-            <span className="text-[10px] text-muted-foreground">File unavailable</span>
-          </div>
-        </div>
-      );
-    }
-    const fileType = update.file_type || '';
-    const fileName = update.original_name || update.file_path || '';
-    const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-
-    // Image preview
-    if (isImage(fileType) || isImage(fileName)) {
-      return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded overflow-hidden p-1">
-          <img
-            src={fileUrl}
-            alt={update.original_name || 'Preview'}
-            className="max-w-full max-h-full w-auto h-auto object-contain"
-            loading="lazy"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              const parent = e.target.parentElement;
-              if (parent) {
-                parent.innerHTML = '<div class="flex flex-col items-center justify-center h-full"><svg class="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="text-[10px] text-muted-foreground mt-1">Preview unavailable</span></div>';
-              }
-            }}
-          />
-        </div>
-      );
-    }
-
-    // PDF preview
-    if (isPdf(fileType, fileName)) {
-      return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded overflow-hidden">
-          <PdfThumbnail url={fileUrl} />
-        </div>
-      );
-    }
-
-    // Video preview
-    if (fileType?.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'mkv', 'm4v'].includes(fileExtension)) {
-      return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-black rounded overflow-hidden">
-          <video
-            src={fileUrl}
-            controls
-            className="w-full h-full object-contain"
-            preload="metadata"
-          >
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      );
-    }
-
-    // Audio preview
-    if (fileType?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(fileExtension)) {
-      return (
-        <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded p-2">
-          <div className="w-full">
-            <div className="flex flex-col items-center mb-2">
-              <FileText className="w-6 h-6 text-muted-foreground mb-1" />
-              <span className="text-[10px] text-foreground font-medium truncate w-full text-center">{fileName}</span>
-            </div>
-            <audio
-              src={fileUrl}
-              controls
-              className="w-full h-8"
-            >
-              Your browser does not support the audio tag.
-            </audio>
-          </div>
-        </div>
-      );
-    }
-
-    // DOCX files - Use docx-preview library
-    if (fileExtension === 'docx' || fileExtension === 'doc') {
-      return (
-        <DocxPreview fileUrl={fileUrl} />
-      );
-    }
-
-    // Excel and PowerPoint - Use Office Online Viewer (fallback for non-DOCX Office files)
-    if (['xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension)) {
-      // Note: Office Online Viewer requires publicly accessible URLs
-      // If your files are behind authentication, you may need a proxy endpoint
-      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
-      return (
-        <div className="w-full h-[120px] rounded overflow-hidden border bg-card">
-          <iframe
-            src={officeViewerUrl}
-            className="w-full h-full border-0"
-            frameBorder="0"
-            allowFullScreen
-            title={`Preview of ${fileName}`}
-            onError={() => {
-              // Fallback if iframe fails
-              console.error('Office viewer failed to load');
-            }}
-          />
-        </div>
-      );
-    }
-
-    // CSV files
-    if (fileExtension === 'csv') {
-      return (
-        <CsvPreview fileUrl={fileUrl} />
-      );
-    }
-
-    // Text files and code files
-    if (fileType?.startsWith('text/') || ['txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'php', 'rb', 'go', 'rs', 'sh', 'yaml', 'yml', 'sql', 'log'].includes(fileExtension)) {
-      return (
-        <TextFilePreview fileUrl={fileUrl} fileExtension={fileExtension} />
-      );
-    }
-
-    // Default fallback with appropriate icons
-    const getFileIcon = () => {
-      if (fileType?.includes('word') || fileType?.includes('msword')) {
-        return <FileText className="w-6 h-6 text-primary" />;
-      }
-      if (fileType?.includes('excel') || fileType?.includes('spreadsheet')) {
-        return <FileText className="w-6 h-6 text-primary" />;
-      }
-      if (fileType?.includes('presentation') || fileType?.includes('powerpoint')) {
-        return <FileText className="w-6 h-6 text-primary" />;
-      }
-      if (fileType?.startsWith('video/')) {
-        return <FileText className="w-6 h-6 text-primary" />;
-      }
-      if (fileType?.startsWith('audio/')) {
-        return <FileText className="w-6 h-6 text-primary" />;
-      }
-      // Archive files
-      if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(fileExtension)) {
-        return <FileText className="w-6 h-6 text-primary" />;
-      }
-      return <FileText className="w-6 h-6 text-muted-foreground" />;
-    };
-
-    const getFileTypeLabel = () => {
-      if (fileType?.includes('word') || fileType?.includes('msword')) return 'Word Document';
-      if (fileType?.includes('excel') || fileType?.includes('spreadsheet')) return 'Excel Spreadsheet';
-      if (fileType?.includes('presentation') || fileType?.includes('powerpoint')) return 'PowerPoint Presentation';
-      if (fileType?.startsWith('video/')) return 'Video File';
-      if (fileType?.startsWith('audio/')) return 'Audio File';
-      if (['zip', 'rar', '7z', 'tar', 'gz'].includes(fileExtension)) return 'Archive File';
-      return fileType || 'File';
-    };
-
-    return (
-      <div className="w-full h-[120px] flex items-center justify-center bg-muted rounded">
-        <div className="flex flex-col items-center">
-          {getFileIcon()}
-          <span className="text-[10px] text-foreground font-medium mt-1">
-            {getFileTypeLabel()}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  const getFileIcon = (update) => {
-    if (!update.file_path) return null;
-    const ext = update.file_path.split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-      return <ImageIcon size={14} className="text-primary" />;
-    }
-    return <FileText size={14} className="text-muted-foreground" />;
-  };
+  const rawRequests = currentTask.clientUpdateRequests || currentTask.client_update_requests || [];
+  const clientUpdateRequests = Array.isArray(rawRequests) ? rawRequests : (rawRequests.data || []);
 
   const getDownloadUrl = (update) => {
     if (!update.file_path || !currentTask.milestone) return null;
-    const milestoneId = currentTask.milestone.id || currentTask.milestone_id;
-    if (!milestoneId || !currentTask.id || !update.id) return null;
-    return route('project-management.progress-updates.download', [
-      milestoneId,
-      currentTask.id,
-      update.id
-    ]);
+    const mId = currentTask.milestone.id || currentTask.milestone_id;
+    if (!mId || !currentTask.id || !update.id) return null;
+    return route('project-management.progress-updates.download', [mId, currentTask.id, update.id]);
   };
 
-  // Get direct storage URL for file previews (images, videos, etc.)
-  const getFileUrl = (update) => {
-    if (!update.file_path) return null;
-    // Use file_url if available (from API), otherwise construct from file_path
-    if (update.file_url) {
-      return update.file_url;
-    }
-    // Construct storage URL directly
-    const baseUrl = window.location.origin;
-    const filePath = update.file_path.startsWith('/') ? update.file_path : `/${update.file_path}`;
-    return `${baseUrl}/storage${filePath}`;
+  const withRefresh = (setter) => (value) => {
+    setter(value);
+    if (!value) setTimeout(() => onRefresh?.(), 100);
   };
-
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      pending: { 
-        bg: 'bg-amber-50 dark:bg-amber-950/30', 
-        text: 'text-amber-700 dark:text-amber-400', 
-        border: 'border-amber-200 dark:border-amber-800',
-        label: 'Pending' 
-      },
-      in_progress: { 
-        bg: 'bg-blue-50 dark:bg-blue-950/30', 
-        text: 'text-blue-700 dark:text-blue-400', 
-        border: 'border-blue-200 dark:border-blue-800',
-        label: 'In Progress' 
-      },
-      completed: { 
-        bg: 'bg-green-50 dark:bg-green-950/30', 
-        text: 'text-green-700 dark:text-green-400', 
-        border: 'border-green-200 dark:border-green-800',
-        label: 'Completed' 
-      },
-    };
-    const config = statusConfig[status] || statusConfig.pending;
-    return (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
-        {config.label}
-      </span>
-    );
-  };
-
-  const getIssueStatusBadge = (status) => {
-    const statusConfig = {
-      open: { 
-        bg: 'bg-red-50 dark:bg-red-950/30', 
-        text: 'text-red-700 dark:text-red-400', 
-        border: 'border-red-200 dark:border-red-800',
-        label: 'Open' 
-      },
-      in_progress: { 
-        bg: 'bg-blue-50 dark:bg-blue-950/30', 
-        text: 'text-blue-700 dark:text-blue-400', 
-        border: 'border-blue-200 dark:border-blue-800',
-        label: 'In Progress' 
-      },
-      resolved: { 
-        bg: 'bg-green-50 dark:bg-green-950/30', 
-        text: 'text-green-700 dark:text-green-400', 
-        border: 'border-green-200 dark:border-green-800',
-        label: 'Resolved' 
-      },
-      closed: { 
-        bg: 'bg-gray-50 dark:bg-gray-950/30', 
-        text: 'text-gray-700 dark:text-gray-400', 
-        border: 'border-gray-200 dark:border-gray-800',
-        label: 'Closed' 
-      },
-    };
-    const config = statusConfig[status] || statusConfig.open;
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
-        {config.label}
-      </span>
-    );
-  };
-
-  const getPriorityBadge = (priority) => {
-    const priorityConfig = {
-      low: { 
-        bg: 'bg-gray-50 dark:bg-gray-950/30', 
-        text: 'text-gray-700 dark:text-gray-400', 
-        border: 'border-gray-200 dark:border-gray-800',
-        label: 'Low' 
-      },
-      medium: { 
-        bg: 'bg-amber-50 dark:bg-amber-950/30', 
-        text: 'text-amber-700 dark:text-amber-400', 
-        border: 'border-amber-200 dark:border-amber-800',
-        label: 'Medium' 
-      },
-      high: { 
-        bg: 'bg-orange-50 dark:bg-orange-950/30', 
-        text: 'text-orange-700 dark:text-orange-400', 
-        border: 'border-orange-200 dark:border-orange-800',
-        label: 'High' 
-      },
-      critical: { 
-        bg: 'bg-red-50 dark:bg-red-950/30', 
-        text: 'text-red-700 dark:text-red-400', 
-        border: 'border-red-200 dark:border-red-800',
-        label: 'Critical' 
-      },
-    };
-    const config = priorityConfig[priority] || priorityConfig.medium;
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
-        {config.label}
-      </span>
-    );
-  };
-
 
   const handleResolveIssue = (issue) => {
-    if (!issue || !issue.id || !project) return;
-    
-    router.put(route("project-management.project-issues.update", [project.id, issue.id]), {
-      ...issue,
-      status: issue.status === 'resolved' ? 'open' : 'resolved',
-    }, {
-      preserveScroll: true,
-      onSuccess: () => {
-        toast.success(issue.status === 'resolved' ? 'Issue reopened successfully' : 'Issue resolved successfully');
-        if (onRefresh) {
-          setTimeout(() => onRefresh(), 100);
-        }
-      },
-      onError: () => {
-        toast.error('Failed to update issue status');
-      },
-    });
+    if (!issue?.id || !project) return;
+    const newStatus = issue.status === 'resolved' ? 'open' : 'resolved';
+    router.put(
+      route('project-management.project-issues.update', [project.id, issue.id]),
+      { title: issue.title, description: issue.description ?? '', priority: issue.priority ?? 'medium', status: newStatus, assigned_to: issue.assigned_to ?? null, project_milestone_id: issue.project_milestone_id ?? null, project_task_id: issue.project_task_id ?? null, due_date: issue.due_date ?? null },
+      { preserveScroll: true, onSuccess: () => { toast.success(issue.status === 'resolved' ? 'Issue reopened' : 'Issue resolved'); onRefresh?.(); }, onError: () => toast.error('Failed to update issue status') }
+    );
   };
+
+  // Progress ring calc
+  const progressPct = progressUpdates.length > 0
+    ? currentTask.status === 'completed' ? 100 : Math.min(progressUpdates.length * 25, 90)
+    : 0;
+  const circumference = 2 * Math.PI * 26;
+  const dashOffset = circumference - (progressPct / 100) * circumference;
+
+  const tabs = [
+    // { id: 'overview',  label: 'Overview',         icon: LayoutGrid,    count: null },
+    { id: 'progress',  label: 'Progress updates',  icon: Activity,      count: progressUpdates.length },
+    { id: 'requests',  label: 'Client requests',   icon: MessageSquare, count: clientUpdateRequests.length },
+    { id: 'issues',    label: 'Issues',             icon: AlertCircle,   count: issues.length },
+  ];
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[95vw] max-w-[1000px] max-h-[95vh] overflow-hidden p-0 bg-background">
-          {/* Header */}
-          <DialogHeader className="px-6 py-5 border-b border-border bg-card/50 backdrop-blur-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <DialogTitle className="text-2xl font-bold text-foreground leading-tight mb-2">
-                      {currentTask.title}
-                    </DialogTitle>
-                    {currentTask.description && (
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                        {currentTask.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0 pt-1">
-                    {getStatusBadge(currentTask.status)}
-                  </div>
+        <DialogContent className="w-[95vw] max-w-[920px] max-h-[92vh] overflow-hidden p-0 bg-white rounded-2xl border border-zinc-200 shadow-2xl">
+
+          {/* ── HEADER ───────────────────────────────────────────────────────── */}
+          <div className="flex items-start gap-3.5 px-6 py-5 border-b border-zinc-100">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-medium text-zinc-900 leading-snug mb-1">
+                {currentTask.title}
+              </h2>
+              <div className="flex items-center gap-2.5 text-xs text-zinc-400 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <Flag size={10} className="text-zinc-300" />
+                  {currentTask.milestone?.name || 'No milestone'}
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  <User size={10} className="text-zinc-300" />
+                  {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
+                </span>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  <Clock size={10} className="text-zinc-300" />
+                  Due {fmt(currentTask.due_date)}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {taskStatusBadge(currentTask.status)}
+              <div className='mx-2'></div>
+            </div>
+          </div>
+
+          {/* ── BODY: sidebar + main ─────────────────────────────────────────── */}
+          <div className="flex overflow-hidden" style={{ height: 'calc(92vh - 90px)' }}>
+
+            {/* SIDEBAR */}
+            <div className="w-52 flex-shrink-0 border-r border-zinc-100 flex flex-col py-3 gap-0.5">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-300 px-4 py-2">Sections</p>
+
+              {tabs.map(({ id, label, icon: Icon, count }) => (
+                <button key={id} onClick={() => setActiveTab(id)}
+                  className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-all text-left border-l-2 ${
+                    activeTab === id
+                      ? 'border-blue-500 bg-zinc-50 text-zinc-900 font-medium'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'
+                  }`}>
+                  <Icon size={14} className="flex-shrink-0" />
+                  <span className="flex-1 truncate">{label}</span>
+                  {count !== null && (
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
+                      activeTab === id
+                        ? 'bg-blue-100 text-blue-600'
+                        : 'bg-zinc-100 text-zinc-400'
+                    }`}>{count}</span>
+                  )}
+                </button>
+              ))}
+
+              {/* Metadata footer */}
+              <div className="mt-auto px-4 py-3 border-t border-zinc-100 space-y-3">
+                <div>
+                  <p className="text-[10px] text-zinc-300 mb-0.5">Milestone</p>
+                  <p className="text-xs text-zinc-700 leading-tight">{currentTask.milestone?.name || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-zinc-300 mb-0.5">Start date</p>
+                  <p className="text-xs text-zinc-700">{fmt(currentTask.start_date) !== 'N/A' ? fmt(currentTask.start_date) : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-zinc-300 mb-0.5">Due date</p>
+                  <p className="text-xs text-zinc-700">{fmt(currentTask.due_date)}</p>
                 </div>
               </div>
             </div>
-          </DialogHeader>
 
-          <div className="overflow-y-auto max-h-[calc(95vh-120px)]">
-            <div className="p-6 space-y-6">
-              {/* Task Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
-                    <Calendar size={20} className="text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                      Due Date
-                    </p>
-                    <p className="text-base font-semibold text-foreground">
-                      {formatDate(currentTask.due_date)}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
-                    <User size={20} className="text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                      Assigned To
-                    </p>
-                    <p className="text-base font-semibold text-foreground truncate">
-                      {currentTask.assignedUser?.name || currentTask.assigned_user?.name || 'Unassigned'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
-                    <Flag size={20} className="text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                      Milestone
-                    </p>
-                    <p className="text-base font-semibold text-foreground truncate">
-                      {currentTask.milestone?.name || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 p-4 bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-50 dark:bg-green-950/30 flex items-center justify-center">
-                    <CheckCircle2 size={20} className="text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                      Status
-                    </p>
-                    <div className="mt-0.5">
-                      {getStatusBadge(currentTask.status)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {/* MAIN CONTENT */}
+            <div className="flex-1 overflow-y-auto">
 
-              {/* Progress Updates Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 h-6 bg-primary rounded-full"></div>
+              {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
+              {activeTab === 'overview' && (
+                <div className="p-6 space-y-5">
+                  {/* Stat row */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Updates filed', value: progressUpdates.length, sub: 'progress entries' },
+                      { label: 'Client requests', value: clientUpdateRequests.length, sub: 'linked to task' },
+                      { label: 'Open issues', value: issues.filter(i => i.status === 'open').length, sub: `of ${issues.length} total` },
+                    ].map((s, i) => (
+                      <div key={i} className="bg-zinc-50 rounded-xl p-4">
+                        <p className="text-xs text-zinc-400 mb-1">{s.label}</p>
+                        <p className="text-2xl font-medium text-zinc-900">{s.value}</p>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">{s.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Progress ring */}
+                  <div className="flex items-center gap-5 bg-zinc-50 rounded-xl p-4">
+                    <svg width="64" height="64" viewBox="0 0 64 64" className="flex-shrink-0">
+                      <circle cx="32" cy="32" r="26" fill="none" stroke="#e4e4e7" strokeWidth="5" />
+                      <circle cx="32" cy="32" r="26" fill="none" stroke="#3b82f6" strokeWidth="5"
+                        strokeDasharray={circumference} strokeDashoffset={dashOffset}
+                        strokeLinecap="round" transform="rotate(-90 32 32)" />
+                    </svg>
                     <div>
-                      <h3 className="text-lg font-bold text-foreground">Progress Updates</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {progressUpdates.length} {progressUpdates.length === 1 ? 'update' : 'updates'}
-                      </p>
+                      <p className="text-2xl font-medium text-zinc-900">{progressPct}%</p>
+                      <p className="text-xs text-zinc-400 mt-0.5">Estimated completion · {progressUpdates.length} update{progressUpdates.length !== 1 ? 's' : ''} filed</p>
                     </div>
                   </div>
-                  {has('progress-updates.create') && (
-                    <Button
-                      onClick={() => setShowAddProgressModal(true)}
-                      size="sm"
-                      className="h-9 text-sm px-4"
-                    >
-                      <Plus size={16} className="mr-2" />
-                      Add Update
-                    </Button>
+
+                  {/* Description */}
+                  {currentTask.description && (
+                    <div className="text-sm text-zinc-500 leading-relaxed border-l-2 border-zinc-200 pl-4 py-1">
+                      {currentTask.description}
+                    </div>
+                  )}
+
+                  {/* Latest update preview */}
+                  {progressUpdates.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mb-3">Latest update</p>
+                      <div className="border border-zinc-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
+                          <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-medium">
+                            {(progressUpdates[0].created_by_name || 'U').charAt(0)}
+                          </div>
+                          <span className="text-zinc-500 font-medium">{progressUpdates[0].created_by_name || 'Unknown'}</span>
+                          <span>·</span>
+                          <span>{fmt(progressUpdates[0].created_at)}</span>
+                        </div>
+                        <p className="text-sm text-zinc-700 leading-relaxed line-clamp-3">
+                          {progressUpdates[0].description || '(No description)'}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className="max-h-[500px] overflow-y-auto pr-1">
+              )}
+
+              {/* ── PROGRESS UPDATES ─────────────────────────────────────────── */}
+              {activeTab === 'progress' && (
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="text-sm font-medium text-zinc-900">Progress updates</h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">{progressUpdates.length} {progressUpdates.length === 1 ? 'entry' : 'entries'} · most recent first</p>
+                    </div>
+                    {has('progress-updates.create') && (
+                      <Button onClick={() => setShowAddProgressModal(true)} size="sm"
+                        className="h-8 text-xs px-3 gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-none">
+                        <Plus size={12} /> Add update
+                      </Button>
+                    )}
+                  </div>
+
                   {progressUpdates.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {progressUpdates.map((update) => (
-                        <div 
-                          key={update.id} 
-                          className="bg-card border border-border rounded-lg hover:border-primary/50 hover:shadow-md transition-all group overflow-hidden"
-                        >
-                          {/* Header */}
-                          <div className="px-4 py-3 border-b border-border bg-muted/30">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                  <User size={14} className="text-primary" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-semibold text-foreground truncate">
-                                    {currentTask.assigned_user?.name || 'Unknown'}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                    <Calendar size={12} />
-                                    {formatDate(update.created_at)}
-                                  </p>
-                                </div>
-                              </div>
-                              
-                              {/* Action buttons */}
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                {update.file_path && getDownloadUrl(update) && has('progress-updates.view') && (
-                                  <a
-                                    href={getDownloadUrl(update)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                    title="Download"
-                                  >
-                                    <Download size={16} />
-                                  </a>
-                                )}
-                                {has('progress-updates.update') && (
-                                  <button
-                                    onClick={() => {
-                                      setEditProgressUpdate({
-                                        ...update,
-                                        task: currentTask
-                                      });
-                                      setShowEditProgressModal(true);
-                                    }}
-                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                    title="Edit"
-                                  >
-                                    <SquarePen size={16} />
-                                  </button>
-                                )}
-                                {has('progress-updates.delete') && (
-                                  <button
-                                    onClick={() => {
-                                      setDeleteProgressUpdate({
-                                        ...update,
-                                        task: currentTask
-                                      });
-                                      setShowDeleteProgressModal(true);
-                                    }}
-                                    className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                    title="Delete"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Content */}
-                          <div className="p-4 space-y-3">
-                            {/* Description */}
-                            {update.description && (
-                              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
-                                {update.description}
-                              </p>
-                            )}
-                            
-                            {/* File Preview */}
-                            {update.file_path && getDownloadUrl(update) && (
-                              <div className="space-y-2">
-                                <div className="rounded-lg overflow-hidden border border-border bg-muted/20">
-                                  {getFilePreview(update)}
-                                </div>
-                                
-                                {/* File download link */}
-                                <a
-                                  href={getDownloadUrl(update)}
-                                  className="inline-flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent/80 text-accent-foreground rounded-md text-xs font-medium group/link w-full transition-colors"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {getFileIcon(update)}
-                                  <span className="truncate flex-1 text-left">{update.original_name || 'Download'}</span>
-                                  {update.file_size && (
-                                    <span className="text-muted-foreground text-xs flex-shrink-0">({formatFileSize(update.file_size)})</span>
-                                  )}
-                                  <Download size={14} className="opacity-0 group-hover/link:opacity-100 transition-opacity flex-shrink-0" />
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {progressUpdates.map((update, idx) => (
+                        <UpdateCard
+                          key={update.id}
+                          update={update}
+                          currentTask={currentTask}
+                          isFirst={idx === 0}
+                          downloadUrl={getDownloadUrl(update)}
+                          onEdit={() => { setEditProgressUpdate({ ...update, task: currentTask }); setShowEditProgressModal(true); }}
+                          onDelete={() => { setDeleteProgressUpdate({ ...update, task: currentTask }); setShowDeleteProgressModal(true); }}
+                        />
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-border">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                          <FileText className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">No progress updates</p>
-                          <p className="text-xs text-muted-foreground mt-1">Get started by adding your first update</p>
-                        </div>
+                    <div className="flex flex-col items-center py-16 gap-3 text-zinc-400">
+                      <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center">
+                        <Activity size={20} className="text-zinc-300" />
                       </div>
+                      <p className="text-sm font-medium text-zinc-500">No progress updates yet</p>
+                      <p className="text-xs text-zinc-400">Add the first update to start tracking progress</p>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
 
-              {/* Issues Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 h-6 bg-destructive rounded-full"></div>
-                    <div>
-                      <h3 className="text-lg font-bold text-foreground">Issues</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {issues.length} {issues.length === 1 ? 'issue' : 'issues'} found
-                      </p>
-                    </div>
+              {/* ── CLIENT REQUESTS ──────────────────────────────────────────── */}
+              {activeTab === 'requests' && (
+                <div className="p-6">
+                  <div className="mb-5">
+                    <h3 className="text-sm font-medium text-zinc-900">Client update requests</h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">{clientUpdateRequests.length} request{clientUpdateRequests.length !== 1 ? 's' : ''} linked to this task</p>
                   </div>
-                </div>
-                <div className="max-h-[400px] overflow-y-auto pr-1">
-                  {issues.length > 0 ? (
+
+                  {clientUpdateRequests.length > 0 ? (
                     <div className="space-y-3">
-                      {issues.map((issue) => (
-                        <div 
-                          key={issue.id} 
-                          className="bg-card border border-border rounded-lg hover:border-destructive/50 hover:shadow-md transition-all group overflow-hidden"
-                        >
-                          {/* Issue Header */}
-                          <div className="px-4 py-3 border-b border-border bg-muted/30">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start gap-2 mb-2">
-                                  <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <AlertCircle size={14} className="text-destructive" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="text-base font-semibold text-foreground mb-2 leading-tight">
-                                      {issue.title}
-                                    </h4>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      {getIssueStatusBadge(issue.status)}
-                                      {getPriorityBadge(issue.priority)}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap ml-10">
-                                  {issue.assignedTo?.name || issue.assigned_to_name ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <User size={12} />
-                                      <span className="text-foreground font-medium">
-                                        {issue.assignedTo?.name || issue.assigned_to_name}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-1.5">
-                                      <User size={12} />
-                                      <span className="text-foreground font-medium">
-                                        {currentTask.assigned_user?.name || 'Unassigned'}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {issue.due_date && (
-                                    <div className="flex items-center gap-1.5">
-                                      <Calendar size={12} />
-                                      <span>Due {formatDate(issue.due_date)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Action Buttons */}
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                {issue.status !== 'resolved' && issue.status !== 'closed' && has('project-issues.update') && (
-                                  <button
-                                    onClick={() => handleResolveIssue(issue)}
-                                    className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-950/30 text-muted-foreground hover:text-green-600 dark:hover:text-green-400 transition-colors"
-                                    title="Resolve"
-                                  >
-                                    <CheckCircle2 size={16} />
-                                  </button>
-                                )}
-                                {issue.status === 'resolved' && has('project-issues.update') && (
-                                  <button
-                                    onClick={() => handleResolveIssue(issue)}
-                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                    title="Reopen"
-                                  >
-                                    <XCircle size={16} />
-                                  </button>
-                                )}
-                                {has('project-issues.update') && (
-                                  <button
-                                    onClick={() => {
-                                      setEditIssue({ ...issue, task: currentTask });
-                                      setShowEditIssueModal(true);
-                                    }}
-                                    className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                                    title="Edit"
-                                  >
-                                    <SquarePen size={16} />
-                                  </button>
-                                )}
-                                {has('project-issues.delete') && (
-                                  <button
-                                    onClick={() => {
-                                      setDeleteIssue({ ...issue, task: currentTask });
-                                      setShowDeleteIssueModal(true);
-                                    }}
-                                    className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                    title="Delete"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                )}
-                              </div>
+                      {clientUpdateRequests.map((req) => (
+                        <div key={req.id} className="border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-300 transition-colors">
+                          {/* Request header */}
+                          <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
+                            <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-medium flex-shrink-0">
+                              {(req.client?.client_name || 'C').charAt(0).toUpperCase()}
                             </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-zinc-800 truncate">{req.client?.client_name || 'Unknown Client'}</p>
+                              <p className="text-[10px] text-zinc-400">{fmtFull(req.created_at)}</p>
+                            </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full text-[10px] font-medium flex-shrink-0">
+                              <Mail size={9} /> Request
+                            </span>
                           </div>
-                          
-                          {/* Issue Content */}
-                          <div className="px-4 py-3">
-                            {issue.description ? (
-                              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
-                                {issue.description}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">No description provided</p>
+                          {/* Request body */}
+                          <div className="px-4 py-3.5">
+                            <p className="text-sm font-medium text-zinc-800 mb-1.5">{req.subject}</p>
+                            <p className="text-xs text-zinc-500 leading-relaxed">{req.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center py-16 gap-3 text-zinc-400">
+                      <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center">
+                        <MessageSquare size={20} className="text-zinc-300" />
+                      </div>
+                      <p className="text-sm font-medium text-zinc-500">No client requests</p>
+                      <p className="text-xs text-zinc-400">Client update requests linked to this task will appear here</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── ISSUES ───────────────────────────────────────────────────── */}
+              {activeTab === 'issues' && (
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="text-sm font-medium text-zinc-900">Issues</h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">{issues.length} {issues.length === 1 ? 'issue' : 'issues'} · {issues.filter(i => i.status === 'open').length} open</p>
+                    </div>
+                    {has('project-issues.create') && (
+                      <Button onClick={() => setShowAddIssueModal(true)} size="sm"
+                        className="h-8 text-xs px-3 gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-none">
+                        <Plus size={12} /> Report issue
+                      </Button>
+                    )}
+                  </div>
+
+                  {issues.length > 0 ? (
+                    <div className="space-y-2">
+                      {issues.map((issue) => (
+                        <div key={issue.id} className="group flex gap-3 border border-zinc-200 rounded-xl p-4 hover:border-zinc-300 transition-colors">
+                          {/* Severity bar */}
+                          <div className={`w-0.5 rounded-full flex-shrink-0 self-stretch ${
+                            issue.priority === 'high' || issue.priority === 'critical' ? 'bg-red-400' :
+                            issue.priority === 'medium' ? 'bg-amber-400' : 'bg-zinc-300'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-zinc-800 mb-1">{issue.title}</p>
+                            {issue.description && (
+                              <p className="text-xs text-zinc-500 leading-relaxed mb-2.5 line-clamp-2">{issue.description}</p>
                             )}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {issueStatusBadge(issue.status)}
+                              {priorityBadge(issue.priority)}
+                              {(issue.assignedTo?.name || issue.assigned_to_name) && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400">
+                                  <User size={9} /> {issue.assignedTo?.name || issue.assigned_to_name}
+                                </span>
+                              )}
+                            </div>
                             {issue.resolved_at && (
-                              <div className="mt-3 pt-3 border-t border-border">
-                                <div className="flex items-center gap-2 px-2 py-1.5 bg-green-50 dark:bg-green-950/30 rounded-md">
-                                  <CheckCircle2 size={14} className="text-green-600 dark:text-green-400 flex-shrink-0" />
-                                  <p className="text-xs font-medium text-green-700 dark:text-green-400">
-                                    Resolved on {formatDate(issue.resolved_at)}
-                                  </p>
-                                </div>
+                              <div className="mt-2">
+                                <span className="inline-flex items-center gap-1 text-[10px] text-green-600 bg-green-50 border border-green-100 px-2 py-0.5 rounded-full">
+                                  <CheckCircle2 size={9} /> Resolved {fmt(issue.resolved_at)}
+                                </span>
                               </div>
+                            )}
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            {has('project-issues.update') && issue.status !== 'closed' && (
+                              <button onClick={() => handleResolveIssue(issue)}
+                                className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-colors ${
+                                  issue.status === 'resolved'
+                                    ? 'border-zinc-200 text-zinc-400 hover:bg-zinc-50'
+                                    : 'border-green-200 text-green-500 hover:bg-green-50'
+                                }`}
+                                title={issue.status === 'resolved' ? 'Reopen' : 'Resolve'}>
+                                {issue.status === 'resolved' ? <XCircle size={13} /> : <CheckCircle2 size={13} />}
+                              </button>
+                            )}
+                            {has('project-issues.update') && (
+                              <button onClick={() => { setEditIssue({ ...issue, task: currentTask }); setShowEditIssueModal(true); }}
+                                className="w-7 h-7 rounded-lg border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 transition-colors">
+                                <SquarePen size={13} />
+                              </button>
+                            )}
+                            {has('project-issues.delete') && (
+                              <button onClick={() => { setDeleteIssue({ ...issue, task: currentTask }); setShowDeleteIssueModal(true); }}
+                                className="w-7 h-7 rounded-lg border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-colors">
+                                <Trash2 size={13} />
+                              </button>
                             )}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-border">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                          <AlertCircle className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">No issues found</p>
-                          <p className="text-xs text-muted-foreground mt-1">Everything looks good!</p>
-                        </div>
+                    <div className="flex flex-col items-center py-16 gap-3 text-zinc-400">
+                      <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center">
+                        <AlertCircle size={20} className="text-zinc-300" />
                       </div>
+                      <p className="text-sm font-medium text-zinc-500">No issues reported</p>
+                      <p className="text-xs text-zinc-400">Everything looks clean on this task</p>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
+
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Progress Update Modals */}
-      {showAddProgressModal && (
-        <AddProgressUpdate
-          setShowAddModal={(value) => {
-            setShowAddProgressModal(value);
-            if (!value && onRefresh) {
-              // Refresh task data after closing modal
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          project={project}
-          tasks={allTasks}
-          preselectedTask={currentTask}
-        />
-      )}
-
-      {showEditProgressModal && editProgressUpdate && (
-        <EditProgressUpdate
-          setShowEditModal={(value) => {
-            setShowEditProgressModal(value);
-            if (!value && onRefresh) {
-              // Refresh task data after closing modal
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          progressUpdate={editProgressUpdate}
-          project={project}
-          tasks={allTasks}
-        />
-      )}
-
-      {showDeleteProgressModal && deleteProgressUpdate && (
-        <DeleteProgressUpdate
-          setShowDeleteModal={(value) => {
-            setShowDeleteProgressModal(value);
-            if (!value && onRefresh) {
-              // Refresh task data after closing modal
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          progressUpdate={deleteProgressUpdate}
-          task={deleteProgressUpdate.task || currentTask}
-        />
-      )}
-
-      {/* Issue Modals */}
-      {showEditIssueModal && editIssue && (
-        <EditIssue
-          setShowEditModal={(value) => {
-            setShowEditIssueModal(value);
-            if (!value && onRefresh) {
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          issue={editIssue}
-          project={project}
-          milestones={milestones || []}
-          tasks={allTasks || []}
-          users={users || []}
-        />
-      )}
-
-      {showDeleteIssueModal && deleteIssue && (
-        <DeleteIssue
-          setShowDeleteModal={(value) => {
-            setShowDeleteIssueModal(value);
-            if (!value && onRefresh) {
-              setTimeout(() => {
-                onRefresh();
-              }, 100);
-            }
-          }}
-          issue={deleteIssue}
-          project={project}
-        />
-      )}
-
+      {/* ── Sub-modals ───────────────────────────────────────────────────────── */}
+      {showAddProgressModal && <AddProgressUpdate setShowAddModal={withRefresh(setShowAddProgressModal)} project={project} tasks={allTasks} preselectedTask={currentTask} />}
+      {showEditProgressModal && editProgressUpdate && <EditProgressUpdate setShowEditModal={withRefresh(setShowEditProgressModal)} progressUpdate={editProgressUpdate} project={project} tasks={allTasks} />}
+      {showDeleteProgressModal && deleteProgressUpdate && <DeleteProgressUpdate setShowDeleteModal={withRefresh(setShowDeleteProgressModal)} progressUpdate={deleteProgressUpdate} task={deleteProgressUpdate.task || currentTask} />}
+      {showAddIssueModal && <AddIssue setShowAddModal={withRefresh(setShowAddIssueModal)} project={project} milestones={milestones || []} tasks={allTasks || []} users={users || []} preselectedTask={currentTask} />}
+      {showEditIssueModal && editIssue && <EditIssue setShowEditModal={withRefresh(setShowEditIssueModal)} issue={editIssue} project={project} milestones={milestones || []} tasks={allTasks || []} users={users || []} />}
+      {showDeleteIssueModal && deleteIssue && <DeleteIssue setShowDeleteModal={withRefresh(setShowDeleteIssueModal)} issue={deleteIssue} project={project} />}
     </>
   );
 };
 
 export default TaskDetailModal;
-

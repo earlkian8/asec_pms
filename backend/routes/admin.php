@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ChatController;
+use App\Http\Controllers\Admin\TrashBinController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
 use Illuminate\Foundation\Application;
@@ -44,7 +45,10 @@ Route::middleware('auth')->group(function () {
         Route::put('/update/{project}', [ProjectsController::class, 'update'])->middleware('permission:projects.update')->name('update');
         Route::delete('/delete/{project}', [ProjectsController::class, 'destroy'])->middleware('permission:projects.delete')->name('destroy');
         Route::get('/view/{project}', [ProjectsController::class, 'show'])->middleware('permission:projects.view')->name('view');
-        
+        Route::get('/document/{project}/{field}', [ProjectsController::class, 'serveDocument'])->middleware('permission:projects.view')->name('document'); 
+        Route::get('/project-management/archived', [ProjectsController::class, 'archived'])->middleware('permission:projects.archive')->name('archived');
+        Route::post('/project-management/{project}/archive', [ProjectsController::class, 'archive'])->middleware('permission:projects.archive')->name('archive');
+        Route::post('/project-management/{project}/unarchive', [ProjectsController::class, 'unarchive'])->middleware('permission:projects.archive')->name('unarchive');
         // Project Teams
         Route::prefix('project-teams')->name('project-teams.')->group(function(){
             Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])->middleware('permission:project-teams.create')->name('store');
@@ -98,12 +102,14 @@ Route::middleware('auth')->group(function () {
             Route::put('/receiving-report/{project}/allocation/{allocation}/report/{receivingReport}', [ProjectMaterialAllocationsController::class, 'updateReceivingReport'])->middleware('permission:material-allocations.update')->name('update-receiving-report');
             Route::delete('/receiving-report/{project}/allocation/{allocation}/report/{receivingReport}', [ProjectMaterialAllocationsController::class, 'destroyReceivingReport'])->middleware('permission:material-allocations.delete')->name('destroy-receiving-report');
             Route::delete('/{project}/allocation/{allocation}', [ProjectMaterialAllocationsController::class, 'destroy'])->middleware('permission:material-allocations.delete')->name('destroy');
+            Route::post('/bulk-receiving-report/{project}', [ProjectMaterialAllocationsController::class, 'bulkReceivingReport'])->middleware('permission:material-allocations.receiving-report')->name('bulk-receiving-report');
         });
 
         // Labor Costs
         Route::prefix('labor-costs')->name('labor-costs.')->group(function(){
             Route::post('/store/{project}', [ProjectLaborCostsController::class, 'store'])->middleware('permission:labor-costs.create')->name('store');
             Route::put('/update/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'update'])->middleware('permission:labor-costs.update')->name('update');
+            Route::put('/submit/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'submit'])->middleware('permission:labor-costs.update')->name('submit');
             Route::delete('/destroy/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'destroy'])->middleware('permission:labor-costs.delete')->name('destroy');
         });
 
@@ -190,6 +196,13 @@ Route::middleware('auth')->group(function () {
         Route::prefix('activity-logs')->name('activity-logs.')->group(function(){
             Route::get('/', [ActivityLogsController::class, 'index'])->middleware('permission:activity-logs.view')->name('index');
         });
+
+        // Trash Bin
+        Route::prefix('trash-bin')->name('trash-bin.')->group(function () {
+            Route::get('/', [TrashBinController::class, 'index'])->middleware('permission:trash-bin.view')->name('index');
+            Route::post('/restore', [TrashBinController::class, 'restore'])->middleware('permission:trash-bin.restore')->name('restore');
+            Route::delete('/force-delete', [TrashBinController::class, 'forceDelete'])->middleware('permission:trash-bin.force-delete')->name('force-delete');
+        });
     });
 
     // Inventory Management
@@ -202,6 +215,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-in/{inventoryItem}', [InventoryItemsController::class, 'stockIn'])->middleware('permission:inventory.stock-in')->name('stock-in');
         Route::post('/stock-out/{inventoryItem}', [InventoryItemsController::class, 'stockOut'])->middleware('permission:inventory.stock-out')->name('stock-out');
         Route::put('/update-status/{inventoryItem}', [InventoryItemsController::class, 'updateStatus'])->middleware('permission:inventory.update')->name('update-status');
+        Route::get('/archived', [InventoryItemsController::class, 'archived'])->middleware('permission:inventory.archive')->name('archived');
+        Route::put('/{inventoryItem}/archive', [InventoryItemsController::class, 'archive'])->middleware('permission:inventory.archive')->name('archive');
+        Route::put('/{inventoryItem}/restore', [InventoryItemsController::class, 'restore'])->middleware('permission:inventory.update')->name('restore');
     });
 
     // Billing Management
@@ -212,6 +228,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('/destroy/{billing}', [BillingsController::class, 'destroy'])->middleware('permission:billing.delete')->name('destroy');
         Route::get('/view/{billing}', [BillingsController::class, 'show'])->middleware('permission:billing.view')->name('show');
         Route::post('/payment/{billing}', [BillingsController::class, 'addPayment'])->middleware('permission:billing.add-payment')->name('add-payment');
+        Route::post('/archive/{billing}', [BillingsController::class, 'archive'])->middleware('permission:billing.archive')->name('archive');
+        Route::post('/unarchive/{billing}', [BillingsController::class, 'unarchive'])->middleware('permission:billing.archive')->name('unarchive');
+        Route::get('/archived', [BillingsController::class, 'archived'])->middleware('permission:billing.view')->name('archived');
+        Route::put('/client-portal-billing-display', [BillingsController::class, 'updateClientPortalBillingDisplay'])->middleware('permission:billing.update')->name('client-portal-billing-display');
     });
 
     // Notifications

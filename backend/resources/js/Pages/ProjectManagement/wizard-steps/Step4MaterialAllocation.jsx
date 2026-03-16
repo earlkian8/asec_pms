@@ -23,29 +23,33 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
 
-  // Ensure inventoryItems is always an array
   const safeItems = Array.isArray(inventoryItems) ? inventoryItems : [];
 
-  // Filter available items (not already allocated)
+  // ── Key change: items are NOT hidden once allocated.
+  // Instead we compute remaining stock = current_stock minus already-allocated quantity.
+  // Only hide if remaining stock hits exactly 0.
+  const getRemainingStock = (item) => {
+    const allocated = materialAllocations.find(
+      a => a.inventory_item_id === item.id.toString()
+    );
+    const currentStock = parseFloat(item.current_stock);
+    if (isNaN(currentStock)) return null;
+    const alreadyAllocated = allocated ? parseFloat(allocated.quantity_allocated) || 0 : 0;
+    return Math.max(0, currentStock - alreadyAllocated);
+  };
+
   const availableItems = safeItems.filter((item) => {
     if (!item || !item.id) return false;
-    
-    // Check if item is already allocated
-    const isAlreadyAllocated = materialAllocations.some(
-      allocation => allocation.inventory_item_id === item.id.toString()
-    );
-    
-    if (isAlreadyAllocated) return false;
-    
-    // Apply search filter
-    const itemCode = `${item.item_code || ''}`.toLowerCase();
-    const itemName = `${item.item_name || ''}`.toLowerCase();
+
+    // Hide only if remaining stock is exactly 0
+    const remaining = getRemainingStock(item);
+    if (remaining !== null && remaining <= 0) return false;
+
+    const itemCode  = `${item.item_code  || ''}`.toLowerCase();
+    const itemName  = `${item.item_name  || ''}`.toLowerCase();
     const searchLower = search.toLowerCase();
-    
-    return (
-      itemCode.includes(searchLower) ||
-      itemName.includes(searchLower)
-    );
+
+    return itemCode.includes(searchLower) || itemName.includes(searchLower);
   });
 
   const toggleSelectAll = (checked) => {
@@ -53,7 +57,6 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       setSelectedItemIds(availableItems.map((item) => item.id.toString()));
     } else {
       setSelectedItemIds([]);
-      // Clear form data when deselecting all
       setFormData({});
     }
   };
@@ -62,13 +65,11 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
     const itemIdStr = itemId.toString();
     if (selectedItemIds.includes(itemIdStr)) {
       setSelectedItemIds(selectedItemIds.filter((id) => id !== itemIdStr));
-      // Clear form data for deselected item
       setFormData((prev) => {
         const newData = { ...prev };
         delete newData[itemIdStr];
         return newData;
       });
-      // Clear errors for deselected item
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[`${itemIdStr}_quantity_allocated`];
@@ -88,7 +89,6 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
         [field]: value,
       },
     }));
-    // Clear error for this field
     if (errors[`${itemIdStr}_${field}`]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -110,23 +110,24 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       return;
     }
 
-    // Validate required fields
     const validationErrors = {};
+
     for (const itemIdStr of selectedItemIds) {
       const item = availableItems.find(i => i.id.toString() === itemIdStr);
-      
       if (!item) continue;
-      
-      const itemName = item.item_name || 'Item';
-      
-      // Validate quantity is required when item is selected
-      if (!formData[itemIdStr]?.quantity_allocated || parseFloat(formData[itemIdStr]?.quantity_allocated) <= 0) {
-        validationErrors[`${itemIdStr}_quantity_allocated`] = `Please enter a valid quantity for ${itemName}`;
+
+      const itemName     = item.item_name || 'Item';
+      const enteredQty   = formData[itemIdStr]?.quantity_allocated;
+      const remainingStock = getRemainingStock(item);
+
+      if (!enteredQty || parseFloat(enteredQty) <= 0) {
+        validationErrors[`${itemIdStr}_quantity_allocated`] =
+          `Please enter a valid quantity for ${itemName}.`;
       } else {
-        // Validate quantity doesn't exceed available stock
-        const quantity = parseFloat(formData[itemIdStr].quantity_allocated);
-        if (item.current_stock !== null && quantity > item.current_stock) {
-          validationErrors[`${itemIdStr}_quantity_allocated`] = `Quantity cannot exceed available stock (${item.current_stock} ${item.unit_of_measure})`;
+        const quantity = parseFloat(enteredQty);
+        if (remainingStock !== null && quantity > remainingStock) {
+          validationErrors[`${itemIdStr}_quantity_allocated`] =
+            `Quantity cannot exceed remaining stock (${remainingStock} ${item.unit_of_measure || ''})`.trim();
         }
       }
     }
@@ -137,39 +138,54 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
       return;
     }
 
-    // Add all selected items
     let addedCount = 0;
+
     for (const itemIdStr of selectedItemIds) {
       const item = availableItems.find(i => i.id.toString() === itemIdStr);
-      
       if (!item) continue;
 
-      // Check if item is already allocated (double-check)
-      const isAlreadyAllocated = materialAllocations.some(
-        allocation => allocation.inventory_item_id === itemIdStr
+      const existingIndex = materialAllocations.findIndex(
+        a => a.inventory_item_id === itemIdStr
       );
 
-      if (!isAlreadyAllocated) {
+      const newQty = parseFloat(formData[itemIdStr]?.quantity_allocated) || 0;
+
+      if (existingIndex !== -1) {
+        // Item already allocated — add on top of existing allocation
+        // We remove the old one and re-add with updated quantity
+        const existing = materialAllocations[existingIndex];
+        const updatedQty = (parseFloat(existing.quantity_allocated) || 0) + newQty;
+
+        removeMaterialAllocation(existingIndex);
         addMaterialAllocation({
-          inventory_item_id: itemIdStr,
-          item_code: item.item_code,
-          item_name: item.item_name,
-          unit_of_measure: item.unit_of_measure,
-          quantity_allocated: parseFloat(formData[itemIdStr]?.quantity_allocated) || 0,
-          notes: formData[itemIdStr]?.notes || null,
+          inventory_item_id:  itemIdStr,
+          item_code:          item.item_code,
+          item_name:          item.item_name,
+          unit_of_measure:    item.unit_of_measure,
+          quantity_allocated: updatedQty,
+          notes:              formData[itemIdStr]?.notes || existing.notes || null,
         });
-        addedCount++;
+      } else {
+        addMaterialAllocation({
+          inventory_item_id:  itemIdStr,
+          item_code:          item.item_code,
+          item_name:          item.item_name,
+          unit_of_measure:    item.unit_of_measure,
+          quantity_allocated: newQty,
+          notes:              formData[itemIdStr]?.notes || null,
+        });
       }
+
+      addedCount++;
     }
 
     if (addedCount > 0) {
       toast.success(`${addedCount} material allocation(s) added successfully`);
-      // Clear selections and form data
       setSelectedItemIds([]);
       setFormData({});
       setErrors({});
     } else {
-      toast.error("No material allocations were added. They may have already been added.");
+      toast.error("No material allocations were added.");
     }
   };
 
@@ -209,8 +225,9 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                 </TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[120px]">Item Code</TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[200px]">Item Name</TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[100px]">Available Stock</TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[100px]">Unit</TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[120px]">Total Stock</TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[120px]">Remaining Stock</TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[80px]">Unit</TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">
                   Quantity <span className="text-red-500">*</span>
                 </TableHead>
@@ -219,9 +236,16 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
             </TableHeader>
             <TableBody>
               {availableItems.map((item) => {
-                const itemIdStr = item.id.toString();
-                const isSelected = selectedItemIds.includes(itemIdStr);
-                
+                const itemIdStr      = item.id.toString();
+                const isSelected     = selectedItemIds.includes(itemIdStr);
+                const totalStock     = parseFloat(item.current_stock);
+                const hasTotalStock  = !isNaN(totalStock);
+                const remainingStock = getRemainingStock(item);
+                const hasRemaining   = remainingStock !== null;
+                const isPartiallyAllocated = materialAllocations.some(
+                  a => a.inventory_item_id === itemIdStr
+                );
+
                 const itemErrors = {
                   quantity_allocated: errors[`${itemIdStr}_quantity_allocated`],
                 };
@@ -230,7 +254,11 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                   <TableRow
                     key={itemIdStr}
                     onClick={(e) => {
-                      if (e.target.closest("input") || e.target.closest("button") || e.target.closest("textarea")) return;
+                      if (
+                        e.target.closest("input") ||
+                        e.target.closest("button") ||
+                        e.target.closest("textarea")
+                      ) return;
                       toggleItem(item.id);
                     }}
                     className={`cursor-pointer transition ${
@@ -245,33 +273,60 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                       />
                     </TableCell>
                     <TableCell className="font-medium text-gray-900">{item.item_code || '---'}</TableCell>
-                    <TableCell className="text-gray-700">{item.item_name || '---'}</TableCell>
                     <TableCell className="text-gray-700">
-                      {item.current_stock !== null ? (
-                        <span className={item.current_stock > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                          {item.current_stock}
+                      <div className="flex items-center gap-2">
+                        {item.item_name || '---'}
+                        {isPartiallyAllocated && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium whitespace-nowrap">
+                            +allocated
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Total stock */}
+                    <TableCell className="text-gray-500 text-xs">
+                      {hasTotalStock ? totalStock : '---'}
+                    </TableCell>
+
+                    {/* Remaining stock — highlighted */}
+                    <TableCell>
+                      {hasRemaining ? (
+                        <span className={`font-semibold text-sm ${
+                          remainingStock <= 0
+                            ? 'text-red-600'
+                            : remainingStock < totalStock * 0.2
+                            ? 'text-amber-600'
+                            : 'text-green-600'
+                        }`}>
+                          {remainingStock}
                         </span>
                       ) : (
-                        '---'
+                        <span className="text-gray-400">---</span>
                       )}
                     </TableCell>
+
                     <TableCell className="text-gray-700">{item.unit_of_measure || '---'}</TableCell>
+
+                    {/* Quantity input */}
                     <TableCell>
                       <Input
                         type="number"
                         step="0.01"
                         min="0.01"
+                        max={hasRemaining ? remainingStock : undefined}
                         placeholder="0.00"
                         value={formData[itemIdStr]?.quantity_allocated || ""}
                         onChange={(e) => handleChange(item.id, "quantity_allocated", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         className={inputClass(itemErrors.quantity_allocated)}
-                        required
                       />
                       {itemErrors.quantity_allocated && (
                         <InputError message={itemErrors.quantity_allocated} className="mt-1" />
                       )}
                     </TableCell>
+
+                    {/* Notes */}
                     <TableCell>
                       <Input
                         type="text"
@@ -285,18 +340,19 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                   </TableRow>
                 );
               })}
+
               {availableItems.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={8} className="text-center py-12">
                     <div className="flex flex-col items-center justify-center">
                       <div className="bg-gray-100 rounded-full p-4 mb-3">
                         <Search className="h-8 w-8 text-gray-400" />
                       </div>
                       <p className="text-gray-500 font-medium text-base">
-                        {search ? "No items found" : "All available items have been allocated"}
+                        {search ? "No items found" : "All available items have been fully allocated"}
                       </p>
                       <p className="text-gray-400 text-sm mt-1">
-                        {search ? "Try adjusting your search" : "No more items available to allocate"}
+                        {search ? "Try adjusting your search" : "No remaining stock available to allocate"}
                       </p>
                     </div>
                   </TableCell>
@@ -330,33 +386,59 @@ export default function Step4MaterialAllocation({ inventoryItems }) {
                 <TableRow>
                   <TableHead>Item Code</TableHead>
                   <TableHead>Item Name</TableHead>
-                  <TableHead>Quantity</TableHead>
+                  <TableHead>Allocated Qty</TableHead>
+                  <TableHead>Remaining Stock</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {materialAllocations.map((allocation, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{allocation.item_code}</TableCell>
-                    <TableCell>{allocation.item_name}</TableCell>
-                    <TableCell className="font-medium">{allocation.quantity_allocated}</TableCell>
-                    <TableCell>{allocation.unit_of_measure}</TableCell>
-                    <TableCell>{allocation.notes || "---"}</TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeMaterialAllocation(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {materialAllocations.map((allocation, index) => {
+                  const sourceItem = safeItems.find(
+                    i => i.id.toString() === allocation.inventory_item_id
+                  );
+                  const totalStock = sourceItem ? parseFloat(sourceItem.current_stock) : null;
+                  const remaining  = totalStock !== null
+                    ? Math.max(0, totalStock - (parseFloat(allocation.quantity_allocated) || 0))
+                    : null;
+
+                  return (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{allocation.item_code}</TableCell>
+                      <TableCell>{allocation.item_name}</TableCell>
+                      <TableCell className="font-semibold text-blue-700">
+                        {allocation.quantity_allocated}
+                      </TableCell>
+                      <TableCell>
+                        {remaining !== null ? (
+                          <span className={`font-semibold text-sm ${
+                            remaining <= 0
+                              ? 'text-red-600'
+                              : remaining < (totalStock * 0.2)
+                              ? 'text-amber-600'
+                              : 'text-green-600'
+                          }`}>
+                            {remaining}
+                          </span>
+                        ) : '---'}
+                      </TableCell>
+                      <TableCell>{allocation.unit_of_measure}</TableCell>
+                      <TableCell>{allocation.notes || "---"}</TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeMaterialAllocation(index)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

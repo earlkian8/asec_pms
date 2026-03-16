@@ -1,5 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
-// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.107:8000/api';
+// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.221.77.31:8000/api';
+
+const TOKEN_KEY = 'auth_token';
+
 interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -13,25 +18,29 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_BASE_URL;
-    // Load token from storage if available
-    // In a real app, you'd use AsyncStorage here
     this.loadToken();
   }
 
   private async loadToken() {
-    // TODO: Load from AsyncStorage when available
-    // const token = await AsyncStorage.getItem('auth_token');
-    // if (token) this.setToken(token);
+    try {
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (token) this.token = token;
+    } catch {
+      // AsyncStorage unavailable — continue without persisted token
+    }
   }
 
   setToken(token: string | null) {
     this.token = token;
-    // TODO: Save to AsyncStorage when available
-    // if (token) {
-    //   AsyncStorage.setItem('auth_token', token);
-    // } else {
-    //   AsyncStorage.removeItem('auth_token');
-    // }
+    try {
+      if (token) {
+        AsyncStorage.setItem(TOKEN_KEY, token);
+      } else {
+        AsyncStorage.removeItem(TOKEN_KEY);
+      }
+    } catch {
+      // Silently fail — token is still held in memory for this session
+    }
   }
 
   getToken(): string | null {
@@ -62,14 +71,12 @@ class ApiService {
 
       if (responseType === 'blob') {
         if (!response.ok) {
-          // Try to get error message from response
           const errorText = await response.text();
           let errorMessage = 'Failed to download file';
           try {
             const errorData = JSON.parse(errorText);
             errorMessage = errorData.message || errorMessage;
           } catch {
-            // If not JSON, use status text
             errorMessage = response.statusText || errorMessage;
           }
           throw new Error(errorMessage);
@@ -84,8 +91,7 @@ class ApiService {
       let data;
       try {
         data = await response.json();
-      } catch (parseError) {
-        // If response is not JSON, return a generic error
+      } catch {
         return {
           success: false,
           message: response.statusText || 'An error occurred',
@@ -93,10 +99,7 @@ class ApiService {
       }
 
       if (!response.ok) {
-        // Extract error message from response
         let errorMessage = data.message || 'An error occurred';
-        
-        // If there are validation errors, format them into a readable message
         if (data.errors && typeof data.errors === 'object') {
           const errorMessages: string[] = [];
           Object.keys(data.errors).forEach(key => {
@@ -107,10 +110,9 @@ class ApiService {
             }
           });
           if (errorMessages.length > 0) {
-            errorMessage = errorMessages[0]; // Use first error message
+            errorMessage = errorMessages[0];
           }
         }
-
         return {
           success: false,
           message: errorMessage,
@@ -123,22 +125,15 @@ class ApiService {
         ...data,
       };
     } catch (error) {
-      if (responseType !== 'json') {
-        throw error;
-      }
-      
-      // Handle network errors
+      if (responseType !== 'json') throw error;
+
       let errorMessage = 'Network error occurred';
       if (error instanceof TypeError && error.message.includes('fetch')) {
         errorMessage = 'Unable to connect to server. Please check your internet connection.';
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
-      return {
-        success: false,
-        message: errorMessage,
-      };
+      return { success: false, message: errorMessage };
     }
   }
 
@@ -165,14 +160,13 @@ class ApiService {
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    const result = await this.request<T>(endpoint, { 
+    const result = await this.request<T>(endpoint, {
       method: 'DELETE',
       responseType: 'json',
     });
     return result as ApiResponse<T>;
   }
 
-  // Billing methods
   async getBillings(params?: Record<string, any>): Promise<ApiResponse<any>> {
     const queryString = params ? new URLSearchParams(params).toString() : '';
     const result = await this.get(`/client/billings${queryString ? `?${queryString}` : ''}`, { responseType: 'json' });
@@ -184,10 +178,6 @@ class ApiService {
     return result as ApiResponse<any>;
   }
 
-  /**
-   * Initiate payment via PayMongo Checkout (hosted payment page).
-   * Returns checkout_url - open this URL in browser/WebView for user to complete payment.
-   */
   async initiatePayment(billingId: number, data: { amount?: number }): Promise<ApiResponse<any>> {
     return this.post(`/client/billings/${billingId}/pay`, data);
   }
@@ -205,4 +195,3 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
-

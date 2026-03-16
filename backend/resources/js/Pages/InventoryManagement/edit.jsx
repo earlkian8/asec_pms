@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Lock } from "lucide-react";
 
 const EditInventoryItem = ({ setShowEditModal, item }) => {
   const categories = [
@@ -107,19 +107,25 @@ const EditInventoryItem = ({ setShowEditModal, item }) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Item Code */}
+          {/* Item Code — readonly, system-generated */}
           <div>
-            <Label className="text-zinc-800">
-              Item Code <span className="text-red-500">*</span>
+            <Label className="text-zinc-800 flex items-center gap-1.5">
+              Item Code
+              <span className="inline-flex items-center gap-1 text-xs font-normal text-gray-500 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
+                <Lock className="h-3 w-3" />
+                Auto-generated
+              </span>
             </Label>
-            <Input
-              type="text"
-              value={data.item_code}
-              onChange={(e) => setData("item_code", e.target.value)}
-              placeholder="e.g., INV-001"
-              className={inputClass(errors.item_code)}
-            />
-            <InputError message={errors.item_code} />
+            <div className="relative mt-1">
+              <Input
+                type="text"
+                value={data.item_code}
+                readOnly
+                disabled
+                className="w-full border text-sm rounded-md px-4 py-2 bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed font-mono select-none"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Item code is system-generated and cannot be changed.</p>
           </div>
 
           {/* Item Name */}

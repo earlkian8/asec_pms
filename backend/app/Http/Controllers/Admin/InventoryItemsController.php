@@ -44,6 +44,8 @@ class InventoryItemsController extends Controller
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $items = InventoryItem::with(['createdBy'])
+            ->withCount('transactions')               // ← needed for delete/archive logic in frontend
+            ->where('is_archived', false)             // ← exclude archived items from main list
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('item_code', 'like', "%{$search}%")
@@ -60,7 +62,6 @@ class InventoryItemsController extends Controller
             })
             ->orderBy($sortBy, $sortOrder)
             ->when($sortBy !== 'created_at', function ($query) {
-                // Add created_at as secondary sort to maintain stable position when sorting by other fields
                 $query->orderBy('created_at', 'desc');
             })
             ->paginate(10);
@@ -80,6 +81,19 @@ class InventoryItemsController extends Controller
             );
         }
 
+        // Aggregate stats — always reflect full dataset (non-archived), not current page
+        $stats = [
+            'total_items'  => InventoryItem::where('is_archived', false)->count(),
+            'active_items' => InventoryItem::where('is_active', true)->where('is_archived', false)->count(),
+            'low_stock'    => InventoryItem::where('is_archived', false)
+                                 ->whereNotNull('min_stock_level')
+                                 ->whereColumn('current_stock', '<=', 'min_stock_level')
+                                 ->count(),
+            'total_value'  => InventoryItem::where('is_archived', false)
+                                 ->selectRaw('COALESCE(SUM(current_stock * unit_price), 0) as total')
+                                 ->value('total') ?? 0,
+        ];
+
         // Get all active projects for stock out dropdown
         $projects = Project::whereIn('status', ['active', 'on_hold'])
             ->orderBy('project_name', 'asc')
@@ -93,6 +107,7 @@ class InventoryItemsController extends Controller
 
         // Get unique categories for filter options
         $categories = InventoryItem::distinct()
+            ->where('is_archived', false)
             ->whereNotNull('category')
             ->pluck('category')
             ->sort()
@@ -115,6 +130,49 @@ class InventoryItemsController extends Controller
                 'categories' => $categories,
             ],
             'sort_by' => $sortBy,
+            'sort_order' => $sortOrder,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Show archived items list.
+     */
+    public function archived(Request $request)
+    {
+        $search    = $request->input('search');
+        $sortBy    = $request->input('sort_by', 'archived_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        $allowedSortColumns = ['archived_at', 'item_code', 'item_name', 'category', 'current_stock', 'unit_price'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'archived_at';
+        }
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
+
+        $items = InventoryItem::with(['createdBy'])
+            ->withCount('transactions')
+            ->where('is_archived', true)
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('item_code', 'like', "%{$search}%")
+                      ->orWhere('item_name', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy($sortBy, $sortOrder)
+            ->paginate(10)
+            ->withQueryString();
+
+        $items->getCollection()->transform(function ($item) {
+            $item->is_low_stock = $item->isLowStock();
+            return $item;
+        });
+
+        return Inertia::render('InventoryManagement/archived', [
+            'items'      => $items,
+            'search'     => $search,
+            'sort_by'    => $sortBy,
             'sort_order' => $sortOrder,
         ]);
     }
@@ -145,6 +203,7 @@ class InventoryItemsController extends Controller
         $initialStockUnitPrice = $data['initial_stock_unit_price'] ?? null;
         $data['current_stock'] = $initialStock;
         $data['is_active'] = $data['is_active'] ?? true;
+        $data['is_archived'] = false;
 
         // Remove initial stock fields from item data
         unset($data['initial_stock'], $data['initial_stock_unit_price']);
@@ -163,7 +222,6 @@ class InventoryItemsController extends Controller
                 'created_by' => auth()->id(),
             ]);
 
-            // Update current stock
             $this->inventoryService->updateItemStock($item);
         }
 
@@ -173,7 +231,6 @@ class InventoryItemsController extends Controller
             'Created inventory item "' . $item->item_name . '" with code "' . $item->item_code . '"' . ($initialStock > 0 ? ' with initial stock of ' . $initialStock : '')
         );
 
-        // System-wide notification for new inventory item
         $this->createSystemNotification(
             'general',
             'New Inventory Item Added',
@@ -187,8 +244,9 @@ class InventoryItemsController extends Controller
 
     public function update(Request $request, InventoryItem $inventoryItem)
     {
+        // item_code is intentionally excluded from validation — it is readonly and system-generated.
+        // We simply preserve the existing value.
         $data = $request->validate([
-            'item_code' => ['required', 'string', 'max:255', Rule::unique('inventory_items')->ignore($inventoryItem->id)],
             'item_name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'category' => 'nullable|string|max:255',
@@ -198,6 +256,9 @@ class InventoryItemsController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        // Never allow item_code to be changed through this endpoint
+        unset($data['item_code']);
+
         $inventoryItem->update($data);
 
         $this->adminActivityLogs(
@@ -206,7 +267,6 @@ class InventoryItemsController extends Controller
             'Updated inventory item "' . $inventoryItem->item_name . '"'
         );
 
-        // System-wide notification for inventory item update
         $this->createSystemNotification(
             'general',
             'Inventory Item Updated',
@@ -220,17 +280,17 @@ class InventoryItemsController extends Controller
 
     public function destroy(InventoryItem $inventoryItem)
     {
-        $itemName = $inventoryItem->item_name;
-        $itemCode = $inventoryItem->item_code;
-
-        // Check if item has transactions (only if table exists)
+        // Hard-guard: if the item has transactions, refuse deletion and suggest archiving instead.
         try {
             if ($inventoryItem->transactions()->count() > 0) {
-                return back()->with('error', 'Cannot delete item with existing transactions. Please delete transactions first.');
+                return back()->with('error', 'Cannot delete this item because it has existing transactions. Please archive it instead to preserve the transaction history.');
             }
         } catch (\Exception $e) {
-            // Table doesn't exist, proceed with deletion
+            // transactions table doesn't exist — allow deletion
         }
+
+        $itemName = $inventoryItem->item_name;
+        $itemCode = $inventoryItem->item_code;
 
         $inventoryItem->delete();
 
@@ -240,7 +300,6 @@ class InventoryItemsController extends Controller
             'Deleted inventory item "' . $itemName . '" with code "' . $itemCode . '"'
         );
 
-        // System-wide notification for inventory item deletion
         $this->createSystemNotification(
             'general',
             'Inventory Item Deleted',
@@ -252,6 +311,54 @@ class InventoryItemsController extends Controller
         return back()->with('success', 'Inventory item deleted successfully');
     }
 
+    /**
+     * Archive an inventory item.
+     * Archived items are hidden from the active inventory list but all transaction
+     * history is preserved. The item can be restored at any time.
+     */
+    public function archive(InventoryItem $inventoryItem)
+    {
+        $inventoryItem->update([
+            'is_archived' => true,
+            'is_active' => false,       // deactivate alongside archiving
+        ]);
+
+        $this->adminActivityLogs(
+            'Inventory Item',
+            'Archived',
+            'Archived inventory item "' . $inventoryItem->item_name . '" (' . $inventoryItem->item_code . ')'
+        );
+
+        $this->createSystemNotification(
+            'general',
+            'Inventory Item Archived',
+            "Inventory item '{$inventoryItem->item_name}' ({$inventoryItem->item_code}) has been archived.",
+            null,
+            route('inventory-management.index')
+        );
+
+        return back()->with('success', 'Inventory item archived successfully');
+    }
+
+    /**
+     * Restore a previously archived inventory item.
+     */
+    public function restore(InventoryItem $inventoryItem)
+    {
+        $inventoryItem->update([
+            'is_archived' => false,
+            'is_active' => true,
+        ]);
+
+        $this->adminActivityLogs(
+            'Inventory Item',
+            'Restored',
+            'Restored archived inventory item "' . $inventoryItem->item_name . '" (' . $inventoryItem->item_code . ')'
+        );
+
+        return back()->with('success', 'Inventory item restored successfully');
+    }
+
     public function stockIn(Request $request, InventoryItem $inventoryItem)
     {
         $data = $request->validate([
@@ -261,10 +368,9 @@ class InventoryItemsController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        // Check if item was low stock before adding
         $wasLowStock = $inventoryItem->isLowStock();
 
-        $transaction = InventoryTransaction::create([
+        InventoryTransaction::create([
             'inventory_item_id' => $inventoryItem->id,
             'transaction_type' => 'stock_in',
             'quantity' => $data['quantity'],
@@ -274,7 +380,6 @@ class InventoryItemsController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        // Update current stock
         $this->inventoryService->updateItemStock($inventoryItem);
         $inventoryItem->refresh();
         $isStillLowStock = $inventoryItem->isLowStock();
@@ -285,7 +390,6 @@ class InventoryItemsController extends Controller
             'Added ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' to "' . $inventoryItem->item_name . '"'
         );
 
-        // System-wide notification for stock in
         $message = "Stock in: {$data['quantity']} {$inventoryItem->unit_of_measure} added to '{$inventoryItem->item_name}'.";
         if ($wasLowStock && !$isStillLowStock) {
             $message .= " Low stock alert resolved.";
@@ -305,7 +409,10 @@ class InventoryItemsController extends Controller
     {
         $data = $request->validate([
             'quantity' => 'required|numeric|min:0.01',
-            'stock_out_type' => 'required|in:project_use,damage,other',
+            'stock_out_type' => [
+                'required',
+                Rule::in(['project_use', 'damage', 'expired', 'lost', 'returned_to_supplier', 'adjustment', 'other']),
+            ],
             'project_id' => 'nullable|exists:projects,id|required_if:stock_out_type,project_use',
             'unit_price' => 'nullable|numeric|min:0',
             'transaction_date' => 'nullable|date',
@@ -328,11 +435,10 @@ class InventoryItemsController extends Controller
             'created_by' => auth()->id(),
         ];
 
-        // If project_use, create material allocation but DON'T remove stock yet
+        // Project use: create material allocation, do NOT remove stock yet (awaiting receiving report)
         if ($data['stock_out_type'] === 'project_use' && isset($data['project_id'])) {
             $project = Project::findOrFail($data['project_id']);
-            
-            // Create or update material allocation
+
             $allocation = $inventoryItem->materialAllocations()
                 ->where('project_id', $project->id)
                 ->where('status', '!=', 'received')
@@ -355,26 +461,14 @@ class InventoryItemsController extends Controller
 
             $transactionData['project_id'] = $project->id;
             $transactionData['project_material_allocation_id'] = $allocation->id;
-            
-            // Create transaction for tracking but DON'T update stock
-            // Stock will be removed when receiving report is created
-            $transaction = InventoryTransaction::create($transactionData);
+
+            // Record transaction for tracking but do NOT deduct stock yet
+            InventoryTransaction::create($transactionData);
         } else {
-            // For non-project_use stock outs, create transaction and update stock immediately
-            $transaction = InventoryTransaction::create($transactionData);
-            // Update current stock
+            // All other stock-out types: immediately deduct stock
+            InventoryTransaction::create($transactionData);
             $this->inventoryService->updateItemStock($inventoryItem);
-        }
 
-        $this->adminActivityLogs(
-            'Inventory Transaction',
-            'Stock Out',
-            'Removed ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' from "' . $inventoryItem->item_name . '" (' . $data['stock_out_type'] . ')'
-        );
-
-        // System-wide notification for stock out (especially if it causes low stock)
-        if ($data['stock_out_type'] !== 'project_use') {
-            $this->inventoryService->updateItemStock($inventoryItem);
             $inventoryItem->refresh();
             $isLowStock = $inventoryItem->isLowStock();
 
@@ -390,6 +484,12 @@ class InventoryItemsController extends Controller
                 route('inventory-management.index')
             );
         }
+
+        $this->adminActivityLogs(
+            'Inventory Transaction',
+            'Stock Out',
+            'Removed ' . $data['quantity'] . ' ' . $inventoryItem->unit_of_measure . ' from "' . $inventoryItem->item_name . '" (' . $data['stock_out_type'] . ')'
+        );
 
         return back()->with('success', 'Stock removed successfully');
     }
@@ -410,7 +510,6 @@ class InventoryItemsController extends Controller
             'Updated inventory item "' . $inventoryItem->item_name . '" status to ' . ($request->boolean('is_active') ? 'Active' : 'Inactive')
         );
 
-        // Inertia handles state preservation via 'only' option in frontend
         return back()->with('success', 'Inventory item status updated successfully.');
     }
 

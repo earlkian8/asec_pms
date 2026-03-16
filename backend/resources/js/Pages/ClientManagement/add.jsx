@@ -15,7 +15,7 @@ import { Label } from '@/Components/ui/label';
 import { Button } from '@/Components/ui/button';
 import { Switch } from '@/Components/ui/switch';
 import { Textarea } from '@/Components/ui/textarea';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Mail, KeyRound } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -92,7 +92,6 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
     });
   };
 
-  // ✅ Reusable input style with error handling
   const inputClass = (error, readOnly = false) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (readOnly
@@ -115,7 +114,21 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
             Enter the details for the new client below.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Auto-password notice */}
+        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 -mt-1">
+          <div className="flex-shrink-0 mt-0.5">
+            <div className="flex items-center gap-1.5">
+              <KeyRound className="h-4 w-4 text-blue-600" />
+              <Mail className="h-4 w-4 text-blue-600" />
+            </div>
+          </div>
+          <p className="text-sm text-blue-700 leading-relaxed">
+            A <span className="font-semibold">secure password will be auto-generated</span> for this client and sent to their email address along with their login credentials. The client will be required to change their password upon first login.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
 
           {/* Client Name */}
           <div>
@@ -126,11 +139,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
               onChange={e => {
                 setData('client_name', e.target.value);
                 if (validationErrors.client_name) {
-                  setValidationErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.client_name;
-                    return newErrors;
-                  });
+                  setValidationErrors(prev => { const n = { ...prev }; delete n.client_name; return n; });
                 }
               }}
               placeholder="Client Name"
@@ -143,22 +152,18 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
           <div>
             <Label className="text-zinc-800">Client Type <span className="text-red-500">*</span></Label>
             <Select
-                value={data.client_type_id ? String(data.client_type_id) : undefined}
-                onValueChange={(value) => {
-                  setData("client_type_id", value);
-                  if (validationErrors.client_type_id) {
-                    setValidationErrors(prev => {
-                      const newErrors = { ...prev };
-                      delete newErrors.client_type_id;
-                      return newErrors;
-                    });
-                  }
-                }}
+              value={data.client_type_id ? String(data.client_type_id) : undefined}
+              onValueChange={(value) => {
+                setData("client_type_id", value);
+                if (validationErrors.client_type_id) {
+                  setValidationErrors(prev => { const n = { ...prev }; delete n.client_type_id; return n; });
+                }
+              }}
             >
-                <SelectTrigger className={selectClass(getFieldError('client_type_id'))}>
+              <SelectTrigger className={selectClass(getFieldError('client_type_id'))}>
                 <SelectValue placeholder="Select Client Type" />
-                </SelectTrigger>
-                <SelectContent>
+              </SelectTrigger>
+              <SelectContent>
                 {clientTypes && clientTypes.length > 0 ? (
                   clientTypes.map(type => (
                     <SelectItem key={type.id} value={String(type.id)}>
@@ -168,10 +173,10 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
                 ) : (
                   <div className="px-2 py-1.5 text-sm text-gray-500">No client types available</div>
                 )}
-                </SelectContent>
+              </SelectContent>
             </Select>
             <InputError message={getFieldError('client_type_id')} />
-            </div>
+          </div>
 
           {/* Contact Person */}
           <div>
@@ -182,11 +187,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
               onChange={e => {
                 setData('contact_person', e.target.value);
                 if (validationErrors.contact_person) {
-                  setValidationErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.contact_person;
-                    return newErrors;
-                  });
+                  setValidationErrors(prev => { const n = { ...prev }; delete n.contact_person; return n; });
                 }
               }}
               placeholder="Contact Person"
@@ -204,11 +205,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
               onChange={e => {
                 setData('email', e.target.value);
                 if (validationErrors.email) {
-                  setValidationErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.email;
-                    return newErrors;
-                  });
+                  setValidationErrors(prev => { const n = { ...prev }; delete n.email; return n; });
                 }
               }}
               placeholder="Email"

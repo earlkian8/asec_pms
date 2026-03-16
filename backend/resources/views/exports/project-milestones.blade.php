@@ -353,7 +353,7 @@
             @if($project['contract_amount'])
             <tr>
                 <td class="summary-label">Contract Amount:</td>
-                <td class="summary-value currency">₱{{ number_format($project['contract_amount'], 2) }}</td>
+                <td class="summary-value currency">{{ number_format($project['contract_amount'], 2) }}</td>
                 <td colspan="2"></td>
             </tr>
             @endif

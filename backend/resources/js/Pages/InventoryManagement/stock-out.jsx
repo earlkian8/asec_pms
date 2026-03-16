@@ -17,6 +17,52 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Textarea } from "@/Components/ui/textarea";
 import { Loader2, ArrowUpFromLine } from "lucide-react";
 
+// All stock-out types. Only 'project_use' requires project selection.
+const STOCK_OUT_TYPES = [
+  {
+    value: "project_use",
+    label: "Project Use",
+    description: "Stock allocated to a specific project",
+    requiresProject: true,
+  },
+  {
+    value: "damage",
+    label: "Damage",
+    description: "Items damaged and written off",
+    requiresProject: false,
+  },
+  {
+    value: "expired",
+    label: "Expired",
+    description: "Items that have passed their expiry date",
+    requiresProject: false,
+  },
+  {
+    value: "lost",
+    label: "Lost / Missing",
+    description: "Items that are lost or unaccounted for",
+    requiresProject: false,
+  },
+  {
+    value: "returned_to_supplier",
+    label: "Returned to Supplier",
+    description: "Items returned to the vendor or supplier",
+    requiresProject: false,
+  },
+  {
+    value: "adjustment",
+    label: "Stock Adjustment",
+    description: "Manual correction to reconcile physical count",
+    requiresProject: false,
+  },
+  {
+    value: "other",
+    label: "Other",
+    description: "Any other reason not listed above",
+    requiresProject: false,
+  },
+];
+
 const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
   const { data, setData, post, errors, processing } = useForm({
     quantity: "",
@@ -26,7 +72,8 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
     notes: "",
   });
 
-  const [showProjectSelect, setShowProjectSelect] = useState(false);
+  const selectedType = STOCK_OUT_TYPES.find(t => t.value === data.stock_out_type) || null;
+  const requiresProject = selectedType?.requiresProject ?? false;
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -35,16 +82,18 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
 
   const handleStockOutTypeChange = (value) => {
-    setData("stock_out_type", value);
-    setData("project_id", ""); // Reset project when type changes
-    setShowProjectSelect(value === "project_use");
+    setData(prev => ({
+      ...prev,
+      stock_out_type: value,
+      project_id: "", // reset project whenever type changes
+    }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (data.stock_out_type === "project_use" && !data.project_id) {
-      toast.error("Please select a project for project use");
+    if (requiresProject && !data.project_id) {
+      toast.error("Please select a project for project use.");
       return;
     }
 
@@ -60,11 +109,11 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
           toast.success("Stock removed successfully!");
         }
       },
-      onError: (errors) => {
-        if (errors.error) {
-          toast.error(errors.error);
+      onError: (errs) => {
+        if (errs.error) {
+          toast.error(errs.error);
         } else {
-          toast.error("Please check the form for errors");
+          toast.error("Please check the form for errors.");
         }
       },
     });
@@ -74,7 +123,7 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
     <Dialog open onOpenChange={setShowStockOutModal}>
       <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-zinc-800">Stock Out - {item.item_name}</DialogTitle>
+          <DialogTitle className="text-zinc-800">Stock Out — {item.item_name}</DialogTitle>
           <DialogDescription className="text-zinc-600">
             Remove stock from this inventory item. Select the reason and provide details.
           </DialogDescription>
@@ -112,7 +161,10 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               className={inputClass(errors.quantity)}
             />
             <InputError message={errors.quantity} />
-            <p className="text-xs text-gray-500 mt-1">Unit: {item.unit_of_measure} (Max: {parseFloat(item.current_stock || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Unit: {item.unit_of_measure} &nbsp;·&nbsp; Max:{" "}
+              {parseFloat(item.current_stock || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
           </div>
 
           {/* Stock Out Type */}
@@ -125,20 +177,26 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               onValueChange={handleStockOutTypeChange}
             >
               <SelectTrigger className={inputClass(errors.stock_out_type)}>
-                <SelectValue placeholder="Select type" />
+                <SelectValue placeholder="Select reason for stock removal" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="project_use">Project Use</SelectItem>
-                <SelectItem value="damage">Damage</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                {STOCK_OUT_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{type.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <InputError message={errors.stock_out_type} />
-            <p className="text-xs text-gray-500 mt-1">Select the reason for removing stock</p>
+            {selectedType && (
+              <p className="text-xs text-gray-500 mt-1">{selectedType.description}</p>
+            )}
           </div>
 
-          {/* Project Selection (only for project_use) */}
-          {showProjectSelect && (
+          {/* Project Selection — only for project_use */}
+          {requiresProject && (
             <div>
               <Label className="text-zinc-800">
                 Project <span className="text-red-500">*</span>
@@ -154,12 +212,12 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
                   {projects.length > 0 ? (
                     projects.map((project) => (
                       <SelectItem key={project.id} value={project.id.toString()}>
-                        {project.project_code} - {project.project_name}
+                        {project.project_code} — {project.project_name}
                       </SelectItem>
                     ))
                   ) : (
                     <div className="px-2 py-1.5 text-sm text-gray-500">
-                      No projects available
+                      No active projects available
                     </div>
                   )}
                 </SelectContent>

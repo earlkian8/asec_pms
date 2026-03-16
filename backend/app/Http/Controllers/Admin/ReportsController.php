@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\ProjectType;
 use App\Models\Client;
 use App\Models\Billing;
 use App\Models\BillingPayment;
@@ -13,6 +14,7 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
+use App\Models\ProjectMiscellaneousExpense;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -32,59 +34,42 @@ class ReportsController extends Controller
     {
         $dateRange = $request->get('date_range', 'last_6_months');
         $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
+        $endDate   = $request->get('end_date');
         $projectId = $request->get('project_id');
-        $clientId = $request->get('client_id');
+        $clientId  = $request->get('client_id');
 
-        // Parse date range
         [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
 
-        // Project Performance Report
-        $projectPerformance = $this->getProjectPerformanceReport($dateStart, $dateEnd, $projectId, $clientId);
-
-        // Financial Report
         $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
-
-        // Client Report
-        $clientReport = $this->getClientReport($dateStart, $dateEnd, $clientId);
-
-        // Inventory Report
         $inventoryReport = $this->getInventoryReport();
+        $projectReport   = $this->getProjectReport($dateStart, $dateEnd, $projectId, $clientId);
+        $trends          = $this->getTrendsData($dateStart, $dateEnd);
 
-        // Team Productivity Report
-        $teamProductivity = $this->getTeamProductivityReport($dateStart, $dateEnd, $projectId);
-
-        // Budget vs Actual Report
-        $budgetReport = $this->getBudgetReport($dateStart, $dateEnd, $projectId, $clientId);
-
-        // Time-based Trends
-        $trends = $this->getTrendsData($dateStart, $dateEnd);
-
-        // Get filter options
         $projects = Project::orderBy('project_name')->get(['id', 'project_code', 'project_name']);
-        $clients = Client::orderBy('client_name')->get(['id', 'client_code', 'client_name']);
+        $clients  = Client::orderBy('client_name')->get(['id', 'client_code', 'client_name']);
 
         return Inertia::render('Reports/index', [
-            'projectPerformance' => $projectPerformance,
             'financialReport' => $financialReport,
-            'clientReport' => $clientReport,
             'inventoryReport' => $inventoryReport,
-            'teamProductivity' => $teamProductivity,
-            'budgetReport' => $budgetReport,
-            'trends' => $trends,
-            'filters' => [
+            'projectReport'   => $projectReport,
+            'trends'          => $trends,
+            'filters'         => [
                 'date_range' => $dateRange,
                 'start_date' => $startDate,
-                'end_date' => $endDate,
+                'end_date'   => $endDate,
                 'project_id' => $projectId,
-                'client_id' => $clientId,
+                'client_id'  => $clientId,
             ],
             'options' => [
                 'projects' => $projects,
-                'clients' => $clients,
+                'clients'  => $clients,
             ],
         ]);
     }
+
+    // -------------------------------------------------------------------------
+    // Date helpers
+    // -------------------------------------------------------------------------
 
     private function parseDateRange($range, $startDate, $endDate)
     {
@@ -93,472 +78,351 @@ class ReportsController extends Controller
         }
 
         return match ($range) {
-            'today' => [now()->startOfDay(), now()->endOfDay()],
-            'this_week' => [now()->startOfWeek(), now()->endOfWeek()],
-            'this_month' => [now()->startOfMonth(), now()->endOfMonth()],
-            'last_month' => [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()],
-            'this_quarter' => [now()->startOfQuarter(), now()->endOfQuarter()],
-            'this_year' => [now()->startOfYear(), now()->endOfYear()],
-            'last_year' => [now()->subYear()->startOfYear(), now()->subYear()->endOfYear()],
-            default => [now()->subMonths(6), now()], // last_6_months
+            'today'         => [now()->startOfDay(),                  now()->endOfDay()],
+            'this_week'     => [now()->startOfWeek(),                 now()->endOfWeek()],
+            'this_month'    => [now()->startOfMonth(),                now()->endOfMonth()],
+            'last_month'    => [now()->subMonth()->startOfMonth(),    now()->subMonth()->endOfMonth()],
+            'this_quarter'  => [now()->startOfQuarter(),              now()->endOfQuarter()],
+            'this_year'     => [now()->startOfYear(),                 now()->endOfYear()],
+            'last_year'     => [now()->subYear()->startOfYear(),      now()->subYear()->endOfYear()],
+            default         => [now()->subMonths(6),                  now()],
         };
     }
 
-    private function getProjectPerformanceReport($startDate, $endDate, $projectId, $clientId)
-    {
-        $query = Project::query();
-
-        if ($projectId) {
-            $query->where('id', $projectId);
-        }
-
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
-
-        $projects = $query->with(['client:id,client_name', 'milestones'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
-            })
-            ->get()
-            ->map(function ($project) {
-                $milestones = $project->milestones;
-                $totalMilestones = $milestones->count();
-                $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->completion_percentage = $totalMilestones > 0 
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
-                    : 0;
-                return $project;
-            });
-
-        $totalProjects = $projects->count();
-        $completedProjects = $projects->where('status', 'completed')->count();
-        $activeProjects = $projects->where('status', 'active')->count();
-        $onHoldProjects = $projects->where('status', 'on_hold')->count();
-        $cancelledProjects = $projects->where('status', 'cancelled')->count();
-
-        $avgCompletion = $projects->avg('completion_percentage') ?? 0;
-        $totalContractValue = $projects->sum('contract_amount');
-
-        // Projects by type
-        $byType = $projects->load('projectType')->groupBy(function ($project) {
-            return $project->projectType ? $project->projectType->name : 'Unknown';
-        })->map(function ($group) {
-            return $group->count();
-        });
-
-        // Projects by status
-        $byStatus = $projects->groupBy('status')->map(function ($group) {
-            return $group->count();
-        });
-
-        // Top performing projects (by completion)
-        $topProjects = $projects->sortByDesc('completion_percentage')->take(10)->values();
-
-        // Overdue projects
-        $overdueProjects = $projects->filter(function ($project) {
-            return $project->status !== 'completed' 
-                && $project->status !== 'cancelled'
-                && $project->planned_end_date 
-                && Carbon::parse($project->planned_end_date)->isPast();
-        });
-
-        return [
-            'summary' => [
-                'total' => $totalProjects,
-                'completed' => $completedProjects,
-                'active' => $activeProjects,
-                'on_hold' => $onHoldProjects,
-                'cancelled' => $cancelledProjects,
-                'avg_completion' => round($avgCompletion, 2),
-                'total_contract_value' => $totalContractValue,
-            ],
-            'by_type' => $byType,
-            'by_status' => $byStatus,
-            'top_projects' => $topProjects,
-            'overdue_count' => $overdueProjects->count(),
-        ];
-    }
+    // -------------------------------------------------------------------------
+    // Financial Report
+    // -------------------------------------------------------------------------
 
     private function getFinancialReport($startDate, $endDate, $projectId, $clientId)
     {
-        // Revenue (from payments) - Only count paid payments for accurate revenue reporting
+        // ── Revenue ──────────────────────────────────────────────────────────
         $paymentQuery = BillingPayment::where('payment_status', 'paid')
             ->whereBetween('payment_date', [$startDate, $endDate]);
-        
+
         if ($projectId) {
-            $paymentQuery->whereHas('billing', function ($q) use ($projectId) {
-                $q->where('project_id', $projectId);
-            });
+            $paymentQuery->whereHas('billing', fn($q) => $q->where('project_id', $projectId));
+        } elseif ($clientId) {
+            $paymentQuery->whereHas('billing.project', fn($q) => $q->where('client_id', $clientId));
         }
 
         $totalRevenue = $paymentQuery->sum('payment_amount');
 
-        // Total Billed
         $billingQuery = Billing::whereBetween('billing_date', [$startDate, $endDate]);
-        
         if ($projectId) {
             $billingQuery->where('project_id', $projectId);
         } elseif ($clientId) {
-            $billingQuery->whereHas('project', function ($q) use ($clientId) {
-                $q->where('client_id', $clientId);
-            });
+            $billingQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId));
         }
 
-        $totalBilled = $billingQuery->sum('billing_amount');
+        $totalBilled      = $billingQuery->sum('billing_amount');
         $totalOutstanding = $totalBilled - $totalRevenue;
 
-        // Expenses (Labor + Materials)
-        $laborQuery = ProjectLaborCost::whereBetween('work_date', [$startDate, $endDate]);
-        $materialQuery = ProjectMaterialAllocation::whereBetween('allocated_at', [$startDate, $endDate]);
-
+        // ── Labor ─────────────────────────────────────────────────────────────
+        $laborQuery = ProjectLaborCost::whereBetween('period_start', [$startDate, $endDate]);
         if ($projectId) {
             $laborQuery->where('project_id', $projectId);
+        } elseif ($clientId) {
+            $laborQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId));
+        }
+        $totalLaborCost = (float) $laborQuery->sum('gross_pay');
+
+        // ── Materials ─────────────────────────────────────────────────────────
+        $materialQuery = ProjectMaterialAllocation::whereBetween('allocated_at', [$startDate, $endDate])
+            ->with('inventoryItem');
+        if ($projectId) {
             $materialQuery->where('project_id', $projectId);
         } elseif ($clientId) {
-            $laborQuery->whereHas('project', function ($q) use ($clientId) {
-                $q->where('client_id', $clientId);
-            });
-            $materialQuery->whereHas('project', function ($q) use ($clientId) {
-                $q->where('client_id', $clientId);
-            });
+            $materialQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId));
         }
-
-        $totalLaborCost = $laborQuery->get()->sum(function ($cost) {
-            return (float) $cost->hours_worked * (float) $cost->hourly_rate;
+        $totalMaterialCost = $materialQuery->get()->sum(function ($allocation) {
+            return $allocation->inventoryItem
+                ? (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price
+                : 0;
         });
 
-        $totalMaterialCost = $materialQuery->with('inventoryItem')
+        // ── Miscellaneous ─────────────────────────────────────────────────────
+        $miscQuery = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate]);
+        if ($projectId) {
+            $miscQuery->where('project_id', $projectId);
+        } elseif ($clientId) {
+            $miscQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId));
+        }
+        $totalMiscCost = (float) $miscQuery->sum('amount');
+
+        $miscByType = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate])
+            ->when($projectId, fn($q) => $q->where('project_id', $projectId))
+            ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)))
+            ->select('expense_type', DB::raw('sum(amount) as total'), DB::raw('count(*) as count'))
+            ->groupBy('expense_type')
             ->get()
-            ->sum(function ($allocation) {
-                if ($allocation->inventoryItem) {
-                    return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-                }
-                return 0;
-            });
+            ->keyBy('expense_type');
 
-        $totalExpenses = $totalLaborCost + $totalMaterialCost;
-        $netProfit = $totalRevenue - $totalExpenses;
-        $profitMargin = $totalRevenue > 0 ? ($netProfit / $totalRevenue) * 100 : 0;
+        $totalExpenses = $totalLaborCost + $totalMaterialCost + $totalMiscCost;
+        $netProfit     = $totalRevenue - $totalExpenses;
+        $profitMargin  = $totalRevenue > 0 ? ($netProfit / $totalRevenue) * 100 : 0;
 
-        // Billing status breakdown
-        $billingStatus = $billingQuery->select('status', DB::raw('count(*) as count'), DB::raw('sum(billing_amount) as total'))
+        $billingStatus = Billing::whereBetween('billing_date', [$startDate, $endDate])
+            ->when($projectId, fn($q) => $q->where('project_id', $projectId))
+            ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)))
+            ->select('status', DB::raw('count(*) as count'), DB::raw('sum(billing_amount) as total'))
             ->groupBy('status')
             ->get()
             ->keyBy('status');
 
+        $monthlyExpenses = $this->getMonthlyExpenseBreakdown($startDate, $endDate, $projectId, $clientId);
+
         return [
             'revenue' => [
-                'total_billed' => $totalBilled,
-                'total_received' => $totalRevenue,
-                'outstanding' => $totalOutstanding,
-                'collection_rate' => $totalBilled > 0 ? ($totalRevenue / $totalBilled) * 100 : 0,
+                'total_billed'    => $totalBilled,
+                'total_received'  => $totalRevenue,
+                'outstanding'     => $totalOutstanding,
+                'collection_rate' => $totalBilled > 0 ? round(($totalRevenue / $totalBilled) * 100, 2) : 0,
             ],
             'expenses' => [
-                'labor' => $totalLaborCost,
-                'materials' => $totalMaterialCost,
-                'total' => $totalExpenses,
+                'labor'         => $totalLaborCost,
+                'materials'     => $totalMaterialCost,
+                'miscellaneous' => $totalMiscCost,
+                'total'         => $totalExpenses,
+                'misc_by_type'  => $miscByType,
             ],
             'profit' => [
-                'net' => $netProfit,
+                'net'    => $netProfit,
                 'margin' => round($profitMargin, 2),
             ],
-            'billing_status' => $billingStatus,
+            'billing_status'   => $billingStatus,
+            'monthly_expenses' => $monthlyExpenses,
         ];
     }
 
-    private function getClientReport($startDate, $endDate, $clientId)
+    private function getMonthlyExpenseBreakdown($startDate, $endDate, $projectId, $clientId)
     {
-        $query = Client::query();
-
-        if ($clientId) {
-            $query->where('id', $clientId);
-        }
-
-        $clients = $query->withCount(['projects' => function ($q) use ($startDate, $endDate) {
-            $q->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                      ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
-            });
-        }])
-        ->with(['projects' => function ($q) use ($startDate, $endDate) {
-            $q->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                      ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
-            })
-            ->with('milestones')
-            ->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
-        }])
-        ->get();
-        
-        // Calculate completion_percentage for each project
-        $clients->each(function ($client) {
-            $client->projects->each(function ($project) {
-                $milestones = $project->milestones;
-                $totalMilestones = $milestones->count();
-                $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->completion_percentage = $totalMilestones > 0 
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
-                    : 0;
-            });
-        });
-
-        $topClients = $clients->map(function ($client) {
-            $totalContractValue = $client->projects->sum('contract_amount');
-            $activeProjects = $client->projects->where('status', 'active')->count();
-            $completedProjects = $client->projects->where('status', 'completed')->count();
-            
-            return [
-                'id' => $client->id,
-                'client_code' => $client->client_code,
-                'client_name' => $client->client_name,
-                'client_type' => $client->client_type,
-                'total_projects' => $client->projects_count,
-                'active_projects' => $activeProjects,
-                'completed_projects' => $completedProjects,
-                'total_contract_value' => $totalContractValue,
-            ];
-        })->sortByDesc('total_contract_value')->take(10)->values();
-
-        return [
-            'total_clients' => $clients->count(),
-            'active_clients' => $clients->where('is_active', true)->count(),
-            'top_clients' => $topClients,
-        ];
-    }
-
-    private function getInventoryReport()
-    {
-        $totalItems = InventoryItem::count();
-        $activeItems = InventoryItem::where('is_active', true)->count();
-        
-        $lowStockItems = InventoryItem::where('is_active', true)
-            ->get()
-            ->filter(function ($item) {
-                return $item->isLowStock();
-            });
-
-        $totalValue = InventoryItem::where('is_active', true)
-            ->get()
-            ->sum(function ($item) {
-                return (float) $item->current_stock * (float) ($item->unit_price ?? 0);
-            });
-
-        // Items by category
-        $byCategory = InventoryItem::where('is_active', true)
-            ->select('category', DB::raw('count(*) as count'))
-            ->groupBy('category')
-            ->get()
-            ->pluck('count', 'category');
-
-        // Most used items (by allocations)
-        $mostUsed = ProjectMaterialAllocation::select('inventory_item_id', DB::raw('sum(quantity_received) as total_used'))
-            ->groupBy('inventory_item_id')
-            ->orderByDesc('total_used')
-            ->limit(10)
-            ->with('inventoryItem:id,item_code,item_name')
-            ->get();
-
-        return [
-            'summary' => [
-                'total_items' => $totalItems,
-                'active_items' => $activeItems,
-                'low_stock_count' => $lowStockItems->count(),
-                'total_value' => $totalValue,
-            ],
-            'by_category' => $byCategory,
-            'low_stock_items' => $lowStockItems->take(10)->values(),
-            'most_used' => $mostUsed,
-        ];
-    }
-
-    private function getTeamProductivityReport($startDate, $endDate, $projectId)
-    {
-        $query = ProjectLaborCost::whereBetween('work_date', [$startDate, $endDate]);
-
-        if ($projectId) {
-            $query->where('project_id', $projectId);
-        }
-
-        $laborCosts = $query->with(['user:id,name', 'project:id,project_name'])
-            ->get();
-
-        // Total hours and cost by user
-        $byUser = $laborCosts->groupBy('user_id')->map(function ($costs, $userId) {
-            $user = $costs->first()->user;
-            $totalHours = $costs->sum('hours_worked');
-            $totalCost = $costs->sum(function ($cost) {
-                return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-            });
-            $avgHourlyRate = $costs->avg('hourly_rate');
-
-            return [
-                'user_id' => $userId,
-                'user_name' => $user->name ?? 'Unknown',
-                'total_hours' => round($totalHours, 2),
-                'total_cost' => $totalCost,
-                'avg_hourly_rate' => round($avgHourlyRate, 2),
-                'work_days' => $costs->count(),
-            ];
-        })->sortByDesc('total_hours')->take(10)->values();
-
-        // Total hours and cost by project
-        $byProject = $laborCosts->groupBy('project_id')->map(function ($costs, $projectId) {
-            $project = $costs->first()->project;
-            $totalHours = $costs->sum('hours_worked');
-            $totalCost = $costs->sum(function ($cost) {
-                return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-            });
-
-            return [
-                'project_id' => $projectId,
-                'project_name' => $project->project_name ?? 'Unknown',
-                'total_hours' => round($totalHours, 2),
-                'total_cost' => $totalCost,
-            ];
-        })->sortByDesc('total_hours')->take(10)->values();
-
-        $totalHours = $laborCosts->sum('hours_worked');
-        $totalCost = $laborCosts->sum(function ($cost) {
-            return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-        });
-
-        return [
-            'summary' => [
-                'total_hours' => round($totalHours, 2),
-                'total_cost' => $totalCost,
-                'avg_hourly_rate' => $totalHours > 0 ? round($totalCost / $totalHours, 2) : 0,
-            ],
-            'by_user' => $byUser,
-            'by_project' => $byProject,
-        ];
-    }
-
-    private function getBudgetReport($startDate, $endDate, $projectId, $clientId)
-    {
-        $query = Project::query();
-
-        if ($projectId) {
-            $query->where('id', $projectId);
-        }
-
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
-
-        $projects = $query->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('planned_end_date', [$startDate, $endDate]);
-            })
-            ->get();
-
-        $budgetData = $projects->map(function ($project) {
-            // Labor costs
-            $laborCosts = ProjectLaborCost::where('project_id', $project->id)
-                ->get()
-                ->sum(function ($cost) {
-                    return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-                });
-
-            // Material costs
-            $materialCosts = ProjectMaterialAllocation::where('project_id', $project->id)
-                ->with('inventoryItem')
-                ->get()
-                ->sum(function ($allocation) {
-                    if ($allocation->inventoryItem) {
-                        return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-                    }
-                    return 0;
-                });
-
-            // Miscellaneous expenses
-            $miscellaneousExpenses = \App\Models\ProjectMiscellaneousExpense::where('project_id', $project->id)
-                ->sum('amount');
-
-            $totalSpent = $laborCosts + $materialCosts + $miscellaneousExpenses;
-            $budget = $project->contract_amount;
-            $variance = $budget - $totalSpent;
-            $variancePercentage = $budget > 0 ? ($variance / $budget) * 100 : 0;
-
-            return [
-                'project_id' => $project->id,
-                'project_code' => $project->project_code,
-                'project_name' => $project->project_name,
-                'budget' => $budget,
-                'labor_cost' => $laborCosts,
-                'material_cost' => $materialCosts,
-                'miscellaneous_expenses' => $miscellaneousExpenses,
-                'total_spent' => $totalSpent,
-                'variance' => $variance,
-                'variance_percentage' => round($variancePercentage, 2),
-                'status' => $project->status,
-            ];
-        })->sortByDesc('total_spent')->take(20)->values();
-
-        $totalBudget = $budgetData->sum('budget');
-        $totalSpent = $budgetData->sum('total_spent');
-        $totalVariance = $totalBudget - $totalSpent;
-
-        return [
-            'summary' => [
-                'total_budget' => $totalBudget,
-                'total_spent' => $totalSpent,
-                'total_variance' => $totalVariance,
-                'variance_percentage' => $totalBudget > 0 ? round(($totalVariance / $totalBudget) * 100, 2) : 0,
-            ],
-            'projects' => $budgetData,
-        ];
-    }
-
-    private function getTrendsData($startDate, $endDate)
-    {
-        $months = collect();
+        $months  = collect();
         $current = $startDate->copy()->startOfMonth();
 
         while ($current->lte($endDate)) {
             $monthEnd = $current->copy()->endOfMonth();
             if ($monthEnd->gt($endDate)) {
-                $monthEnd = $endDate;
+                $monthEnd = $endDate->copy();
             }
 
-            // Revenue - Only count paid payments
+            // Labor — filter by period_start
+            $laborQ = ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd]);
+            $matQ   = ProjectMaterialAllocation::whereBetween('allocated_at', [$current, $monthEnd])->with('inventoryItem');
+            $miscQ  = ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd]);
+
+            if ($projectId) {
+                $laborQ->where('project_id', $projectId);
+                $matQ->where('project_id', $projectId);
+                $miscQ->where('project_id', $projectId);
+            } elseif ($clientId) {
+                $laborQ->whereHas('project', fn($q) => $q->where('client_id', $clientId));
+                $matQ->whereHas('project', fn($q) => $q->where('client_id', $clientId));
+                $miscQ->whereHas('project', fn($q) => $q->where('client_id', $clientId));
+            }
+
+            $labor    = (float) $laborQ->sum('gross_pay');
+            $material = $matQ->get()->sum(fn($a) => $a->inventoryItem
+                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
+            $misc     = (float) $miscQ->sum('amount');
+
+            $months->push([
+                'month'     => $current->format('M Y'),
+                'month_key' => $current->format('Y-m'),
+                'labor'     => $labor,
+                'materials' => $material,
+                'misc'      => $misc,
+                'total'     => $labor + $material + $misc,
+            ]);
+
+            $current->addMonth();
+        }
+
+        return $months;
+    }
+
+    // -------------------------------------------------------------------------
+    // Inventory Report
+    // -------------------------------------------------------------------------
+
+    private function getInventoryReport()
+    {
+        $totalItems  = InventoryItem::count();
+        $activeItems = InventoryItem::where('is_active', true)->count();
+        $allActive   = InventoryItem::where('is_active', true)->get();
+
+        $lowStockItems = $allActive->filter(fn($item) => $item->isLowStock());
+        $totalValue    = $allActive->sum(fn($item) => (float) $item->current_stock * (float) ($item->unit_price ?? 0));
+
+        $byCategory = InventoryItem::where('is_active', true)
+            ->select('category', DB::raw('count(*) as count'), DB::raw('sum(current_stock * unit_price) as total_value'))
+            ->groupBy('category')
+            ->get();
+
+        $mostUsed = ProjectMaterialAllocation::select('inventory_item_id', DB::raw('sum(quantity_received) as total_used'))
+            ->groupBy('inventory_item_id')
+            ->orderByDesc('total_used')
+            ->limit(10)
+            ->with('inventoryItem:id,item_code,item_name,unit_of_measure,unit_price')
+            ->get();
+
+        $stockHealth = [
+            'healthy'      => $allActive->filter(fn($i) => !$i->isLowStock() && $i->current_stock > 0)->count(),
+            'low_stock'    => $lowStockItems->count(),
+            'out_of_stock' => $allActive->filter(fn($i) => $i->current_stock <= 0)->count(),
+        ];
+
+        return [
+            'summary' => [
+                'total_items'     => $totalItems,
+                'active_items'    => $activeItems,
+                'low_stock_count' => $lowStockItems->count(),
+                'total_value'     => $totalValue,
+            ],
+            'by_category'     => $byCategory,
+            'low_stock_items' => $lowStockItems->take(10)->values(),
+            'most_used'       => $mostUsed,
+            'stock_health'    => $stockHealth,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Project Report
+    // -------------------------------------------------------------------------
+
+    private function getProjectReport($startDate, $endDate, $projectId, $clientId)
+    {
+        $query = Project::query();
+        if ($projectId) $query->where('id', $projectId);
+        if ($clientId)  $query->where('client_id', $clientId);
+
+        $projects = $query
+            ->with(['client:id,client_name', 'milestones', 'projectType:id,name'])
+            ->get()
+            ->map(function ($project) {
+                $milestones    = $project->milestones;
+                $total         = $milestones->count();
+                $completed     = $milestones->where('status', 'completed')->count();
+                $completionPct = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+
+                // Use new schema — sum gross_pay
+                $laborCost = (float) ProjectLaborCost::where('project_id', $project->id)
+                    ->sum('gross_pay');
+
+                $materialCost = ProjectMaterialAllocation::where('project_id', $project->id)
+                    ->with('inventoryItem')
+                    ->get()
+                    ->sum(fn($a) => $a->inventoryItem
+                        ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
+
+                $miscCost   = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)->sum('amount');
+                $totalSpent = $laborCost + $materialCost + $miscCost;
+
+                $budget      = (float) $project->contract_amount;
+                $variance    = $budget - $totalSpent;
+                $variancePct = $budget > 0 ? ($variance / $budget) * 100 : 0;
+
+                $isOverdue = $project->status !== 'completed'
+                    && $project->status !== 'cancelled'
+                    && $project->planned_end_date
+                    && Carbon::parse($project->planned_end_date)->isPast();
+
+                return array_merge($project->toArray(), [
+                    'completion_percentage' => $completionPct,
+                    'total_milestones'      => $total,
+                    'completed_milestones'  => $completed,
+                    'labor_cost'            => $laborCost,
+                    'material_cost'         => $materialCost,
+                    'misc_cost'             => $miscCost,
+                    'total_spent'           => $totalSpent,
+                    'variance'              => $variance,
+                    'variance_percentage'   => round($variancePct, 2),
+                    'is_overdue'            => $isOverdue,
+                    'project_type_name'     => $project->projectType->name ?? 'Unknown',
+                    'client_name'           => $project->client->client_name ?? 'Unknown',
+                ]);
+            });
+
+        $totalProjects     = $projects->count();
+        $completedProjects = $projects->where('status', 'completed')->count();
+        $activeProjects    = $projects->where('status', 'active')->count();
+        $onHoldProjects    = $projects->where('status', 'on_hold')->count();
+        $overdueProjects   = $projects->where('is_overdue', true)->count();
+        $avgCompletion     = $projects->avg('completion_percentage') ?? 0;
+        $totalBudget       = $projects->sum('contract_amount');
+        $totalSpent        = $projects->sum('total_spent');
+
+        $byStatus    = $projects->groupBy('status')->map(fn($g) => $g->count());
+        $byType      = $projects->groupBy('project_type_name')->map(fn($g) => $g->count());
+        $topProjects = $projects->sortByDesc('contract_amount')->take(10)->values();
+
+        return [
+            'summary' => [
+                'total'               => $totalProjects,
+                'completed'           => $completedProjects,
+                'active'              => $activeProjects,
+                'on_hold'             => $onHoldProjects,
+                'overdue'             => $overdueProjects,
+                'avg_completion'      => round($avgCompletion, 2),
+                'total_budget'        => $totalBudget,
+                'total_spent'         => $totalSpent,
+                'total_variance'      => $totalBudget - $totalSpent,
+                'variance_percentage' => $totalBudget > 0
+                    ? round((($totalBudget - $totalSpent) / $totalBudget) * 100, 2)
+                    : 0,
+            ],
+            'by_status'  => $byStatus,
+            'by_type'    => $byType,
+            'projects'   => $topProjects,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Trends
+    // -------------------------------------------------------------------------
+
+    private function getTrendsData($startDate, $endDate)
+    {
+        $months  = collect();
+        $current = $startDate->copy()->startOfMonth();
+
+        while ($current->lte($endDate)) {
+            $monthEnd = $current->copy()->endOfMonth();
+            if ($monthEnd->gt($endDate)) $monthEnd = $endDate->copy();
+
             $revenue = BillingPayment::where('payment_status', 'paid')
                 ->whereBetween('payment_date', [$current, $monthEnd])
                 ->sum('payment_amount');
 
-            // Expenses
-            $laborCost = ProjectLaborCost::whereBetween('work_date', [$current, $monthEnd])
-                ->get()
-                ->sum(function ($cost) {
-                    return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-                });
+            // Labor — use period_start + gross_pay
+            $laborCost = (float) ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd])
+                ->sum('gross_pay');
 
             $materialCost = ProjectMaterialAllocation::whereBetween('allocated_at', [$current, $monthEnd])
                 ->with('inventoryItem')
                 ->get()
-                ->sum(function ($allocation) {
-                    if ($allocation->inventoryItem) {
-                        return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-                    }
-                    return 0;
-                });
+                ->sum(fn($a) => $a->inventoryItem
+                    ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
 
-            // Projects
-            $projectsStarted = Project::whereBetween('start_date', [$current, $monthEnd])->count();
+            $miscCost = (float) ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
+                ->sum('amount');
+
+            $projectsStarted   = Project::whereBetween('start_date', [$current, $monthEnd])->count();
             $projectsCompleted = Project::where('status', 'completed')
                 ->whereBetween('actual_end_date', [$current, $monthEnd])
                 ->count();
 
+            $totalExpenses = $laborCost + $materialCost + $miscCost;
+
             $months->push([
-                'month' => $current->format('M Y'),
-                'month_key' => $current->format('Y-m'),
-                'revenue' => $revenue,
-                'labor_cost' => $laborCost,
-                'material_cost' => $materialCost,
-                'total_expenses' => $laborCost + $materialCost,
-                'net_profit' => $revenue - ($laborCost + $materialCost),
-                'projects_started' => $projectsStarted,
+                'month'              => $current->format('M Y'),
+                'month_key'          => $current->format('Y-m'),
+                'revenue'            => (float) $revenue,
+                'labor_cost'         => $laborCost,
+                'material_cost'      => $materialCost,
+                'misc_cost'          => $miscCost,
+                'total_expenses'     => $totalExpenses,
+                'net_profit'         => (float) $revenue - $totalExpenses,
+                'projects_started'   => $projectsStarted,
                 'projects_completed' => $projectsCompleted,
             ]);
 
@@ -568,158 +432,206 @@ class ReportsController extends Controller
         return $months;
     }
 
+    // =========================================================================
+    // Exports
+    // =========================================================================
+
     public function exportProjectPerformance(Request $request)
     {
-        $dateRange = $request->get('date_range', 'last_6_months');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $projectId = $request->get('project_id');
-        $clientId = $request->get('client_id');
-        $format = $request->get('format', 'xlsx');
+        [$dateStart, $dateEnd] = $this->parseDateRange(
+            $request->get('date_range', 'last_6_months'),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
 
-        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
-        $projectPerformance = $this->getProjectPerformanceReport($dateStart, $dateEnd, $projectId, $clientId);
+        $projectReport = $this->getProjectReport($dateStart, $dateEnd, $request->get('project_id'), $request->get('client_id'));
+        $format        = $request->get('format', 'xlsx');
+        $filename      = $this->generateFilename('project-report', $request->get('date_range', 'last_6_months'), $request->get('start_date'), $request->get('end_date'), $format);
 
-        $filename = $this->generateFilename('project-performance', $dateRange, $startDate, $endDate, $format);
-
-        if ($format === 'csv') {
-            return Excel::download(new ProjectPerformanceExport($projectPerformance), $filename, \Maatwebsite\Excel\Excel::CSV);
-        }
-
-        return Excel::download(new ProjectPerformanceExport($projectPerformance), $filename);
+        return $format === 'csv'
+            ? Excel::download(new ProjectPerformanceExport($projectReport), $filename, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download(new ProjectPerformanceExport($projectReport), $filename);
     }
 
     public function exportFinancial(Request $request)
     {
-        $dateRange = $request->get('date_range', 'last_6_months');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $projectId = $request->get('project_id');
-        $clientId = $request->get('client_id');
-        $format = $request->get('format', 'xlsx');
+        [$dateStart, $dateEnd] = $this->parseDateRange(
+            $request->get('date_range', 'last_6_months'),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
 
-        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
-        $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
+        $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $request->get('project_id'), $request->get('client_id'));
+        $format          = $request->get('format', 'xlsx');
+        $filename        = $this->generateFilename('financial-report', $request->get('date_range', 'last_6_months'), $request->get('start_date'), $request->get('end_date'), $format);
 
-        $filename = $this->generateFilename('financial-report', $dateRange, $startDate, $endDate, $format);
-
-        if ($format === 'csv') {
-            return Excel::download(new FinancialReportExport($financialReport), $filename, \Maatwebsite\Excel\Excel::CSV);
-        }
-
-        return Excel::download(new FinancialReportExport($financialReport), $filename);
+        return $format === 'csv'
+            ? Excel::download(new FinancialReportExport($financialReport), $filename, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download(new FinancialReportExport($financialReport), $filename);
     }
 
     public function exportClient(Request $request)
     {
-        $dateRange = $request->get('date_range', 'last_6_months');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $clientId = $request->get('client_id');
-        $format = $request->get('format', 'xlsx');
+        [$dateStart, $dateEnd] = $this->parseDateRange(
+            $request->get('date_range', 'last_6_months'),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
 
-        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
-        $clientReport = $this->getClientReport($dateStart, $dateEnd, $clientId);
+        $clientReport = $this->getClientReport($dateStart, $dateEnd, $request->get('client_id'));
+        $format       = $request->get('format', 'xlsx');
+        $filename     = $this->generateFilename('client-report', $request->get('date_range', 'last_6_months'), $request->get('start_date'), $request->get('end_date'), $format);
 
-        $filename = $this->generateFilename('client-report', $dateRange, $startDate, $endDate, $format);
-
-        if ($format === 'csv') {
-            return Excel::download(new ClientReportExport($clientReport), $filename, \Maatwebsite\Excel\Excel::CSV);
-        }
-
-        return Excel::download(new ClientReportExport($clientReport), $filename);
+        return $format === 'csv'
+            ? Excel::download(new ClientReportExport($clientReport), $filename, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download(new ClientReportExport($clientReport), $filename);
     }
 
     public function exportInventory(Request $request)
     {
-        $format = $request->get('format', 'xlsx');
         $inventoryReport = $this->getInventoryReport();
+        $format          = $request->get('format', 'xlsx');
+        $filename        = $this->generateFilename('inventory-report', 'all', null, null, $format);
 
-        $filename = $this->generateFilename('inventory-report', 'all', null, null, $format);
-
-        if ($format === 'csv') {
-            return Excel::download(new InventoryReportExport($inventoryReport), $filename, \Maatwebsite\Excel\Excel::CSV);
-        }
-
-        return Excel::download(new InventoryReportExport($inventoryReport), $filename);
+        return $format === 'csv'
+            ? Excel::download(new InventoryReportExport($inventoryReport), $filename, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download(new InventoryReportExport($inventoryReport), $filename);
     }
 
     public function exportTeamProductivity(Request $request)
     {
-        $dateRange = $request->get('date_range', 'last_6_months');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $projectId = $request->get('project_id');
-        $format = $request->get('format', 'xlsx');
+        [$dateStart, $dateEnd] = $this->parseDateRange(
+            $request->get('date_range', 'last_6_months'),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
 
-        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
-        $teamProductivity = $this->getTeamProductivityReport($dateStart, $dateEnd, $projectId);
+        $teamProductivity = $this->getTeamProductivityReport($dateStart, $dateEnd, $request->get('project_id'));
+        $format           = $request->get('format', 'xlsx');
+        $filename         = $this->generateFilename('team-productivity', $request->get('date_range', 'last_6_months'), $request->get('start_date'), $request->get('end_date'), $format);
 
-        $filename = $this->generateFilename('team-productivity', $dateRange, $startDate, $endDate, $format);
-
-        if ($format === 'csv') {
-            return Excel::download(new TeamProductivityExport($teamProductivity), $filename, \Maatwebsite\Excel\Excel::CSV);
-        }
-
-        return Excel::download(new TeamProductivityExport($teamProductivity), $filename);
+        return $format === 'csv'
+            ? Excel::download(new TeamProductivityExport($teamProductivity), $filename, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download(new TeamProductivityExport($teamProductivity), $filename);
     }
 
     public function exportBudget(Request $request)
     {
-        $dateRange = $request->get('date_range', 'last_6_months');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $projectId = $request->get('project_id');
-        $clientId = $request->get('client_id');
-        $format = $request->get('format', 'xlsx');
+        [$dateStart, $dateEnd] = $this->parseDateRange(
+            $request->get('date_range', 'last_6_months'),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
 
-        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
-        $budgetReport = $this->getBudgetReport($dateStart, $dateEnd, $projectId, $clientId);
+        $projectReport = $this->getProjectReport($dateStart, $dateEnd, $request->get('project_id'), $request->get('client_id'));
+        $format        = $request->get('format', 'xlsx');
+        $filename      = $this->generateFilename('budget-report', $request->get('date_range', 'last_6_months'), $request->get('start_date'), $request->get('end_date'), $format);
 
-        $filename = $this->generateFilename('budget-report', $dateRange, $startDate, $endDate, $format);
-
-        if ($format === 'csv') {
-            return Excel::download(new BudgetReportExport($budgetReport), $filename, \Maatwebsite\Excel\Excel::CSV);
-        }
-
-        return Excel::download(new BudgetReportExport($budgetReport), $filename);
+        return $format === 'csv'
+            ? Excel::download(new BudgetReportExport($projectReport), $filename, \Maatwebsite\Excel\Excel::CSV)
+            : Excel::download(new BudgetReportExport($projectReport), $filename);
     }
 
     public function exportAll(Request $request)
     {
-        $dateRange = $request->get('date_range', 'last_6_months');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
+        [$dateStart, $dateEnd] = $this->parseDateRange(
+            $request->get('date_range', 'last_6_months'),
+            $request->get('start_date'),
+            $request->get('end_date')
+        );
+
         $projectId = $request->get('project_id');
-        $clientId = $request->get('client_id');
+        $clientId  = $request->get('client_id');
 
-        [$dateStart, $dateEnd] = $this->parseDateRange($dateRange, $startDate, $endDate);
-
-        $projectPerformance = $this->getProjectPerformanceReport($dateStart, $dateEnd, $projectId, $clientId);
         $financialReport = $this->getFinancialReport($dateStart, $dateEnd, $projectId, $clientId);
-        $clientReport = $this->getClientReport($dateStart, $dateEnd, $clientId);
         $inventoryReport = $this->getInventoryReport();
-        $teamProductivity = $this->getTeamProductivityReport($dateStart, $dateEnd, $projectId);
-        $budgetReport = $this->getBudgetReport($dateStart, $dateEnd, $projectId, $clientId);
+        $projectReport   = $this->getProjectReport($dateStart, $dateEnd, $projectId, $clientId);
 
-        $filename = $this->generateFilename('all-reports', $dateRange, $startDate, $endDate, 'xlsx');
+        $filename = $this->generateFilename('all-reports', $request->get('date_range', 'last_6_months'), $request->get('start_date'), $request->get('end_date'), 'xlsx');
 
         return Excel::download(
-            new AllReportsExport(
-                $projectPerformance,
-                $financialReport,
-                $clientReport,
-                $inventoryReport,
-                $teamProductivity,
-                $budgetReport
-            ),
+            new AllReportsExport($projectReport, $financialReport, null, $inventoryReport, null, $projectReport),
             $filename
         );
     }
 
+    // -------------------------------------------------------------------------
+    // Legacy helpers
+    // -------------------------------------------------------------------------
+
+    private function getClientReport($startDate, $endDate, $clientId)
+    {
+        $query = Client::query();
+        if ($clientId) $query->where('id', $clientId);
+
+        $clients = $query->withCount(['projects' => function ($q) use ($startDate, $endDate) {
+            $q->where(fn($q2) => $q2
+                ->whereBetween('start_date', [$startDate, $endDate])
+                ->orWhereBetween('planned_end_date', [$startDate, $endDate])
+            );
+        }])->with(['projects' => function ($q) use ($startDate, $endDate) {
+            $q->where(fn($q2) => $q2
+                ->whereBetween('start_date', [$startDate, $endDate])
+                ->orWhereBetween('planned_end_date', [$startDate, $endDate])
+            )->select('id', 'client_id', 'project_name', 'contract_amount', 'status');
+        }])->get();
+
+        $topClients = $clients->map(function ($client) {
+            return [
+                'id'                   => $client->id,
+                'client_code'          => $client->client_code,
+                'client_name'          => $client->client_name,
+                'client_type'          => $client->client_type,
+                'total_projects'       => $client->projects_count,
+                'active_projects'      => $client->projects->where('status', 'active')->count(),
+                'completed_projects'   => $client->projects->where('status', 'completed')->count(),
+                'total_contract_value' => $client->projects->sum('contract_amount'),
+            ];
+        })->sortByDesc('total_contract_value')->take(10)->values();
+
+        return [
+            'total_clients'  => $clients->count(),
+            'active_clients' => $clients->where('is_active', true)->count(),
+            'top_clients'    => $topClients,
+        ];
+    }
+
+    private function getTeamProductivityReport($startDate, $endDate, $projectId)
+    {
+        $query = ProjectLaborCost::whereBetween('period_start', [$startDate, $endDate]);
+        if ($projectId) $query->where('project_id', $projectId);
+
+        $entries = $query->with(['user:id,name', 'employee', 'project:id,project_name'])->get();
+
+        $byWorker = $entries->groupBy(function ($entry) {
+            return $entry->assignable_type . '-' . ($entry->user_id ?? $entry->employee_id);
+        })->map(function ($costs) {
+            $first = $costs->first();
+            return [
+                'worker_name'    => $first->assignable_name,
+                'worker_type'    => $first->assignable_type_label,
+                'total_days'     => round($costs->sum('days_present'), 2),
+                'total_cost'     => round($costs->sum('gross_pay'), 2),
+                'avg_daily_rate' => round($costs->avg('daily_rate'), 2),
+                'periods'        => $costs->count(),
+            ];
+        })->sortByDesc('total_cost')->take(10)->values();
+
+        return [
+            'summary' => [
+                'total_days'     => round($entries->sum('days_present'), 2),
+                'total_cost'     => round($entries->sum('gross_pay'), 2),
+                'avg_daily_rate' => $entries->count() > 0
+                    ? round($entries->avg('daily_rate'), 2)
+                    : 0,
+            ],
+            'by_worker' => $byWorker,
+        ];
+    }
+
     private function generateFilename($reportType, $dateRange, $startDate, $endDate, $format)
     {
-        $timestamp = now()->format('Ymd_His');
+        $timestamp    = now()->format('Ymd_His');
         $dateRangeStr = 'all';
 
         if ($startDate && $endDate) {
@@ -732,4 +644,3 @@ class ReportsController extends Controller
         return "{$reportType}_{$dateRangeStr}_{$timestamp}.{$extension}";
     }
 }
-

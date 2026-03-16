@@ -22,7 +22,7 @@ class ClientTypesController extends Controller
         $sortOrder = $request->input('sort_order', 'desc');
 
         // Validate sort column
-        $allowedSortColumns = ['created_at', 'name', 'is_active'];
+        $allowedSortColumns = ['created_at', 'name', 'is_active', 'clients_count'];
         if (!in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
@@ -40,25 +40,34 @@ class ClientTypesController extends Controller
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
                 $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
             })
-            ->orderBy($sortBy, $sortOrder)
-            ->when($sortBy !== 'created_at', function ($query) use ($sortOrder) {
-                // Always add created_at as secondary sort to maintain stable position
-                $query->orderBy('created_at', 'desc');
+            ->when($sortBy === 'clients_count', function ($query) use ($sortOrder) {
+                // clients_count is an aggregate alias — must use orderByRaw
+                $query->orderByRaw("clients_count {$sortOrder}")->orderBy('created_at', 'desc');
             })
-            ->when($sortBy === 'created_at', function ($query) {
-                // If sorting by created_at, ensure consistent secondary sort (by id for stability)
-                $query->orderBy('id', 'desc');
+            ->when($sortBy !== 'clients_count', function ($query) use ($sortBy, $sortOrder) {
+                $query->orderBy($sortBy, $sortOrder)
+                      ->when($sortBy !== 'created_at', fn ($q) => $q->orderBy('created_at', 'desc'))
+                      ->when($sortBy === 'created_at', fn ($q) => $q->orderBy('id', 'desc'));
             })
             ->paginate(10);
 
+        // Compute stats from ALL records (not paginated)
+        $stats = [
+            'total'          => ClientType::count(),
+            'active'         => ClientType::where('is_active', true)->count(),
+            'inactive'       => ClientType::where('is_active', false)->count(),
+            'total_clients'  => ClientType::withCount('clients')->get()->sum('clients_count'),
+        ];
+
         return Inertia::render('ClientTypeManagement/index', [
             'clientTypes' => $clientTypes,
-            'search' => $search,
-            'filters' => [
+            'search'      => $search,
+            'filters'     => [
                 'is_active' => $isActive,
             ],
-            'sort_by' => $sortBy,
-            'sort_order' => $sortOrder,
+            'sort_by'     => $sortBy,
+            'sort_order'  => $sortOrder,
+            'stats'       => $stats,
         ]);
     }
 
@@ -83,7 +92,6 @@ class ClientTypesController extends Controller
                 route('client-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the creation
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
@@ -98,7 +106,6 @@ class ClientTypesController extends Controller
             'is_active'   => ['required', 'boolean'],
         ]);
 
-        // Ensure is_active is a proper boolean
         $validated['is_active'] = filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
 
         $oldName = $clientType->name;
@@ -116,7 +123,6 @@ class ClientTypesController extends Controller
                 route('client-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the update
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
@@ -127,7 +133,6 @@ class ClientTypesController extends Controller
     {
         $name = $clientType->name;
 
-        // Prevent deletion if client type has related clients
         if ($clientType->clients()->exists()) {
             return back()->withErrors([
                 'message' => 'This client type has existing clients and cannot be deleted.',
@@ -147,7 +152,6 @@ class ClientTypesController extends Controller
                 route('client-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the deletion
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
@@ -160,7 +164,6 @@ class ClientTypesController extends Controller
             'is_active' => ['required', 'boolean'],
         ]);
 
-        // Prevent status update if client type has related clients
         if ($clientType->clients()->exists()) {
             return back()->withErrors([
                 'message' => 'Cannot change status of this client type because it is currently being used by clients.',
@@ -187,11 +190,9 @@ class ClientTypesController extends Controller
                 route('client-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the status update
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
         return redirect()->route('client-type-management.index')->with('success', 'Client type status updated successfully.');
     }
 }
-

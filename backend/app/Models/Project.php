@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Project extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'project_code',
         'project_name',
@@ -20,13 +23,36 @@ class Project extends Model
         'location',
         'description',
         'billing_type',
+        // Documents
+        'building_permit',
+        'business_permit',
+        'environmental_compliance',
+        'contractor_license',
+        'surety_bond',
+        'signed_contract',
+        'notice_to_proceed',
+        // Archive
+        'archived_at',
     ];
 
-    public function client(){
+    protected $casts = [
+        'archived_at' => 'datetime',
+    ];
+
+    protected $appends = ['has_billings'];
+
+    public function getHasBillingsAttribute(): bool
+    {
+        return $this->billings()->exists();
+    }
+
+    public function client()
+    {
         return $this->belongsTo(Client::class, 'client_id', 'id');
     }
 
-    public function projectType(){
+    public function projectType()
+    {
         return $this->belongsTo(ProjectType::class, 'project_type_id', 'id');
     }
 
@@ -40,23 +66,17 @@ class Project extends Model
         return $this->hasMany(ProjectTeam::class, 'project_id');
     }
 
-    /**
-     * Alias for team() - plural form for better readability
-     */
     public function teams()
     {
         return $this->team();
     }
 
-    /**
-     * Get all active team users (for task assignment dropdown)
-     */
     public function teamUsers()
     {
         return $this->team()
-            ->active()      // only active members
-            ->current()     // current members
-            ->with('user'); // eager load employee/user info
+            ->active()
+            ->current()
+            ->with('user');
     }
 
     public function billings()

@@ -19,7 +19,7 @@ class ProjectTypesController extends Controller
         $search = $request->input('search');
         $isActive = $request->input('is_active');
         $sortBy = $request->input('sort_by', 'created_at');
-        $sortOrder = $request->input('sort_order', 'desc'); // Default to desc for created_at
+        $sortOrder = $request->input('sort_order', 'desc');
 
         // Validate sort column
         $allowedSortColumns = ['created_at', 'name', 'is_active'];
@@ -42,23 +42,28 @@ class ProjectTypesController extends Controller
             })
             ->orderBy($sortBy, $sortOrder)
             ->when($sortBy !== 'created_at', function ($query) use ($sortOrder) {
-                // Always add created_at as secondary sort to maintain stable position
                 $query->orderBy('created_at', 'desc');
             })
             ->when($sortBy === 'created_at', function ($query) {
-                // If sorting by created_at, ensure consistent secondary sort (by id for stability)
                 $query->orderBy('id', 'desc');
             })
             ->paginate(10);
 
+        // Compute stats from full dataset (not just current page)
+        $stats = [
+            'total'          => ProjectType::count(),
+            'active'         => ProjectType::where('is_active', true)->count(),
+            'inactive'       => ProjectType::where('is_active', false)->count(),
+            'total_projects' => ProjectType::withCount('projects')->get()->sum('projects_count'),
+        ];
+
         return Inertia::render('ProjectTypeManagement/index', [
             'projectTypes' => $projectTypes,
-            'search' => $search,
-            'filters' => [
-                'is_active' => $isActive,
-            ],
-            'sort_by' => $sortBy,
-            'sort_order' => $sortOrder,
+            'search'       => $search,
+            'filters'      => ['is_active' => $isActive],
+            'sort_by'      => $sortBy,
+            'sort_order'   => $sortOrder,
+            'stats'        => $stats,
         ]);
     }
 
@@ -83,7 +88,6 @@ class ProjectTypesController extends Controller
                 route('project-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the creation
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
@@ -98,11 +102,9 @@ class ProjectTypesController extends Controller
             'is_active'   => ['required', 'boolean'],
         ]);
 
-        // Ensure is_active is a proper boolean
         $validated['is_active'] = filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN);
 
         $oldName = $projectType->name;
-
         $projectType->update($validated);
 
         $this->adminActivityLogs('ProjectType', 'Update', 'Updated Project Type ' . $oldName);
@@ -116,7 +118,6 @@ class ProjectTypesController extends Controller
                 route('project-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the update
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
@@ -127,7 +128,6 @@ class ProjectTypesController extends Controller
     {
         $name = $projectType->name;
 
-        // Prevent deletion if project type has related projects
         if ($projectType->projects()->exists()) {
             return back()->withErrors([
                 'message' => 'This project type has existing projects and cannot be deleted.',
@@ -147,7 +147,6 @@ class ProjectTypesController extends Controller
                 route('project-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the deletion
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
@@ -180,11 +179,9 @@ class ProjectTypesController extends Controller
                 route('project-type-management.index')
             );
         } catch (\Exception $e) {
-            // Log error but don't fail the status update
             \Log::error('Failed to create system notification: ' . $e->getMessage());
         }
 
         return redirect()->route('project-type-management.index')->with('success', 'Project type status updated successfully.');
     }
 }
-

@@ -23,36 +23,37 @@ export default function Step2TeamMembers({ users }) {
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
 
-  // Ensure users is always an array
   const safeUsers = Array.isArray(users) ? users : [];
 
-  // Filter available members (not already added)
   const availableMembers = safeUsers.filter((member) => {
     if (!member || !member.id) return false;
     const memberId = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
     const memberType = member.type || 'user';
-    
-    // Check if member is already in teamMembers
+
     const isAlreadyAdded = teamMembers.some(tm => {
       const tmId = typeof tm.id === 'string' ? parseInt(tm.id, 10) : tm.id;
       const tmType = tm.type || 'user';
       return tmId === memberId && tmType === memberType;
     });
-    
+
     if (isAlreadyAdded) return false;
-    
-    // Apply search filter
+
     const fullName = `${member.name || ''}`.toLowerCase();
     const email = member.email ? member.email.toLowerCase() : '';
     const position = member.position ? member.position.toLowerCase() : '';
     const searchLower = search.toLowerCase();
-    
+
     return (
       fullName.includes(searchLower) ||
       email.includes(searchLower) ||
       position.includes(searchLower)
     );
   });
+
+  const getMemberRole = (member) => {
+    if (member.type === 'employee') return member.position || 'No Position';
+    return member.role || 'No Role';
+  };
 
   const toggleSelectAll = (checked) => {
     if (checked) {
@@ -68,56 +69,20 @@ export default function Step2TeamMembers({ users }) {
   const toggleMember = (compositeId) => {
     if (selectedMemberIds.includes(compositeId)) {
       setSelectedMemberIds(selectedMemberIds.filter((id) => id !== compositeId));
-      // Clear form data for deselected member
       setFormData((prev) => {
         const newData = { ...prev };
         delete newData[compositeId];
         return newData;
       });
-      // Clear errors for deselected member
       setErrors((prev) => {
         const newErrors = { ...prev };
-        delete newErrors[`${compositeId}_role`];
         delete newErrors[`${compositeId}_hourly_rate`];
         delete newErrors[`${compositeId}_start_date`];
+        delete newErrors[`${compositeId}_end_date`];
         return newErrors;
       });
     } else {
       setSelectedMemberIds([...selectedMemberIds, compositeId]);
-      // Auto-populate role when member is selected
-      const member = availableMembers.find(m => {
-        const mId = typeof m.id === 'number' ? m.id : parseInt(m.id, 10);
-        const mType = m.type || 'user';
-        return `${mType}-${mId}` === compositeId;
-      });
-      if (member) {
-        const currentRole = formData[compositeId]?.role;
-        // Auto-fill role if not already set
-        if (!currentRole) {
-          const autoRole = (member.type === 'user' && member.role) 
-            ? member.role 
-            : (member.type === 'employee' && member.position) 
-            ? member.position 
-            : null;
-          
-          if (autoRole) {
-            // Set role in formData and clear any existing error
-            setFormData((prev) => ({
-              ...prev,
-              [compositeId]: {
-                ...prev[compositeId],
-                role: autoRole,
-              },
-            }));
-            // Clear error for role if it exists
-            setErrors((prev) => {
-              const newErrors = { ...prev };
-              delete newErrors[`${compositeId}_role`];
-              return newErrors;
-            });
-          }
-        }
-      }
     }
   };
 
@@ -129,13 +94,29 @@ export default function Step2TeamMembers({ users }) {
         [field]: value,
       },
     }));
-    // Clear error for this field
+    // Clear the error for this field on change
     if (errors[`${compositeId}_${field}`]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[`${compositeId}_${field}`];
         return newErrors;
       });
+    }
+    // When start_date changes, re-validate end_date live
+    if (field === 'start_date') {
+      const endDate = formData[compositeId]?.end_date;
+      if (endDate && endDate < value) {
+        setErrors((prev) => ({
+          ...prev,
+          [`${compositeId}_end_date`]: 'End date must be on or after start date.',
+        }));
+      } else if (endDate) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[`${compositeId}_end_date`];
+          return newErrors;
+        });
+      }
     }
   };
 
@@ -151,42 +132,47 @@ export default function Step2TeamMembers({ users }) {
       return;
     }
 
-    // Validate required fields
     const validationErrors = {};
+
     for (const compositeId of selectedMemberIds) {
       const member = availableMembers.find(m => {
         const mId = typeof m.id === 'number' ? m.id : parseInt(m.id, 10);
         const mType = m.type || 'user';
         return `${mType}-${mId}` === compositeId;
       });
-      
+
       if (!member) continue;
-      
+
       const memberName = member.name || 'Team Member';
-      
-      // Get role from formData or fallback to member's role/position
-      const roleValue = formData[compositeId]?.role || 
-                       (member.type === 'user' ? member.role : null) ||
-                       (member.type === 'employee' ? member.position : null) ||
-                       '';
-      
-      if (!roleValue || roleValue.trim() === '') {
-        validationErrors[`${compositeId}_role`] = `Please enter a role for ${memberName}`;
+      const memberFormData = formData[compositeId] || {};
+
+      // ── Hourly Rate ──
+      const hourlyRateVal = memberFormData.hourly_rate;
+      if (hourlyRateVal === undefined || hourlyRateVal === '' || parseFloat(hourlyRateVal) < 0) {
+        validationErrors[`${compositeId}_hourly_rate`] = `Hourly rate for ${memberName} must be at least 0.`;
       }
-      if (!formData[compositeId]?.hourly_rate || parseFloat(formData[compositeId]?.hourly_rate) <= 0) {
-        validationErrors[`${compositeId}_hourly_rate`] = `Please enter a valid hourly rate for ${memberName}`;
-      }
-      if (!formData[compositeId]?.start_date) {
-        validationErrors[`${compositeId}_start_date`] = `Please enter a start date for ${memberName}`;
-      }
-      
-      // Validate dates against project dates
-      if (formData[compositeId]?.start_date) {
-        if (projectData.start_date && formData[compositeId].start_date < projectData.start_date) {
-          validationErrors[`${compositeId}_start_date`] = `Start date cannot be before project start date (${projectData.start_date})`;
+
+      // ── Start Date — required ──
+      if (!memberFormData.start_date) {
+        validationErrors[`${compositeId}_start_date`] = `Start date is required for ${memberName}.`;
+      } else {
+        if (projectData.start_date && memberFormData.start_date < projectData.start_date) {
+          validationErrors[`${compositeId}_start_date`] = `Start date cannot be before project start date (${projectData.start_date}).`;
+        } else if (projectData.planned_end_date && memberFormData.start_date > projectData.planned_end_date) {
+          validationErrors[`${compositeId}_start_date`] = `Start date cannot be after project end date (${projectData.planned_end_date}).`;
         }
-        if (projectData.planned_end_date && formData[compositeId].start_date > projectData.planned_end_date) {
-          validationErrors[`${compositeId}_start_date`] = `Start date cannot be after project end date (${projectData.planned_end_date})`;
+      }
+
+      // ── End Date — now REQUIRED ──
+      if (!memberFormData.end_date) {
+        validationErrors[`${compositeId}_end_date`] = `End date is required for ${memberName}.`;
+      } else {
+        if (memberFormData.start_date && memberFormData.end_date < memberFormData.start_date) {
+          validationErrors[`${compositeId}_end_date`] = `End date must be on or after start date for ${memberName}.`;
+        } else if (projectData.planned_end_date && memberFormData.end_date > projectData.planned_end_date) {
+          validationErrors[`${compositeId}_end_date`] = `End date cannot be after project end date (${projectData.planned_end_date}).`;
+        } else if (projectData.start_date && memberFormData.end_date < projectData.start_date) {
+          validationErrors[`${compositeId}_end_date`] = `End date cannot be before project start date (${projectData.start_date}).`;
         }
       }
     }
@@ -197,21 +183,19 @@ export default function Step2TeamMembers({ users }) {
       return;
     }
 
-    // Add all selected members
     let addedCount = 0;
     for (const compositeId of selectedMemberIds) {
       const [memberType, memberIdStr] = compositeId.split('-');
       const memberIdInt = parseInt(memberIdStr, 10);
-      
+
       const member = availableMembers.find(m => {
         const mId = typeof m.id === 'number' ? m.id : parseInt(m.id, 10);
         const mType = m.type || 'user';
         return mId === memberIdInt && mType === memberType;
       });
-      
+
       if (!member) continue;
 
-      // Check if member is already added (double-check)
       const isAlreadyAdded = teamMembers.some(tm => {
         const tmId = typeof tm.id === 'string' ? parseInt(tm.id, 10) : tm.id;
         const tmType = tm.type || 'user';
@@ -219,21 +203,15 @@ export default function Step2TeamMembers({ users }) {
       });
 
       if (!isAlreadyAdded) {
-        // Get role from formData or fallback to member's role/position
-        const roleValue = formData[compositeId]?.role || 
-                         (member.type === 'user' ? member.role : null) ||
-                         (member.type === 'employee' ? member.position : null) ||
-                         '';
-        
         addTeamMember({
-          id: memberIdInt,
-          type: memberType,
-          name: member.name || 'Unknown',
-          email: member.email || '',
-          role: roleValue,
+          id:          memberIdInt,
+          type:        memberType,
+          name:        member.name || 'Unknown',
+          email:       member.email || '',
+          role:        getMemberRole(member),
           hourly_rate: parseFloat(formData[compositeId]?.hourly_rate) || 0,
-          start_date: formData[compositeId]?.start_date || '',
-          end_date: formData[compositeId]?.end_date || null,
+          start_date:  formData[compositeId]?.start_date || '',
+          end_date:    formData[compositeId]?.end_date || '',
         });
         addedCount++;
       }
@@ -241,7 +219,6 @@ export default function Step2TeamMembers({ users }) {
 
     if (addedCount > 0) {
       toast.success(`${addedCount} team member(s) added successfully`);
-      // Clear selections and form data
       setSelectedMemberIds([]);
       setFormData({});
       setErrors({});
@@ -253,6 +230,17 @@ export default function Step2TeamMembers({ users }) {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Assign Team Members</h3>
+
+      {/* Project date context hint */}
+      {(projectData.start_date || projectData.planned_end_date) && (
+        <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <span className="font-semibold text-blue-700">Project dates: </span>
+          <span className="text-blue-600">
+            {projectData.start_date || '—'} → {projectData.planned_end_date || '—'}
+          </span>
+          <span className="ml-2 text-blue-500">· Member dates must fall within this range.</span>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative">
@@ -285,31 +273,34 @@ export default function Step2TeamMembers({ users }) {
                   />
                 </TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider w-24">Type</TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[180px]">Name</TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[200px]">Email</TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">
-                  Role <span className="text-red-500">*</span>
-                </TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">Name</TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[180px]">Email</TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">Role</TableHead>
                 <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">
                   Hourly Rate <span className="text-red-500">*</span>
                 </TableHead>
-                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">
                   Start Date <span className="text-red-500">*</span>
+                </TableHead>
+                <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">
+                  End Date <span className="text-red-500">*</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {availableMembers.map((member) => {
-                const memberId = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
+                const memberId   = typeof member.id === 'number' ? member.id : parseInt(member.id, 10);
                 const memberType = member.type || 'user';
                 const compositeId = `${memberType}-${memberId}`;
-                const isSelected = selectedMemberIds.includes(compositeId);
-                
+                const isSelected  = selectedMemberIds.includes(compositeId);
+
                 const memberErrors = {
-                  role: errors[`${compositeId}_role`],
                   hourly_rate: errors[`${compositeId}_hourly_rate`],
-                  start_date: errors[`${compositeId}_start_date`],
+                  start_date:  errors[`${compositeId}_start_date`],
+                  end_date:    errors[`${compositeId}_end_date`],
                 };
+
+                const memberStartDate = formData[compositeId]?.start_date;
 
                 return (
                   <TableRow
@@ -342,56 +333,61 @@ export default function Step2TeamMembers({ users }) {
                     </TableCell>
                     <TableCell className="font-medium text-gray-900">{member.name || '---'}</TableCell>
                     <TableCell className="text-gray-700">{member.email || '---'}</TableCell>
-                    <TableCell className="min-w-[150px]">
-                      <Input
-                        placeholder={member.role || member.position || "Enter role"}
-                        value={formData[compositeId]?.role || member.role || member.position || ""}
-                        onChange={(e) => handleChange(compositeId, "role", e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        className={`${inputClass(memberErrors.role)} min-w-[140px]`}
-                        required
-                      />
-                      {memberErrors.role && (
-                        <InputError message={memberErrors.role} className="mt-1" />
-                      )}
+                    <TableCell>
+                      <span className="inline-block px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 whitespace-nowrap">
+                        {getMemberRole(member)}
+                      </span>
                     </TableCell>
+
+                    {/* Hourly Rate */}
                     <TableCell>
                       <Input
                         type="number"
                         step="0.01"
                         min="0"
                         placeholder="0.00"
-                        value={formData[compositeId]?.hourly_rate || ""}
+                        value={formData[compositeId]?.hourly_rate ?? ""}
                         onChange={(e) => handleChange(compositeId, "hourly_rate", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         className={inputClass(memberErrors.hourly_rate)}
-                        required
                       />
-                      {memberErrors.hourly_rate && (
-                        <InputError message={memberErrors.hourly_rate} className="mt-1" />
-                      )}
+                      <InputError message={memberErrors.hourly_rate} className="mt-1" />
                     </TableCell>
+
+                    {/* Start Date */}
                     <TableCell>
                       <Input
                         type="date"
-                        value={formData[compositeId]?.start_date || ""}
+                        value={formData[compositeId]?.start_date ?? ""}
                         onChange={(e) => handleChange(compositeId, "start_date", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         min={projectData.start_date || undefined}
                         max={projectData.planned_end_date || undefined}
                         className={inputClass(memberErrors.start_date)}
-                        required
                       />
-                      {memberErrors.start_date && (
-                        <InputError message={memberErrors.start_date} className="mt-1" />
-                      )}
+                      <InputError message={memberErrors.start_date} className="mt-1" />
+                    </TableCell>
+
+                    {/* End Date — now required */}
+                    <TableCell>
+                      <Input
+                        type="date"
+                        value={formData[compositeId]?.end_date ?? ""}
+                        onChange={(e) => handleChange(compositeId, "end_date", e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        min={memberStartDate || projectData.start_date || undefined}
+                        max={projectData.planned_end_date || undefined}
+                        className={inputClass(memberErrors.end_date)}
+                      />
+                      <InputError message={memberErrors.end_date} className="mt-1" />
                     </TableCell>
                   </TableRow>
                 );
               })}
+
               {availableMembers.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={8} className="text-center py-12">
                     <div className="flex flex-col items-center justify-center">
                       <div className="bg-gray-100 rounded-full p-4 mb-3">
                         <Search className="h-8 w-8 text-gray-400" />
@@ -438,6 +434,7 @@ export default function Step2TeamMembers({ users }) {
                   <TableHead>Role</TableHead>
                   <TableHead>Hourly Rate</TableHead>
                   <TableHead>Start Date</TableHead>
+                  <TableHead>End Date</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -458,8 +455,9 @@ export default function Step2TeamMembers({ users }) {
                     </TableCell>
                     <TableCell>{member.email || '---'}</TableCell>
                     <TableCell>{member.role || '---'}</TableCell>
-                    <TableCell>{member.hourly_rate ? `₱${parseFloat(member.hourly_rate).toFixed(2)}` : "---"}</TableCell>
-                    <TableCell>{member.start_date || "---"}</TableCell>
+                    <TableCell>{member.hourly_rate !== undefined ? `₱${parseFloat(member.hourly_rate).toFixed(2)}` : '---'}</TableCell>
+                    <TableCell>{member.start_date || '---'}</TableCell>
+                    <TableCell>{member.end_date || '---'}</TableCell>
                     <TableCell>
                       <Button
                         type="button"

@@ -22,6 +22,7 @@ class PermissionSeeder extends Seeder
             'projects.update',
             'projects.delete',
             'projects.view-all',
+            'projects.archive',
 
             // Project Teams
             'project-teams.view',
@@ -102,6 +103,7 @@ class PermissionSeeder extends Seeder
             'inventory.stock-in',
             'inventory.stock-out',
             'inventory.allocate',
+            'inventory.archive',
 
             // Billing
             'billing.view',
@@ -110,6 +112,7 @@ class PermissionSeeder extends Seeder
             'billing.delete',
             'billing.add-payment',
             'billing.view-payments',
+            'billing.archive',
 
             // Reports
             'reports.view',
@@ -137,6 +140,11 @@ class PermissionSeeder extends Seeder
             // Activity Logs
             'activity-logs.view',
             'activity-logs.export',
+
+            // Trash Bin
+            'trash-bin.view',
+            'trash-bin.restore',
+            'trash-bin.force-delete',
         ];
 
         foreach ($permissions as $permission) {

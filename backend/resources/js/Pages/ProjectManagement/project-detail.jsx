@@ -40,12 +40,6 @@ export default function ProjectDetail() {
             permission: 'project-teams.view'
         },
         { 
-            key: "milestones", 
-            label: "Milestones", 
-            component: <MilestonesTab project={project} milestoneData={milestoneData}/>,
-            permission: 'project-milestones.view'
-        },
-        { 
             key: "material-allocation", 
             label: "Material Allocation", 
             component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} />,
@@ -63,12 +57,18 @@ export default function ProjectDetail() {
             component: <MiscellaneousExpenseTab project={project} miscellaneousExpenseData={miscellaneousExpenseData} />,
             permission: 'miscellaneous-expenses.view'
         },
-        { 
-            key: "request-updates", 
-            label: "Request Updates", 
-            component: <RequestUpdatesTab project={project} requestUpdatesData={requestUpdatesData} />,
-            permission: 'projects.view'
+                { 
+            key: "milestones", 
+            label: "Milestones", 
+            component: <MilestonesTab project={project} milestoneData={milestoneData}/>,
+            permission: 'project-milestones.view'
         },
+        // { 
+        //     key: "request-updates", 
+        //     label: "Request Updates", 
+        //     component: <RequestUpdatesTab project={project} requestUpdatesData={requestUpdatesData} />,
+        //     permission: 'projects.view'
+        // },
     ];
 
     // Filter tabs based on user permissions

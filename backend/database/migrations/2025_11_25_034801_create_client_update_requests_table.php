@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('client_id')->constrained('clients')->onDelete('cascade');
             $table->foreignId('project_id')->nullable()->constrained('projects')->onDelete('cascade');
+            $table->foreignId('task_id')->constrained('project_tasks')->onDelete('cascade');
             $table->string('subject');
             $table->text('message');
             $table->timestamps();

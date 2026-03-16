@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Billing extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'project_id',
@@ -20,15 +21,32 @@ class Billing extends Model
         'status',
         'description',
         'created_by',
+        'archived_at',
     ];
 
     protected $casts = [
         'billing_amount' => 'decimal:2',
-        'billing_date' => 'date',
-        'due_date' => 'date',
+        'billing_date'   => 'date',
+        'due_date'       => 'date',
+        'archived_at'    => 'datetime',
     ];
 
-    // Relationships
+    // ── Scopes ──────────────────────────────────────────────────────────────
+
+    /** Active (non-archived) billings — used by default queries */
+    public function scopeActive($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    /** Archived billings only */
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
+
+    // ── Relationships ────────────────────────────────────────────────────────
+
     public function project()
     {
         return $this->belongsTo(Project::class);
@@ -49,10 +67,10 @@ class Billing extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // Computed properties
+    // ── Computed properties ──────────────────────────────────────────────────
+
     public function getTotalPaidAttribute()
     {
-        // Only count payments with status='paid' - pending, failed, or cancelled payments should not count
         return $this->payments()
             ->where('payment_status', 'paid')
             ->sum('payment_amount');
@@ -65,17 +83,21 @@ class Billing extends Model
 
     public function getPaymentPercentageAttribute()
     {
-        if ($this->billing_amount == 0) {
-            return 0;
-        }
+        if ($this->billing_amount == 0) return 0;
         return ($this->total_paid / $this->billing_amount) * 100;
     }
 
-    // Auto-update status based on payments
-    public function updateStatus()
+    public function getIsArchivedAttribute(): bool
+    {
+        return !is_null($this->archived_at);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    public function updateStatus(): void
     {
         $totalPaid = $this->total_paid;
-        
+
         if ($totalPaid == 0) {
             $this->status = 'unpaid';
         } elseif ($totalPaid >= $this->billing_amount) {
@@ -83,8 +105,17 @@ class Billing extends Model
         } else {
             $this->status = 'partial';
         }
-        
+
         $this->save();
     }
-}
 
+    public function archive(): void
+    {
+        $this->update(['archived_at' => now()]);
+    }
+
+    public function unarchive(): void
+    {
+        $this->update(['archived_at' => null]);
+    }
+}

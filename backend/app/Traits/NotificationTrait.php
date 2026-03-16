@@ -51,13 +51,9 @@ trait NotificationTrait
         }
         
         foreach ($users as $user) {
-            // Skip the user who triggered the notification to avoid self-notification
-            if ($authId && $user->id !== $authId) {
+
                 $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
-            } elseif (!$authId) {
-                // If no authenticated user, notify all users
-                $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
-            }
+            
         }
         
         return $notifications;

@@ -1,5 +1,5 @@
 import { useForm } from "@inertiajs/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -20,8 +20,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import { Loader2, Save, CreditCard } from "lucide-react";
+import { Loader2, Save, CreditCard, Sparkles } from "lucide-react";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
+
+// Auto-generate a reference number based on payment method and timestamp
+const generateReferenceNumber = (paymentMethod = 'bank_transfer') => {
+  const prefixMap = {
+    cash:          'CASH',
+    check:         'CHK',
+    bank_transfer: 'BT',
+    credit_card:   'CC',
+    other:         'REF',
+  };
+  const prefix = prefixMap[paymentMethod] || 'REF';
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}-${timestamp}-${random}`;
+};
 
 const AddPayment = ({ setShowPaymentModal, billing }) => {
   const remainingAmount = parseFloat(billing.billing_amount || 0) - parseFloat(billing.total_paid || 0);
@@ -30,11 +45,17 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
     payment_amount: "",
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: "bank_transfer",
-    reference_number: "",
+    reference_number: generateReferenceNumber("bank_transfer"),
     notes: "",
   });
 
   const [paymentAmountDisplay, setPaymentAmountDisplay] = useState('');
+
+  // Regenerate reference number whenever payment method changes
+  useEffect(() => {
+    setData("reference_number", generateReferenceNumber(data.payment_method));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.payment_method]);
 
   const inputClass = (error, readOnly = false) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -47,7 +68,6 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Validate payment amount doesn't exceed remaining
     if (parseFloat(data.payment_amount) > remainingAmount) {
       toast.error(`Payment amount cannot exceed remaining amount (₱${remainingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`);
       return;
@@ -128,33 +148,27 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
               value={paymentAmountDisplay}
               onChange={(e) => {
                 let inputValue = e.target.value;
-                
-                // Allow empty string
+
                 if (inputValue === '') {
                   setPaymentAmountDisplay('');
                   setData("payment_amount", '');
                   return;
                 }
-                
-                // Remove all non-numeric characters except decimal point
+
                 inputValue = inputValue.replace(/[^\d.]/g, '');
-                
-                // Prevent multiple decimal points
+
                 const parts = inputValue.split('.');
                 if (parts.length > 2) {
                   inputValue = parts[0] + '.' + parts.slice(1).join('');
                 }
-                
-                // Limit decimal places to 2
+
                 if (parts.length === 2 && parts[1].length > 2) {
                   inputValue = parts[0] + '.' + parts[1].substring(0, 2);
                 }
-                
-                // Format with commas for display
+
                 const formattedValue = formatNumberWithCommas(inputValue);
                 setPaymentAmountDisplay(formattedValue);
-                
-                // Store numeric value (without commas)
+
                 const numericValue = parseFormattedNumber(inputValue);
                 setData("payment_amount", numericValue);
               }}
@@ -200,15 +214,23 @@ const AddPayment = ({ setShowPaymentModal, billing }) => {
             <InputError message={errors.payment_method} />
           </div>
 
-          {/* Reference Number */}
+          {/* Reference Number — auto-generated, read-only */}
           <div className="col-span-2">
-            <Label className="text-zinc-800">Reference Number</Label>
+            <Label className="text-zinc-800 flex items-center gap-1.5">
+              Reference Number
+              <span className="inline-flex items-center gap-1 text-xs font-normal text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                <Sparkles className="h-3 w-3" />
+                Auto-generated
+              </span>
+            </Label>
             <Input
               value={data.reference_number}
-              onChange={(e) => setData("reference_number", e.target.value)}
-              placeholder="Check number, transaction ID, etc."
-              className={inputClass(errors.reference_number)}
+              readOnly
+              className={inputClass(false, true) + " font-mono tracking-wide"}
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Unique reference ID generated automatically based on payment method.
+            </p>
             <InputError message={errors.reference_number} />
           </div>
 

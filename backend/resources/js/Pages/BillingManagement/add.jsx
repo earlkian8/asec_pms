@@ -38,7 +38,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
     description: "",
   });
 
-  // Update billing type and milestones when project is selected
   useEffect(() => {
     if (data.project_id) {
       const project = projects.find(p => p.id.toString() === data.project_id.toString());
@@ -46,13 +45,11 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
         setSelectedProject(project);
         setData('billing_type', project.billing_type);
         setMilestones(project.milestones || []);
-        // Clear milestone if project changes
         if (project.billing_type !== 'milestone') {
           setData('milestone_id', '');
           setData('billing_amount', '');
           setBillingAmountDisplay('');
         }
-        // For fixed_price billing, auto-fill billing amount with contract amount (fixed)
         if (project.billing_type === 'fixed_price' && project.contract_amount) {
           const amount = parseFloat(project.contract_amount).toFixed(2);
           setData('billing_amount', amount);
@@ -72,7 +69,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
     }
   }, [data.project_id]);
 
-  // Sync display value when billing_amount changes (e.g., from milestone calculation)
   useEffect(() => {
     if (data.billing_amount) {
       setBillingAmountDisplay(formatNumberWithCommas(data.billing_amount));
@@ -89,7 +85,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     post(route("billing-management.store"), {
       preserveScroll: true,
       onSuccess: (page) => {
@@ -110,6 +105,12 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
       },
     });
   };
+
+  // Derive remaining billable amount from the total_billed sent by the backend
+  const contractAmount  = selectedProject ? parseFloat(selectedProject.contract_amount || 0) : 0;
+  const totalBilled     = selectedProject ? parseFloat(selectedProject.total_billed || 0) : 0;
+  const remainingBillable = contractAmount - totalBilled;
+  const isFullyBilled   = selectedProject && contractAmount > 0 && remainingBillable <= 0;
 
   return (
     <Dialog open onOpenChange={setShowAddModal}>
@@ -153,7 +154,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             </div>
           )}
 
-          {/* Milestone (only for milestone-based billing) */}
+          {/* Milestone */}
           {data.billing_type === 'milestone' && (
             <div className="col-span-2">
               <Label className="text-zinc-800">Milestone <span className="text-red-500">*</span></Label>
@@ -161,7 +162,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
                 value={data.milestone_id}
                 onValueChange={(value) => {
                   setData("milestone_id", value);
-                  // Calculate billing amount based on milestone percentage
                   const selectedMilestone = milestones.find(m => m.id.toString() === value);
                   if (selectedMilestone && selectedProject && selectedMilestone.billing_percentage) {
                     const calculatedAmount = (parseFloat(selectedProject.contract_amount || 0) * parseFloat(selectedMilestone.billing_percentage)) / 100;
@@ -184,20 +184,41 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             </div>
           )}
 
-          {/* Contract Amount Info (read-only) */}
-          {selectedProject && selectedProject.contract_amount && (
+          {/* Contract Amount + remaining billable info */}
+          {selectedProject && contractAmount > 0 && (
             <div className="col-span-2">
               <Label className="text-zinc-800">Contract Amount</Label>
               <Input
-                value={`₱${parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                value={`₱${contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 readOnly
                 className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                {data.billing_type === 'fixed_price' 
-                  ? 'Billing amount should not exceed contract amount'
-                  : 'For milestone billing, amount is calculated from milestone percentage'}
-              </p>
+              <div className={`mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs rounded-lg px-3 py-2 border ${
+                isFullyBilled
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : totalBilled > 0
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-500'
+              }`}>
+                <span>
+                  Already billed:{' '}
+                  <span className="font-semibold">
+                    ₱{totalBilled.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                  </span>
+                </span>
+                {isFullyBilled ? (
+                  <span className="font-semibold text-red-600">
+                    Fully billed — you can still submit, but it will be rejected unless a previous billing was deleted
+                  </span>
+                ) : (
+                  <span>
+                    Remaining billable:{' '}
+                    <span className="font-semibold">
+                      ₱{remainingBillable.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </span>
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -208,60 +229,39 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
               type="text"
               value={billingAmountDisplay}
               onChange={(e) => {
-                // Only allow changes when not read-only
                 if (data.billing_type !== 'milestone' && !(data.billing_type === 'fixed_price' && selectedProject)) {
                   let inputValue = e.target.value;
-                  
-                  // Allow empty string
                   if (inputValue === '') {
                     setBillingAmountDisplay('');
                     setData("billing_amount", '');
                     return;
                   }
-                  
-                  // Remove all non-numeric characters except decimal point
                   inputValue = inputValue.replace(/[^\d.]/g, '');
-                  
-                  // Prevent multiple decimal points
                   const parts = inputValue.split('.');
-                  if (parts.length > 2) {
-                    inputValue = parts[0] + '.' + parts.slice(1).join('');
-                  }
-                  
-                  // Limit decimal places to 2
-                  if (parts.length === 2 && parts[1].length > 2) {
-                    inputValue = parts[0] + '.' + parts[1].substring(0, 2);
-                  }
-                  
-                  // Format with commas for display
-                  const formattedValue = formatNumberWithCommas(inputValue);
-                  setBillingAmountDisplay(formattedValue);
-                  
-                  // Store numeric value (without commas)
-                  const numericValue = parseFormattedNumber(inputValue);
-                  setData("billing_amount", numericValue);
+                  if (parts.length > 2) inputValue = parts[0] + '.' + parts.slice(1).join('');
+                  if (parts.length === 2 && parts[1].length > 2) inputValue = parts[0] + '.' + parts[1].substring(0, 2);
+                  setBillingAmountDisplay(formatNumberWithCommas(inputValue));
+                  setData("billing_amount", parseFormattedNumber(inputValue));
                 }
               }}
               readOnly={data.billing_type === 'milestone' || (data.billing_type === 'fixed_price' && selectedProject)}
-              placeholder={selectedProject && data.billing_type === 'fixed_price' 
-                ? `Max: ₱${parseFloat(selectedProject.contract_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : "0.00"}
+              placeholder="0.00"
               className={data.billing_type === 'fixed_price' || data.billing_type === 'milestone'
-                ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed" 
+                ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
                 : inputClass(errors.billing_amount)}
             />
-            {selectedProject && data.billing_type === 'fixed_price' && selectedProject.contract_amount && (
+            {selectedProject && data.billing_type === 'fixed_price' && contractAmount > 0 && (
               <p className="text-xs text-gray-500 mt-1">
-                Fixed amount: ₱{parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Fixed at contract amount: ₱{contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </p>
             )}
             {data.billing_type === 'milestone' && selectedProject && data.milestone_id && (() => {
               const selectedMilestone = milestones.find(m => m.id.toString() === data.milestone_id.toString());
-              if (selectedMilestone && selectedMilestone.billing_percentage && selectedProject.contract_amount) {
-                const calculatedAmount = (parseFloat(selectedProject.contract_amount) * parseFloat(selectedMilestone.billing_percentage)) / 100;
+              if (selectedMilestone?.billing_percentage && contractAmount) {
+                const calculatedAmount = (contractAmount * parseFloat(selectedMilestone.billing_percentage)) / 100;
                 return (
                   <p className="text-xs text-gray-500 mt-1">
-                    Calculated from milestone percentage: ₱{parseFloat(selectedProject.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {selectedMilestone.billing_percentage}% = ₱{calculatedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₱{contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} × {selectedMilestone.billing_percentage}% = ₱{calculatedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </p>
                 );
               }
@@ -308,7 +308,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.description} />
           </div>
 
-          {/* Footer Buttons */}
+          {/* Footer */}
           <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
             <Button
               type="button"
@@ -325,15 +325,9 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
               disabled={processing}
             >
               {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" />Creating...</>
               ) : (
-                <>
-                  <Save size={16} />
-                  Create Billing
-                </>
+                <><Save size={16} />Create Billing</>
               )}
             </Button>
           </DialogFooter>

@@ -34,6 +34,7 @@ class BillingService
             'createdBy:id,name'
         ])
             ->withCount('payments')
+            ->whereNull('archived_at')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('billing_code', 'ilike', "%{$search}%")

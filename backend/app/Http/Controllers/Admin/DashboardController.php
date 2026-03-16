@@ -127,9 +127,7 @@ class DashboardController extends Controller
         $inProgressTasks = ProjectTask::where('status', 'in_progress')->count();
 
         // Budget Statistics
-        $totalLaborCost = ProjectLaborCost::get()->sum(function ($cost) {
-            return (float) $cost->hours_worked * (float) $cost->hourly_rate;
-        });
+        $totalLaborCost = (float) ProjectLaborCost::sum('gross_pay');
 
         $totalMaterialCost = ProjectMaterialAllocation::with('inventoryItem')
             ->get()
@@ -158,10 +156,10 @@ class DashboardController extends Controller
 
         // Monthly Expenses (last 6 months) - Labor + Materials
         $monthlyLaborCosts = ProjectLaborCost::select(
-            DB::raw("DATE_TRUNC('month', work_date) as month"),
-            DB::raw('SUM(hours_worked * hourly_rate) as total')
+            DB::raw("DATE_TRUNC('month', period_start) as month"),
+            DB::raw('SUM(gross_pay) as total')
         )
-            ->where('work_date', '>=', now()->subMonths(6))
+            ->where('period_start', '>=', now()->subMonths(6))
             ->groupBy('month')
             ->orderBy('month', 'asc')
             ->get()

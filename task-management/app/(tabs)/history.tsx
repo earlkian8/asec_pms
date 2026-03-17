@@ -1,55 +1,56 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  TextInput, ScrollView, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Search,
-  CheckCircle2,
-  FileText,
-  Calendar,
-  Filter,
-  Clock,
-} from 'lucide-react-native';
+import { Search, CheckCircle2, FileText, Calendar, Clock, X, ArrowRight } from 'lucide-react-native';
 import { Task, ProgressUpdate } from '@/types';
-import { AppColors } from '@/utils/colors';
+import { D } from '@/utils/colors';
 import { formatDate, formatDateTime } from '@/utils/dateUtils';
-import AnimatedCard from '@/components/AnimatedCard';
 import { apiService } from '@/services/api';
 
 type HistoryFilter = 'all' | 'completed' | 'updates';
 
 interface HistoryData {
-  completedTasks: Task[];
-  progressUpdates: Array<ProgressUpdate & { task?: Task }>;
+  completedTasks:   Task[];
+  progressUpdates:  Array<ProgressUpdate & { task?: Task }>;
+}
+
+const FILTER_META: Record<HistoryFilter, { label: string }> = {
+  all:       { label: 'All'              },
+  completed: { label: 'Completed Tasks'  },
+  updates:   { label: 'Progress Updates' },
+};
+
+// ── Section header (reusing client-app pattern) ────────────────────────────────
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionBar} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
 }
 
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<HistoryFilter>('all');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [filter,      setFilter]      = useState<HistoryFilter>('all');
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+
+  const [completedTasks,    setCompletedTasks]    = useState<Task[]>([]);
   const [allProgressUpdates, setAllProgressUpdates] = useState<Array<ProgressUpdate & { task?: Task }>>([]);
 
   const loadHistoryData = async () => {
     try {
       setError(null);
       const response = await apiService.get<HistoryData>('/task-management/dashboard/history');
-
-      // Type guard to check if response is ApiResponse
       if (typeof response === 'object' && 'success' in response) {
         if (response.success && response.data) {
           setCompletedTasks(response.data.completedTasks || []);
@@ -57,11 +58,8 @@ export default function HistoryScreen() {
         } else {
           setError(response.message || 'Failed to load history');
         }
-      } else {
-        setError('Invalid response from server');
       }
     } catch (err) {
-      console.error('Error loading history:', err);
       setError('Failed to load history. Please try again.');
     } finally {
       setLoading(false);
@@ -69,261 +67,186 @@ export default function HistoryScreen() {
     }
   };
 
-  useEffect(() => {
-    loadHistoryData();
-  }, []);
+  useEffect(() => { loadHistoryData(); }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadHistoryData();
-  };
+  const onRefresh = () => { setRefreshing(true); loadHistoryData(); };
 
   const filteredData = useMemo(() => {
-    let data: Array<{ type: 'task' | 'update'; item: Task | (ProgressUpdate & { task?: Task }) }> = [];
+    const data: Array<{ type: 'task' | 'update'; item: Task | (ProgressUpdate & { task?: Task }) }> = [];
+    const q = searchQuery.toLowerCase();
 
     if (filter === 'all' || filter === 'completed') {
-      completedTasks.forEach((task) => {
-        if (
-          !searchQuery ||
-          task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          task.description.toLowerCase().includes(searchQuery.toLowerCase())
-        ) {
+      completedTasks.forEach(task => {
+        if (!q || task.title.toLowerCase().includes(q) || task.description.toLowerCase().includes(q))
           data.push({ type: 'task', item: task });
-        }
       });
     }
-
     if (filter === 'all' || filter === 'updates') {
-      allProgressUpdates.forEach((update) => {
-        if (
-          !searchQuery ||
-          update.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          update.task?.title.toLowerCase().includes(searchQuery.toLowerCase())
-        ) {
+      allProgressUpdates.forEach(update => {
+        if (!q || update.description?.toLowerCase().includes(q) || update.task?.title.toLowerCase().includes(q))
           data.push({ type: 'update', item: update });
-        }
       });
     }
 
     return data.sort((a, b) => {
-      const dateA =
-        a.type === 'task'
-          ? new Date((a.item as Task).updatedAt).getTime()
-          : new Date((a.item as ProgressUpdate).created_at).getTime();
-      const dateB =
-        b.type === 'task'
-          ? new Date((b.item as Task).updatedAt).getTime()
-          : new Date((b.item as ProgressUpdate).created_at).getTime();
+      const dateA = a.type === 'task'
+        ? new Date((a.item as Task).updatedAt).getTime()
+        : new Date((a.item as ProgressUpdate).created_at).getTime();
+      const dateB = b.type === 'task'
+        ? new Date((b.item as Task).updatedAt).getTime()
+        : new Date((b.item as ProgressUpdate).created_at).getTime();
       return dateB - dateA;
     });
   }, [searchQuery, filter, completedTasks, allProgressUpdates]);
 
-  const renderItem = ({
-    item,
-    index,
-  }: {
-    item: { type: 'task' | 'update'; item: Task | (ProgressUpdate & { task?: Task }) };
-    index: number;
-  }) => {
-    if (item.type === 'task') {
-      const task = item.item as Task;
-      return (
-        <AnimatedCard
-          index={index}
-          delay={100}
-          onPress={() => router.push(`/task-detail?id=${task.id}`)}
-          style={styles.card}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconContainer}>
-              <CheckCircle2 size={20} color={AppColors.completed} />
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{task.title}</Text>
-              <Text 
-                style={[
-                  styles.cardSubtitle,
-                  !task.description && styles.placeholderText,
-                ]} 
-                numberOfLines={2}
-              >
-                {task.description || 'No description provided'}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.cardFooter}>
-            <View style={styles.cardMeta}>
-              <Calendar size={14} color={AppColors.textSecondary} />
-              <Text style={styles.cardMetaText}>
-                Completed on {formatDate(task.updatedAt)}
-              </Text>
-            </View>
-            <Text style={styles.cardProject}>{task.projectName}</Text>
-          </View>
-        </AnimatedCard>
-      );
-    } else {
-      const update = item.item as ProgressUpdate & { task?: Task };
-      return (
-        <AnimatedCard
-          index={index}
-          delay={100}
-          onPress={() =>
-            update.task && router.push(`/task-detail?id=${update.task.id}`)
-          }
-          style={styles.card}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconContainer}>
-              <FileText size={20} color={AppColors.primary} />
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>
-                Progress Update: {update.task?.title || 'Unknown Task'}
-              </Text>
-              <Text 
-                style={[
-                  styles.cardSubtitle,
-                  !update.description && styles.placeholderText,
-                ]} 
-                numberOfLines={2}
-              >
-                {update.description || 'No description provided'}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.cardFooter}>
-            <View style={styles.cardMeta}>
-              <Clock size={14} color={AppColors.textSecondary} />
-              <Text style={styles.cardMetaText}>
-                {formatDateTime(update.created_at)}
-              </Text>
-            </View>
-            {update.original_name && (
-              <View style={styles.fileBadge}>
-                <FileText size={12} color={AppColors.primary} />
-                <Text style={styles.fileBadgeText} numberOfLines={1}>
-                  {update.original_name}
-                </Text>
-              </View>
-            )}
-          </View>
-        </AnimatedCard>
-      );
-    }
-  };
-
   if (loading && !refreshing) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={AppColors.primary} />
-        <Text style={[styles.loadingText, { color: AppColors.textSecondary }]}>
-          Loading history...
-        </Text>
+      <View style={[styles.root, styles.center]}>
+        <ActivityIndicator size="large" color={D.ink} />
       </View>
     );
   }
 
-  if (error && !refreshing) {
+  if (error) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text style={[styles.errorText, { color: AppColors.error || '#ef4444' }]}>
-          {error}
-        </Text>
-        <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: AppColors.primary }]}
-          onPress={loadHistoryData}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
+      <View style={[styles.root, styles.center]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={loadHistoryData}>
+          <Text style={styles.retryBtnText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={[styles.header, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border, paddingTop: insets.top + 20 }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: AppColors.text }]}>History</Text>
-          <Text style={[styles.headerSubtitle, { color: AppColors.textSecondary }]}>
-            {filteredData.length} item{filteredData.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
-      </View>
+  const renderItem = ({ item }: { item: typeof filteredData[0] }) => {
+    if (item.type === 'task') {
+      const task = item.item as Task;
+      return (
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => router.push(`/task-detail?id=${task.id}`)}
+          activeOpacity={0.7}>
+          <View style={styles.cardLeft}>
+            <View style={[styles.cardIconWrap, { backgroundColor: D.greenBg }]}>
+              <CheckCircle2 size={16} color={D.green} strokeWidth={2} />
+            </View>
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{task.title}</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>
+              {task.description || 'No description provided'}
+            </Text>
+            <View style={styles.cardFooter}>
+              <View style={styles.metaItem}>
+                <Calendar size={11} color={D.inkLight} strokeWidth={2} />
+                <Text style={styles.metaText}>Completed {formatDate(task.updatedAt)}</Text>
+              </View>
+              <Text style={styles.cardProject} numberOfLines={1}>{task.projectName}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
 
-      <View style={[styles.searchContainer, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
-        <View style={[styles.searchInputContainer, { backgroundColor: AppColors.background, borderColor: AppColors.border }]}>
-          <Search size={20} color={AppColors.textSecondary} />
-            <TextInput
-            style={[styles.searchInput, { color: AppColors.text }]}
-            placeholder="Search history..."
-            placeholderTextColor={AppColors.textSecondary}
+    const update = item.item as ProgressUpdate & { task?: Task };
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => update.task && router.push(`/task-detail?id=${update.task.id}`)}
+        activeOpacity={0.7}>
+        <View style={styles.cardLeft}>
+          <View style={[styles.cardIconWrap, { backgroundColor: D.blueBg }]}>
+            <FileText size={16} color={D.blue} strokeWidth={2} />
+          </View>
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {update.task?.title ?? 'Unknown Task'}
+          </Text>
+          <Text style={styles.cardDesc} numberOfLines={2}>
+            {update.description || 'No description provided'}
+          </Text>
+          <View style={styles.cardFooter}>
+            <View style={styles.metaItem}>
+              <Clock size={11} color={D.inkLight} strokeWidth={2} />
+              <Text style={styles.metaText}>{formatDateTime(update.created_at)}</Text>
+            </View>
+            {update.original_name && (
+              <View style={styles.filePill}>
+                <FileText size={10} color={D.blue} />
+                <Text style={styles.filePillText} numberOfLines={1}>{update.original_name}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={styles.root}>
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerTitle}>History</Text>
+            <Text style={styles.headerSub}>{filteredData.length} item{filteredData.length !== 1 ? 's' : ''}</Text>
+          </View>
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchBar}>
+          <Search size={15} color={D.inkLight} strokeWidth={2} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search history…"
+            placeholderTextColor={D.inkLight}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-        </View>
-      </View>
-
-      <View style={[styles.filterContainer, { backgroundColor: AppColors.card, borderBottomColor: AppColors.border }]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-        >
-          {(['all', 'completed', 'updates'] as HistoryFilter[]).map((f) => (
-            <TouchableOpacity
-              key={f}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: filter === f ? AppColors.primary : AppColors.card,
-                  borderColor: filter === f ? AppColors.primary : AppColors.border,
-                },
-              ]}
-              onPress={() => setFilter(f)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color: filter === f ? '#FFFFFF' : AppColors.textSecondary,
-                  },
-                ]}
-              >
-                {f === 'all'
-                  ? 'All'
-                  : f === 'completed'
-                  ? 'Completed Tasks'
-                  : 'Progress Updates'}
-              </Text>
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X size={14} color={D.inkLight} strokeWidth={2} />
             </TouchableOpacity>
-          ))}
+          )}
+        </View>
+
+        {/* Filter chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
+          {(Object.entries(FILTER_META) as [HistoryFilter, { label: string }][]).map(([key, meta]) => {
+            const isActive = filter === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                onPress={() => setFilter(key)}
+                style={[styles.chip, isActive && { backgroundColor: D.ink, borderColor: D.ink }]}>
+                <Text style={[styles.chipText, isActive && { color: '#FFF' }]}>{meta.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
+      {/* ── List ───────────────────────────────────────────────────────────── */}
       <FlatList
         data={filteredData}
         renderItem={renderItem}
-        keyExtractor={(item, index) =>
-          `${item.type}-${item.type === 'task' ? (item.item as Task).id : (item.item as ProgressUpdate).id}-${index}`
+        keyExtractor={(item, idx) =>
+          `${item.type}-${item.type === 'task' ? (item.item as Task).id : (item.item as ProgressUpdate).id}-${idx}`
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={AppColors.primary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Clock size={48} color={AppColors.textSecondary} />
-            <Text style={styles.emptyText}>No history found</Text>
-            <Text style={styles.emptySubtext}>
-              {searchQuery
-                ? 'Try adjusting your search'
-                : 'Your completed tasks and progress updates will appear here'}
+          <View style={styles.emptyCard}>
+            <Clock size={32} color={D.inkLight} strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>No history found</Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery ? 'Try adjusting your search' : 'Completed tasks and progress updates appear here'}
             </Text>
           </View>
         }
@@ -332,181 +255,72 @@ export default function HistoryScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: AppColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  searchContainer: {
-    padding: 20,
-    borderBottomWidth: 1,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 52,
-    borderWidth: 1,
-    gap: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '400',
-  },
-  filterContainer: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  filterScroll: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  listContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  card: {
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  cardIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: AppColors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: AppColors.text,
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: AppColors.textSecondary,
-    lineHeight: 20,
-  },
-  placeholderText: {
-    fontStyle: 'italic',
-    color: AppColors.textSecondary + '80',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: AppColors.border,
-  },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cardMetaText: {
-    fontSize: 12,
-    color: AppColors.textSecondary,
-  },
-  cardProject: {
-    fontSize: 12,
-    color: AppColors.textSecondary,
-    fontWeight: '500',
-  },
-  fileBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: AppColors.primary + '20',
-    borderRadius: 6,
-  },
-  fileBadgeText: {
-    fontSize: 11,
-    color: AppColors.primary,
-    fontWeight: '500',
-    maxWidth: 100,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: AppColors.text,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: AppColors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+  root:   { flex: 1, backgroundColor: D.chalk },
+  center: { justifyContent: 'center', alignItems: 'center' },
 
+  // Header
+  header: {
+    backgroundColor: D.surface, borderBottomWidth: 1,
+    borderBottomColor: D.hairline, paddingHorizontal: 20, paddingBottom: 12,
+  },
+  headerTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  headerTitle: { fontSize: 26, fontWeight: '700', color: D.ink, letterSpacing: -0.5 },
+  headerSub:   { fontSize: 12, color: D.inkLight, marginTop: 2 },
+
+  // Search
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline,
+    borderRadius: 10, paddingHorizontal: 12, height: 42, gap: 8, marginBottom: 12,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: D.ink },
+
+  // Chips
+  chipScroll: { marginHorizontal: -20 },
+  chipRow:    { paddingHorizontal: 20, gap: 8 },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1, borderColor: D.hairline, backgroundColor: D.chalk,
+  },
+  chipText: { fontSize: 12, fontWeight: '600', color: D.inkMid },
+
+  // Section header
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  sectionBar:    { width: 3, height: 16, backgroundColor: D.ink, borderRadius: 2 },
+  sectionTitle:  { fontSize: 15, fontWeight: '700', color: D.ink },
+
+  // Card
+  card: {
+    flexDirection: 'row', gap: 12,
+    backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline,
+    borderRadius: 12, padding: 14, marginBottom: 10,
+  },
+  cardLeft:     { paddingTop: 2 },
+  cardIconWrap: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  cardBody:     { flex: 1 },
+  cardTitle:    { fontSize: 14, fontWeight: '700', color: D.ink, lineHeight: 20, marginBottom: 3 },
+  cardDesc:     { fontSize: 12, color: D.inkMid, lineHeight: 17, marginBottom: 10 },
+  cardFooter:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  metaItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText:     { fontSize: 11, color: D.inkLight },
+  cardProject:  { fontSize: 11, color: D.inkLight, maxWidth: 110 },
+  filePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: D.blueBg, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
+  },
+  filePillText: { fontSize: 10, color: D.blue, fontWeight: '500', maxWidth: 80 },
+
+  // List
+  listContent: { padding: 16, paddingBottom: 40 },
+
+  // Empty
+  emptyCard:     { backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 32, alignItems: 'center', marginTop: 20 },
+  emptyTitle:    { fontSize: 15, fontWeight: '700', color: D.ink, marginTop: 12 },
+  emptySubtitle: { fontSize: 12, color: D.inkLight, marginTop: 4, textAlign: 'center' },
+
+  // Error
+  errorText:    { fontSize: 14, color: D.red, marginBottom: 16, textAlign: 'center', paddingHorizontal: 20 },
+  retryBtn:     { backgroundColor: D.ink, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
+  retryBtnText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
+});

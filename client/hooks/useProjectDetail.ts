@@ -19,6 +19,9 @@ export interface ProjectDetailTask {
   status: 'completed' | 'in-progress' | 'pending';
   assignedTo: string;
   dueDate: string;
+  progressUpdatesCount?: number;
+  issuesCount?: number;
+  requestUpdatesCount?: number;
 }
 
 export interface ProgressUpdateFile {
@@ -122,6 +125,12 @@ export interface ProjectDetail {
   expectedCompletion: string;
   budget: number;
   spent: number;
+  paymentStatus?: {
+    status: 'paid' | 'partial' | 'unpaid';
+    totalAmount: number;
+    remainingAmount: number;
+    paidAmount: number;
+  };
   budgetBreakdown: BudgetBreakdown;
   location: string;
   projectManager: string;

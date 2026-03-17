@@ -190,7 +190,7 @@ export default function HelpCenterScreen() {
         <SectionLabel title="Need More Help?" />
         <View style={[styles.contactCard, { borderLeftColor: D.inkMid }]}>
           <Text style={styles.contactText}>
-            Can't find what you're looking for? Reach out to your project manager directly from any project page, or contact our support team from the About tab.
+            Can’t find what you’re looking for? Reach out to your project manager directly from any project page, or contact our support team from the About tab.
           </Text>
         </View>
 

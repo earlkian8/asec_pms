@@ -16,17 +16,19 @@ import { apiService } from '@/services/api';
 interface RequestUpdateModalProps {
   visible: boolean;
   onClose: () => void;
+  taskId: string;
+  taskName: string;
   projectId: string;
   projectName: string;
-  projectManager: string;
 }
 
 export default function RequestUpdateModal({
   visible,
   onClose,
+  taskId,
+  taskName,
   projectId,
   projectName,
-  projectManager,
 }: RequestUpdateModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -44,7 +46,8 @@ export default function RequestUpdateModal({
     
     try {
       const response = await apiService.post('/client/request-update', {
-        project_id: parseInt(projectId),
+        task_id: parseInt(taskId, 10),
+        project_id: parseInt(projectId, 10),
         subject: subject.trim(),
         message: message.trim(),
       });
@@ -77,7 +80,7 @@ export default function RequestUpdateModal({
       <View style={styles.overlay}>
         <View style={[styles.modal, { backgroundColor, borderColor }]}>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: textColor }]}>Request Project Update</Text>
+            <Text style={[styles.title, { color: textColor }]}>Request Task Update</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={textSecondary} />
             </TouchableOpacity>
@@ -90,8 +93,8 @@ export default function RequestUpdateModal({
             </View>
 
             <View style={styles.infoSection}>
-              <Text style={[styles.label, { color: textSecondary }]}>Project Manager</Text>
-              <Text style={[styles.value, { color: textColor }]}>{projectManager}</Text>
+              <Text style={[styles.label, { color: textSecondary }]}>Task</Text>
+              <Text style={[styles.value, { color: textColor }]}>{taskName}</Text>
             </View>
 
             <View style={styles.inputSection}>

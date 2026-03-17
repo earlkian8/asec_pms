@@ -12,7 +12,7 @@ import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import { toast } from 'sonner';
-import { Check, Trash2, SquarePen, Filter, X, Search, Calendar, ArrowUpDown, Users, UserCheck, UserX } from 'lucide-react';
+import { Check, Trash2, SquarePen, Filter, X, Search, Calendar, ArrowUpDown, Users, UserCheck, UserX, LogOut } from 'lucide-react';
 import { Switch } from "@/Components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -20,6 +20,7 @@ import { usePermission } from '@/utils/permissions';
 import AddProjectTeam from './add';
 import EditProjectTeam from './edit';
 import UnassignTeamMember from './delete';
+import RemoveTeamMember from './remove';
 
 export default function TeamTab({ project, teamData }) {
   const { has } = usePermission();
@@ -37,6 +38,8 @@ export default function TeamTab({ project, teamData }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showUnassignModal, setShowUnassignModal] = useState(false);
   const [editProjectTeam, setEditProjectTeam] = useState(null);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [removeTeamMember, setRemoveTeamMember] = useState(null);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [showFilterCard, setShowFilterCard] = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
@@ -255,17 +258,26 @@ export default function TeamTab({ project, teamData }) {
     setShowUnassignModal(false);
   };
   
-  const handleToggleStatus = (team) => {
+  const handleChangeStatus = (team, newStatus) => {
     router.put(
       route("project-management.project-teams.update-status", [project.id, team.id]),
-      { is_active: !team.is_active },
+      { assignment_status: newStatus },
       {
         preserveScroll: true,
-        onSuccess: () => {
-          const name = team.assignable_name || team.user?.name || (team.employee?.first_name + ' ' + team.employee?.last_name) || 'Team member';
-          toast.success(`${name} status updated.`);
+        onSuccess: (page) => {
+          const flash = page.props.flash;
+          if (flash?.error) {
+            toast.error(flash.error);
+          } else {
+            const name = team.assignable_name || 'Team member';
+            const label = newStatus === 'active' ? 'Re-activated' : newStatus === 'released' ? 'Released' : 'Updated';
+            toast.success(`${name} ${label.toLowerCase()} successfully.`);
+          }
         },
-        onError: () => toast.error("Failed to update status.")
+        onError: (errors) => {
+          const msg = errors?.assignment_status || errors?.conflict || errors?.error || "Failed to update status.";
+          toast.error(msg);
+        }
       }
     );
   };
@@ -273,10 +285,28 @@ export default function TeamTab({ project, teamData }) {
   const formatCurrency = (amount) => amount ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount) : '---';
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
-  // Calculate stats
-  const totalMembers = projectTeams.length;
-  const activeMembers = projectTeams.filter(t => t.is_active).length;
-  const inactiveMembers = projectTeams.filter(t => !t.is_active).length;
+  const handleForceRemove = (team) => {
+    setRemoveTeamMember(team);
+    setShowRemoveModal(true);
+  };
+
+  const handleRemoveSuccess = () => {
+    setRemoveTeamMember(null);
+    setShowRemoveModal(false);
+  };
+
+  // Assignment status helpers
+  const STATUS_CONFIG = {
+    active:    { label: 'Active',    bg: 'bg-green-100',  text: 'text-green-800',  border: 'border-green-200' },
+    completed: { label: 'Completed', bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-200'  },
+    released:  { label: 'Released',  bg: 'bg-gray-100',   text: 'text-gray-700',   border: 'border-gray-300'  },
+  };
+  const getStatusConfig = (status) => STATUS_CONFIG[status] || STATUS_CONFIG.released;
+
+  // Calculate stats using assignment_status
+  const totalMembers   = projectTeams.length;
+  const activeMembers  = projectTeams.filter(t => t.assignment_status === 'active').length;
+  const releasedMembers = projectTeams.filter(t => t.assignment_status === 'released').length;
 
   const columns = [
     { header: '', width: '3%' },
@@ -317,14 +347,14 @@ export default function TeamTab({ project, teamData }) {
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-red-700 uppercase tracking-wide">Inactive</p>
-                <p className="text-2xl font-bold text-red-900 mt-1">{inactiveMembers}</p>
+                <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Released</p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">{releasedMembers}</p>
               </div>
-              <div className="bg-red-200 rounded-full p-3">
-                <UserX className="h-5 w-5 text-red-700" />
+              <div className="bg-gray-200 rounded-full p-3">
+                <UserX className="h-5 w-5 text-gray-600" />
               </div>
             </div>
           </div>
@@ -420,7 +450,8 @@ export default function TeamTab({ project, teamData }) {
                         <SelectContent>
                           <SelectItem value="all">All Statuses</SelectItem>
                           <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="released">Released</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -569,11 +600,11 @@ export default function TeamTab({ project, teamData }) {
         <div className="flex gap-2">
           {has('project-teams.delete') && selectedIds.length > 0 && (
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all duration-200 px-6 h-11 whitespace-nowrap"
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-md hover:shadow-lg transition-all duration-200 px-6 h-11 whitespace-nowrap"
               onClick={handleBulkUnassign}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Unassign Selected ({selectedIds.length})
+              <LogOut className="mr-2 h-4 w-4" />
+              Release Selected ({selectedIds.length})
             </Button>
           )}
           {has('project-teams.create') && (
@@ -678,21 +709,14 @@ export default function TeamTab({ project, teamData }) {
                     {formatDate(team.end_date)}
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm">
-                    {has('project-teams.update') ? (
-                      <Switch
-                        checked={team.is_active}
-                        onCheckedChange={() => handleToggleStatus(team)}
-                        className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
-                      />
-                    ) : (
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${
-                        team.is_active 
-                          ? 'bg-green-100 text-green-800 border border-green-200' 
-                          : 'bg-red-100 text-red-800 border border-red-200'
-                      }`}>
-                        {team.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    )}
+                    {(() => {
+                      const cfg = getStatusConfig(team.assignment_status);
+                      return (
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+                          {cfg.label}
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-left px-4 py-4 text-sm">
                     <div className="flex gap-1.5">
@@ -703,6 +727,33 @@ export default function TeamTab({ project, teamData }) {
                           title="Edit"
                         >
                           <SquarePen size={16} />
+                        </button>
+                      )}
+                      {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'active' && (
+                        <button
+                          onClick={() => handleChangeStatus(team, 'released')}
+                          className="p-2 rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-all duration-200 hover:scale-110 border border-amber-200 hover:border-amber-300"
+                          title="Release — frees this person for other projects"
+                        >
+                          <LogOut size={16} />
+                        </button>
+                      )}
+                      {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'released' && (
+                        <button
+                          onClick={() => handleChangeStatus(team, 'active')}
+                          className="p-2 rounded-lg hover:bg-green-100 text-green-600 hover:text-green-700 transition-all duration-200 hover:scale-110 border border-green-200 hover:border-green-300"
+                          title="Re-activate — assigns them back to this project"
+                        >
+                          <UserCheck size={16} />
+                        </button>
+                      )}
+                      {has('project-teams.delete') && (
+                        <button
+                          onClick={() => handleForceRemove(team)}
+                          className="p-2 rounded-lg hover:bg-red-100 text-red-500 hover:text-red-700 transition-all duration-200 hover:scale-110 border border-red-200 hover:border-red-300"
+                          title="Remove — permanently delete from project"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       )}
                     </div>
@@ -798,6 +849,14 @@ export default function TeamTab({ project, teamData }) {
           teamMembers={projectTeams}
           selectedIds={selectedIds}
           onSuccess={handleUnassignSuccess}
+        />
+      )}
+      {showRemoveModal && removeTeamMember && (
+        <RemoveTeamMember
+          setShowRemoveModal={setShowRemoveModal}
+          project={project}
+          teamMember={removeTeamMember}
+          onSuccess={handleRemoveSuccess}
         />
       )}
     </div>

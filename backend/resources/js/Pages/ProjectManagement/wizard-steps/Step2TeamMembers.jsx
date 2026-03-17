@@ -242,6 +242,16 @@ export default function Step2TeamMembers({ users }) {
         </div>
       )}
 
+      {/* Single-assignment rule notice */}
+      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+        <span className="mt-0.5 flex-shrink-0">ℹ️</span>
+        <span>
+          <strong>Employees</strong> can only be actively assigned to <strong>one project at a time</strong>.
+          Those currently on another project won't appear here — they become available once released or their assignment ends.
+          <strong>Users (contractors)</strong> are exempt and can be assigned to multiple projects.
+        </span>
+      </div>
+
       {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />

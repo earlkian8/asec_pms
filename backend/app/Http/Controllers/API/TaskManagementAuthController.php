@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\TaskManagementAuthorization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,9 @@ class TaskManagementAuthController extends Controller
             ]);
         }
 
+        $authz = app(TaskManagementAuthorization::class);
+        $role = $authz->getRole($user);
+
         // Revoke all existing tokens (optional - for single device login)
         // $user->tokens()->delete();
 
@@ -41,6 +45,7 @@ class TaskManagementAuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'role' => $role,
                 ],
                 'token' => $token,
             ],
@@ -53,6 +58,8 @@ class TaskManagementAuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+        $authz = app(TaskManagementAuthorization::class);
+        $role = $authz->getRole($user);
 
         return response()->json([
             'success' => true,
@@ -60,6 +67,7 @@ class TaskManagementAuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'role' => $role,
             ],
         ]);
     }

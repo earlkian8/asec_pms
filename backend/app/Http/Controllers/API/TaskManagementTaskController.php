@@ -7,6 +7,7 @@ use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
 use App\Models\User;
+use App\Services\TaskManagementAuthorization;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,9 +23,8 @@ class TaskManagementTaskController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
             ->with([
                 'milestone.project',
                 'assignedUser'
@@ -32,6 +32,14 @@ class TaskManagementTaskController extends Controller
             ->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -67,12 +75,18 @@ class TaskManagementTaskController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project', 'assignedUser'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -132,12 +146,18 @@ class TaskManagementTaskController extends Controller
     public function progressUpdates(Request $request, $id)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -189,12 +209,18 @@ class TaskManagementTaskController extends Controller
     public function storeProgressUpdate(Request $request, $id)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -287,12 +313,18 @@ class TaskManagementTaskController extends Controller
     public function updateProgressUpdate(Request $request, $id, $updateId)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -378,12 +410,18 @@ class TaskManagementTaskController extends Controller
     public function deleteProgressUpdate(Request $request, $id, $updateId)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -421,12 +459,18 @@ class TaskManagementTaskController extends Controller
     public function downloadProgressUpdateFile(Request $request, $id, $updateId)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -463,12 +507,18 @@ class TaskManagementTaskController extends Controller
     public function issues(Request $request, $id)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -513,13 +563,20 @@ class TaskManagementTaskController extends Controller
     public function storeIssue(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
             ->with('milestone.project')
             ->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -590,12 +647,18 @@ class TaskManagementTaskController extends Controller
     public function updateIssue(Request $request, $id, $issueId)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',
@@ -670,12 +733,18 @@ class TaskManagementTaskController extends Controller
     public function deleteIssue(Request $request, $id, $issueId)
     {
         $user = $request->user();
-        
-        $task = ProjectTask::where('id', $id)
-            ->where('assigned_to', $user->id)
-            ->first();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
 
         if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Task not found or you do not have access to it',

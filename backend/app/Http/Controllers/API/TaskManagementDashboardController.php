@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
+use App\Services\TaskManagementAuthorization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -18,8 +19,9 @@ class TaskManagementDashboardController extends Controller
     public function statistics(Request $request)
     {
         $user = $request->user();
-        
-        $tasks = ProjectTask::where('assigned_to', $user->id)
+
+        $authz = app(TaskManagementAuthorization::class);
+        $tasks = $authz->visibleTasksQuery($user)
             ->with(['milestone.project'])
             ->get();
 
@@ -70,7 +72,8 @@ class TaskManagementDashboardController extends Controller
         $user = $request->user();
         $limit = $request->get('limit', 5);
 
-        $tasks = ProjectTask::where('assigned_to', $user->id)
+        $authz = app(TaskManagementAuthorization::class);
+        $tasks = $authz->visibleTasksQuery($user)
             ->where('status', '!=', 'completed')
             ->whereNotNull('due_date')
             ->with([
@@ -113,7 +116,8 @@ class TaskManagementDashboardController extends Controller
         $status = $request->get('status');
         $search = $request->get('search');
 
-        $query = ProjectTask::where('assigned_to', $user->id)
+        $authz = app(TaskManagementAuthorization::class);
+        $query = $authz->visibleTasksQuery($user)
             ->with([
                 'milestone.project',
                 'assignedUser'
@@ -184,9 +188,10 @@ class TaskManagementDashboardController extends Controller
         $user = $request->user();
         $search = $request->get('search');
 
+        $authz = app(TaskManagementAuthorization::class);
+
         // Get completed tasks
-        $completedTasksQuery = ProjectTask::where('assigned_to', $user->id)
-            ->where('status', 'completed')
+        $completedTasksQuery = $authz->visibleTasksQuery($user)->where('status', 'completed')
             ->with([
                 'milestone.project',
                 'assignedUser'
@@ -227,8 +232,8 @@ class TaskManagementDashboardController extends Controller
         });
 
         // Get all progress updates for tasks assigned to the user
-        $progressUpdatesQuery = ProgressUpdate::whereHas('task', function ($q) use ($user) {
-            $q->where('assigned_to', $user->id);
+        $progressUpdatesQuery = ProgressUpdate::whereHas('task', function ($q) use ($authz, $user) {
+            $q->whereIn('id', $authz->visibleTasksQuery($user)->select('id'));
         })
             ->with([
                 'task.milestone.project',

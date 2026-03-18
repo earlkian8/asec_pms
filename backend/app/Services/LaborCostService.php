@@ -41,8 +41,10 @@ class LaborCostService
             ->withQueryString();
 
         // Team members for the add/edit dropdowns
+        // Only show actively assigned members — released/completed cannot receive payroll
         $teamMembers = $project->team()
             ->active()
+            ->occupied()
             ->current()
             ->with(['user', 'employee'])
             ->get()

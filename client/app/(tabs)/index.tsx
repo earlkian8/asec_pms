@@ -3,19 +3,16 @@ import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, RefreshControl,
 } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApp } from '@/contexts/AppContext';
 import { useDashboard, DashboardProject } from '@/hooks/useDashboard';
 import { useBillings } from '@/hooks/useBillings';
-import { FIRM_CONTACT } from '@/constants/contact';
 import {
   Briefcase, CheckCircle, Clock, Receipt,
   AlertCircle, Bell, ArrowRight,
 } from 'lucide-react-native';
-import RequestUpdateModal from '@/components/RequestUpdateModal';
 import NotificationCenter from '@/components/NotificationCenter';
 import AnimatedView from '@/components/AnimatedView';
 import ProjectCard from '@/components/cards/ProjectCard';
@@ -94,7 +91,7 @@ function BillingPill({ label, count, color, bg }: {
 export default function HomeScreen() {
   const { user, displayBillingModule } = useAuth();
   const { unreadCount, refreshNotifications } = useApp();
-  const { statistics, projects, loading, refresh } = useDashboard();
+  const { statistics, projects, loading, error, refresh } = useDashboard();
   const { billings, loading: billingsLoading, refresh: refreshBillings } = useBillings({
     sortBy: 'created_at',
     sortOrder: 'desc',
@@ -104,8 +101,6 @@ export default function HomeScreen() {
   const dialog   = useDialog();
 
   const [refreshing,       setRefreshing]       = useState(false);
-  const [showRequestUpdate,setShowRequestUpdate] = useState(false);
-  const [selectedProject,  setSelectedProject]  = useState<DashboardProject | null>(null);
   const [showNotifications,setShowNotifications] = useState(false);
 
   const activeProjects  = projects.filter((p) => p.status === 'active');
@@ -148,26 +143,6 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refresh, refreshBillings, refreshNotifications]);
 
-  const handleContact = async (project: DashboardProject) => {
-    const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-    dialog.showConfirm(
-      `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-      async () => {
-        try {
-          const canOpen = await Linking.canOpenURL(emailUrl);
-          if (canOpen) await Linking.openURL(emailUrl);
-          else dialog.showError('Unable to open email client');
-        } catch { dialog.showError('Failed to open email client'); }
-      },
-      'Contact Project Manager', 'Email', 'Cancel'
-    );
-  };
-
-  const handleRequestUpdate = (project: DashboardProject) => {
-    setSelectedProject(project);
-    setShowRequestUpdate(true);
-  };
-
   return (
     <View style={styles.root}>
       <ScrollView
@@ -196,6 +171,28 @@ export default function HomeScreen() {
         </View>
 
         {loading && !statistics && <LoadingState message="Loading dashboard..." />}
+
+        {!loading && !statistics && error ? (
+          <View style={{ marginTop: 18 }}>
+            <EmptyState
+              icon={AlertCircle}
+              title="Dashboard unavailable"
+              subtitle={error}
+            />
+            <TouchableOpacity
+              style={{
+                marginTop: 14,
+                alignSelf: 'center',
+                backgroundColor: D.ink,
+                paddingHorizontal: 18,
+                paddingVertical: 10,
+                borderRadius: 10,
+              }}
+              onPress={onRefresh}>
+              <Text style={{ color: '#FFF', fontWeight: '700' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {statistics && (
           <>
@@ -289,8 +286,6 @@ export default function HomeScreen() {
                       }}
                       index={index}
                       onPress={() => router.push(`/project/${project.id}`)}
-                      onContact={(p) => handleContact(project)}
-                      onRequestUpdate={(p) => handleRequestUpdate(project)}
                       paymentStatus={getProjectPaymentStatus(project.id)}
                     />
                   ))
@@ -302,16 +297,6 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
-
-      {selectedProject && (
-        <RequestUpdateModal
-          visible={showRequestUpdate}
-          onClose={() => { setShowRequestUpdate(false); setSelectedProject(null); }}
-          projectId={selectedProject.id}
-          projectName={selectedProject.name}
-          projectManager={selectedProject.projectManager}
-        />
-      )}
       <NotificationCenter
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}

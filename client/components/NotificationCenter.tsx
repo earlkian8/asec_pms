@@ -154,7 +154,7 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
                   <Ionicons name="notifications-off-outline" size={64} color={textSecondary} />
                   <Text style={[styles.emptyText, { color: textColor }]}>No notifications</Text>
                   <Text style={[styles.emptySubtext, { color: textSecondary }]}>
-                    You're all caught up!
+                    You’re all caught up!
                   </Text>
                 </View>
               ) : (

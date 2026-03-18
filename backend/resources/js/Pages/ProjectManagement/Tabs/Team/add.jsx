@@ -244,6 +244,15 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
             <DialogTitle className="text-zinc-800">Add Team Members</DialogTitle>
           </DialogHeader>
 
+          {/* Single-assignment info banner */}
+          <div className="mb-3 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
+            <span className="mt-0.5 flex-shrink-0">ℹ️</span>
+            <span>
+              <strong>Employees</strong> with an active assignment on another project are hidden until released or their assignment ends.
+              <strong>Users (contractors)</strong> can be assigned to multiple projects.
+            </span>
+          </div>
+
           {/* Search + New Buttons */}
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="relative flex-1 max-w-md">

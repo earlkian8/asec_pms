@@ -10,17 +10,17 @@ import {
   DialogFooter
 } from "@/Components/ui/dialog"
 import { Button } from '@/Components/ui/button';
-import { Loader2, AlertTriangle, Trash2 } from 'lucide-react';
+import { Loader2, AlertTriangle, LogOut } from 'lucide-react';
 
 const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, selectedIds, onSuccess }) => {
   const [processing, setProcessing] = useState(false);
 
-  // Determine if it's bulk or single unassign
+  // Determine if it's bulk or single
   const isBulk = selectedIds && selectedIds.length > 1;
   const membersToUnassign = teamMembers?.filter(member => selectedIds?.includes(member.id)) || [];
   const memberCount = selectedIds?.length || 0;
 
-  const handleUnassign = (e) => {
+  const handleRelease = (e) => {
     e.preventDefault();
     setProcessing(true);
 
@@ -37,12 +37,11 @@ const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, select
             toast.error(flash.error);
           } else {
             if (isBulk) {
-              toast.success(`${memberCount} team member(s) unassigned successfully.`);
+              toast.success(`${memberCount} team member(s) released successfully.`);
             } else {
-              const memberName = membersToUnassign[0]?.user?.name || 'Team member';
-              toast.success(`${memberName} unassigned successfully.`);
+              const memberName = membersToUnassign[0]?.assignable_name || membersToUnassign[0]?.user?.name || 'Team member';
+              toast.success(`${memberName} released successfully.`);
             }
-            // Call onSuccess callback to clear selection
             if (onSuccess) {
               onSuccess();
             }
@@ -54,7 +53,7 @@ const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, select
           if (errors.message) {
             toast.error(errors.message);
           } else {
-            toast.error('Failed to unassign team member(s). Please try again.');
+            toast.error('Failed to release team member(s). Please try again.');
           }
         }
       }
@@ -66,29 +65,30 @@ const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, select
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="bg-red-100 rounded-full p-2">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+            <div className="bg-amber-100 rounded-full p-2">
+              <AlertTriangle className="h-6 w-6 text-amber-600" />
             </div>
-            <DialogTitle className="text-red-900">
-              {isBulk ? 'Unassign Team Members' : 'Unassign Team Member'}
+            <DialogTitle className="text-amber-900">
+              {isBulk ? 'Release Team Members' : 'Release Team Member'}
             </DialogTitle>
           </div>
           <DialogDescription className="text-gray-600 pt-2">
             {isBulk ? (
               <>
-                Are you sure you want to unassign <span className="font-semibold text-gray-900">{memberCount} team member(s)</span> from this project?
+                Are you sure you want to release <span className="font-semibold text-gray-900">{memberCount} team member(s)</span> from this project?
                 <br /><br />
                 This action will:
                 <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                  <li>Remove them from the project team</li>
-                  <li>Unassign all tasks assigned to these members</li>
-                  <li>Remove their access to project resources</li>
+                  <li>Set their assignment status to <span className="font-semibold">Released</span></li>
+                  <li>Make them available for assignment to other projects</li>
+                  <li>Unassign any tasks assigned to these members</li>
+                  <li className="text-green-700">Their assignment history is preserved</li>
                 </ul>
                 <div className="mt-3 p-2 bg-gray-50 rounded-lg border border-gray-200 max-h-32 overflow-y-auto">
-                  <p className="text-xs font-semibold text-gray-700 mb-1">Members to be unassigned:</p>
+                  <p className="text-xs font-semibold text-gray-700 mb-1">Members to be released:</p>
                   <ul className="text-xs text-gray-600 space-y-0.5">
                     {membersToUnassign.slice(0, 5).map((member) => (
-                      <li key={member.id}>• {member.user?.name || 'Unknown'} ({member.role})</li>
+                      <li key={member.id}>• {member.assignable_name || member.user?.name || 'Unknown'} ({member.role})</li>
                     ))}
                     {membersToUnassign.length > 5 && (
                       <li className="text-gray-500 italic">... and {membersToUnassign.length - 5} more</li>
@@ -98,26 +98,27 @@ const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, select
               </>
             ) : (
               <>
-                Are you sure you want to unassign{" "}
+                Are you sure you want to release{" "}
                 <span className="font-semibold text-gray-900">
-                  {membersToUnassign[0]?.user?.name || 'this team member'}
+                  {membersToUnassign[0]?.assignable_name || membersToUnassign[0]?.user?.name || 'this team member'}
                 </span>{" "}
                 ({membersToUnassign[0]?.role || 'Unknown role'}) from this project?
                 <br /><br />
                 This action will:
                 <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                  <li>Remove them from the project team</li>
-                  <li>Unassign all tasks assigned to this member</li>
-                  <li>Remove their access to project resources</li>
+                  <li>Set their assignment status to <span className="font-semibold">Released</span></li>
+                  <li>Make them available for assignment to other projects</li>
+                  <li>Unassign any tasks assigned to this member</li>
+                  <li className="text-green-700">Their assignment history is preserved</li>
                 </ul>
                 <span className="text-xs text-gray-500 mt-2 block">
-                  This action <span className="font-semibold text-red-600">cannot be undone</span>.
+                  Need to permanently remove instead? Use the <span className="font-semibold text-red-600">Remove</span> button from the action column.
                 </span>
               </>
             )}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleUnassign} className="flex flex-col gap-4">
+        <form onSubmit={handleRelease} className="flex flex-col gap-4">
           <DialogFooter className="flex flex-row gap-2 justify-end mt-4">
             <Button
               type="button"
@@ -130,19 +131,18 @@ const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, select
             </Button>
             <Button
               type="submit"
-              variant="destructive"
               disabled={processing}
-              className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {processing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Unassigning...
+                  Releasing...
                 </>
               ) : (
                 <>
-                  <Trash2 size={16} />
-                  {isBulk ? `Unassign ${memberCount} Member(s)` : 'Unassign Member'}
+                  <LogOut size={16} />
+                  {isBulk ? `Release ${memberCount} Member(s)` : 'Release Member'}
                 </>
               )}
             </Button>
@@ -154,4 +154,3 @@ const UnassignTeamMember = ({ setShowUnassignModal, project, teamMembers, select
 };
 
 export default UnassignTeamMember;
-

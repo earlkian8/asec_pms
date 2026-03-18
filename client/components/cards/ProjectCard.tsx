@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Calendar, Mail, AlertCircle, CreditCard, ArrowRight } from 'lucide-react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Calendar, AlertCircle, CreditCard } from 'lucide-react-native';
 import AnimatedCard from '@/components/AnimatedCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { getBillingStatusColors } from '@/utils/statusHelpers';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const D = {
@@ -40,13 +39,11 @@ interface ProjectCardProps {
   project: ProjectCardProject;
   index: number;
   onPress: () => void;
-  onContact: (project: ProjectCardProject) => void;
-  onRequestUpdate: (project: ProjectCardProject) => void;
   paymentStatus?: { status: 'unpaid' | 'partial' | 'paid'; amount: number } | null;
 }
 
 export default function ProjectCard({
-  project, index, onPress, onContact, onRequestUpdate, paymentStatus,
+  project, index, onPress, paymentStatus,
 }: ProjectCardProps) {
   const hasPaymentAlert = paymentStatus && paymentStatus.status !== 'paid';
 
@@ -123,17 +120,7 @@ export default function ProjectCard({
 
       {/* ── Actions ──────────────────────────────────────────────────────── */}
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.mailBtn}
-          onPress={() => onContact(project)}>
-          <Mail size={15} color={D.inkMid} strokeWidth={2} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.updateBtn}
-          onPress={() => onRequestUpdate(project)}>
-          <Text style={styles.updateBtnText}>Request Update</Text>
-          <ArrowRight size={13} color="#FFF" strokeWidth={2.5} />
-        </TouchableOpacity>
+        <View style={styles.actionSpacer} />
       </View>
     </AnimatedCard>
   );
@@ -179,15 +166,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderTopWidth: 1, borderTopColor: D.hairline, paddingTop: 12,
   },
-  mailBtn: {
-    width: 36, height: 36, borderRadius: 8,
-    backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  updateBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6, height: 36,
-    backgroundColor: D.ink, borderRadius: 8,
-  },
-  updateBtnText: { fontSize: 13, fontWeight: '600', color: '#FFF' },
+  actionSpacer: { height: 1 },
 });

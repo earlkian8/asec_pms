@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/delete/{project}/{projectTeam?}', [ProjectTeamsController::class, 'destroy'])->middleware('permission:project-teams.delete')->name('destroy');
             Route::put('/update-status/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'handleStatus'])->middleware('permission:project-teams.update')->name('update-status');
             Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])->middleware('permission:project-teams.update')->name('update');
+            Route::delete('/force-remove/{project}/{projectTeam}', [ProjectTeamsController::class, 'forceRemove'])->middleware('permission:project-teams.delete')->name('force-remove');
         });
 
         // Project Files

@@ -13,6 +13,7 @@ use App\Models\ProjectIssue;
 use App\Models\ProgressUpdate;
 use App\Models\InventoryItem;
 use App\Models\ClientUpdateRequest;
+use App\Models\Billing;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,36 @@ use Illuminate\Support\Facades\Storage;
 class ClientDashboardController extends Controller
 {
     use NotificationTrait;
+
+    private function computeProjectPaymentStatus(int $projectId): array
+    {
+        // Consider only non-archived billings (and exclude soft-deleted by default).
+        $billings = Billing::active()
+            ->where('project_id', $projectId)
+            ->get();
+
+        $total = (float) $billings->sum('billing_amount');
+        $remaining = (float) $billings->sum(fn ($b) => (float) $b->remaining_amount);
+
+        $status = 'paid';
+        if ($total <= 0) {
+            // No billings created yet -> treat as unpaid (nothing to pay) but keep status informative.
+            $status = 'unpaid';
+        } elseif ($remaining >= $total) {
+            $status = 'unpaid';
+        } elseif ($remaining > 0) {
+            $status = 'partial';
+        } else {
+            $status = 'paid';
+        }
+
+        return [
+            'status' => $status,
+            'totalAmount' => $total,
+            'remainingAmount' => $remaining,
+            'paidAmount' => max(0, $total - $remaining),
+        ];
+    }
     /**
      * Get dashboard statistics for authenticated client
      */
@@ -29,8 +60,11 @@ class ClientDashboardController extends Controller
     {
         $client = $request->user();
         
-        // Get all projects for this client
-        $projects = Project::where('client_id', $client->id)->get();
+        // Get all *visible* projects for this client
+        // Exclude archived and soft-deleted projects from client portal.
+        $projects = Project::where('client_id', $client->id)
+            ->whereNull('archived_at')
+            ->get();
         $projectIds = $projects->pluck('id');
         
         // Calculate statistics
@@ -47,8 +81,9 @@ class ClientDashboardController extends Controller
             ->sum(DB::raw('project_material_allocations.quantity_received * inventory_items.unit_price'));
         
         // Labor costs
+        // NOTE: Labor is now period-based with computed gross_pay.
         $laborCosts = ProjectLaborCost::whereIn('project_id', $projectIds)
-            ->sum(DB::raw('hours_worked * hourly_rate'));
+            ->sum('gross_pay');
         
         // Miscellaneous expenses
         $miscellaneousExpenses = ProjectMiscellaneousExpense::whereIn('project_id', $projectIds)
@@ -104,14 +139,17 @@ class ClientDashboardController extends Controller
         $sortOrder = $request->query('sort_order', 'asc'); // Sort direction
         
         $query = Project::where('client_id', $client->id)
+            ->whereNull('archived_at')
             ->with(['team.user', 'team.employee', 'milestones.tasks']);
         
         // Search filter
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('project_name', 'ilike', "%{$search}%")
-                  ->orWhere('location', 'ilike', "%{$search}%")
-                  ->orWhere('description', 'ilike', "%{$search}%");
+                // Use portable case-insensitive search across DBs (MySQL/Postgres/etc.)
+                $needle = '%' . strtolower($search) . '%';
+                $q->whereRaw('LOWER(project_name) LIKE ?', [$needle])
+                  ->orWhereRaw('LOWER(location) LIKE ?', [$needle])
+                  ->orWhereRaw('LOWER(description) LIKE ?', [$needle]);
             });
         }
         
@@ -153,7 +191,7 @@ class ClientDashboardController extends Controller
         
         // Pre-calculate all labor costs
         $laborCostsByProject = ProjectLaborCost::whereIn('project_id', $projectIds)
-            ->select('project_id', DB::raw('SUM(hours_worked * hourly_rate) as total'))
+            ->select('project_id', DB::raw('SUM(gross_pay) as total'))
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
         
@@ -221,6 +259,7 @@ class ClientDashboardController extends Controller
                 'spent' => $spent,
                 'location' => $project->location ?? '',
                 'projectManager' => $projectManagerName,
+                'paymentStatus' => $this->computeProjectPaymentStatus((int) $project->id),
             ];
         });
         
@@ -246,6 +285,7 @@ class ClientDashboardController extends Controller
         
         // Get all projects (same logic as projects method but without pagination)
         $query = Project::where('client_id', $client->id)
+            ->whereNull('archived_at')
             ->with(['team.user', 'team.employee', 'milestones.tasks']);
         
         $projects = $query->get();
@@ -261,7 +301,7 @@ class ClientDashboardController extends Controller
             ->pluck('total', 'project_id');
         
         $laborCostsByProject = ProjectLaborCost::whereIn('project_id', $projectIds)
-            ->select('project_id', DB::raw('SUM(hours_worked * hourly_rate) as total'))
+            ->select('project_id', DB::raw('SUM(gross_pay) as total'))
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
         
@@ -357,14 +397,16 @@ class ClientDashboardController extends Controller
     }
 
     /**
-     * Submit a request update for a project
+     * Submit a request update for a task (client portal)
      */
     public function requestUpdate(Request $request)
     {
         $client = $request->user();
         
         $validator = Validator::make($request->all(), [
-            'project_id' => 'required|integer|exists:projects,id',
+            // NOTE: Request updates are task-scoped. project_id is optional metadata.
+            'task_id' => 'required|integer|exists:project_tasks,id',
+            'project_id' => 'nullable|integer|exists:projects,id',
             'subject' => 'required|string|max:255',
             'message' => 'required|string',
         ]);
@@ -377,22 +419,37 @@ class ClientDashboardController extends Controller
             ], 422);
         }
 
-        // Verify that the project belongs to the authenticated client
-        $project = Project::where('id', $request->project_id)
-            ->where('client_id', $client->id)
-            ->first();
+        // Verify task ownership through milestone → project and client ownership
+        $task = ProjectTask::with('milestone.project')->find($request->task_id);
+        $milestone = $task?->milestone;
+        $project = $milestone?->project;
 
-        if (!$project) {
+        if (
+            !$task ||
+            !$milestone ||
+            !$project ||
+            (int) $project->client_id !== (int) $client->id ||
+            !is_null($project->archived_at)
+        ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Project not found or does not belong to you',
+                'message' => 'Task not found or does not belong to you',
             ], 404);
         }
 
-        // Create the request update
+        // Optional: if project_id is provided, ensure it matches the task's project
+        if ($request->filled('project_id') && (int) $request->project_id !== (int) $project->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid project_id for the given task',
+            ], 422);
+        }
+
+        // Create the request update (task-scoped)
         $updateRequest = ClientUpdateRequest::create([
             'client_id' => $client->id,
-            'project_id' => $request->project_id,
+            'project_id' => $project->id,
+            'task_id' => $task->id,
             'subject' => $request->subject,
             'message' => $request->message,
         ]);
@@ -401,7 +458,7 @@ class ClientDashboardController extends Controller
         $this->createSystemNotification(
             'general',
             'Client Update Request',
-            "Client '{$client->client_name}' has submitted an update request for project '{$project->project_name}': {$request->subject}",
+            "Client '{$client->client_name}' has submitted an update request for task '{$task->title}' in project '{$project->project_name}': {$request->subject}",
             $project,
             null // API doesn't have web routes
         );
@@ -414,6 +471,7 @@ class ClientDashboardController extends Controller
                 'subject' => $updateRequest->subject,
                 'message' => $updateRequest->message,
                 'project_id' => $updateRequest->project_id,
+                'task_id' => $updateRequest->task_id,
                 'created_at' => $updateRequest->created_at,
             ],
         ], 201);
@@ -429,6 +487,7 @@ class ClientDashboardController extends Controller
         // Get project and verify ownership
         $project = Project::where('id', $id)
             ->where('client_id', $client->id)
+            ->whereNull('archived_at')
             ->with([
                 'team.user',
                 'team.employee',
@@ -477,7 +536,7 @@ class ClientDashboardController extends Controller
             ->sum(DB::raw('project_material_allocations.quantity_received * inventory_items.unit_price'));
         
         $laborCosts = ProjectLaborCost::where('project_id', $projectId)
-            ->sum(DB::raw('hours_worked * hourly_rate'));
+            ->sum('gross_pay');
         
         $miscellaneousExpenses = ProjectMiscellaneousExpense::where('project_id', $projectId)
             ->sum('amount');
@@ -506,7 +565,12 @@ class ClientDashboardController extends Controller
             'cancelled' => 'on-hold',
         ];
 
-        // Format milestones with tasks and progress updates
+        // Load per-task counts for milestone UI (updates/issues/requests)
+        $project->milestones->each(function ($m) {
+            $m->tasks->loadCount(['progressUpdates', 'issues', 'clientUpdateRequests']);
+        });
+
+        // Format milestones with tasks
         $formattedMilestones = $milestones->map(function ($milestone) {
             $tasks = $milestone->tasks->map(function ($task) {
                 $progressUpdates = $task->progressUpdates->map(function ($update) {
@@ -525,6 +589,9 @@ class ClientDashboardController extends Controller
                     'status' => $task->status === 'completed' ? 'completed' : ($task->status === 'in_progress' ? 'in-progress' : 'pending'),
                     'assignedTo' => $task->assignedUser ? $task->assignedUser->name : 'Unassigned',
                     'dueDate' => $task->due_date,
+                    'progressUpdatesCount' => (int) ($task->progress_updates_count ?? 0),
+                    'issuesCount' => (int) ($task->issues_count ?? 0),
+                    'requestUpdatesCount' => (int) ($task->client_update_requests_count ?? 0),
                 ];
             });
 
@@ -742,6 +809,7 @@ class ClientDashboardController extends Controller
                 'expectedCompletion' => $project->planned_end_date,
                 'budget' => (float) $project->contract_amount,
                 'spent' => $spent,
+                'paymentStatus' => $this->computeProjectPaymentStatus((int) $project->id),
                 'budgetBreakdown' => [
                     'materialCosts' => (float) $materialCosts,
                     'laborCosts' => (float) $laborCosts,
@@ -762,6 +830,133 @@ class ClientDashboardController extends Controller
     }
 
     /**
+     * Get task details for authenticated client (task-scoped drilldown)
+     */
+    public function taskDetail(Request $request, $id)
+    {
+        $client = $request->user();
+
+        $task = ProjectTask::where('id', $id)
+            ->with([
+                'assignedUser',
+                'milestone.project',
+                'progressUpdates.createdBy',
+                'issues.reportedBy',
+                'issues.assignedTo',
+                'clientUpdateRequests.client',
+            ])
+            ->first();
+
+        $milestone = $task?->milestone;
+        $project = $milestone?->project;
+
+        if (
+            !$task ||
+            !$milestone ||
+            !$project ||
+            (int) $project->client_id !== (int) $client->id ||
+            !is_null($project->archived_at)
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or does not belong to you',
+            ], 404);
+        }
+
+        $formattedProgressUpdates = $task->progressUpdates
+            ->map(function ($update) use ($request) {
+                $fileData = null;
+                if ($update->file_path) {
+                    $fileUrl = null;
+                    if (Storage::disk('public')->exists($update->file_path)) {
+                        $scheme = $request->getScheme();
+                        $host = $request->getHost();
+                        $port = $request->getPort();
+                        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+                        $fileUrl = $baseUrl . '/storage/' . $update->file_path;
+                    }
+
+                    $fileData = [
+                        'path' => $update->file_path,
+                        'type' => $update->file_type,
+                        'name' => $update->original_name,
+                        'size' => $update->file_size,
+                        'url' => $fileUrl,
+                    ];
+                }
+
+                return [
+                    'id' => (string) $update->id,
+                    'description' => $update->description,
+                    'author' => $update->createdBy ? $update->createdBy->name : 'Unknown',
+                    'date' => $update->created_at->toISOString(),
+                    'file' => $fileData,
+                ];
+            })
+            ->sortByDesc('date')
+            ->values()
+            ->all();
+
+        $formattedIssues = $task->issues
+            ->map(function ($issue) {
+                return [
+                    'id' => (string) $issue->id,
+                    'title' => $issue->title,
+                    'description' => $issue->description ?? '',
+                    'priority' => $issue->priority ?? 'medium',
+                    'status' => $issue->status ?? 'open',
+                    'reportedBy' => $issue->reportedBy ? $issue->reportedBy->name : 'Unknown',
+                    'assignedTo' => $issue->assignedTo ? $issue->assignedTo->name : 'Unassigned',
+                    'dueDate' => $issue->due_date ? $issue->due_date->toDateString() : null,
+                    'resolvedAt' => $issue->resolved_at ? $issue->resolved_at->toDateString() : null,
+                    'createdAt' => $issue->created_at->toISOString(),
+                ];
+            })
+            ->sortByDesc('createdAt')
+            ->values()
+            ->all();
+
+        $formattedClientRequests = $task->clientUpdateRequests
+            ->map(function ($req) {
+                return [
+                    'id' => (string) $req->id,
+                    'subject' => $req->subject,
+                    'message' => $req->message,
+                    'author' => 'You',
+                    'date' => $req->created_at->toISOString(),
+                ];
+            })
+            ->sortByDesc('date')
+            ->values()
+            ->all();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'task' => [
+                    'id' => (string) $task->id,
+                    'name' => $task->title,
+                    'description' => $task->description ?? '',
+                    'status' => $task->status === 'completed' ? 'completed' : ($task->status === 'in_progress' ? 'in-progress' : 'pending'),
+                    'assignedTo' => $task->assignedUser ? $task->assignedUser->name : 'Unassigned',
+                    'dueDate' => $task->due_date,
+                ],
+                'milestone' => [
+                    'id' => (string) $milestone->id,
+                    'name' => $milestone->name,
+                ],
+                'project' => [
+                    'id' => (string) $project->id,
+                    'name' => $project->project_name,
+                ],
+                'progressUpdates' => $formattedProgressUpdates,
+                'issues' => $formattedIssues,
+                'requestUpdates' => $formattedClientRequests,
+            ],
+        ]);
+    }
+
+    /**
      * Download progress update file for authenticated client
      */
     public function downloadProgressUpdateFile(Request $request, $projectId, $updateId)
@@ -771,6 +966,7 @@ class ClientDashboardController extends Controller
         // Verify that the project belongs to the authenticated client
         $project = Project::where('id', $projectId)
             ->where('client_id', $client->id)
+            ->whereNull('archived_at')
             ->first();
 
         if (!$project) {

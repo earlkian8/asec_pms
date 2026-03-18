@@ -4,20 +4,15 @@ import {
   TouchableOpacity, TextInput, RefreshControl,
   Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProjects, Project } from '@/hooks/useProjects';
-import { FIRM_CONTACT } from '@/constants/contact';
-import { Ionicons } from '@expo/vector-icons';
 import {
-  Search, Filter, ArrowUpDown, X, Check, AlertCircle, SlidersHorizontal,
+  Search, Filter, X, Check, AlertCircle, SlidersHorizontal,
 } from 'lucide-react-native';
-import RequestUpdateModal from '@/components/RequestUpdateModal';
 import ProjectCard from '@/components/cards/ProjectCard';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
-import { AppColors } from '@/constants/colors';
 import { useDialog } from '@/contexts/DialogContext';
 
 type SortOption = 'name' | 'progress' | 'budget' | 'date' | 'status';
@@ -50,8 +45,6 @@ export default function ProjectsScreen() {
   const [showSortModal,  setShowSortModal]  = useState(false);
   const [showFilterModal,setShowFilterModal]= useState(false);
   const [refreshing,     setRefreshing]     = useState(false);
-  const [showRequestUpdate,setShowRequestUpdate] = useState(false);
-  const [selectedProject,  setSelectedProject]   = useState<Project | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
@@ -62,7 +55,7 @@ export default function ProjectsScreen() {
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  const { projects, loading, refresh } = useProjects({
+  const { projects, loading, error, refresh } = useProjects({
     status: filterStatus,
     search: debouncedSearch,
     sortBy,
@@ -77,26 +70,6 @@ export default function ProjectsScreen() {
     await refresh();
     setRefreshing(false);
   }, [refresh]);
-
-  const handleContact = async (project: Project | { name: string; projectManager: string }) => {
-    const emailUrl = `mailto:${FIRM_CONTACT.email}?subject=Project Update Request: ${project.name}`;
-    dialog.showConfirm(
-      `Would you like to email ${project.projectManager}?\n\nEmail: ${FIRM_CONTACT.email}`,
-      async () => {
-        try {
-          const canOpen = await Linking.canOpenURL(emailUrl);
-          if (canOpen) await Linking.openURL(emailUrl);
-          else dialog.showError('Unable to open email client');
-        } catch { dialog.showError('Failed to open email client'); }
-      },
-      'Contact Project Manager', 'Email', 'Cancel'
-    );
-  };
-
-  const handleRequestUpdate = (project: Project | { id: string; name: string; projectManager: string }) => {
-    setSelectedProject(project as Project);
-    setShowRequestUpdate(true);
-  };
 
   const statusCounts = useMemo(() => ({
     all:       projects.length,
@@ -182,6 +155,17 @@ export default function ProjectsScreen() {
       {/* ── List ────────────────────────────────────────────────────────────── */}
       {loading ? (
         <LoadingState />
+      ) : error ? (
+        <View style={{ padding: 16 }}>
+          <EmptyState
+            icon={AlertCircle}
+            title="Unable to load projects"
+            subtitle={error}
+          />
+          <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={filteredProjects}
@@ -190,8 +174,6 @@ export default function ProjectsScreen() {
               project={item}
               index={index}
               onPress={() => router.push(`/project/${item.id}`)}
-              onContact={handleContact}
-              onRequestUpdate={handleRequestUpdate}
             />
           )}
           keyExtractor={(item) => item.id.toString()}
@@ -292,15 +274,6 @@ export default function ProjectsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {selectedProject && (
-        <RequestUpdateModal
-          visible={showRequestUpdate}
-          onClose={() => { setShowRequestUpdate(false); setSelectedProject(null); }}
-          projectId={selectedProject.id}
-          projectName={selectedProject.name}
-          projectManager={selectedProject.projectManager}
-        />
-      )}
     </View>
   );
 }
@@ -369,4 +342,7 @@ const styles = StyleSheet.create({
   sheetDot:        { width: 8, height: 8, borderRadius: 4 },
   sheetOptionText: { fontSize: 15, fontWeight: '500', color: D.inkMid },
   sheetOptionSub:  { fontSize: 12, color: D.inkLight, marginTop: 1 },
+
+  retryBtn:     { backgroundColor: D.ink, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, marginTop: 16, alignSelf: 'center' },
+  retryBtnText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
 });

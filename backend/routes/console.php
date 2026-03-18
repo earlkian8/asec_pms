@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Schedule daily pruning of trash bin items older than 30 days
 Schedule::command('trashbin:prune')->daily();
+
+// Rotation: auto-complete assignments whose end_date has passed
+// This frees the person for re-assignment to another project
+Schedule::command('project-teams:complete-expired')->dailyAt('00:05');

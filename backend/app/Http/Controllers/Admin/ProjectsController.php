@@ -8,6 +8,7 @@ use App\Models\ClientType;
 use App\Models\Project;
 use App\Models\ProjectType;
 use App\Models\ProjectTask;
+use App\Enums\AssignmentStatus;
 use App\Models\ProjectTeam;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectMaterialAllocation;
@@ -158,7 +159,16 @@ class ProjectsController extends Controller
             'type'  => 'user',
         ]);
 
-        $employees = Employee::where('is_active', true)->orderBy('first_name')->orderBy('last_name')
+        // Employees with an active assignment in ANY project are excluded (rotation rule)
+        // Users (contractors) are exempt — they can be on multiple projects
+        $occupiedEmployeeIds = ProjectTeam::occupied()
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->unique()->filter()->toArray();
+
+        $employees = Employee::where('is_active', true)
+            ->whereNotIn('id', $occupiedEmployeeIds)
+            ->orderBy('first_name')->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'email', 'position'])
             ->map(fn ($e) => [
                 'id'       => $e->id,
@@ -365,18 +375,30 @@ class ProjectsController extends Controller
                     if ($member['type'] === 'employee' && !\App\Models\Employee::where('id', $member['id'])->where('is_active', true)->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid employee.']]);
                     }
+                    // Rotation guard: employees cannot be on two projects at once
+                    if ($member['type'] === 'employee') {
+                        $occupied = ProjectTeam::occupied()
+                            ->where('employee_id', $member['id'])
+                            ->exists();
+                        if ($occupied) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                "team_members.{$index}.id" => ['This employee already has an active project assignment.'],
+                            ]);
+                        }
+                    }
                 }
                 foreach ($validated['team_members'] as $member) {
                     ProjectTeam::create([
-                        'project_id'      => $project->id,
-                        'user_id'         => $member['type'] === 'user' ? $member['id'] : null,
-                        'employee_id'     => $member['type'] === 'employee' ? $member['id'] : null,
-                        'assignable_type' => $member['type'],
-                        'role'            => $member['role'],
-                        'hourly_rate'     => $member['hourly_rate'],
-                        'start_date'      => $member['start_date'],
-                        'end_date'        => $member['end_date'] ?? null,
-                        'is_active'       => true,
+                        'project_id'        => $project->id,
+                        'user_id'           => $member['type'] === 'user' ? $member['id'] : null,
+                        'employee_id'       => $member['type'] === 'employee' ? $member['id'] : null,
+                        'assignable_type'   => $member['type'],
+                        'role'              => $member['role'],
+                        'hourly_rate'       => $member['hourly_rate'],
+                        'start_date'        => $member['start_date'],
+                        'end_date'          => $member['end_date'] ?? null,
+                        'is_active'         => true,
+                        'assignment_status' => AssignmentStatus::Active->value,
                     ]);
                 }
             }

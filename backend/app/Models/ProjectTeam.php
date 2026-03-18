@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AssignmentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -20,47 +21,39 @@ class ProjectTeam extends Model
         'start_date',
         'end_date',
         'is_active',
+        'assignment_status',
         'created_by',
     ];
 
     protected $casts = [
-        'hourly_rate' => 'decimal:2',
-        'start_date'  => 'date',
-        'end_date'    => 'date',
-        'is_active'   => 'boolean',
+        'hourly_rate'       => 'decimal:2',
+        'start_date'        => 'date',
+        'end_date'          => 'date',
+        'is_active'         => 'boolean',
+        'assignment_status' => AssignmentStatus::class,
     ];
 
     protected $appends = [
         'assignable_name',
     ];
 
-    /**
-     * Get the project that owns the team member.
-     */
+    // ─── Relationships ────────────────────────────────────────────────────────
+
     public function project()
     {
         return $this->belongsTo(Project::class, 'project_id');
     }
 
-    /**
-     * Get the user assigned to the project team.
-     */
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    /**
-     * Get the employee assigned to the project team.
-     */
     public function employee()
     {
         return $this->belongsTo(Employee::class, 'employee_id');
     }
 
-    /**
-     * Get the assignable (user or employee) for this team member.
-     */
     public function assignable()
     {
         if ($this->assignable_type === 'employee' && $this->employee_id) {
@@ -69,32 +62,49 @@ class ProjectTeam extends Model
         return $this->user();
     }
 
-    /**
-     * Get the name of the assignable (user or employee).
-     */
-    public function getAssignableNameAttribute()
+    // ─── Computed Attributes ──────────────────────────────────────────────────
+
+    public function getAssignableNameAttribute(): string
     {
-        // If assignable_type is set, use it
         if ($this->assignable_type === 'employee' && $this->employee) {
             return $this->employee->full_name;
         }
         if ($this->assignable_type === 'user' && $this->user) {
             return $this->user->name;
         }
-        
-        // Fallback: if assignable_type is not set (legacy records), check which one exists
+
+        // Fallback for legacy records without assignable_type
         if ($this->employee_id && $this->employee) {
             return $this->employee->full_name;
         }
         if ($this->user_id && $this->user) {
             return $this->user->name;
         }
-        
+
         return 'N/A';
     }
 
+    // ─── Query Scopes ─────────────────────────────────────────────────────────
+
     /**
-     * Scope to get only active team members.
+     * Scope: records where the person is actively occupying a project slot.
+     * This is the single source of truth for "is this person busy?"
+     */
+    public function scopeOccupied($query)
+    {
+        return $query->where('assignment_status', AssignmentStatus::Active->value);
+    }
+
+    /**
+     * Scope: records where the person is available (completed or released).
+     */
+    public function scopeAvailable($query)
+    {
+        return $query->where('assignment_status', '!=', AssignmentStatus::Active->value);
+    }
+
+    /**
+     * Scope: only active team members (legacy is_active flag — kept for backward compat).
      */
     public function scopeActive($query)
     {
@@ -102,7 +112,7 @@ class ProjectTeam extends Model
     }
 
     /**
-     * Scope to get team members by role.
+     * Scope: filter by role.
      */
     public function scopeByRole($query, string $role)
     {
@@ -110,7 +120,7 @@ class ProjectTeam extends Model
     }
 
     /**
-     * Scope to get current team members (no end date or end date in future).
+     * Scope: current members (no end date or end date not yet past).
      */
     public function scopeCurrent($query)
     {
@@ -120,8 +130,28 @@ class ProjectTeam extends Model
         });
     }
 
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
     /**
-     * Check if the team member is currently active.
+     * Returns true if this assignment is blocking the person from being
+     * assigned to another project.
+     */
+    public function isOccupied(): bool
+    {
+        return $this->assignment_status === AssignmentStatus::Active;
+    }
+
+    /**
+     * Returns true if this person can be re-assigned (status is completed or released).
+     */
+    public function isAvailableForReassignment(): bool
+    {
+        return $this->assignment_status->isAvailable();
+    }
+
+    /**
+     * @deprecated Use isOccupied() / assignment_status for availability checks.
+     *             Kept for any other code that still references isCurrentlyActive().
      */
     public function isCurrentlyActive(): bool
     {
@@ -130,7 +160,7 @@ class ProjectTeam extends Model
         }
 
         $today = now()->toDateString();
-        
+
         if ($this->start_date && $this->start_date > $today) {
             return false;
         }

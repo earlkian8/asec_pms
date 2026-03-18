@@ -45,6 +45,9 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     
     // Project detail route
     Route::get('/projects/{id}', [ClientDashboardController::class, 'projectDetail']);
+
+    // Task detail route (task-scoped drilldown)
+    Route::get('/tasks/{id}', [ClientDashboardController::class, 'taskDetail']);
     
     // Request Update routes
     Route::post('/request-update', [ClientDashboardController::class, 'requestUpdate']);

@@ -1,34 +1,19 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  TrendingUp,
-  Calendar,
-  FileText,
-  ArrowRight,
-  BarChart3,
-  Folder,
-  ChevronRight,
+  CheckCircle2, Clock, AlertCircle,
+  Calendar, FileText, ArrowRight, BarChart3,
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { AppColors, getStatusColor, getPriorityColor } from '@/utils/colors';
+import { D, AppColors, getStatusColor, getStatusBg } from '@/utils/colors';
 import { formatDate, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService } from '@/services/api';
 import { Task } from '@/types';
-import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
 import Logo from '@/components/Logo';
 
@@ -41,578 +26,307 @@ interface DashboardStats {
   critical: number;
 }
 
+// ── Shared primitives ──────────────────────────────────────────────────────────
+
+function StatChip({
+  icon: Icon, value, label, accent, bg,
+}: {
+  icon: any; value: number; label: string; accent: string; bg: string;
+}) {
+  return (
+    <View style={[styles.statChip, { borderLeftColor: accent }]}>
+      <View style={[styles.statChipIcon, { backgroundColor: bg }]}>
+        <Icon size={13} color={accent} strokeWidth={2.5} />
+      </View>
+      <View>
+        <Text style={styles.statChipValue}>{value}</Text>
+        <Text style={styles.statChipLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderLeft}>
+        <View style={styles.sectionBar} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {onSeeAll && (
+        <TouchableOpacity onPress={onSeeAll} style={styles.seeAllBtn}>
+          <Text style={styles.seeAllText}>See all</Text>
+          <ArrowRight size={12} color={D.ink} strokeWidth={2.5} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ── Main screen ────────────────────────────────────────────────────────────────
+
 export default function HomeScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const router  = useRouter();
+  const insets  = useSafeAreaInsets();
   const { user } = useAuth();
+
   const [stats, setStats] = useState<DashboardStats>({
-    total: 0,
-    pending: 0,
-    inProgress: 0,
-    completed: 0,
-    overdue: 0,
-    critical: 0,
+    total: 0, pending: 0, inProgress: 0,
+    completed: 0, overdue: 0, critical: 0,
   });
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch statistics and upcoming tasks in parallel
-      const [statsResponse, tasksResponse] = await Promise.all([
+      const [statsRes, tasksRes] = await Promise.all([
         apiService.get<DashboardStats>('/task-management/dashboard/statistics'),
         apiService.get<Task[]>('/task-management/dashboard/upcoming-tasks?limit=5'),
       ]);
-
-      if (statsResponse.success && statsResponse.data) {
-        setStats(statsResponse.data);
-      }
-
-      if (tasksResponse.success && tasksResponse.data) {
-        setUpcomingTasks(Array.isArray(tasksResponse.data) ? tasksResponse.data : []);
-      }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      if (statsRes.success && statsRes.data) setStats(statsRes.data);
+      if (tasksRes.success && tasksRes.data)
+        setUpcomingTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []);
+    } catch (e) {
+      console.error('Error loading dashboard data:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+  useEffect(() => { loadDashboardData(); }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadDashboardData();
-  };
-
-  const StatCard = ({
-    icon: Icon,
-    label,
-    value,
-    color,
-    gradient,
-    onPress,
-  }: {
-    icon: any;
-    label: string;
-    value: number;
-    color: string;
-    gradient: readonly [string, string];
-    onPress?: () => void;
-  }) => (
-    <TouchableOpacity
-      style={[styles.statCard, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <LinearGradient
-        colors={gradient as [string, string]}
-        style={styles.statIconContainer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <Icon size={24} color="#FFFFFF" />
-      </LinearGradient>
-      <View style={styles.statContent}>
-        <Text style={[styles.statValue, { color: AppColors.text }]}>{value}</Text>
-        <Text style={[styles.statLabel, { color: AppColors.textSecondary }]}>{label}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const onRefresh = () => { setRefreshing(true); loadDashboardData(); };
 
   if (loading && !refreshing) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={AppColors.primary} />
+      <View style={[styles.root, styles.center]}>
+        <ActivityIndicator size="large" color={D.ink} />
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
+      style={styles.root}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={AppColors.primary}
-        />
-      }
-    >
-      {/* Header */}
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />
+      }>
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.greeting, { color: AppColors.textSecondary }]}>Welcome back,</Text>
-          <Text style={[styles.userName, { color: AppColors.text }]}>{user?.name || 'User'}</Text>
+          <Text style={styles.greeting}>Good day,</Text>
+          <Text style={styles.userName} numberOfLines={1}>{user?.name ?? 'User'}</Text>
         </View>
         <Logo width={120} height={30} />
       </View>
 
-        {/* Stats Grid */}
-        <AnimatedView delay={100}>
-          <View style={styles.statsGrid}>
-            <View style={styles.twoColumnRow}>
-              <View style={styles.halfWidthCard}>
-                <StatCard
-                  icon={BarChart3}
-                  label="Total Tasks"
-                  value={stats.total}
-                  color={AppColors.primary}
-                  gradient={['#3B82F6', '#2563EB']}
-                  onPress={() => router.push('/(tabs)/tasks')}
-                />
-              </View>
-              <View style={styles.halfWidthCard}>
-                <StatCard
-                  icon={Clock}
-                  label="In Progress"
-                  value={stats.inProgress}
-                  color={AppColors.inProgress}
-                  gradient={['#3B82F6', '#2563EB']}
-                  onPress={() => router.push('/(tabs)/tasks?filter=in_progress')}
-                />
-              </View>
-            </View>
-            <View style={styles.fullWidthCard}>
-              <StatCard
-                icon={CheckCircle2}
-                label="Completed"
-                value={stats.completed}
-                color={AppColors.completed}
-                gradient={['#10B981', '#059669']}
-                onPress={() => router.push('/(tabs)/history')}
-              />
-            </View>
-            <View style={styles.fullWidthCard}>
-              <StatCard
-                icon={AlertCircle}
-                label="Overdue"
-                value={stats.overdue}
-                color={AppColors.error}
-                gradient={['#EF4444', '#DC2626']}
-                onPress={() => router.push('/(tabs)/tasks?filter=overdue')}
-              />
-            </View>
-          </View>
-        </AnimatedView>
+      {/* ── Stat chips ─────────────────────────────────────────────────────── */}
+      <AnimatedView delay={80}>
+        <View style={styles.statsRow}>
+          <StatChip icon={BarChart3}    value={stats.total}      label="Total"     accent={D.blue}  bg={D.blueBg}  />
+          <View style={styles.statDiv} />
+          <StatChip icon={Clock}        value={stats.inProgress} label="In Progress" accent={D.amber} bg={D.amberBg} />
+          <View style={styles.statDiv} />
+          <StatChip icon={CheckCircle2} value={stats.completed}  label="Done"      accent={D.green} bg={D.greenBg} />
+        </View>
+      </AnimatedView>
 
-        {/* Priority Alert */}
-        {stats.critical > 0 && (
-          <AnimatedView delay={200}>
-            <AnimatedCard
-              onPress={() => router.push('/(tabs)/tasks?filter=critical')}
-              style={[styles.alertCard, { backgroundColor: AppColors.warning + '10', borderColor: AppColors.warning + '30' }]}>
-              <View style={[styles.alertIconContainer, { backgroundColor: AppColors.warning + '20' }]}>
-                <AlertCircle size={24} color={AppColors.critical} />
-              </View>
-              <View style={styles.alertContent}>
-                <Text style={[styles.alertTitle, { color: AppColors.text }]}>Critical Tasks</Text>
-                <Text style={[styles.alertText, { color: AppColors.textSecondary }]}>
-                  You have {stats.critical} critical task{stats.critical !== 1 ? 's' : ''} requiring immediate attention
+      {/* ── Overdue / critical alert ────────────────────────────────────────── */}
+      {(stats.overdue > 0 || stats.critical > 0) && (
+        <AnimatedView delay={140}>
+          <TouchableOpacity
+            style={styles.alertCard}
+            onPress={() => router.push('/(tabs)/tasks')}
+            activeOpacity={0.8}>
+            <View style={styles.alertIconWrap}>
+              <AlertCircle size={16} color={D.red} strokeWidth={2.5} />
+            </View>
+            <View style={{ flex: 1 }}>
+              {stats.overdue > 0 && (
+                <Text style={styles.alertText}>
+                  <Text style={styles.alertCount}>{stats.overdue}</Text> overdue task{stats.overdue !== 1 ? 's' : ''}
                 </Text>
-              </View>
-              <ArrowRight size={20} color={AppColors.critical} />
-            </AnimatedCard>
-          </AnimatedView>
-        )}
-
-        {/* Upcoming Tasks */}
-        <AnimatedView delay={300}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleRow}>
-                <Calendar size={20} color={AppColors.text} />
-                <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Upcoming Tasks</Text>
-              </View>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
-                <Text style={[styles.seeAllText, { color: AppColors.primary }]}>See All</Text>
-              </TouchableOpacity>
+              )}
+              {stats.critical > 0 && (
+                <Text style={styles.alertText}>
+                  <Text style={styles.alertCount}>{stats.critical}</Text> critical task{stats.critical !== 1 ? 's' : ''}
+                </Text>
+              )}
             </View>
+            <ArrowRight size={14} color={D.red} strokeWidth={2.5} />
+          </TouchableOpacity>
+        </AnimatedView>
+      )}
 
-            {upcomingTasks.length > 0 ? (
-              upcomingTasks.map((task, index) => {
-                const statusColor = getStatusColor(task.status);
-                const overdue = task.dueDate && isOverdue(task.dueDate);
-                const daysUntil = task.dueDate ? getDaysUntilDue(task.dueDate) : null;
+      {/* ── Upcoming tasks ──────────────────────────────────────────────────── */}
+      <AnimatedView delay={200}>
+        <View style={styles.section}>
+          <SectionHeader title="Upcoming Tasks" onSeeAll={() => router.push('/(tabs)/tasks')} />
 
-                return (
-                  <AnimatedCard
-                    key={task.id}
-                    index={index}
-                    delay={400}
-                    onPress={() => router.push(`/task-detail?id=${task.id}`)}
-                    style={styles.taskCard}
-                  >
-                    <View style={styles.taskHeader}>
-                      <View style={styles.taskTitleRow}>
-                        <View
-                          style={[
-                            styles.statusIndicator,
-                            { backgroundColor: statusColor },
-                          ]}
-                        />
-                        <Text style={[styles.taskTitle, { color: AppColors.text }]} numberOfLines={2}>
-                          {task.title}
+          {upcomingTasks.length > 0 ? (
+            upcomingTasks.map((task, idx) => {
+              const statusColor = getStatusColor(task.status);
+              const statusBg    = getStatusBg(task.status);
+              const overdue     = task.dueDate && isOverdue(task.dueDate);
+              const daysUntil   = task.dueDate ? getDaysUntilDue(task.dueDate) : null;
+
+              return (
+                <TouchableOpacity
+                  key={task.id}
+                  style={styles.taskCard}
+                  onPress={() => router.push(`/task-detail?id=${task.id}`)}
+                  activeOpacity={0.7}>
+
+                  {/* left accent bar */}
+                  <View style={[styles.taskAccentBar, { backgroundColor: statusColor }]} />
+
+                  <View style={styles.taskCardInner}>
+                    <View style={styles.taskCardTop}>
+                      <Text style={styles.taskTitle} numberOfLines={2}>{task.title}</Text>
+                      <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
+                        <Text style={[styles.statusPillText, { color: statusColor }]}>
+                          {task.status.replace('_', ' ')}
                         </Text>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            {
-                              backgroundColor: statusColor + '20',
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusText,
-                              { color: statusColor },
-                            ]}
-                          >
-                            {task.status.replace('_', ' ').toUpperCase()}
-                          </Text>
-                        </View>
                       </View>
                     </View>
 
-                    <Text style={[styles.taskDescription, { color: AppColors.textSecondary }]} numberOfLines={2}>
-                      {task.description || 'No description provided for this task.'}
-                    </Text>
+                    {task.description ? (
+                      <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
+                    ) : null}
 
                     <View style={styles.taskMeta}>
-                      <View style={styles.metaRow}>
-                        <View style={styles.metaItem}>
-                          <Calendar
-                            size={14}
-                            color={overdue ? AppColors.error : AppColors.textSecondary}
-                          />
-                          <Text
-                            style={[
-                              styles.metaText,
-                              { color: overdue ? AppColors.error : AppColors.textSecondary },
-                              overdue && styles.overdueText,
-                            ]}
-                          >
-                            {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
-                            {overdue && ' (Overdue)'}
-                            {!overdue && daysUntil !== null && daysUntil <= 3 && daysUntil > 0 && ` (${daysUntil}d left)`}
-                          </Text>
-                        </View>
+                      <View style={styles.metaItem}>
+                        <Calendar size={12} color={overdue ? D.red : D.inkLight} strokeWidth={2} />
+                        <Text style={[styles.metaText, overdue && { color: D.red, fontWeight: '600' }]}>
+                          {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
+                          {overdue ? ' · Overdue' : (daysUntil !== null && daysUntil <= 3 && daysUntil > 0 ? ` · ${daysUntil}d left` : '')}
+                        </Text>
                       </View>
-
-                      <View style={styles.metaRow}>
-                        <View style={styles.metaItem}>
-                          <Folder size={14} color={AppColors.textSecondary} />
-                          <Text style={[styles.metaText, { color: AppColors.textSecondary }]}>{task.projectName}</Text>
-                        </View>
-                      </View>
+                      <Text style={styles.taskProject} numberOfLines={1}>{task.projectName}</Text>
                     </View>
-
-                    <View style={[styles.taskFooter, { borderTopColor: AppColors.border }]}>
-                      <Text style={[styles.milestoneText, { color: AppColors.textSecondary }]}>{task.milestoneName}</Text>
-                      <ChevronRight size={20} color={AppColors.textSecondary} />
-                    </View>
-                  </AnimatedCard>
-                );
-              })
-            ) : (
-              <AnimatedView delay={400}>
-                <View style={[styles.emptyState, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
-                  <CheckCircle2 size={32} color={AppColors.success} />
-                  <Text style={[styles.emptyText, { color: AppColors.text }]}>All caught up!</Text>
-                  <Text style={[styles.emptySubtext, { color: AppColors.textSecondary }]}>
-                    You have no upcoming tasks
-                  </Text>
-                </View>
-              </AnimatedView>
-            )}
-          </View>
-        </AnimatedView>
-
-        {/* Quick Actions */}
-        <AnimatedView delay={500}>
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: AppColors.text }]}>Quick Actions</Text>
-            <View style={styles.quickActions}>
-              <AnimatedCard
-                index={0}
-                delay={600}
-                onPress={() => router.push('/(tabs)/tasks')}
-                style={styles.quickActionCard}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: AppColors.primary + '20' }]}>
-                  <FileText size={24} color={AppColors.primary} />
-                </View>
-                <Text style={[styles.quickActionText, { color: AppColors.text }]}>View All Tasks</Text>
-              </AnimatedCard>
-              <AnimatedCard
-                index={1}
-                delay={650}
-                onPress={() => router.push('/(tabs)/history')}
-                style={styles.quickActionCard}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: AppColors.success + '20' }]}>
-                  <TrendingUp size={24} color={AppColors.success} />
-                </View>
-                <Text style={[styles.quickActionText, { color: AppColors.text }]}>View History</Text>
-              </AnimatedCard>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={styles.emptyCard}>
+              <CheckCircle2 size={32} color={D.green} strokeWidth={1.5} />
+              <Text style={styles.emptyTitle}>All caught up!</Text>
+              <Text style={styles.emptySubtitle}>No upcoming tasks</Text>
             </View>
+          )}
+        </View>
+      </AnimatedView>
+
+      {/* ── Quick actions ───────────────────────────────────────────────────── */}
+      <AnimatedView delay={260}>
+        <View style={styles.section}>
+          <SectionHeader title="Quick Actions" />
+          <View style={styles.quickRow}>
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => router.push('/(tabs)/tasks')}
+              activeOpacity={0.7}>
+              <View style={[styles.quickIcon, { backgroundColor: D.blueBg }]}>
+                <FileText size={18} color={D.blue} strokeWidth={2} />
+              </View>
+              <Text style={styles.quickLabel}>All Tasks</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => router.push('/(tabs)/history')}
+              activeOpacity={0.7}>
+              <View style={[styles.quickIcon, { backgroundColor: D.greenBg }]}>
+                <CheckCircle2 size={18} color={D.green} strokeWidth={2} />
+              </View>
+              <Text style={styles.quickLabel}>History</Text>
+            </TouchableOpacity>
           </View>
-        </AnimatedView>
+        </View>
+      </AnimatedView>
     </ScrollView>
   );
 }
 
+// ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: AppColors.background,
+  root:    { flex: 1, backgroundColor: D.chalk },
+  center:  { justifyContent: 'center', alignItems: 'center' },
+  content: { paddingHorizontal: 20, paddingBottom: 48 },
+
+  // Header
+  header:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  greeting: { fontSize: 12, color: D.inkLight, fontWeight: '500', letterSpacing: 0.3, marginBottom: 2 },
+  userName: { fontSize: 24, fontWeight: '700', color: D.ink, letterSpacing: -0.5, lineHeight: 28 },
+
+  // Stat chips row
+  statsRow: {
+    flexDirection: 'row', backgroundColor: D.surface,
+    borderWidth: 1, borderColor: D.hairline, borderRadius: 12,
+    paddingVertical: 14, paddingHorizontal: 12,
+    marginBottom: 14, alignItems: 'center',
   },
-  content: {
-    padding: 20,
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  greeting: {
-    fontSize: 14,
-    fontWeight: '400',
-    marginBottom: 4,
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  statsGrid: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  twoColumnRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidthCard: {
-    flex: 1,
-  },
-  fullWidthCard: {
-    width: '100%',
-  },
-  statCard: {
-    width: '100%',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  statChip:      { flex: 1, flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, paddingLeft: 10, gap: 8 },
+  statChipIcon:  { width: 28, height: 28, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  statChipValue: { fontSize: 17, fontWeight: '700', color: D.ink, lineHeight: 20 },
+  statChipLabel: { fontSize: 10, fontWeight: '500', color: D.inkLight },
+  statDiv:       { width: 1, height: 32, backgroundColor: D.hairline, marginHorizontal: 8 },
+
+  // Alert card
   alertCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    marginBottom: 24,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: D.surface, borderWidth: 1, borderColor: '#FCCAC3',
+    borderRadius: 10, padding: 12, marginBottom: 20,
   },
-  alertIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  alertIconWrap: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: D.redBg, justifyContent: 'center', alignItems: 'center',
   },
-  alertContent: {
-    flex: 1,
-  },
-  alertTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  alertText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  alertButton: {
-    padding: 8,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  alertText:  { fontSize: 13, color: D.inkMid, lineHeight: 18 },
+  alertCount: { fontWeight: '700', color: D.red },
+
+  // Section
+  section:           { marginBottom: 8 },
+  sectionHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionBar:        { width: 3, height: 16, backgroundColor: D.ink, borderRadius: 2 },
+  sectionTitle:      { fontSize: 15, fontWeight: '700', color: D.ink },
+  seeAllBtn:         { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  seeAllText:        { fontSize: 12, fontWeight: '600', color: D.ink },
+
+  // Task card
   taskCard: {
-    marginBottom: 12,
+    flexDirection: 'row', backgroundColor: D.surface,
+    borderWidth: 1, borderColor: D.hairline, borderRadius: 12,
+    marginBottom: 10, overflow: 'hidden',
   },
-  taskHeader: {
-    marginBottom: 12,
-  },
-  taskTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statusIndicator: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
-  },
-  taskTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  priorityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  priorityText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  taskDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  taskMeta: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  metaText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  overdueText: {
-    fontWeight: '600',
-  },
-  taskFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-  },
-  milestoneText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  quickActionCard: {
-    flex: 1,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: AppColors.background,
-  },
+  taskAccentBar:  { width: 4 },
+  taskCardInner:  { flex: 1, padding: 14 },
+  taskCardTop:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
+  taskTitle:      { flex: 1, fontSize: 14, fontWeight: '700', color: D.ink, lineHeight: 20 },
+  statusPill:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  statusPillText: { fontSize: 10, fontWeight: '600', textTransform: 'capitalize' },
+  taskDesc:       { fontSize: 12, color: D.inkMid, lineHeight: 17, marginBottom: 10 },
+  taskMeta:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  metaItem:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText:       { fontSize: 11, color: D.inkLight, fontWeight: '500' },
+  taskProject:    { fontSize: 11, color: D.inkLight, fontWeight: '500', maxWidth: 120 },
+
+  // Empty
+  emptyCard:     { backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 32, alignItems: 'center' },
+  emptyTitle:    { fontSize: 15, fontWeight: '700', color: D.ink, marginTop: 12 },
+  emptySubtitle: { fontSize: 12, color: D.inkLight, marginTop: 4 },
+
+  // Quick actions
+  quickRow:    { flexDirection: 'row', gap: 10 },
+  quickCard:   { flex: 1, backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 16, alignItems: 'center', gap: 8 },
+  quickIcon:   { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  quickLabel:  { fontSize: 12, fontWeight: '600', color: D.ink },
 });

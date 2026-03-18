@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClientUpdateRequest;
+use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
@@ -17,6 +19,51 @@ use Carbon\Carbon;
 class TaskManagementTaskController extends Controller
 {
     use NotificationTrait;
+
+    /**
+     * Sync milestone status based on its current tasks.
+     * Mirrors admin behavior from ProjectTasksController::syncMilestoneStatus().
+     */
+    private function syncMilestoneStatus(ProjectMilestone $milestone): void
+    {
+        $tasks = $milestone->tasks()->get();
+
+        if ($tasks->isEmpty()) {
+            if ($milestone->status === 'completed') {
+                $milestone->update(['status' => 'in_progress']);
+            }
+            return;
+        }
+
+        $allCompleted = $tasks->every(fn ($t) => $t->status === 'completed');
+        $anyActive = $tasks->contains(fn ($t) => in_array($t->status, ['in_progress', 'completed']));
+
+        if ($allCompleted) {
+            if ($milestone->status !== 'completed') {
+                $milestone->update(['status' => 'completed']);
+            }
+        } elseif ($anyActive) {
+            if ($milestone->status !== 'in_progress') {
+                $milestone->update(['status' => 'in_progress']);
+            }
+        }
+        // If all tasks are pending, leave milestone as-is (admin rule).
+    }
+
+    /**
+     * Auto-start work when progress is reported.
+     * Mirrors admin behavior from ProgressUpdatesController::autoProgressMilestone().
+     */
+    private function autoProgressMilestone(ProjectTask $task, ProjectMilestone $milestone): void
+    {
+        if ($task->status === 'pending') {
+            $task->update(['status' => 'in_progress']);
+        }
+
+        if ($milestone->status === 'pending') {
+            $milestone->update(['status' => 'in_progress']);
+        }
+    }
     /**
      * Get task detail with related data
      */
@@ -97,9 +144,27 @@ class TaskManagementTaskController extends Controller
             'status' => 'required|in:pending,in_progress,completed',
         ]);
 
+        // Cannot mark as completed without at least 1 progress update (admin parity)
+        if ($request->status === 'completed') {
+            if ($task->progressUpdates()->count() === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot mark task as completed. Please add at least one progress update first.',
+                    'errors' => [
+                        'status' => ['Cannot mark task as completed. Please add at least one progress update first.'],
+                    ],
+                ], 422);
+            }
+        }
+
         $oldStatus = $task->status;
         $task->status = $request->status;
         $task->save();
+
+        // ── Auto-status: task status changed → sync milestone ──
+        if ($task->milestone) {
+            $this->syncMilestoneStatus($task->milestone);
+        }
 
         // Reload task with relationships
         $task->load(['milestone.project', 'assignedUser']);
@@ -263,6 +328,11 @@ class TaskManagementTaskController extends Controller
 
         $progressUpdate->load('createdBy');
         $task->load(['milestone.project']);
+
+        // ── Auto-status: progress update added → task/milestone move to in_progress ──
+        if ($task->milestone) {
+            $this->autoProgressMilestone($task, $task->milestone);
+        }
 
         // System-wide notification for progress update
         if ($task->milestone && $task->milestone->project) {
@@ -605,6 +675,11 @@ class TaskManagementTaskController extends Controller
 
         $issue->load(['reportedBy', 'assignedTo']);
 
+        // ── Auto-status: issue added → milestone moves to in_progress ──
+        if ($task->milestone && $task->milestone->status === 'pending') {
+            $task->milestone->update(['status' => 'in_progress']);
+        }
+
         // System-wide notification for new issue
         if ($task->milestone && $task->milestone->project) {
             $project = $task->milestone->project;
@@ -638,6 +713,51 @@ class TaskManagementTaskController extends Controller
                 'created_at' => $issue->created_at->toISOString(),
                 'updated_at' => $issue->updated_at->toISOString(),
             ],
+        ]);
+    }
+
+    /**
+     * View-only: client request updates for a task (mobile parity).
+     */
+    public function requestUpdates(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $requests = ClientUpdateRequest::query()
+            ->where('task_id', $task->id)
+            ->with('client')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn (ClientUpdateRequest $r) => [
+                'id' => $r->id,
+                'subject' => $r->subject,
+                'message' => $r->message,
+                'client_id' => $r->client_id,
+                'client_name' => $r->client?->client_name ?? null,
+                'created_at' => $r->created_at?->toISOString(),
+            ])
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $requests,
         ]);
     }
 

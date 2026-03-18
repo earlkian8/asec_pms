@@ -30,7 +30,7 @@ class TaskManagementAuthController extends Controller
         }
 
         $authz = app(TaskManagementAuthorization::class);
-        $role = $authz->getRole($user);
+        $permissions = $user->getAllPermissions()->pluck('name')->values();
 
         // Revoke all existing tokens (optional - for single device login)
         // $user->tokens()->delete();
@@ -45,7 +45,7 @@ class TaskManagementAuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'role' => $role,
+                    'permissions' => $permissions,
                 ],
                 'token' => $token,
             ],
@@ -58,8 +58,7 @@ class TaskManagementAuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        $authz = app(TaskManagementAuthorization::class);
-        $role = $authz->getRole($user);
+        $permissions = $user->getAllPermissions()->pluck('name')->values();
 
         return response()->json([
             'success' => true,
@@ -67,7 +66,7 @@ class TaskManagementAuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $role,
+                'permissions' => $permissions,
             ],
         ]);
     }

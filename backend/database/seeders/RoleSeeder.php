@@ -121,6 +121,57 @@ class RoleSeeder extends Seeder
             'reports.view', 'reports.project-performance', // View project reports
         ]);
 
+        // 7. Foreman (TM) - Task-management app execution only (permission-driven)
+        $tmForeman = Role::firstOrCreate(
+            ['name' => 'Foreman (TM)', 'guard_name' => 'web'],
+            ['name' => 'Foreman (TM)', 'guard_name' => 'web']
+        );
+        $tmForeman->syncPermissions([
+            'tm.access',
+            'tm.tasks.view',
+            'tm.tasks.update-status',
+            'tm.progress-updates.view',
+            'tm.progress-updates.create',
+            'tm.progress-updates.update-own',
+            'tm.progress-updates.delete-own',
+            'tm.issues.view',
+            'tm.issues.create',
+            'tm.issues.update-own',
+            'tm.issues.delete-own',
+            'tm.files.download',
+        ]);
+
+        // 8. Engineer (TM) - Task-management app project-scoped management
+        $tmEngineer = Role::firstOrCreate(
+            ['name' => 'Engineer (TM)', 'guard_name' => 'web'],
+            ['name' => 'Engineer (TM)', 'guard_name' => 'web']
+        );
+        $tmEngineer->syncPermissions([
+            // Execution
+            'tm.access',
+            'tm.tasks.view',
+            'tm.tasks.update-status',
+            'tm.progress-updates.view',
+            'tm.progress-updates.create',
+            'tm.progress-updates.update-own',
+            'tm.progress-updates.delete-own',
+            'tm.issues.view',
+            'tm.issues.create',
+            'tm.issues.update-own',
+            'tm.issues.delete-own',
+            'tm.files.download',
+
+            // Management
+            'tm.projects.view-assigned',
+            'tm.milestones.manage',
+            'tm.tasks.manage',
+            'tm.team.view',
+            'tm.team.assign',
+            'tm.team.release',
+            'tm.team.reactivate',
+            'tm.team.force-remove',
+        ]);
+
         $this->command->info('Roles seeded successfully!');
     }
 }

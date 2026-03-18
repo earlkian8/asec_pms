@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: number;
         name: string;
         email: string;
+        permissions?: string[];
       }>('/task-management/me');
 
       if (response.success && response.data) {
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: response.data.id,
           name: response.data.name,
           email: response.data.email,
+          permissions: response.data.permissions || [],
         });
       } else {
         setUser(null);
@@ -61,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: number;
           name: string;
           email: string;
+          permissions?: string[];
         };
         token: string;
       }>('/task-management/login', { email, password });
@@ -74,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: response.data.user.id,
           name: response.data.user.name,
           email: response.data.user.email,
+          permissions: response.data.user.permissions || [],
         });
 
         return { success: true };
@@ -107,6 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const hasPermission = (permission: string) => {
+    return !!user?.permissions?.includes(permission);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -116,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         checkAuth,
+        hasPermission,
       }}>
       {children}
     </AuthContext.Provider>

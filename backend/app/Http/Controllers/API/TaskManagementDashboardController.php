@@ -256,10 +256,16 @@ class TaskManagementDashboardController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $formattedProgressUpdates = $progressUpdates->map(function ($update) {
+        // Generate storage URL using request host (works for mobile apps, not just localhost)
+        $scheme = $request->getScheme();
+        $host = $request->getHost();
+        $port = $request->getPort();
+        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
+
+        $formattedProgressUpdates = $progressUpdates->map(function ($update) use ($baseUrl) {
             $fileUrl = null;
             if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                $fileUrl = url(Storage::disk('public')->url($update->file_path));
+                $fileUrl = $baseUrl . '/storage/' . $update->file_path;
             }
 
             $task = $update->task;

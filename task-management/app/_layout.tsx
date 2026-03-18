@@ -19,6 +19,14 @@ export default function RootLayout() {
               options={{ headerShown: false, presentation: 'card' }}
             />
             <Stack.Screen
+              name="project-detail"
+              options={{ headerShown: false, presentation: 'card' }}
+            />
+            <Stack.Screen
+              name="milestone-tasks"
+              options={{ headerShown: false, presentation: 'card' }}
+            />
+            <Stack.Screen
               name="help-center"
               options={{ headerShown: false, presentation: 'card' }}
             />

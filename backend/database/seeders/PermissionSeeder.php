@@ -13,6 +13,32 @@ class PermissionSeeder extends Seeder
     public function run(): void
     {
         $permissions = [
+            // ─────────────────────────────────────────────────────────────────
+            // Task Management App (mobile) - namespaced permissions
+            // ─────────────────────────────────────────────────────────────────
+            'tm.access',
+            'tm.tasks.view',
+            'tm.tasks.update-status',
+            'tm.progress-updates.view',
+            'tm.progress-updates.create',
+            'tm.progress-updates.update-own',
+            'tm.progress-updates.delete-own',
+            'tm.issues.view',
+            'tm.issues.create',
+            'tm.issues.update-own',
+            'tm.issues.delete-own',
+            'tm.files.download',
+
+            // Engineer / higher-level project management (project-scoped in API)
+            'tm.projects.view-assigned',
+            'tm.milestones.manage',
+            'tm.tasks.manage',
+            'tm.team.view',
+            'tm.team.assign',
+            'tm.team.release',
+            'tm.team.reactivate',
+            'tm.team.force-remove',
+
             // Dashboard
             'dashboard.view',
 

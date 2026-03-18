@@ -1,11 +1,14 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, CheckSquare, Clock, User } from 'lucide-react-native';
+import { Home, CheckSquare, Clock, User, FolderKanban } from 'lucide-react-native';
 import { D } from '@/utils/colors';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { hasPermission } = useAuth();
+  const showProjects = hasPermission('tm.projects.view-assigned');
 
   return (
     <Tabs
@@ -46,6 +49,15 @@ export default function TabLayout() {
         options={{
           title: 'History',
           tabBarIcon: ({ color, size }) => <Clock size={size ?? 22} color={color} strokeWidth={1.8} />,
+        }}
+      />
+      <Tabs.Screen
+        name="projects"
+        options={{
+          title: 'Projects',
+          // Hide from tab bar if unauthorized (expo-router file-based route still exists)
+          href: showProjects ? '/projects' : null,
+          tabBarIcon: ({ color, size }) => <FolderKanban size={size ?? 22} color={color} strokeWidth={1.8} />,
         }}
       />
       <Tabs.Screen

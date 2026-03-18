@@ -28,7 +28,7 @@ import {
   X,
   Paperclip,
 } from 'lucide-react-native';
-import { Task, ProgressUpdate, Issue } from '@/types';
+import { Task, ProgressUpdate, Issue, RequestUpdate } from '@/types';
 import { AppColors, getStatusColor, getPriorityColor, getIssueStatusColor } from '@/utils/colors';
 import { formatDate, formatDateTime, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
 import { apiService, API_BASE_URL } from '@/services/api';
@@ -52,6 +52,7 @@ export default function TaskDetailScreen() {
   const [task, setTask] = useState<Task | null>(null);
   const [progressUpdates, setProgressUpdates] = useState<ProgressUpdate[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [requestUpdates, setRequestUpdates] = useState<RequestUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -111,6 +112,7 @@ export default function TaskDetailScreen() {
         loadTask(),
         loadProgressUpdates(),
         loadIssues(),
+        loadRequestUpdates(),
       ]);
     } catch (error) {
       console.error('Error loading task data:', error);
@@ -160,6 +162,19 @@ export default function TaskDetailScreen() {
       }
     } catch (error) {
       console.error('Error loading issues:', error);
+    }
+  };
+
+  const loadRequestUpdates = async () => {
+    try {
+      const response = await apiService.get<RequestUpdate[]>(`/task-management/tasks/${taskId}/request-updates`);
+      if (typeof response === 'object' && 'success' in response) {
+        if (response.success && response.data) {
+          setRequestUpdates(Array.isArray(response.data) ? response.data : []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading request updates:', error);
     }
   };
 
@@ -721,6 +736,55 @@ export default function TaskDetailScreen() {
               <Text style={styles.emptyText}>No issues reported</Text>
               <Text style={styles.emptySubtext}>
                 Great! No issues have been reported for this task
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Request Updates Section (view-only) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <MessageSquare size={20} color={AppColors.text} />
+              <Text style={styles.sectionTitle}>
+                Request Updates ({requestUpdates.length})
+              </Text>
+            </View>
+          </View>
+
+          {requestUpdates.length > 0 ? (
+            requestUpdates.map((ru, index) => (
+              <AnimatedView key={ru.id} delay={100 + index * 50}>
+                <AnimatedCard index={index} delay={150 + index * 50} style={styles.requestCard}>
+                  <Text style={styles.requestSubject} numberOfLines={2}>
+                    {ru.subject || 'No subject'}
+                  </Text>
+                  <Text style={styles.requestMessage}>
+                    {ru.message || 'No message provided.'}
+                  </Text>
+                  <View style={styles.requestMetaRow}>
+                    <View style={styles.requestMetaItem}>
+                      <User size={12} color={AppColors.textSecondary} />
+                      <Text style={styles.requestMetaText}>
+                        {ru.client_name || 'Client'}
+                      </Text>
+                    </View>
+                    <View style={styles.requestMetaItem}>
+                      <Clock size={12} color={AppColors.textSecondary} />
+                      <Text style={styles.requestMetaText}>
+                        {formatDateTime(ru.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+                </AnimatedCard>
+              </AnimatedView>
+            ))
+          ) : (
+            <View style={styles.emptySection}>
+              <MessageSquare size={32} color={AppColors.textSecondary} />
+              <Text style={styles.emptyText}>No request updates</Text>
+              <Text style={styles.emptySubtext}>
+                Client request updates for this task appear here
               </Text>
             </View>
           )}
@@ -1369,6 +1433,46 @@ const styles = StyleSheet.create({
   issueDate: {
     fontSize: 12,
     color: AppColors.textSecondary,
+  },
+  requestCard: {
+    backgroundColor: AppColors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    shadowColor: AppColors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  requestSubject: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: AppColors.text,
+    marginBottom: 8,
+  },
+  requestMessage: {
+    fontSize: 14,
+    color: AppColors.textSecondary,
+    lineHeight: 20,
+  },
+  requestMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  requestMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  requestMetaText: {
+    fontSize: 12,
+    color: AppColors.textSecondary,
+    fontWeight: '500',
   },
   emptySection: {
     alignItems: 'center',

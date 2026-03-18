@@ -2,6 +2,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  permissions?: string[];
 }
 
 export interface Task {
@@ -53,5 +54,14 @@ export interface Issue {
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RequestUpdate {
+  id: number;
+  subject: string | null;
+  message: string | null;
+  client_id: number | null;
+  client_name?: string | null;
+  created_at: string;
 }
 

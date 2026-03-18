@@ -9,7 +9,8 @@ import { Search, CheckCircle2, FileText, Calendar, Clock, X, ArrowRight } from '
 import { Task, ProgressUpdate } from '@/types';
 import { D } from '@/utils/colors';
 import { formatDate, formatDateTime } from '@/utils/dateUtils';
-import { apiService } from '@/services/api';
+import { apiService, API_BASE_URL } from '@/services/api';
+import { Image } from 'expo-image';
 
 type HistoryFilter = 'all' | 'completed' | 'updates';
 
@@ -149,6 +150,14 @@ export default function HistoryScreen() {
     }
 
     const update = item.item as ProgressUpdate & { task?: Task };
+    const updateImageUrl =
+      update.file_url
+        ? (update.file_url.startsWith('http')
+          ? update.file_url
+          : `${API_BASE_URL.replace('/api', '')}${update.file_url}`)
+        : null;
+
+    const isImage = !!update.file_type?.startsWith('image/');
     return (
       <TouchableOpacity
         style={styles.card}
@@ -178,6 +187,18 @@ export default function HistoryScreen() {
               </View>
             )}
           </View>
+
+          {isImage && updateImageUrl && (
+            <View style={styles.imageWrap}>
+              <Image
+                source={{ uri: updateImageUrl }}
+                style={styles.image}
+                contentFit="cover"
+                transition={200}
+                placeholder={{ blurhash: 'LGF5]+Yk^6#M@-5c,1J5@[or[Q6.' }}
+              />
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -310,6 +331,19 @@ const styles = StyleSheet.create({
     backgroundColor: D.blueBg, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
   },
   filePillText: { fontSize: 10, color: D.blue, fontWeight: '500', maxWidth: 80 },
+
+  imageWrap: {
+    marginTop: 10,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: D.hairline,
+    backgroundColor: D.chalk,
+  },
+  image: {
+    width: '100%',
+    height: 180,
+  },
 
   // List
   listContent: { padding: 16, paddingBottom: 40 },

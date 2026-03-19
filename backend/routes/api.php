@@ -12,10 +12,10 @@ use App\Http\Controllers\API\WebhookController;
 use App\Http\Controllers\API\TaskManagementAuthController;
 use App\Http\Controllers\API\TaskManagementDashboardController;
 use App\Http\Controllers\API\TaskManagementTaskController;
-use App\Http\Controllers\Api\TaskManagement\ProjectsController as TaskManagementProjectsController;
-use App\Http\Controllers\Api\TaskManagement\MilestonesController as TaskManagementMilestonesController;
-use App\Http\Controllers\Api\TaskManagement\TasksController as TaskManagementTasksController;
-use App\Http\Controllers\Api\TaskManagement\TeamController as TaskManagementTeamController;
+use App\Http\Controllers\API\TaskManagement\ProjectsController as TaskManagementProjectsController;
+use App\Http\Controllers\API\TaskManagement\MilestonesController as TaskManagementMilestonesController;
+use App\Http\Controllers\API\TaskManagement\TasksController as TaskManagementTasksController;
+use App\Http\Controllers\API\TaskManagement\TeamController as TaskManagementTeamController;
 
 // PayMongo webhook (public - verify signature in production)
 Route::post('/webhooks/paymongo', [WebhookController::class, 'handlePayMongo']);

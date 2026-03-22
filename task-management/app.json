@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "task-management",
+    "name": "Task Management",
     "slug": "task-management",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/task-management-logo.png",
     "scheme": "taskmanagement",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

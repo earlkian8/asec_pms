@@ -27,7 +27,6 @@ class ProjectsController extends Controller
 
         $projects = Project::query()
             ->whereIn('id', $projectIds)
-            ->whereNull('archived_at')
             ->withCount(['milestones', 'team'])
             ->orderBy('project_name', 'asc')
             ->get()

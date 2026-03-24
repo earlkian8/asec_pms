@@ -627,7 +627,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-gray-900">{formatCurrency(billing.billing_amount)}</p>
-                        <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(billing.status)}`}>
+                        <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-semibold capitalize ${getBillingStatusColor(billing.status)}`}>
                           {billing.status}
                         </span>
                         </div>

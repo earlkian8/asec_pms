@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
-  TrendingUp, TrendingDown, DollarSign, Package, FolderKanban,
+  TrendingUp, TrendingDown, PhilippinePeso, Package, FolderKanban,
   Download, ChevronDown, AlertTriangle, CheckCircle2,
   BarChart3, Activity, Layers,
 } from 'lucide-react';
@@ -384,7 +384,7 @@ export default function Reports({
   ];
 
   const tabs = [
-    { key: 'financial', label: 'Financial', icon: DollarSign },
+    { key: 'financial', label: 'Financial', icon: PhilippinePeso },
     { key: 'project',   label: 'Projects',  icon: FolderKanban },
     { key: 'inventory', label: 'Inventory', icon: Package },
   ];
@@ -517,7 +517,7 @@ export default function Reports({
             value={php(financialReport?.revenue?.total_received)}
             sub={`Billed: ${php(financialReport?.revenue?.total_billed)}`}
             color="blue"
-            icon={DollarSign}
+            icon={PhilippinePeso}
           />
           <KpiCard
             label="Total Expenses"
@@ -690,7 +690,7 @@ export default function Reports({
               </div>
 
               <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                <SectionHeader icon={DollarSign} title="Expense Composition" subtitle="Total split across expense categories" />
+                <SectionHeader icon={PhilippinePeso} title="Expense Composition" subtitle="Total split across expense categories" />
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   {[
                     { label: 'Labor',     val: financialReport?.expenses?.labor,         cls: 'bg-blue-50 text-blue-700' },
@@ -710,7 +710,7 @@ export default function Reports({
             {/* Billing status donut + Misc by type + collection health */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                <SectionHeader icon={DollarSign} title="Billing Status" subtitle="Amount distribution across billing states" />
+                <SectionHeader icon={PhilippinePeso} title="Billing Status" subtitle="Amount distribution across billing states" />
                 <DonutChart data={billingDonutData} height={200} />
                 <DataTable
                   columns={[
@@ -997,7 +997,7 @@ export default function Reports({
                 color={inventoryReport?.summary?.low_stock_count > 0 ? 'orange' : 'green'}
                 icon={AlertTriangle}
               />
-              <KpiCard label="Total Value"  value={php(inventoryReport?.summary?.total_value)}     color="teal"   icon={DollarSign} />
+              <KpiCard label="Total Value"  value={php(inventoryReport?.summary?.total_value)}     color="teal"   icon={PhilippinePeso} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

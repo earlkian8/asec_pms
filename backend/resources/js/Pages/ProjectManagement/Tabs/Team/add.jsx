@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -8,463 +8,596 @@ import {
 } from "@/Components/ui/dialog"
 import { Input } from "@/Components/ui/input"
 import { Button } from "@/Components/ui/button"
-import { Label } from "@/Components/ui/label"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/Components/ui/table"
-import { Checkbox } from "@/Components/ui/checkbox"
 import { router } from "@inertiajs/react"
 import { toast } from "sonner"
-import { Loader2, SquarePen, Search, UserCheck, Users } from "lucide-react"
-import AddUser from "@/Pages/UserManagement/Users/add"
-import AddEmployee from "@/Pages/EmployeeManagement/add"
+import {
+  Loader2, SquarePen, Search, Zap, Clock, Calendar, CalendarRange,
+  AlertCircle, ChevronDown, ChevronUp, X, Users, UserCheck, Building2,
+  SunMedium, Sunset, Moon, CheckCircle2
+} from "lucide-react"
 import InputError from "@/Components/InputError"
 
-export default function AddProjectTeam({ setShowAddModal, assignables = [], project }) {
-  const [search, setSearch] = useState("")
-  const [selectedAssignables, setSelectedAssignables] = useState([])
-  const [formData, setFormData] = useState({})
-  const [showNewUserModal, setShowNewUserModal] = useState(false)
-  const [showNewEmployeeModal, setShowNewEmployeeModal] = useState(false)
-  const [processing, setProcessing] = useState(false)
-  const [errors, setErrors] = useState({})
+// ─── Date Presets ──────────────────────────────────────────────────────────────
+const getDatePresets = (projectStartDate, projectEndDate) => {
+  const today  = new Date().toISOString().split("T")[0]
+  const pStart = projectStartDate || today
+  const pEnd   = projectEndDate || ""
 
-  // Ensure assignables is always an array
+  const clamp = (dateStr) => pEnd && dateStr > pEnd ? pEnd : dateStr
+
+  const addMonths = (dateStr, months) => {
+    const d = new Date(dateStr)
+    d.setMonth(d.getMonth() + months)
+    return clamp(d.toISOString().split("T")[0])
+  }
+  const addWeeks = (dateStr, weeks) => {
+    const d = new Date(dateStr)
+    d.setDate(d.getDate() + weeks * 7)
+    return clamp(d.toISOString().split("T")[0])
+  }
+
+  return [
+    { id: "full",        label: "Full Project", icon: "⚡", color: "indigo", description: "Entire project",   start: pStart, end: pEnd,                  disabled: !pEnd  },
+    { id: "first_month", label: "1 Month",      icon: "📅", color: "blue",   description: "30 days",          start: pStart, end: addMonths(pStart, 1)                    },
+    { id: "quarter",     label: "Quarter",       icon: "🗓", color: "violet", description: "3 months",         start: pStart, end: addMonths(pStart, 3)                    },
+    { id: "two_weeks",   label: "2 Weeks",       icon: "⏱", color: "cyan",   description: "Sprint",           start: pStart, end: addWeeks(pStart, 2)                     },
+    { id: "custom",      label: "Custom",        icon: "✏️", color: "gray",   description: "Manual dates",     start: "",     end: ""                                      },
+  ]
+}
+
+const TIME_SLOTS = [
+  { id: "morning",   label: "Morning",   time: "08:00–12:00", Icon: SunMedium, color: "amber"  },
+  { id: "afternoon", label: "Afternoon", time: "13:00–17:00", Icon: Sunset,    color: "orange" },
+  { id: "evening",   label: "Evening",   time: "18:00–22:00", Icon: Moon,      color: "indigo" },
+  { id: "fullday",   label: "Full Day",  time: "08:00–17:00", Icon: Calendar,  color: "green"  },
+]
+
+const PRESET_STYLE = {
+  indigo: { base: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100", active: "bg-indigo-600 border-indigo-600 text-white shadow-md" },
+  blue:   { base: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",         active: "bg-blue-600 border-blue-600 text-white shadow-md"   },
+  violet: { base: "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100", active: "bg-violet-600 border-violet-600 text-white shadow-md" },
+  cyan:   { base: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100",         active: "bg-cyan-600 border-cyan-600 text-white shadow-md"   },
+  gray:   { base: "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100",         active: "bg-gray-700 border-gray-700 text-white shadow-md"   },
+  amber:  { base: "border-amber-200 bg-amber-50 text-amber-700",                        active: "bg-amber-500 border-amber-500 text-white shadow-md" },
+  orange: { base: "border-orange-200 bg-orange-50 text-orange-700",                     active: "bg-orange-500 border-orange-500 text-white shadow-md" },
+  green:  { base: "border-green-200 bg-green-50 text-green-700",                        active: "bg-green-600 border-green-600 text-white shadow-md" },
+}
+
+// ─── Assignable Row Card ───────────────────────────────────────────────────────
+function AssignableCard({ assignable, isSelected, onToggle, formData, errors, onFormChange, project }) {
+  const [expanded, setExpanded] = useState(false)
+  const presets = useMemo(
+    () => getDatePresets(project?.start_date, project?.planned_end_date),
+    [project?.start_date, project?.planned_end_date]
+  )
+
+  const compositeId = `${assignable.type || "user"}-${assignable.id}`
+  const isEmployee  = assignable.type === "employee"
+  const role        = isEmployee ? (assignable.position || "No Position") : (assignable.role || "No Role")
+  const activePreset = formData?.date_preset
+
+  const applyPreset = (preset) => {
+    onFormChange(compositeId, "date_preset", preset.id)
+    if (preset.id !== "custom") {
+      onFormChange(compositeId, "start_date", preset.start)
+      onFormChange(compositeId, "end_date", preset.end)
+    }
+  }
+
+  const applySlot = (slot) => {
+    onFormChange(compositeId, "time_slot", slot.id)
+    onFormChange(compositeId, "work_hours", slot.time)
+  }
+
+  const hasErrors  = errors?.role || errors?.hourly_rate || errors?.start_date
+  const hasData    = formData?.hourly_rate || formData?.start_date
+
+  return (
+    <div className={`rounded-2xl border-2 transition-all duration-200 overflow-hidden ${
+      isSelected
+        ? hasErrors
+          ? "border-red-300 bg-red-50/30"
+          : "border-indigo-400 bg-gradient-to-br from-indigo-50/60 to-white shadow-md"
+        : "border-gray-200 bg-white hover:border-gray-300"
+    }`}>
+      {/* Row header — always visible */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+        onClick={() => onToggle(compositeId)}
+      >
+        {/* Checkbox */}
+        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+          isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 hover:border-indigo-400"
+        }`}>
+          {isSelected && (
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+
+        {/* Avatar */}
+        <div className={`w-9 h-9 rounded-xl font-bold text-sm flex items-center justify-center flex-shrink-0 ${
+          isEmployee ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+        }`}>
+          {(assignable.name || "?")[0].toUpperCase()}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm text-gray-900 truncate">{assignable.name}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+              isEmployee ? "bg-orange-50 text-orange-700 border-orange-200" : "bg-blue-50 text-blue-700 border-blue-200"
+            }`}>{isEmployee ? "Employee" : "User"}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-gray-400 truncate">{assignable.email || "—"}</span>
+            <span className="text-xs font-medium text-gray-600">{role}</span>
+          </div>
+        </div>
+
+        {/* Summary chips when selected and collapsed */}
+        {isSelected && !expanded && hasData && (
+          <div className="hidden sm:flex items-center gap-1.5 flex-wrap">
+            {formData?.hourly_rate && (
+              <span className="text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 font-medium">
+                ₱{parseFloat(formData.hourly_rate || 0).toFixed(2)}/hr
+              </span>
+            )}
+            {activePreset && activePreset !== "custom" && (
+              <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-full px-2 py-0.5">
+                ⚡ {presets.find(p => p.id === activePreset)?.label}
+              </span>
+            )}
+            {formData?.work_hours && (
+              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
+                🕐 {formData.work_hours}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Expand/Error indicator */}
+        {isSelected && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
+            className={`p-1.5 rounded-lg transition flex-shrink-0 ${
+              hasErrors ? "text-red-500 hover:bg-red-50" : "text-indigo-500 hover:bg-indigo-50"
+            }`}
+          >
+            {hasErrors
+              ? <AlertCircle size={16} />
+              : expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+            }
+          </button>
+        )}
+      </div>
+
+      {/* Expanded form */}
+      {isSelected && expanded && (
+        <div className="border-t border-indigo-100 bg-gradient-to-b from-indigo-50/40 to-transparent p-4 space-y-4">
+
+          {/* Hourly Rate */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                Hourly Rate (₱) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₱</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData?.hourly_rate || ""}
+                  onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`pl-7 text-sm ${errors?.hourly_rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400"}`}
+                />
+              </div>
+              {errors?.hourly_rate && <InputError message={errors.hourly_rate} className="mt-1" />}
+            </div>
+
+            {/* Role (read-only) */}
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Role</label>
+              <Input
+                readOnly
+                value={role}
+                className="text-sm bg-gray-50 border-gray-200 text-gray-600 cursor-default"
+              />
+            </div>
+          </div>
+
+          {/* Duration Presets */}
+          <div>
+            <label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-1">
+              <Zap size={11} className="text-indigo-500" />
+              Assignment Duration <span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {presets.map((p) => {
+                const style = PRESET_STYLE[p.color] || PRESET_STYLE.gray
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={p.disabled}
+                    onClick={(e) => { e.stopPropagation(); applyPreset(p) }}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      activePreset === p.id ? style.active : style.base
+                    }`}
+                  >
+                    {p.icon} {p.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">Start Date</label>
+                <Input
+                  type="date"
+                  value={formData?.start_date || ""}
+                  onChange={(e) => { onFormChange(compositeId, "start_date", e.target.value); onFormChange(compositeId, "date_preset", "custom") }}
+                  onClick={(e) => e.stopPropagation()}
+                  min={project?.start_date || undefined}
+                  max={project?.planned_end_date || undefined}
+                  className={`text-sm ${errors?.start_date ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400"}`}
+                />
+                {errors?.start_date && <InputError message={errors.start_date} className="mt-1" />}
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 mb-1 block uppercase tracking-wide">End Date</label>
+                <Input
+                  type="date"
+                  value={formData?.end_date || ""}
+                  onChange={(e) => { onFormChange(compositeId, "end_date", e.target.value); onFormChange(compositeId, "date_preset", "custom") }}
+                  onClick={(e) => e.stopPropagation()}
+                  min={formData?.start_date || project?.start_date || undefined}
+                  max={project?.planned_end_date || undefined}
+                  className="text-sm border-gray-300 focus:border-indigo-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Work Shift */}
+          <div>
+            <label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-1">
+              <Clock size={11} className="text-indigo-500" />
+              Work Shift
+              <span className="font-normal text-gray-400 ml-1">(enables rotation across projects)</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {TIME_SLOTS.map(({ id, label, time, Icon, color }) => {
+                const style = PRESET_STYLE[color] || PRESET_STYLE.gray
+                const isActive = formData?.time_slot === id
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); applySlot({ id, label, time }) }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                      isActive ? style.active : style.base
+                    }`}
+                  >
+                    <Icon size={12} />
+                    <span>{label}</span>
+                    <span className="opacity-60">{time}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
+export default function AddProjectTeam({ setShowAddModal, assignables = [], project }) {
+  const [search,              setSearch]              = useState("")
+  const [selectedIds,         setSelectedIds]         = useState([])
+  const [formData,            setFormData]            = useState({})
+  const [processing,          setProcessing]          = useState(false)
+  const [errors,              setErrors]              = useState({})
+  const [typeFilter,          setTypeFilter]          = useState("all")
+
   const safeAssignables = Array.isArray(assignables) ? assignables : []
 
-  // Create composite ID (type-id) to uniquely identify users and employees
-  const getCompositeId = (assignable) => {
-    if (!assignable) return null;
-    const type = assignable.type || 'user';
-    return `${type}-${assignable.id}`;
-  };
+  const getCompositeId = (a) => `${a?.type || "user"}-${a?.id}`
 
-  const filteredAssignables = safeAssignables.filter((a) => {
+  const filtered = safeAssignables.filter((a) => {
     if (!a) return false
-    const fullName = `${a.name || ''}`.toLowerCase()
-    const email = a.email ? a.email.toLowerCase() : ''
-    const position = a.position ? a.position.toLowerCase() : ''
+    if (typeFilter !== "all" && (a.type || "user") !== typeFilter) return false
+    const s = search.toLowerCase()
     return (
-      fullName.includes(search.toLowerCase()) ||
-      email.includes(search.toLowerCase()) ||
-      position.includes(search.toLowerCase())
+      `${a.name || ""}`.toLowerCase().includes(s) ||
+      (a.email || "").toLowerCase().includes(s) ||
+      (a.position || "").toLowerCase().includes(s) ||
+      (a.role || "").toLowerCase().includes(s)
     )
   })
 
-  const toggleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedAssignables(filteredAssignables.map((a) => getCompositeId(a)).filter(id => id !== null))
-    } else {
-      setSelectedAssignables([])
-    }
+  const toggleSelectAll = (checked) =>
+    setSelectedIds(checked ? filtered.map(getCompositeId) : [])
+
+  const toggleAssignable = (compositeId) =>
+    setSelectedIds((prev) =>
+      prev.includes(compositeId) ? prev.filter((id) => id !== compositeId) : [...prev, compositeId]
+    )
+
+  const handleChange = (compositeId, field, value) => {
+    setFormData((prev) => ({ ...prev, [compositeId]: { ...prev[compositeId], [field]: value } }))
+    const key = `assignable_${compositeId}_${field}`
+    if (errors[key]) setErrors((prev) => { const n = { ...prev }; delete n[key]; return n })
   }
 
-  const toggleAssignable = (compositeId) => {
-    if (selectedAssignables.includes(compositeId)) {
-      setSelectedAssignables(selectedAssignables.filter((aid) => aid !== compositeId))
-    } else {
-      setSelectedAssignables([...selectedAssignables, compositeId])
-    }
-  }
-
-  const handleChange = (id, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value,
-      },
-    }))
-  }
-
-  // Auto-populate role when assignable is selected
-  const handleAssignableToggle = (compositeId) => {
-    toggleAssignable(compositeId);
-    const assignable = safeAssignables.find(a => {
-      const aCompositeId = getCompositeId(a);
-      return aCompositeId === compositeId;
-    });
-    if (assignable) {
-      if (assignable.type === 'user' && assignable.role && !formData[compositeId]?.role) {
-        handleChange(compositeId, 'role', assignable.role);
-      } else if (assignable.type === 'employee' && assignable.position && !formData[compositeId]?.role) {
-        handleChange(compositeId, 'role', assignable.position);
+  const applyPresetToAll = (preset, slot) => {
+    selectedIds.forEach((id) => {
+      if (preset) {
+        handleChange(id, "date_preset", preset.id)
+        if (preset.id !== "custom") {
+          handleChange(id, "start_date", preset.start)
+          handleChange(id, "end_date",   preset.end)
+        }
       }
-    }
+      if (slot) {
+        handleChange(id, "time_slot",  slot.id)
+        handleChange(id, "work_hours", slot.time)
+      }
+    })
+    toast.success(`Applied to all ${selectedIds.length} selected members`)
   }
 
-  const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
-    (error
-      ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
-      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleSubmit = () => {
     setProcessing(true)
     setErrors({})
 
-    if (selectedAssignables.length === 0) {
-      toast.error("Please select at least one team member.")
-      setProcessing(false)
-      return
-    }
-    
-    // Validate that all selected assignables exist
-    const missingAssignables = selectedAssignables.filter(compositeId => 
-      !safeAssignables.find(a => {
-        const aCompositeId = getCompositeId(a);
-        return aCompositeId === compositeId;
-      })
-    )
-    if (missingAssignables.length > 0) {
-      toast.error("Some selected team members are no longer available. Please refresh and try again.")
+    if (selectedIds.length === 0) {
+      toast.error("Select at least one team member")
       setProcessing(false)
       return
     }
 
-    // Validate required fields
     const validationErrors = {}
-    for (const compositeId of selectedAssignables) {
-      const assignable = safeAssignables.find(a => {
-        const aCompositeId = getCompositeId(a);
-        return aCompositeId === compositeId;
-      });
-      const assignableName = assignable?.name || 'Team Member'
-      
-      // Get role from formData or fallback to assignable's role/position
-      const roleValue = formData[compositeId]?.role || 
-                       (assignable?.type === 'user' ? assignable.role : null) ||
-                       (assignable?.type === 'employee' ? assignable.position : null) ||
-                       '';
-      
-      if (!roleValue || roleValue.trim() === '') {
-        validationErrors[`assignable_${compositeId}_role`] = `Role is required for ${assignableName}`
+    for (const compositeId of selectedIds) {
+      const a    = safeAssignables.find((x) => getCompositeId(x) === compositeId)
+      const name = a?.name || "Team Member"
+      const fd   = formData[compositeId] || {}
+
+      const role = fd.role || (a?.type === "user" ? a.role : null) || (a?.type === "employee" ? a.position : null) || ""
+      if (!role.trim()) validationErrors[`assignable_${compositeId}_role`] = `Role required for ${name}`
+
+      if (!fd.hourly_rate || parseFloat(fd.hourly_rate) < 0) {
+        validationErrors[`assignable_${compositeId}_hourly_rate`] = `Hourly rate required for ${name}`
       }
-      if (!formData[compositeId]?.hourly_rate || parseFloat(formData[compositeId]?.hourly_rate) <= 0) {
-        validationErrors[`assignable_${compositeId}_hourly_rate`] = `Please enter a valid hourly rate for ${assignableName}`
-      }
-      if (!formData[compositeId]?.start_date) {
-        validationErrors[`assignable_${compositeId}_start_date`] = `Please enter a start date for ${assignableName}`
-      }
+      if (!fd.start_date) validationErrors[`assignable_${compositeId}_start_date`] = `Start date required for ${name}`
     }
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors)
       setProcessing(false)
-      toast.error("Please check the form for errors")
+      toast.error("Please fill in required fields")
       return
     }
 
-    const assignablesPayload = selectedAssignables
-      .map((compositeId) => {
-        const assignable = safeAssignables.find(a => {
-          const aCompositeId = getCompositeId(a);
-          return aCompositeId === compositeId;
-        });
-        if (!assignable) {
-          console.warn(`Assignable with composite id ${compositeId} not found`)
-          return null
-        }
-        // Get role from formData or fallback to assignable's role/position
-        const roleValue = formData[compositeId]?.role || 
-                         (assignable.type === 'user' ? assignable.role : null) ||
-                         (assignable.type === 'employee' ? assignable.position : null) ||
-                         '';
-        
-        return {
-          id: parseInt(assignable.id, 10),
-          type: assignable.type || 'user',
-          role: roleValue,
-          hourly_rate: parseFloat(formData[compositeId]?.hourly_rate) || 0,
-          start_date: formData[compositeId]?.start_date,
-          end_date: formData[compositeId]?.end_date || null,
-        }
-      })
-      .filter(item => item !== null) // Remove any null entries
+    const payload = selectedIds.map((compositeId) => {
+      const a    = safeAssignables.find((x) => getCompositeId(x) === compositeId)
+      const fd   = formData[compositeId] || {}
+      const role = fd.role || (a?.type === "user" ? a.role : null) || (a?.type === "employee" ? a.position : null) || ""
+      return {
+        id:          parseInt(a.id, 10),
+        type:        a.type || "user",
+        role:        role,
+        hourly_rate: parseFloat(fd.hourly_rate) || 0,
+        start_date:  fd.start_date,
+        end_date:    fd.end_date || null,
+        time_slot:   fd.time_slot || null,
+        work_hours:  fd.work_hours || null,
+      }
+    }).filter(Boolean)
 
     router.post(
       route("project-management.project-teams.store", project.id),
-      { assignables: assignablesPayload },
+      { assignables: payload },
       {
         preserveScroll: true,
-        onSuccess: () => {
-          toast.success("Team members assigned successfully")
-          setShowAddModal(false)
-          setProcessing(false)
-          setErrors({})
-        },
-        onError: (errors) => {
-          setProcessing(false)
-          setErrors(errors)
-          toast.error("Failed to assign some team members.")
-        },
+        onSuccess: () => { toast.success("Team members assigned successfully"); setShowAddModal(false) },
+        onError:   (errs) => { setProcessing(false); setErrors(errs); toast.error("Failed to assign some team members.") },
       }
     )
   }
 
-  // Handle modal close and refresh
-  const handleUserModalClose = () => {
-    setShowNewUserModal(false);
-    // Refresh the page to get updated assignables
-    setTimeout(() => {
-      router.reload({ only: ['teamData'], preserveScroll: true });
-    }, 100);
-  };
-
-  const handleEmployeeModalClose = () => {
-    setShowNewEmployeeModal(false);
-    // Refresh the page to get updated assignables
-    setTimeout(() => {
-      router.reload({ only: ['teamData'], preserveScroll: true });
-    }, 100);
-  };
+  const employeeCount = filtered.filter(a => a.type === "employee").length
+  const userCount     = filtered.filter(a => a.type !== "employee").length
+  const presets       = getDatePresets(project?.start_date, project?.planned_end_date)
 
   return (
-    <>
-      {showNewUserModal && (
-        <AddUser 
-          setShowAddModal={handleUserModalClose}
-        />
-      )}
-      {showNewEmployeeModal && (
-        <AddEmployee 
-          setShowAddModal={handleEmployeeModalClose}
-        />
-      )}
+    <Dialog open onOpenChange={setShowAddModal}>
+      <DialogContent className="w-[96vw] max-w-3xl max-h-[92vh] overflow-hidden flex flex-col rounded-3xl p-0">
 
-      <Dialog open onOpenChange={setShowAddModal}>
-        <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-zinc-800">Add Team Members</DialogTitle>
-          </DialogHeader>
+        {/* ── Header ── */}
+        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 pt-6 pb-5 flex-shrink-0">
+          <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
+            <Users size={20} />
+            Add Team Members
+          </DialogTitle>
+          <p className="text-indigo-200 text-sm mt-1">
+            Select people and configure their assignment. Use ⚡ presets to set dates in one click.
+          </p>
 
-          {/* Single-assignment info banner */}
-          <div className="mb-3 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
-            <span className="mt-0.5 flex-shrink-0">ℹ️</span>
-            <span>
-              <strong>Employees</strong> with an active assignment on another project are hidden until released or their assignment ends.
-              <strong>Users (contractors)</strong> can be assigned to multiple projects.
-            </span>
-          </div>
+          {/* Project date display */}
+          {(project?.start_date || project?.planned_end_date) && (
+            <div className="mt-3 flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white">
+              <CalendarRange size={12} />
+              <span className="font-medium">Project:</span>
+              <span className="font-mono">{project.start_date || "—"} → {project.planned_end_date || "—"}</span>
+            </div>
+          )}
+        </div>
 
-          {/* Search + New Buttons */}
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 z-10" />
+        {/* ── Rotation notice ── */}
+        <div className="mx-6 mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 text-xs text-amber-800 flex-shrink-0">
+          <AlertCircle size={13} className="flex-shrink-0 mt-0.5 text-amber-500" />
+          <span>
+            <strong>Employees</strong> can only have one active project at a time. Assign a{" "}
+            <strong>Work Shift</strong> to enable partial-day rotation (e.g. morning on Project A, afternoon on Project B).{" "}
+            <strong>Users/contractors</strong> can appear on multiple projects.
+          </span>
+        </div>
+
+        {/* ── Search + Filter ── */}
+        <div className="px-6 pt-3 pb-2 space-y-2 flex-shrink-0">
+          <div className="flex gap-2 items-center flex-wrap">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search by name, email, or position..."
+                placeholder="Search name, email, role..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 border-gray-300 rounded-lg"
+                className="pl-10 border-gray-300 rounded-xl h-9 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               />
             </div>
 
-            {/* <div className="flex gap-2">
-              <Button
-                type="button"
-                className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200"
-                onClick={() => setShowNewUserModal(true)}
-              >
-                <Users className="mr-2 h-4 w-4" />
-                New User
-              </Button>
-              <Button
-                type="button"
-                className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md transition-all duration-200"
-                onClick={() => setShowNewEmployeeModal(true)}
-              >
-                <UserCheck className="mr-2 h-4 w-4" />
-                New Employee
-              </Button>
-            </div> */}
+            {/* Type tabs */}
+            <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white">
+              {[
+                { id: "all",      label: `All (${safeAssignables.length})`  },
+                { id: "employee", label: `Employees (${safeAssignables.filter(a => a.type === "employee").length})` },
+                { id: "user",     label: `Users (${safeAssignables.filter(a => a.type !== "employee").length})`     },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setTypeFilter(tab.id)}
+                  className={`px-3 py-1.5 font-medium transition-all ${
+                    typeFilter === tab.id ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => toggleSelectAll(selectedIds.length < filtered.length)}
+              className="text-xs px-3 py-1.5 h-9 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1.5 transition"
+            >
+              <Users size={12} />
+              {selectedIds.length === filtered.length && filtered.length > 0 ? "Deselect All" : "Select All"}
+            </button>
           </div>
 
-          {/* Scrollable Table */}
-          <div className="max-h-[400px] overflow-y-auto border rounded-xl border-gray-200 bg-white">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={
-                        filteredAssignables.length > 0 &&
-                        selectedAssignables.length === filteredAssignables.length
-                      }
-                      indeterminate={
-                        selectedAssignables.length > 0 &&
-                        selectedAssignables.length < filteredAssignables.length
-                      }
-                      onCheckedChange={(checked) => toggleSelectAll(checked)}
-                    />
-                  </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider w-20">Type</TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[150px]">Name</TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[180px]">Email</TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[200px]">
-                    Role
-                  </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[130px]">
-                    Hourly Rate <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">
-                    Start Date <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="font-bold text-xs sm:text-sm text-gray-700 uppercase tracking-wider min-w-[140px]">End Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAssignables.map((assignable) => {
-                  const compositeId = getCompositeId(assignable);
-                  const isSelected = selectedAssignables.includes(compositeId);
-                  const assignableErrors = {
-                    role: errors[`assignable_${compositeId}_role`],
-                    hourly_rate: errors[`assignable_${compositeId}_hourly_rate`],
-                    start_date: errors[`assignable_${compositeId}_start_date`],
-                  }
+          {/* Bulk preset bar */}
+          {selectedIds.length >= 2 && (
+            <div className="bg-indigo-600 rounded-2xl px-3 py-2 flex items-center gap-2 flex-wrap">
+              <span className="text-white text-xs font-medium whitespace-nowrap">
+                Apply to {selectedIds.length}:
+              </span>
+              {presets.filter(p => p.id !== "custom").map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={p.disabled}
+                  onClick={() => applyPresetToAll(p)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-medium border border-white/30 transition disabled:opacity-40"
+                >
+                  {p.icon} {p.label}
+                </button>
+              ))}
+              <div className="w-px h-4 bg-white/20 mx-1" />
+              {TIME_SLOTS.map(({ id, label, time, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => applyPresetToAll(null, { id, label, time })}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/25 text-white text-xs border border-white/20 transition"
+                  title={`${label} shift`}
+                >
+                  <Clock size={10} /> {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-                  return (
-                    <TableRow
-                      key={compositeId}
-                      onClick={(e) => {
-                        if (e.target.closest("input")) return;
-                        handleAssignableToggle(compositeId);
-                      }}
-                      className={`cursor-pointer transition ${
-                        isSelected ? "bg-blue-50/50" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleAssignable(compositeId)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {assignable.type === 'employee' ? (
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                            Employee
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                            User
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium text-gray-900">{assignable.name}</TableCell>
-                      <TableCell className="text-gray-700">{assignable.email || '---'}</TableCell>
-                      <TableCell className="min-w-[200px]">
-                        <Input
-                          placeholder={assignable.role || assignable.position || "Role"}
-                          value={formData[compositeId]?.role || assignable.role || assignable.position || ""}
-                          readOnly
-                          onClick={(e) => e.stopPropagation()}
-                          className="bg-gray-50 border-gray-300 text-gray-700 cursor-not-allowed min-w-[180px]"
-                          title={formData[compositeId]?.role || assignable.role || assignable.position || "Role (from user/employee profile)"}
-                        />
-                        {assignableErrors.role && (
-                          <InputError message={assignableErrors.role} className="mt-1" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={formData[compositeId]?.hourly_rate || ""}
-                          onChange={(e) => handleChange(compositeId, "hourly_rate", e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className={inputClass(assignableErrors.hourly_rate)}
-                          required
-                        />
-                        {assignableErrors.hourly_rate && (
-                          <InputError message={assignableErrors.hourly_rate} className="mt-1" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="date"
-                          value={formData[compositeId]?.start_date || ""}
-                          onChange={(e) => handleChange(compositeId, "start_date", e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          min={project?.start_date || undefined}
-                          max={project?.planned_end_date || undefined}
-                          className={inputClass(assignableErrors.start_date)}
-                          required
-                        />
-                        {assignableErrors.start_date && (
-                          <InputError message={assignableErrors.start_date} className="mt-1" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="date"
-                          value={formData[compositeId]?.end_date || ""}
-                          onChange={(e) => handleChange(compositeId, "end_date", e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          min={formData[compositeId]?.start_date || project?.start_date || undefined}
-                          max={project?.planned_end_date || undefined}
-                          className="w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {filteredAssignables.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="bg-gray-100 rounded-full p-4 mb-3">
-                          <Search className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 font-medium text-base">No team members found</p>
-                        <p className="text-gray-400 text-sm mt-1">Try adjusting your search or add new users/employees</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+        {/* ── Member list ── */}
+        <div className="flex-1 overflow-y-auto px-6 pb-2 space-y-2">
+          {filtered.length > 0 ? (
+            filtered.map((a) => {
+              const compositeId = getCompositeId(a)
+              const isSelected  = selectedIds.includes(compositeId)
+              const memberErrors = {
+                role:        errors[`assignable_${compositeId}_role`],
+                hourly_rate: errors[`assignable_${compositeId}_hourly_rate`],
+                start_date:  errors[`assignable_${compositeId}_start_date`],
+              }
+              return (
+                <AssignableCard
+                  key={compositeId}
+                  assignable={a}
+                  isSelected={isSelected}
+                  onToggle={toggleAssignable}
+                  formData={formData[compositeId]}
+                  errors={memberErrors}
+                  onFormChange={handleChange}
+                  project={project}
+                />
+              )
+            })
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-2xl">
+              <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                <Search className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-gray-500 font-medium text-sm">No members found</p>
+              <p className="text-gray-400 text-xs mt-1">Try adjusting your search or filter</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer ── */}
+        <DialogFooter className="flex-shrink-0 border-t border-gray-100 bg-gray-50/80 px-6 py-4 flex items-center justify-between gap-3 rounded-b-3xl">
+          <div className="text-sm text-gray-500">
+            {selectedIds.length > 0 ? (
+              <span className="font-semibold text-indigo-700">{selectedIds.length} selected</span>
+            ) : (
+              <span>Select members to add</span>
+            )}
           </div>
-
-          <DialogFooter className="flex justify-end gap-2 mt-4 border-t pt-4">
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setShowAddModal(false)}
               disabled={processing}
-              className="border-gray-300 hover:bg-gray-50 transition-all duration-200"
+              className="rounded-xl border-gray-300 h-9 px-4 text-sm"
             >
               Cancel
             </Button>
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={processing || selectedAssignables.length === 0}
-              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={processing || selectedIds.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 h-9 text-sm font-medium shadow-md shadow-indigo-200 flex items-center gap-2 disabled:opacity-50"
             >
               {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Adding...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" /> Adding...</>
               ) : (
-                <>
-                  <SquarePen size={16} />
-                  Add Selected ({selectedAssignables.length})
-                </>
+                <><CheckCircle2 size={15} /> Add {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}</>
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

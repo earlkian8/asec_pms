@@ -23,6 +23,8 @@ class ProjectTeam extends Model
         'is_active',
         'assignment_status',
         'created_by',
+        'time_slot',
+        'work_hours',
     ];
 
     protected $casts = [
@@ -170,5 +172,32 @@ class ProjectTeam extends Model
         }
 
         return true;
+    }
+
+     public static function fullyOccupiedEmployeeIds(): array
+    {
+        // Employees with no time_slot = fullday implicit = fully occupied
+        $noSlot = static::where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
+            ->whereNotNull('employee_id')
+            ->whereNull('time_slot')
+            ->pluck('employee_id')
+            ->unique()->filter()->toArray();
+ 
+        // Employees with a 'fullday' time_slot = fully occupied
+        $fullday = static::where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
+            ->whereNotNull('employee_id')
+            ->where('time_slot', 'fullday')
+            ->pluck('employee_id')
+            ->unique()->filter()->toArray();
+ 
+        // Employees with 2+ active records = split shift maxed out
+        $twoSlots = static::where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
+            ->whereNotNull('employee_id')
+            ->groupBy('employee_id')
+            ->havingRaw('COUNT(*) >= 2')
+            ->pluck('employee_id')
+            ->toArray();
+ 
+        return array_unique(array_merge($noSlot, $fullday, $twoSlots));
     }
 }

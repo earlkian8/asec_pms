@@ -55,7 +55,7 @@ class PermissionSeeder extends Seeder
             'project-teams.create',
             'project-teams.update',
             'project-teams.delete',
-
+            'project-teams.rotate',
             // Project Files
             'project-files.view',
             'project-files.upload',

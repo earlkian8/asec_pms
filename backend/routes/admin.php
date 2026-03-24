@@ -51,11 +51,33 @@ Route::middleware('auth')->group(function () {
         Route::post('/project-management/{project}/unarchive', [ProjectsController::class, 'unarchive'])->middleware('permission:projects.archive')->name('unarchive');
         // Project Teams
         Route::prefix('project-teams')->name('project-teams.')->group(function(){
-            Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])->middleware('permission:project-teams.create')->name('store');
-            Route::post('/delete/{project}/{projectTeam?}', [ProjectTeamsController::class, 'destroy'])->middleware('permission:project-teams.delete')->name('destroy');
-            Route::put('/update-status/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'handleStatus'])->middleware('permission:project-teams.update')->name('update-status');
-            Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])->middleware('permission:project-teams.update')->name('update');
-            Route::delete('/force-remove/{project}/{projectTeam}', [ProjectTeamsController::class, 'forceRemove'])->middleware('permission:project-teams.delete')->name('force-remove');
+            Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])
+                ->middleware('permission:project-teams.create')
+                ->name('store');
+
+            Route::post('/delete/{project}/{projectTeam?}', [ProjectTeamsController::class, 'destroy'])
+                ->middleware('permission:project-teams.delete')
+                ->name('destroy');
+
+            Route::put('/update-status/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'handleStatus'])
+                ->middleware('permission:project-teams.update')
+                ->name('update-status');
+
+            Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])
+                ->middleware('permission:project-teams.update')
+                ->name('update');
+
+            Route::delete('/force-remove/{project}/{projectTeam}', [ProjectTeamsController::class, 'forceRemove'])
+                ->middleware('permission:project-teams.delete')
+                ->name('force-remove');
+
+            Route::post('/rotate/{project}', [ProjectTeamsController::class, 'rotate'])
+                ->middleware('permission:project-teams.rotate')
+                ->name('rotate');
+
+            Route::get('/history', [ProjectTeamsController::class, 'history'])
+                ->middleware('permission:project-teams.view')
+                ->name('history');
         });
 
         // Project Files

@@ -25,7 +25,7 @@ const TABS = [
 ];
 
 const TAB_FIELDS = {
-  basic:     ['first_name', 'last_name', 'email', 'phone', 'position', 'is_active'],
+  basic:     ['first_name', 'middle_name', 'last_name', 'email', 'phone', 'position', 'is_active'],
   personal:  ['profile_image', 'secondary_phone', 'gender', 'date_of_birth', 'civil_status',
                'nationality', 'region', 'province', 'city_municipality', 'barangay',
                'address', 'zip_code', 'notes'],
@@ -96,12 +96,13 @@ const AddEmployee = ({ setShowAddModal }) => {
 
   const { data, setData, post, errors, processing } = useForm({
     // Basic
-    first_name: '',
-    last_name:  '',
-    email:      '',
-    phone:      '',
-    position:   '',
-    is_active:  true,
+    first_name:  '',
+    middle_name: '',
+    last_name:   '',
+    email:       '',
+    phone:       '',
+    position:    '',
+    is_active:   true,
 
     // Personal
     profile_image:   null,
@@ -213,6 +214,11 @@ const AddEmployee = ({ setShowAddModal }) => {
                     <InputError message={errors.first_name} />
                   </div>
                   <div>
+                    <Label className="text-zinc-800">Middle Name <span className="text-zinc-400 text-xs font-normal">(optional)</span></Label>
+                    <Input value={data.middle_name} onChange={e => setData('middle_name', e.target.value)} placeholder="Middle name" className={inputClass(errors.middle_name)} />
+                    <InputError message={errors.middle_name} />
+                  </div>
+                  <div className="sm:col-span-2">
                     <Label className="text-zinc-800">Last Name <span className="text-red-600">*</span></Label>
                     <Input value={data.last_name} onChange={e => setData('last_name', e.target.value)} placeholder="Last name" className={inputClass(errors.last_name)} />
                     <InputError message={errors.last_name} />

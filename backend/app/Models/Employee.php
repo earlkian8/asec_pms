@@ -17,6 +17,7 @@ class Employee extends Model
 
         // Name & Work
         'first_name',
+        'middle_name',
         'last_name',
         'email',
         'phone',
@@ -86,9 +87,18 @@ class Employee extends Model
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
+    /**
+     * Format: "First M. Last" (middle initial only if middle_name is set)
+     */
     public function getFullNameAttribute(): string
     {
-        return "{$this->first_name} {$this->last_name}";
+        $parts = array_filter([
+            trim($this->first_name ?? ''),
+            $this->middle_name ? strtoupper(mb_substr(trim($this->middle_name), 0, 1)) . '.' : null,
+            trim($this->last_name ?? ''),
+        ]);
+
+        return implode(' ', $parts);
     }
 
     public function getProfileImageUrlAttribute(): ?string

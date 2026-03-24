@@ -58,9 +58,10 @@ class EmployeesController extends Controller
     private function baseRules(bool $isCreate = true, ?Employee $employee = null): array
     {
         return array_merge([
-            'first_name' => ['required', 'string', 'max:100'],
-            'last_name'  => ['required', 'string', 'max:100'],
-            'email'      => [
+            'first_name'  => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name'   => ['required', 'string', 'max:100'],
+            'email'       => [
                 'required', 'email',
                 $isCreate
                     ? Rule::unique('employees', 'email')
@@ -121,11 +122,13 @@ class EmployeesController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
                       ->orWhere('last_name', 'like', "%{$search}%")
+                      ->orWhere('middle_name', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%")
                       ->orWhere('phone', 'like', "%{$search}%")
                       ->orWhere('position', 'like', "%{$search}%")
                       ->orWhere('employee_id', 'like', "%{$search}%")
-                      ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"]);
+                      ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"])
+                      ->orWhereRaw("CONCAT(first_name, ' ', middle_name, ' ', last_name) LIKE ?", ["%{$search}%"]);
                 });
             })
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
@@ -164,14 +167,15 @@ class EmployeesController extends Controller
         $v = $request->validate($this->baseRules(true));
 
         $employee = Employee::create([
-            'first_name' => $v['first_name'],
-            'last_name'  => $v['last_name'],
-            'email'      => $v['email'],
-            'phone'      => $v['phone'] ?? null,
-            'position'   => $v['position'] ?? null,
-            'is_active'  => $v['is_active'],
+            'first_name'  => $v['first_name'],
+            'middle_name' => $v['middle_name'] ?? null,
+            'last_name'   => $v['last_name'],
+            'email'       => $v['email'],
+            'phone'       => $v['phone'] ?? null,
+            'position'    => $v['position'] ?? null,
+            'is_active'   => $v['is_active'],
 
-            'profile_image'   => $this->storeImage($request, 'profile_image', 'employee-profile-images'),
+            'profile_image' => $this->storeImage($request, 'profile_image', 'employee-profile-images'),
 
             'secondary_phone' => $v['secondary_phone'] ?? null,
             'gender'          => $v['gender'] ?? null,
@@ -202,8 +206,6 @@ class EmployeesController extends Controller
             'notes' => $v['notes'] ?? null,
         ]);
 
-        // employee_id is auto-generated via model boot (EMP-00001 etc.)
-
         $this->adminActivityLogs('Employee', 'Add', "Added Employee {$employee->full_name} ({$employee->employee_id})");
         $this->createSystemNotification(
             'general', 'New Employee Added',
@@ -223,12 +225,13 @@ class EmployeesController extends Controller
         $oldName = $employee->full_name;
 
         $employee->update([
-            'first_name' => $v['first_name'],
-            'last_name'  => $v['last_name'],
-            'email'      => $v['email'],
-            'phone'      => $v['phone'] ?? null,
-            'position'   => $v['position'] ?? null,
-            'is_active'  => $v['is_active'],
+            'first_name'  => $v['first_name'],
+            'middle_name' => $v['middle_name'] ?? null,
+            'last_name'   => $v['last_name'],
+            'email'       => $v['email'],
+            'phone'       => $v['phone'] ?? null,
+            'position'    => $v['position'] ?? null,
+            'is_active'   => $v['is_active'],
 
             'profile_image' => $this->replaceImage($request, 'profile_image', 'employee-profile-images', $employee->profile_image),
 
@@ -285,7 +288,6 @@ class EmployeesController extends Controller
         }
 
         try {
-            // Soft delete — do NOT delete images (record still exists and may be restored)
             $employee->delete();
 
             $this->adminActivityLogs('Employee', 'Delete', "Deleted Employee {$name}");

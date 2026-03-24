@@ -29,7 +29,7 @@ const TABS = [
 ];
 
 const TAB_FIELDS = {
-  account:   ['name', 'email', 'password', 'password_confirmation', 'role'],
+  account:   ['first_name', 'middle_name', 'last_name', 'email', 'password', 'password_confirmation', 'role'],
   personal:  ['profile_image', 'phone', 'secondary_phone', 'gender', 'date_of_birth',
                'civil_status', 'nationality', 'region', 'province', 'city_municipality',
                'barangay', 'address', 'zip_code', 'notes'],
@@ -112,12 +112,13 @@ const AddUser = ({ setShowAddModal, roles }) => {
 
   const { data, setData, post, errors, processing } = useForm({
     // Account
-    name: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     email: '',
     password: '',
     password_confirmation: '',
     role: '',
-    // employee_id: '',
 
     // Personal
     profile_image: null,
@@ -128,7 +129,7 @@ const AddUser = ({ setShowAddModal, roles }) => {
     civil_status: '',
     nationality: '',
 
-    // Address — plain strings, PhilippineAddressSelector manages { code, name } internally
+    // Address
     region: '',
     province: '',
     city_municipality: '',
@@ -238,19 +239,46 @@ const AddUser = ({ setShowAddModal, roles }) => {
             {/* ── ACCOUNT ───────────────────────────────────────── */}
             {activeTab === 'account' && (
               <div className="grid grid-cols-1 gap-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Login Credentials</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Full Name</p>
 
+                {/* First + Middle name side by side, Last name full width */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-zinc-800">First Name <span className="text-red-500">*</span></Label>
+                    <Input
+                      type="text"
+                      value={data.first_name}
+                      onChange={e => setData('first_name', e.target.value)}
+                      placeholder="e.g. Juan"
+                      className={inputClass(errors.first_name)}
+                    />
+                    <InputError message={errors.first_name} />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-800">Middle Name <span className="text-zinc-400 font-normal text-xs">(optional)</span></Label>
+                    <Input
+                      type="text"
+                      value={data.middle_name}
+                      onChange={e => setData('middle_name', e.target.value)}
+                      placeholder="e.g. Domingo"
+                      className={inputClass(errors.middle_name)}
+                    />
+                    <InputError message={errors.middle_name} />
+                  </div>
+                </div>
                 <div>
-                  <Label className="text-zinc-800">Full Name</Label>
+                  <Label className="text-zinc-800">Last Name <span className="text-red-500">*</span></Label>
                   <Input
                     type="text"
-                    value={data.name}
-                    onChange={e => setData('name', e.target.value)}
-                    placeholder="Enter full name"
-                    className={inputClass(errors.name)}
+                    value={data.last_name}
+                    onChange={e => setData('last_name', e.target.value)}
+                    placeholder="e.g. Dela Cruz"
+                    className={inputClass(errors.last_name)}
                   />
-                  <InputError message={errors.name} />
+                  <InputError message={errors.last_name} />
                 </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Login Credentials</p>
 
                 <div>
                   <Label className="text-zinc-800">Email Address</Label>
@@ -319,16 +347,6 @@ const AddUser = ({ setShowAddModal, roles }) => {
                     </Select>
                     <InputError message={errors.role} />
                   </div>
-                  {/* <div>
-                    <Label className="text-zinc-800">Employee ID</Label>
-                    <Input
-                      value={data.employee_id}
-                      onChange={e => setData('employee_id', e.target.value)}
-                      placeholder="e.g. EMP-0001"
-                      className={inputClass(errors.employee_id)}
-                    />
-                    <InputError message={errors.employee_id} />
-                  </div> */}
                 </div>
               </div>
             )}

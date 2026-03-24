@@ -68,7 +68,10 @@ class UsersController extends Controller
     private function baseRules(bool $isCreate = true, ?User $user = null): array
     {
         return array_merge([
-            'name'  => 'required|string|max:255',
+            'first_name'  => 'required|string|max:100',
+            'middle_name' => 'nullable|string|max:100',
+            'last_name'   => 'required|string|max:100',
+
             'email' => [
                 'required', 'string', 'email', 'max:254',
                 $isCreate
@@ -139,7 +142,9 @@ class UsersController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('middle_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('employee_id', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%");
@@ -150,7 +155,7 @@ class UsersController extends Controller
             $query->whereHas('roles', fn ($q) => $q->where('name', $roleFilter));
         }
 
-        $allowed   = ['name', 'email', 'employee_id', 'created_at'];
+        $allowed   = ['first_name', 'last_name', 'email', 'employee_id', 'created_at'];
         $sortBy    = in_array($sortBy, $allowed) ? $sortBy : 'created_at';
         $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
 
@@ -189,9 +194,11 @@ class UsersController extends Controller
         $v = $request->validate($this->baseRules(true), $this->passwordMessages);
 
         $user = User::create([
-            'name'              => $v['name'],
-            'email'             => $v['email'],
-            'password'          => Hash::make($v['password']),
+            'first_name'  => $v['first_name'],
+            'middle_name' => $v['middle_name'] ?? null,
+            'last_name'   => $v['last_name'],
+            'email'       => $v['email'],
+            'password'    => Hash::make($v['password']),
             'email_verified_at' => now(),
 
             'employee_id'   => $v['employee_id'] ?? null,
@@ -244,8 +251,10 @@ class UsersController extends Controller
         $v = $request->validate($this->baseRules(false, $user), $this->passwordMessages);
 
         $data = [
-            'name'  => $v['name'],
-            'email' => $v['email'],
+            'first_name'  => $v['first_name'],
+            'middle_name' => $v['middle_name'] ?? null,
+            'last_name'   => $v['last_name'],
+            'email'       => $v['email'],
 
             'employee_id'   => $v['employee_id'] ?? null,
             'profile_image' => $this->replaceImage($request, 'profile_image', 'profile-images', $user->profile_image),

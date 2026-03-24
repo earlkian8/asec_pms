@@ -78,6 +78,14 @@ export default function UsersIndex() {
     return text.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   };
 
+  // Build "First M. Last" display from raw fields (mirrors model accessor)
+  const formatName = (user) => {
+    const parts = [user.first_name];
+    if (user.middle_name) parts.push(user.middle_name.charAt(0).toUpperCase() + '.');
+    parts.push(user.last_name);
+    return parts.filter(Boolean).join(' ');
+  };
+
   const activeFiltersCount = () => (localFilters.role ? 1 : 0);
 
   const handleFilterChange = (filterType, value) => {
@@ -150,7 +158,13 @@ export default function UsersIndex() {
 
   const avatarColors = ['bg-blue-500','bg-emerald-500','bg-violet-500','bg-rose-500','bg-amber-500','bg-cyan-500'];
   const avatarColor  = (id) => avatarColors[id % avatarColors.length];
-  const initials     = (name) => name ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : '?';
+
+  // Initials from first + last name
+  const initials = (user) => {
+    const f = user.first_name?.[0] ?? '';
+    const l = user.last_name?.[0] ?? '';
+    return (f + l).toUpperCase() || '?';
+  };
 
   if (!has('users.view')) {
     return (
@@ -282,7 +296,8 @@ export default function UsersIndex() {
                             <SelectTrigger className="w-full h-9"><SelectValue /></SelectTrigger>
                             <SelectContent style={{ zIndex: 50 }}>
                               <SelectItem value="created_at">Date Created</SelectItem>
-                              <SelectItem value="name">Name</SelectItem>
+                              <SelectItem value="first_name">First Name</SelectItem>
+                              <SelectItem value="last_name">Last Name</SelectItem>
                               <SelectItem value="email">Email</SelectItem>
                               <SelectItem value="employee_id">Employee ID</SelectItem>
                             </SelectContent>
@@ -332,16 +347,16 @@ export default function UsersIndex() {
                     users.map((user, index) => (
                       <TableRow key={user.id} className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
 
-                        {/* Employee — avatar + name + employee_id */}
+                        {/* Employee — avatar + formatted name + employee_id */}
                         <TableCell className="px-3 sm:px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className={`h-9 w-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold shadow-sm overflow-hidden ${user.profile_image_url ? '' : avatarColor(user.id)}`}>
                               {user.profile_image_url
                                 ? <img src={user.profile_image_url} alt={user.name} className="h-full w-full object-cover" />
-                                : initials(user.name)}
+                                : initials(user)}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 truncate">{capitalizeText(user.name)}</p>
+                              <p className="text-sm font-semibold text-gray-900 truncate">{formatName(user)}</p>
                               {user.employee_id && <p className="text-xs text-gray-400 font-mono">{user.employee_id}</p>}
                             </div>
                           </div>

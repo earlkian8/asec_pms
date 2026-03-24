@@ -87,9 +87,9 @@ class ProjectTeamService
 
         // Available users (only filtered per-project, NOT globally)
         $users = User::with('roles')
-            ->whereNotIn('id', $existingUserIds)
-            ->orderBy('name')
-            ->get()
+        ->whereNotIn('id', $existingUserIds)
+        ->orderBy('first_name')->orderBy('last_name')
+        ->get()
             ->map(function ($user) {
                 return [
                     'id'    => $user->id,

@@ -22,9 +22,8 @@ class ProjectTeam extends Model
         'end_date',
         'is_active',
         'assignment_status',
-        'created_by',
-        'time_slot',
-        'work_hours',
+        'released_at',
+        'reactivated_at',
     ];
 
     protected $casts = [
@@ -33,6 +32,8 @@ class ProjectTeam extends Model
         'end_date'          => 'date',
         'is_active'         => 'boolean',
         'assignment_status' => AssignmentStatus::class,
+        'released_at'       => 'datetime',
+        'reactivated_at'    => 'datetime',
     ];
 
     protected $appends = [
@@ -174,30 +175,18 @@ class ProjectTeam extends Model
         return true;
     }
 
-     public static function fullyOccupiedEmployeeIds(): array
+    /**
+     * Simple rule: any employee with an active assignment is fully occupied.
+     * One employee = one project at a time.
+     */
+    public static function fullyOccupiedEmployeeIds(): array
     {
-        // Employees with no time_slot = fullday implicit = fully occupied
-        $noSlot = static::where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
+        return static::where('assignment_status', AssignmentStatus::Active->value)
             ->whereNotNull('employee_id')
-            ->whereNull('time_slot')
             ->pluck('employee_id')
-            ->unique()->filter()->toArray();
- 
-        // Employees with a 'fullday' time_slot = fully occupied
-        $fullday = static::where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
-            ->whereNotNull('employee_id')
-            ->where('time_slot', 'fullday')
-            ->pluck('employee_id')
-            ->unique()->filter()->toArray();
- 
-        // Employees with 2+ active records = split shift maxed out
-        $twoSlots = static::where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
-            ->whereNotNull('employee_id')
-            ->groupBy('employee_id')
-            ->havingRaw('COUNT(*) >= 2')
-            ->pluck('employee_id')
+            ->unique()
+            ->filter()
+            ->values()
             ->toArray();
- 
-        return array_unique(array_merge($noSlot, $fullday, $twoSlots));
     }
 }

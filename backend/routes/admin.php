@@ -72,10 +72,6 @@ Route::middleware('auth')->group(function () {
                 ->middleware('permission:project-teams.delete')
                 ->name('force-remove');
 
-            Route::post('/rotate/{project}', [ProjectTeamsController::class, 'rotate'])
-                ->middleware('permission:project-teams.rotate')
-                ->name('rotate');
-
             Route::get('/history', [ProjectTeamsController::class, 'history'])
                 ->middleware('permission:project-teams.view')
                 ->name('history');

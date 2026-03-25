@@ -9,7 +9,7 @@ import { Label } from "@/Components/ui/label";
 import { toast } from 'sonner';
 import {
   Check, Trash2, SquarePen, Filter, X, Search, Calendar,
-  ArrowUpDown, Users, UserCheck, UserX, LogOut, ArrowLeftRight, Eye, Clock,
+  ArrowUpDown, Users, UserCheck, UserX, LogOut, Eye,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -18,7 +18,6 @@ import AddProjectTeam from './add';
 import EditProjectTeam from './edit';
 import UnassignTeamMember from './delete';
 import RemoveTeamMember from './remove';
-import RotateTeamMember from './RotateTeamMember';
 import ViewAssignmentHistory from './ViewAssignmentHistory';
 
 export default function TeamTab({ project, teamData }) {
@@ -37,8 +36,6 @@ export default function TeamTab({ project, teamData }) {
   const [editProjectTeam,     setEditProjectTeam]     = useState(null);
   const [showRemoveModal,     setShowRemoveModal]     = useState(false);
   const [removeTeamMember,    setRemoveTeamMember]    = useState(null);
-  const [showRotateModal,     setShowRotateModal]     = useState(false);
-  const [rotateTeamMember,    setRotateTeamMember]    = useState(null);
   const [showHistoryModal,    setShowHistoryModal]    = useState(false);
   const [historyTeamMember,   setHistoryTeamMember]   = useState(null);
   const [searchInput,         setSearchInput]         = useState(initialSearch);
@@ -183,7 +180,6 @@ export default function TeamTab({ project, teamData }) {
     date ? new Date(date).toLocaleDateString('en-PH') : '---';
 
   const handleForceRemove = (team) => { setRemoveTeamMember(team); setShowRemoveModal(true); };
-  const handleRotate      = (team) => { setRotateTeamMember(team); setShowRotateModal(true); };
   const handleViewHistory = (team) => { setHistoryTeamMember(team); setShowHistoryModal(true); };
 
   const STATUS_CONFIG = {
@@ -197,26 +193,16 @@ export default function TeamTab({ project, teamData }) {
   const activeMembers   = projectTeams.filter(t => t.assignment_status === 'active').length;
   const releasedMembers = projectTeams.filter(t => t.assignment_status === 'released').length;
 
-  // ── Rotate button logic ────────────────────────────────────────────────────
-  // Show rotate only for active employees who haven't maxed out their slots.
-  // active_slot_count is set by the backend transform (see instructions).
-  const canRotate = (team) => {
-    if (team.assignment_status !== 'active') return false;
-    if (team.assignable_type !== 'employee') return false;
-    const slotCount = team.active_slot_count ?? 0;
-    return slotCount < 2;
-  };
-
   const columns = [
     { header: '',            width: '3%'  },
-    { header: 'Member',      width: '20%' },
+    { header: 'Member',      width: '22%' },
     { header: 'Email',       width: '18%' },
-    { header: 'Role',        width: '11%' },
+    { header: 'Role',        width: '12%' },
     { header: 'Rate',        width: '10%' },
     { header: 'Start',       width: '10%' },
     { header: 'End',         width: '10%' },
-    { header: 'Status',      width: '9%'  },
-    { header: 'Actions',     width: '9%'  },
+    { header: 'Status',      width: '8%'  },
+    { header: 'Actions',     width: '7%'  },
   ];
 
   return (
@@ -445,8 +431,6 @@ export default function TeamTab({ project, teamData }) {
           <TableBody>
             {projectTeams.length > 0 ? projectTeams.map((team, index) => {
               const isSelected  = selectedIds.includes(team.id);
-              const showRotateBtn = canRotate(team);
-              const slotCount   = team.active_slot_count ?? 0;
 
               return (
                 <TableRow key={team.id}
@@ -474,21 +458,6 @@ export default function TeamTab({ project, teamData }) {
                       }`}>
                         {team.assignable_type === 'employee' ? 'Employee' : 'User'}
                       </span>
-                      {/* Split shift indicator */}
-                      {team.time_slot && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 border border-indigo-200">
-                          <Clock size={9} />
-                          {team.time_slot}
-                        </span>
-                      )}
-                      {/* Fully split badge */}
-                      {slotCount >= 2 && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-600 border border-violet-200"
-                          title="This employee is split across 2 projects">
-                          <ArrowLeftRight size={9} />
-                          split
-                        </span>
-                      )}
                     </div>
                   </TableCell>
 
@@ -533,16 +502,14 @@ export default function TeamTab({ project, teamData }) {
                   <TableCell className="px-4 py-4 text-sm">
                     <div className="flex gap-1.5 flex-wrap">
 
-                      {/* Eye — assignment history (employees only) */}
-                      {team.assignable_type === 'employee' && (
-                        <button
-                          onClick={() => handleViewHistory(team)}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-all border border-slate-200 hover:border-slate-300"
-                          title="View assignment history"
-                        >
-                          <Eye size={15} />
-                        </button>
-                      )}
+                      {/* Eye — assignment history */}
+                      <button
+                        onClick={() => handleViewHistory(team)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-all border border-slate-200 hover:border-slate-300"
+                        title="View assignment history"
+                      >
+                        <Eye size={15} />
+                      </button>
 
                       {/* Edit */}
                       {has('project-teams.update') && (
@@ -555,41 +522,19 @@ export default function TeamTab({ project, teamData }) {
                         </button>
                       )}
 
-                      {/* Rotate — only for employees with <2 active slots */}
-                      {has('project-teams.update') && showRotateBtn && (
-                        <button
-                          onClick={() => handleRotate(team)}
-                          className="p-1.5 rounded-lg hover:bg-violet-100 text-violet-600 hover:text-violet-700 transition-all border border-violet-200 hover:border-violet-300"
-                          title="Split shift — assign to a second project on different hours"
-                        >
-                          <ArrowLeftRight size={15} />
-                        </button>
-                      )}
-
-                      {/* Rotate disabled tooltip — employee has 2 slots already */}
-                      {has('project-teams.update') && team.assignable_type === 'employee' && slotCount >= 2 && team.assignment_status === 'active' && (
-                        <button
-                          disabled
-                          className="p-1.5 rounded-lg opacity-30 cursor-not-allowed text-violet-400 border border-violet-200"
-                          title="Already split across 2 projects — release one slot first"
-                        >
-                          <ArrowLeftRight size={15} />
-                        </button>
-                      )}
-
-                      {/* Release */}
-                      {has('project-teams.delete') && team.assignment_status === 'active' && (
+                      {/* Release (employees only) */}
+                      {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'active' && (
                         <button
                           onClick={() => handleChangeStatus(team, 'released')}
                           className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-all border border-amber-200 hover:border-amber-300"
-                          title="Release — frees this slot for other projects"
+                          title="Release — frees this employee for other projects"
                         >
                           <LogOut size={15} />
                         </button>
                       )}
 
-                      {/* Re-activate */}
-                      {has('project-teams.delete') && team.assignment_status === 'released' && (
+                      {/* Re-activate (employees only) */}
+                      {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'released' && (
                         <button
                           onClick={() => handleChangeStatus(team, 'active')}
                           className="p-1.5 rounded-lg hover:bg-green-100 text-green-600 hover:text-green-700 transition-all border border-green-200 hover:border-green-300"
@@ -684,14 +629,6 @@ export default function TeamTab({ project, teamData }) {
           project={project}
           teamMember={removeTeamMember}
           onSuccess={() => { setRemoveTeamMember(null); setShowRemoveModal(false); }}
-        />
-      )}
-      {showRotateModal && rotateTeamMember && (
-        <RotateTeamMember
-          currentTeam={rotateTeamMember}
-          currentProject={project}
-          availableProjects={teamData?.availableProjects || []}
-          setShowModal={setShowRotateModal}
         />
       )}
       {showHistoryModal && historyTeamMember && (

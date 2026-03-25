@@ -411,7 +411,16 @@ class TeamController extends Controller
             }
         }
 
-        $projectTeam->update(['assignment_status' => $newStatus->value]);
+        // Record timestamps
+        $updateData = ['assignment_status' => $newStatus->value];
+
+        if ($newStatus === AssignmentStatus::Released) {
+            $updateData['released_at'] = now();
+        } elseif ($newStatus === AssignmentStatus::Active && $projectTeam->assignment_status === AssignmentStatus::Released) {
+            $updateData['reactivated_at'] = now();
+        }
+
+        $projectTeam->update($updateData);
 
         return response()->json([
             'success' => true,
@@ -455,7 +464,10 @@ class TeamController extends Controller
                 ->update(['assigned_to' => null]);
         }
 
-        $projectTeam->update(['assignment_status' => AssignmentStatus::Released->value]);
+        $projectTeam->update([
+            'assignment_status' => AssignmentStatus::Released->value,
+            'released_at'       => now(),
+        ]);
 
         return response()->json([
             'success' => true,

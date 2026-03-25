@@ -11,9 +11,9 @@ import { Button } from "@/Components/ui/button"
 import { router } from "@inertiajs/react"
 import { toast } from "sonner"
 import {
-  Loader2, SquarePen, Search, Zap, Clock, Calendar, CalendarRange,
+  Loader2, SquarePen, Search, Zap, Calendar, CalendarRange,
   AlertCircle, ChevronDown, ChevronUp, X, Users, UserCheck, Building2,
-  SunMedium, Sunset, Moon, CheckCircle2
+  CheckCircle2
 } from "lucide-react"
 import InputError from "@/Components/InputError"
 
@@ -45,22 +45,12 @@ const getDatePresets = (projectStartDate, projectEndDate) => {
   ]
 }
 
-const TIME_SLOTS = [
-  { id: "morning",   label: "Morning",   time: "08:00–12:00", Icon: SunMedium, color: "amber"  },
-  { id: "afternoon", label: "Afternoon", time: "13:00–17:00", Icon: Sunset,    color: "orange" },
-  { id: "evening",   label: "Evening",   time: "18:00–22:00", Icon: Moon,      color: "indigo" },
-  { id: "fullday",   label: "Full Day",  time: "08:00–17:00", Icon: Calendar,  color: "green"  },
-]
-
 const PRESET_STYLE = {
   indigo: { base: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100", active: "bg-indigo-600 border-indigo-600 text-white shadow-md" },
   blue:   { base: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",         active: "bg-blue-600 border-blue-600 text-white shadow-md"   },
   violet: { base: "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100", active: "bg-violet-600 border-violet-600 text-white shadow-md" },
   cyan:   { base: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100",         active: "bg-cyan-600 border-cyan-600 text-white shadow-md"   },
   gray:   { base: "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100",         active: "bg-gray-700 border-gray-700 text-white shadow-md"   },
-  amber:  { base: "border-amber-200 bg-amber-50 text-amber-700",                        active: "bg-amber-500 border-amber-500 text-white shadow-md" },
-  orange: { base: "border-orange-200 bg-orange-50 text-orange-700",                     active: "bg-orange-500 border-orange-500 text-white shadow-md" },
-  green:  { base: "border-green-200 bg-green-50 text-green-700",                        active: "bg-green-600 border-green-600 text-white shadow-md" },
 }
 
 // ─── Assignable Row Card ───────────────────────────────────────────────────────
@@ -82,11 +72,6 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
       onFormChange(compositeId, "start_date", preset.start)
       onFormChange(compositeId, "end_date", preset.end)
     }
-  }
-
-  const applySlot = (slot) => {
-    onFormChange(compositeId, "time_slot", slot.id)
-    onFormChange(compositeId, "work_hours", slot.time)
   }
 
   const hasErrors  = errors?.role || errors?.hourly_rate || errors?.start_date
@@ -148,11 +133,6 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
             {activePreset && activePreset !== "custom" && (
               <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-full px-2 py-0.5">
                 ⚡ {presets.find(p => p.id === activePreset)?.label}
-              </span>
-            )}
-            {formData?.work_hours && (
-              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-                🕐 {formData.work_hours}
               </span>
             )}
           </div>
@@ -265,35 +245,6 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
               </div>
             </div>
           </div>
-
-          {/* Work Shift */}
-          <div>
-            <label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-1">
-              <Clock size={11} className="text-indigo-500" />
-              Work Shift
-              <span className="font-normal text-gray-400 ml-1">(enables rotation across projects)</span>
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {TIME_SLOTS.map(({ id, label, time, Icon, color }) => {
-                const style = PRESET_STYLE[color] || PRESET_STYLE.gray
-                const isActive = formData?.time_slot === id
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); applySlot({ id, label, time }) }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-                      isActive ? style.active : style.base
-                    }`}
-                  >
-                    <Icon size={12} />
-                    <span>{label}</span>
-                    <span className="opacity-60">{time}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
         </div>
       )}
     </div>
@@ -339,7 +290,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
     if (errors[key]) setErrors((prev) => { const n = { ...prev }; delete n[key]; return n })
   }
 
-  const applyPresetToAll = (preset, slot) => {
+  const applyPresetToAll = (preset) => {
     selectedIds.forEach((id) => {
       if (preset) {
         handleChange(id, "date_preset", preset.id)
@@ -347,10 +298,6 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
           handleChange(id, "start_date", preset.start)
           handleChange(id, "end_date",   preset.end)
         }
-      }
-      if (slot) {
-        handleChange(id, "time_slot",  slot.id)
-        handleChange(id, "work_hours", slot.time)
       }
     })
     toast.success(`Applied to all ${selectedIds.length} selected members`)
@@ -399,8 +346,6 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
         hourly_rate: parseFloat(fd.hourly_rate) || 0,
         start_date:  fd.start_date,
         end_date:    fd.end_date || null,
-        time_slot:   fd.time_slot || null,
-        work_hours:  fd.work_hours || null,
       }
     }).filter(Boolean)
 
@@ -409,14 +354,21 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
       { assignables: payload },
       {
         preserveScroll: true,
-        onSuccess: () => { toast.success("Team members assigned successfully"); setShowAddModal(false) },
-        onError:   (errs) => { setProcessing(false); setErrors(errs); toast.error("Failed to assign some team members.") },
+        onSuccess: (page) => {
+          setProcessing(false)
+          const flash = page.props?.flash
+          if (flash?.error) {
+            toast.error(flash.error)
+          } else {
+            toast.success(flash?.success || "Team members assigned successfully")
+            setShowAddModal(false)
+          }
+        },
+        onError: (errs) => { setProcessing(false); setErrors(errs); toast.error("Failed to assign some team members.") },
       }
     )
   }
 
-  const employeeCount = filtered.filter(a => a.type === "employee").length
-  const userCount     = filtered.filter(a => a.type !== "employee").length
   const presets       = getDatePresets(project?.start_date, project?.planned_end_date)
 
   return (
@@ -443,12 +395,12 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
           )}
         </div>
 
-        {/* ── Rotation notice ── */}
+        {/* ── Info notice ── */}
         <div className="mx-6 mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 text-xs text-amber-800 flex-shrink-0">
           <AlertCircle size={13} className="flex-shrink-0 mt-0.5 text-amber-500" />
           <span>
-            <strong>Employees</strong> can only have one active project at a time. Assign a{" "}
-            <strong>Work Shift</strong> to enable partial-day rotation (e.g. morning on Project A, afternoon on Project B).{" "}
+            <strong>Employees</strong> can only be active on one project at a time. To move an employee here,
+            release them from their current project first.{" "}
             <strong>Users/contractors</strong> can appear on multiple projects.
           </span>
         </div>
@@ -511,18 +463,6 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-medium border border-white/30 transition disabled:opacity-40"
                 >
                   {p.icon} {p.label}
-                </button>
-              ))}
-              <div className="w-px h-4 bg-white/20 mx-1" />
-              {TIME_SLOTS.map(({ id, label, time, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => applyPresetToAll(null, { id, label, time })}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/25 text-white text-xs border border-white/20 transition"
-                  title={`${label} shift`}
-                >
-                  <Clock size={10} /> {label}
                 </button>
               ))}
             </div>

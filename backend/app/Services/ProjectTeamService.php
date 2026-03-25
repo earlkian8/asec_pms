@@ -63,29 +63,7 @@ class ProjectTeamService
             ->paginate(10)
             ->withQueryString();
 
-        // ── Attach active_slot_count per team member ──────────────────────────
-        // This tells the frontend whether the Rotate button should be shown.
-        // active_slot_count = number of active ProjectTeam records for that employee.
-        $projectTeams->getCollection()->transform(function ($team) {
-            if ($team->assignable_type === 'employee' && $team->employee_id) {
-                $team->active_slot_count = ProjectTeam::where('employee_id', $team->employee_id)
-                    ->where('assignment_status', AssignmentStatus::Active->value)
-                    ->count();
-            } else {
-                $team->active_slot_count = 0;
-            }
-            return $team;
-        });
-
         // ── Available assignables ─────────────────────────────────────────────
-        //
-        // EMPLOYEES: use fullyOccupiedEmployeeIds() — excludes employees who:
-        //   (a) have a fullday/unslotted active record, OR
-        //   (b) already have 2 active split-shift records.
-        //
-        // USERS: only excluded if already in THIS project (contractors are free
-        //   to be on multiple projects simultaneously).
-
         $occupiedEmployeeIds = ProjectTeam::fullyOccupiedEmployeeIds();
 
         $existingUserIds = ProjectTeam::where('project_id', $project->id)
@@ -130,19 +108,11 @@ class ProjectTeamService
             ->sort()
             ->values();
 
-        // ── Available projects for rotation target ────────────────────────────
-        $availableProjects = Project::where('id', '!=', $project->id)
-            ->whereNull('archived_at')
-            ->where('status', 'active')
-            ->orderBy('project_name')
-            ->get(['id', 'project_name', 'start_date', 'planned_end_date']);
-
         return [
             'projectTeams'      => $projectTeams,
             'users'             => $users,
             'employees'         => $employees,
             'allAssignables'    => $allAssignables,
-            'availableProjects' => $availableProjects,
             'filterOptions'     => [
                 'roles'              => $roles,
                 'assignmentStatuses' => AssignmentStatus::values(),

@@ -12,35 +12,11 @@ use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProjectTeamsController extends Controller
 {
     use ActivityLogsTrait, NotificationTrait;
-
-    // ─── Shift definitions ────────────────────────────────────────────────────
-
-    private function shiftHours(): array
-    {
-        return [
-            'morning'   => ['start' => 8,  'end' => 12, 'label' => '08:00–12:00'],
-            'afternoon' => ['start' => 13, 'end' => 17, 'label' => '13:00–17:00'],
-            'evening'   => ['start' => 18, 'end' => 22, 'label' => '18:00–22:00'],
-        ];
-    }
-
-    private function shiftsOverlap(string $a, string $b): bool
-    {
-        $hours = $this->shiftHours();
-
-        if (!isset($hours[$a], $hours[$b])) {
-            return true; // unknown shifts = assume overlap (safe default)
-        }
-
-        return $hours[$a]['start'] < $hours[$b]['end']
-            && $hours[$b]['start'] < $hours[$a]['end'];
-    }
 
     // ─── Store ────────────────────────────────────────────────────────────────
 
@@ -53,7 +29,7 @@ class ProjectTeamsController extends Controller
             'assignables.*.role'        => ['required', 'string', 'max:50'],
             'assignables.*.hourly_rate' => ['required', 'numeric', 'min:0'],
             'assignables.*.start_date'  => ['required', 'date'],
-            'assignables.*.end_date'    => ['required', 'date', 'after_or_equal:assignables.*.start_date'],
+            'assignables.*.end_date'    => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
 
         foreach ($validated['assignables'] as $index => $assignable) {
@@ -85,12 +61,12 @@ class ProjectTeamsController extends Controller
                         "assignables.{$index}.start_date" => "Start date cannot be after project end date ({$project->planned_end_date})",
                     ])->withInput();
                 }
-                if ($project->start_date && $assignable['end_date'] < $project->start_date) {
+                if ($assignable['end_date'] && $project->start_date && $assignable['end_date'] < $project->start_date) {
                     return redirect()->back()->withErrors([
                         "assignables.{$index}.end_date" => "End date cannot be before project start date ({$project->start_date})",
                     ])->withInput();
                 }
-                if ($project->planned_end_date && $assignable['end_date'] > $project->planned_end_date) {
+                if ($assignable['end_date'] && $project->planned_end_date && $assignable['end_date'] > $project->planned_end_date) {
                     return redirect()->back()->withErrors([
                         "assignables.{$index}.end_date" => "End date cannot be after project end date ({$project->planned_end_date})",
                     ])->withInput();
@@ -109,14 +85,14 @@ class ProjectTeamsController extends Controller
                     $name = $this->resolveAssignableName($assignable);
                     return redirect()->back()->withErrors([
                         "assignables.{$index}.id" =>
-                            "{$name} is fully occupied on another project. Release them first before assigning here.",
+                            "{$name} is currently active on another project. Release them first before assigning here.",
                     ])->withInput();
                 }
             }
 
-            // Skip duplicate (same project + same role + same person)
+            // Skip duplicate — only if there's already an ACTIVE assignment for this person on this project
             $exists = ProjectTeam::where('project_id', $project->id)
-                ->where('role', $assignable['role'])
+                ->where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
                 ->where(function ($q) use ($assignable) {
                     if ($assignable['type'] === 'user') {
                         $q->where('user_id', $assignable['id'])->whereNull('employee_id');
@@ -143,7 +119,6 @@ class ProjectTeamsController extends Controller
                     'end_date'          => $assignable['end_date'] ?? null,
                     'is_active'         => true,
                     'assignment_status' => AssignmentStatus::Active->value,
-                    'created_by'        => auth()->id(),
                 ]);
 
                 $name = $this->resolveAssignableName($assignable);
@@ -216,22 +191,20 @@ class ProjectTeamsController extends Controller
             }
         }
 
-        // If setting employee to active, check for occupation conflicts
+        // If re-activating, check no other active assignment
         if (
             isset($validated['assignment_status'])
             && $validated['assignment_status'] === AssignmentStatus::Active->value
             && $projectTeam->assignable_type === 'employee'
         ) {
-            $occupiedIds = ProjectTeam::fullyOccupiedEmployeeIds();
-            // Exclude self from occupied check
-            $selfActive = ProjectTeam::where('employee_id', $projectTeam->employee_id)
+            $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
                 ->where('assignment_status', AssignmentStatus::Active->value)
                 ->where('id', '!=', $projectTeam->id)
-                ->count();
+                ->exists();
 
-            if ($selfActive >= 2) {
+            if ($conflict) {
                 return redirect()->back()->withErrors([
-                    'assignment_status' => "{$projectTeam->assignable_name} already has 2 active assignments.",
+                    'assignment_status' => "{$projectTeam->assignable_name} already has an active assignment on another project.",
                 ])->withInput();
             }
         }
@@ -279,33 +252,17 @@ class ProjectTeamsController extends Controller
 
         $newStatus = AssignmentStatus::from($request->assignment_status);
 
-        // Re-activating an employee — check occupation
+        // Re-activating an employee — check for conflicts
         if ($newStatus === AssignmentStatus::Active && $projectTeam->assignable_type === 'employee') {
-            // Count OTHER active records for this employee (not counting self)
-            $otherActiveCount = ProjectTeam::where('employee_id', $projectTeam->employee_id)
+            $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
                 ->where('assignment_status', AssignmentStatus::Active->value)
                 ->where('id', '!=', $projectTeam->id)
-                ->count();
+                ->exists();
 
-            if ($otherActiveCount >= 2) {
+            if ($conflict) {
                 return redirect()->back()->with('error',
-                    "{$projectTeam->assignable_name} already has 2 active project slots. Release one first."
+                    "{$projectTeam->assignable_name} already has an active assignment on another project. Release them there first."
                 );
-            }
-
-            // If they have 1 other active slotted record, the re-activation slot must not overlap
-            if ($otherActiveCount === 1) {
-                $existingSlot = ProjectTeam::where('employee_id', $projectTeam->employee_id)
-                    ->where('assignment_status', AssignmentStatus::Active->value)
-                    ->where('id', '!=', $projectTeam->id)
-                    ->value('time_slot');
-
-                if ($existingSlot && $projectTeam->time_slot
-                    && $this->shiftsOverlap($projectTeam->time_slot, $existingSlot)) {
-                    return redirect()->back()->with('error',
-                        "{$projectTeam->assignable_name} already has an overlapping shift ({$existingSlot}) on another project."
-                    );
-                }
             }
         }
 
@@ -313,7 +270,16 @@ class ProjectTeamsController extends Controller
             ? $projectTeam->assignment_status->label()
             : $projectTeam->assignment_status;
 
-        $projectTeam->update(['assignment_status' => $newStatus->value]);
+        // Record timestamps
+        $updateData = ['assignment_status' => $newStatus->value];
+
+        if ($newStatus === AssignmentStatus::Released) {
+            $updateData['released_at'] = now();
+        } elseif ($newStatus === AssignmentStatus::Active && $projectTeam->assignment_status === AssignmentStatus::Released) {
+            $updateData['reactivated_at'] = now();
+        }
+
+        $projectTeam->update($updateData);
 
         $this->adminActivityLogs('Project Team', 'Update Status',
             "Updated {$projectTeam->assignable_name} assignment status from {$oldLabel} to {$newStatus->label()} "
@@ -400,153 +366,6 @@ class ProjectTeamsController extends Controller
         return redirect()->back()->with('success', "{$name} has been permanently removed from the project.");
     }
 
-    // ─── Rotate ───────────────────────────────────────────────────────────────
-
-    /**
-     * Split an employee's working day across two projects.
-     *
-     * Rules:
-     *   - Only employees can be rotated (contractors/users are exempt).
-     *   - fullday shift is not allowed for either side (it uses all hours).
-     *   - The two shifts must not overlap.
-     *   - The employee must currently have only 1 active record (not already split).
-     *   - A new active ProjectTeam record is created on the target project.
-     *   - The current record is tagged with its retained time_slot.
-     */
-    public function rotate(Request $request, Project $project)
-    {
-        $validated = $request->validate([
-            'team_id'        => ['required', 'integer', 'exists:project_teams,id'],
-            'from_shift'     => ['required', 'string', 'in:morning,afternoon,evening'],
-            'to_project_id'  => ['required', 'integer', 'exists:projects,id'],
-            'to_shift'       => ['required', 'string', 'in:morning,afternoon,evening'],
-            'to_start_date'  => ['required', 'date'],
-            'to_end_date'    => ['nullable', 'date', 'after_or_equal:to_start_date'],
-            'to_hourly_rate' => ['required', 'numeric', 'min:0'],
-        ]);
-
-        $currentTeam = ProjectTeam::with('employee')->findOrFail($validated['team_id']);
-
-        if ($currentTeam->project_id !== $project->id) {
-            abort(403, 'Team member does not belong to this project.');
-        }
-
-        if ($currentTeam->assignable_type !== 'employee') {
-            return redirect()->back()->with('error', 'Only employees can be rotated.');
-        }
-
-        if ($currentTeam->assignment_status !== AssignmentStatus::Active) {
-            return redirect()->back()->with('error', 'Only active team members can be rotated.');
-        }
-
-        $targetProject = Project::findOrFail($validated['to_project_id']);
-        $employeeId    = $currentTeam->employee_id;
-        $memberName    = $currentTeam->assignable_name;
-
-        // ── Guard 1: shifts must not overlap ──────────────────────────────────
-        if ($this->shiftsOverlap($validated['from_shift'], $validated['to_shift'])) {
-            return redirect()->back()->with('error',
-                "The two shifts overlap. Choose two non-overlapping shifts (e.g. morning + afternoon)."
-            );
-        }
-
-        // ── Guard 2: employee must not already have 2 active slots ────────────
-        $activeCount = ProjectTeam::where('employee_id', $employeeId)
-            ->where('assignment_status', AssignmentStatus::Active->value)
-            ->count();
-
-        if ($activeCount >= 2) {
-            return redirect()->back()->with('error',
-                "{$memberName} is already split across 2 projects. Release one slot before rotating again."
-            );
-        }
-
-        // ── Guard 3: check existing slots for overlap ─────────────────────────
-        $existingSlots = ProjectTeam::where('employee_id', $employeeId)
-            ->where('assignment_status', AssignmentStatus::Active->value)
-            ->where('id', '!=', $currentTeam->id)
-            ->pluck('time_slot')
-            ->filter()
-            ->toArray();
-
-        foreach ($existingSlots as $existingSlot) {
-            if ($this->shiftsOverlap($validated['to_shift'], $existingSlot)) {
-                return redirect()->back()->with('error',
-                    "{$memberName} already has an overlapping shift ({$existingSlot}) on another project."
-                );
-            }
-        }
-
-        // ── Guard 4: not already on target project ────────────────────────────
-        $alreadyOnTarget = ProjectTeam::where('project_id', $targetProject->id)
-            ->where('employee_id', $employeeId)
-            ->where('assignment_status', AssignmentStatus::Active->value)
-            ->exists();
-
-        if ($alreadyOnTarget) {
-            return redirect()->back()->with('error',
-                "{$memberName} already has an active assignment on {$targetProject->project_name}."
-            );
-        }
-
-        $shifts = $this->shiftHours();
-
-        DB::beginTransaction();
-        try {
-            // 1. Tag current assignment with the retained shift
-            $currentTeam->update([
-                'time_slot'  => $validated['from_shift'],
-                'work_hours' => $shifts[$validated['from_shift']]['label'],
-            ]);
-
-            // 2. Create new assignment on target project
-            ProjectTeam::create([
-                'project_id'        => $targetProject->id,
-                'employee_id'       => $employeeId,
-                'user_id'           => null,
-                'assignable_type'   => 'employee',
-                'role'              => $currentTeam->role,
-                'hourly_rate'       => $validated['to_hourly_rate'],
-                'start_date'        => $validated['to_start_date'],
-                'end_date'          => $validated['to_end_date'] ?? null,
-                'is_active'         => true,
-                'assignment_status' => AssignmentStatus::Active->value,
-                'time_slot'         => $validated['to_shift'],
-                'work_hours'        => $shifts[$validated['to_shift']]['label'],
-                'created_by'        => auth()->id(),
-            ]);
-
-            DB::commit();
-
-            $fromLabel = ucfirst($validated['from_shift']) . ' (' . $shifts[$validated['from_shift']]['label'] . ')';
-            $toLabel   = ucfirst($validated['to_shift'])   . ' (' . $shifts[$validated['to_shift']]['label']   . ')';
-
-            $this->adminActivityLogs('Project Team', 'Rotate',
-                "Rotated {$memberName} — {$fromLabel} on {$project->project_name}, "
-                . "{$toLabel} on {$targetProject->project_name}"
-            );
-
-            $this->createSystemNotification(
-                'general', 'Team Member Rotated',
-                "{$memberName} is now split: {$fromLabel} on '{$project->project_name}' "
-                . "and {$toLabel} on '{$targetProject->project_name}'.",
-                $project,
-                route('project-management.view', $project->id)
-            );
-
-            return redirect()->back()->with('success',
-                "{$memberName} rotated successfully. "
-                . "{$fromLabel} on {$project->project_name}, "
-                . "{$toLabel} on {$targetProject->project_name}."
-            );
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Rotation error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to rotate: ' . $e->getMessage());
-        }
-    }
-
     // ─── History ──────────────────────────────────────────────────────────────
 
     /**
@@ -593,9 +412,9 @@ class ProjectTeamsController extends Controller
             'assignment_status' => $team->assignment_status instanceof \BackedEnum
                 ? $team->assignment_status->value
                 : $team->assignment_status,
-            'time_slot'         => $team->time_slot,
-            'work_hours'        => $team->work_hours,
-            'created_at'        => $team->created_at,
+            'released_at'       => $team->released_at?->toISOString(),
+            'reactivated_at'    => $team->reactivated_at?->toISOString(),
+            'created_at'        => $team->created_at?->toISOString(),
         ]);
 
         return response()->json(['assignments' => $assignments]);
@@ -618,7 +437,10 @@ class ProjectTeamsController extends Controller
                 ->update(['assigned_to' => null]);
         }
 
-        $team->update(['assignment_status' => AssignmentStatus::Released->value]);
+        $team->update([
+            'assignment_status' => AssignmentStatus::Released->value,
+            'released_at'       => now(),
+        ]);
 
         $this->adminActivityLogs('Project Team', 'Release',
             "Released {$name} ({$role}) from Project {$project->project_name}"

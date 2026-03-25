@@ -1,10 +1,10 @@
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogTitle,
 } from "@/Components/ui/dialog"
 import { useEffect, useState } from "react"
 import {
   Clock, Calendar, Building2, Loader2,
-  ArrowLeftRight, AlertCircle,
+  AlertCircle, CalendarCheck, RotateCcw, User, Briefcase, Mail, DollarSign
 } from "lucide-react"
 
 const STATUS_CONFIG = {
@@ -13,32 +13,37 @@ const STATUS_CONFIG = {
   completed: { label: "Completed", dot: "bg-blue-500",   bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200"  },
 }
 
-const SHIFT_LABELS = {
-  morning:   { label: "Morning",   time: "08:00–12:00", color: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-200"  },
-  afternoon: { label: "Afternoon", time: "13:00–17:00", color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
-  evening:   { label: "Evening",   time: "18:00–22:00", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" },
-  fullday:   { label: "Full Day",  time: "08:00–17:00", color: "text-green-600",  bg: "bg-green-50",  border: "border-green-200"  },
-}
-
 function formatDate(d) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-PH", {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
+    month: "short", day: "numeric", year: "numeric"
   })
+}
+
+function formatDateTime(d) {
+  if (!d) return null
+  return new Date(d).toLocaleString("en-PH", {
+    month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  })
+}
+
+function formatCurrency(amount) {
+  if (!amount) return "—"
+  return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(amount)
 }
 
 export default function ViewAssignmentHistory({ teamMember, onClose }) {
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState("details")
 
   const memberName = teamMember?.assignable_name || "Team Member"
+  const isEmployee = teamMember?.assignable_type === "employee"
 
   useEffect(() => {
     if (!teamMember) return
-
     setLoading(true)
     setError(null)
 
@@ -52,31 +57,26 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
     fetch(route("project-management.project-teams.history") + "?" + params.toString(), {
       headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" },
     })
-      .then(res => {
-        if (!res.ok) throw new Error()
-        return res.json()
-      })
-      .then(data => {
-        setAssignments(data.assignments || [])
-        setLoading(false)
-      })
-      .catch(() => {
-        setError("Could not load assignment history.")
-        setLoading(false)
-      })
+      .then(res => { if (!res.ok) throw new Error(); return res.json() })
+      .then(data => { setAssignments(data.assignments || []); setLoading(false) })
+      .catch(() => { setError("Could not load assignment history."); setLoading(false) })
   }, [teamMember])
 
-  const activeAssignments   = assignments.filter(a => a.assignment_status === "active")
-  const inactiveAssignments = assignments.filter(a => a.assignment_status !== "active")
+  const tabs = [
+    { id: "details", label: "Details" },
+    ...(isEmployee ? [{ id: "logs", label: "Rotation Logs" }] : []),
+  ]
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="w-[96vw] max-w-lg max-h-[85vh] overflow-y-auto rounded-xl p-0 border">
+      <DialogContent className="w-[96vw] max-w-lg max-h-[85vh] overflow-hidden flex flex-col rounded-xl p-0 border">
 
-        {/* SIMPLE HEADER */}
-        <div className="px-5 py-4 border-b bg-white">
+        {/* HEADER */}
+        <div className="px-5 py-4 border-b bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-700">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold ${
+              isEmployee ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+            }`}>
               {memberName[0]?.toUpperCase()}
             </div>
             <div>
@@ -84,71 +84,134 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
                 {memberName}
               </DialogTitle>
               <p className="text-xs text-gray-500">
-                Assignment history
+                {isEmployee ? "Employee" : "User"} • {teamMember?.role || "No role"}
               </p>
             </div>
           </div>
 
-          {!loading && (
-            <div className="flex gap-2 mt-3 text-xs">
-              <span className="px-2 py-1 rounded-md bg-gray-100 text-gray-700">
-                {assignments.length} total
-              </span>
-              <span className="px-2 py-1 rounded-md bg-green-100 text-green-700">
-                {activeAssignments.length} active
-              </span>
-              {activeAssignments.length >= 2 && (
-                <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 flex items-center gap-1">
-                  <ArrowLeftRight size={12} />
-                  Split
-                </span>
-              )}
-            </div>
-          )}
+          {/* TABS */}
+          <div className="flex gap-1 mt-3 bg-gray-100 rounded-lg p-0.5">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* BODY */}
-        <div className="p-5">
-          {loading && (
-            <div className="flex flex-col items-center py-10">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400 mb-2" />
-              <p className="text-xs text-gray-500">Loading...</p>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto p-5">
 
-          {error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-xs text-red-600">
-              <AlertCircle size={14} />
-              {error}
-            </div>
-          )}
-
-          {!loading && !error && assignments.length === 0 && (
-            <div className="text-center py-10">
-              <Building2 className="h-6 w-6 text-gray-300 mx-auto mb-2" />
-              <p className="text-xs text-gray-500">No history found</p>
-            </div>
-          )}
-
-          {!loading && !error && assignments.length > 0 && (
+          {/* ─── Details Tab ─── */}
+          {activeTab === "details" && (
             <div className="space-y-4">
+              {/* Current assignment info */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assignment Info</h4>
 
-              {activeAssignments.length > 0 && (
-                <Section title="Active">
-                  {activeAssignments.map(a => (
-                    <AssignmentCard key={a.id} assignment={a} />
-                  ))}
-                </Section>
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoItem icon={<Briefcase size={13} />} label="Role" value={teamMember?.role || "—"} />
+                  <InfoItem icon={<DollarSign size={13} />} label="Hourly Rate" value={formatCurrency(teamMember?.hourly_rate)} />
+                  <InfoItem icon={<Calendar size={13} />} label="Start Date" value={formatDate(teamMember?.start_date)} />
+                  <InfoItem icon={<Calendar size={13} />} label="End Date" value={formatDate(teamMember?.end_date)} />
+                </div>
+
+                <div className="mt-2">
+                  {(() => {
+                    const status = STATUS_CONFIG[teamMember?.assignment_status] || STATUS_CONFIG.active
+                    return (
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${status.bg} ${status.text} ${status.border}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                        {status.label}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              {/* Contact info */}
+              <div className="space-y-3 pt-3 border-t border-gray-100">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</h4>
+                <InfoItem
+                  icon={<Mail size={13} />}
+                  label="Email"
+                  value={teamMember?.user?.email || teamMember?.employee?.email || "—"}
+                />
+                {isEmployee && teamMember?.employee?.position && (
+                  <InfoItem icon={<User size={13} />} label="Position" value={teamMember.employee.position} />
+                )}
+              </div>
+
+              {/* Project assignments overview */}
+              {!loading && assignments.length > 0 && (
+                <div className="space-y-3 pt-3 border-t border-gray-100">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Project Assignments ({assignments.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {assignments.map(a => (
+                      <div key={a.id} className={`flex items-center justify-between rounded-lg border p-2.5 text-xs ${
+                        a.assignment_status === "active" ? "border-green-200 bg-green-50/40" : "border-gray-200 bg-white"
+                      }`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 truncate">{a.project?.project_name || "—"}</p>
+                          <p className="text-gray-500 mt-0.5">{formatDate(a.start_date)} → {a.end_date ? formatDate(a.end_date) : "ongoing"}</p>
+                        </div>
+                        {(() => {
+                          const s = STATUS_CONFIG[a.assignment_status] || STATUS_CONFIG.released
+                          return (
+                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border ${s.bg} ${s.text} ${s.border}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                              {s.label}
+                            </span>
+                          )
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Rotation Logs Tab (employees only) ─── */}
+          {activeTab === "logs" && isEmployee && (
+            <div>
+              {loading && (
+                <div className="flex flex-col items-center py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400 mb-2" />
+                  <p className="text-xs text-gray-500">Loading...</p>
+                </div>
               )}
 
-              {inactiveAssignments.length > 0 && (
-                <Section title="Past">
-                  {inactiveAssignments.map(a => (
-                    <AssignmentCard key={a.id} assignment={a} />
-                  ))}
-                </Section>
+              {error && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-xs text-red-600">
+                  <AlertCircle size={14} /> {error}
+                </div>
               )}
 
+              {!loading && !error && assignments.length === 0 && (
+                <div className="text-center py-10">
+                  <Building2 className="h-6 w-6 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500">No rotation logs found</p>
+                </div>
+              )}
+
+              {!loading && !error && assignments.length > 0 && (
+                <div className="space-y-2">
+                  {assignments.map(a => (
+                    <RotationLogCard key={a.id} assignment={a} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -157,52 +220,72 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
   )
 }
 
-function Section({ title, children }) {
+function InfoItem({ icon, label, value }) {
   return (
-    <div>
-      <p className="text-xs font-medium text-gray-500 mb-2">{title}</p>
-      <div className="space-y-2">{children}</div>
+    <div className="flex items-start gap-2">
+      <span className="text-gray-400 mt-0.5 flex-shrink-0">{icon}</span>
+      <div>
+        <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
+        <p className="text-sm text-gray-900 font-medium">{value}</p>
+      </div>
     </div>
   )
 }
 
-function AssignmentCard({ assignment }) {
+function RotationLogCard({ assignment }) {
   const status = STATUS_CONFIG[assignment.assignment_status] || STATUS_CONFIG.released
-  const shift  = assignment.time_slot ? SHIFT_LABELS[assignment.time_slot] : null
-  const isActive = assignment.assignment_status === "active"
 
   return (
     <div className={`rounded-lg border p-3 text-sm ${
-      isActive ? "border-green-200 bg-green-50/40" : "border-gray-200 bg-white"
+      assignment.assignment_status === "active" ? "border-green-200 bg-green-50/40" : "border-gray-200 bg-white"
     }`}>
-      <div className="flex justify-between gap-2">
-        <div className="flex-1 min-w-0">
-
+      <div className="flex justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
           <p className="font-medium text-gray-900 truncate">
             {assignment.project?.project_name || "—"}
           </p>
-
-          <p className="text-xs text-gray-500 mb-1">
-            {assignment.role || "No role"}
-          </p>
-
-          {shift && (
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border ${shift.bg} ${shift.color} ${shift.border}`}>
-              <Clock size={10} />
-              {shift.label}
-            </span>
-          )}
-
-          <div className="mt-1 text-[11px] text-gray-500">
-            {formatDate(assignment.start_date)} → {assignment.end_date ? formatDate(assignment.end_date) : "ongoing"}
-          </div>
+          <p className="text-xs text-gray-500">{assignment.role || "No role"}</p>
         </div>
-
-        <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border ${status.bg} ${status.text} ${status.border}`}>
+        <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border self-start ${status.bg} ${status.text} ${status.border}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
           {status.label}
-        </div>
+        </span>
       </div>
+
+      {/* Timeline entries */}
+      <div className="space-y-1 border-t border-gray-100 pt-2 mt-1">
+        {assignment.created_at && (
+          <TimelineEntry
+            icon={<CalendarCheck size={11} className="text-green-500" />}
+            label="Assigned"
+            date={formatDateTime(assignment.created_at)}
+          />
+        )}
+        {assignment.released_at && (
+          <TimelineEntry
+            icon={<Clock size={11} className="text-amber-500" />}
+            label="Released"
+            date={formatDateTime(assignment.released_at)}
+          />
+        )}
+        {assignment.reactivated_at && (
+          <TimelineEntry
+            icon={<RotateCcw size={11} className="text-blue-500" />}
+            label="Reactivated"
+            date={formatDateTime(assignment.reactivated_at)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TimelineEntry({ icon, label, date }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="flex-shrink-0">{icon}</span>
+      <span className="text-gray-400 w-16">{label}</span>
+      <span className="font-medium text-gray-600">{date}</span>
     </div>
   )
 }

@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ChatController;
+use App\Http\Controllers\Admin\ClientUpdateRequestViewController;
 use App\Http\Controllers\Admin\TrashBinController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
@@ -147,6 +148,18 @@ Route::middleware('auth')->group(function () {
         Route::prefix('request-updates')->name('request-updates.')->group(function(){
             Route::delete('/delete/{project}/{clientUpdateRequest}', [ProjectsController::class, 'destroyRequestUpdate'])->middleware('permission:projects.delete')->name('destroy');
         }); 
+
+        Route::prefix('client-update-requests')->name('client-update-requests.')->group(function(){
+            // Mark a single request as viewed
+            Route::post('{clientUpdateRequest}/mark-viewed', [ClientUpdateRequestViewController::class, 'markViewed'])
+                ->middleware('permission:projects.update')
+                ->name('mark-viewed');
+            
+            // Bulk-mark multiple requests as viewed (used by TaskDetailModal on tab open)
+            Route::post('mark-viewed-bulk', [ClientUpdateRequestViewController::class, 'markViewedBulk'])
+                ->middleware('permission:projects.update')
+                ->name('mark-viewed-bulk');
+        });
     });
 
     // Employee Management

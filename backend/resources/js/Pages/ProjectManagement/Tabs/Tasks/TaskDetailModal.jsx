@@ -6,7 +6,7 @@ import {
   Plus, Download, SquarePen, Trash2, FileText,
   Image as ImageIcon, Calendar, User, AlertCircle,
   Flag, CheckCircle2, XCircle, MessageSquare, Mail,
-  LayoutGrid, Activity, Clock, X,
+  LayoutGrid, Activity, Clock, X, Bell,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import { router } from '@inertiajs/react';
@@ -22,7 +22,7 @@ import * as pdfjsLib from "pdfjs-dist";
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.mjs`;
 import { renderAsync } from "docx-preview";
 
-// ─── File preview sub-components (unchanged internals) ────────────────────────
+// ─── File preview sub-components ─────────────────────────────────────────────
 const PdfThumbnail = ({ url }) => {
   const canvasRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -134,27 +134,19 @@ const UpdateCard = ({ update, currentTask, onEdit, onDelete, downloadUrl, isFirs
 
   return (
     <div className={`group bg-white border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-300 hover:shadow-sm transition-all ${isFirst ? 'col-span-2' : ''}`}>
-      {/* Media */}
       {(hasImage || hasPdf || hasDocx) && (
         <div className={`w-full bg-zinc-100 overflow-hidden relative ${mediaClass}`}>
           {hasImage && (
-            <img
-              src={fileUrl}
-              alt="Update attachment"
-              className="w-full h-full object-cover"
-              onError={e => { e.target.parentElement.classList.add('hidden'); }}
-            />
+            <img src={fileUrl} alt="Update attachment" className="w-full h-full object-cover"
+              onError={e => { e.target.parentElement.classList.add('hidden'); }} />
           )}
           {hasPdf && <PdfThumbnail url={fileUrl} />}
           {hasDocx && <DocxPreview fileUrl={fileUrl} />}
-          {/* Overlay badge */}
           <span className="absolute top-2 right-2 bg-black/50 text-white text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide">
             {hasPdf ? 'PDF' : hasDocx ? 'DOCX' : 'Photo'}
           </span>
         </div>
       )}
-
-      {/* Body */}
       <div className="p-3.5">
         <div className="flex items-center gap-2 mb-2.5 text-xs text-zinc-400">
           <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-medium text-[10px] flex-shrink-0">
@@ -164,11 +156,9 @@ const UpdateCard = ({ update, currentTask, onEdit, onDelete, downloadUrl, isFirs
           <span>·</span>
           <span>{fmt(update.created_at)}</span>
         </div>
-
         {update.description && (
           <p className="text-sm text-zinc-700 leading-relaxed line-clamp-4">{update.description}</p>
         )}
-
         {fileUrl && (
           <div className="mt-2.5 flex items-center gap-2 text-xs text-zinc-400">
             <FileText size={12} />
@@ -177,8 +167,6 @@ const UpdateCard = ({ update, currentTask, onEdit, onDelete, downloadUrl, isFirs
           </div>
         )}
       </div>
-
-      {/* Actions */}
       <div className="flex items-center gap-1 px-3.5 py-2.5 border-t border-zinc-100 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
         {downloadUrl && (
           <a href={downloadUrl} target="_blank" rel="noopener noreferrer"
@@ -204,6 +192,11 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const { has }   = usePermission();
   const { props } = usePage();
   const [activeTab, setActiveTab] = useState('progress');
+
+  // Track locally which request IDs this user has already viewed this session
+  // (optimistic — server is the source of truth on reload)
+  const [locallyViewed, setLocallyViewed] = useState(new Set());
+  const markViewedCalled = useRef(false);
 
   const [showAddProgressModal,    setShowAddProgressModal]    = useState(false);
   const [showEditProgressModal,   setShowEditProgressModal]   = useState(false);
@@ -241,6 +234,59 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const rawRequests = currentTask.clientUpdateRequests || currentTask.client_update_requests || [];
   const clientUpdateRequests = Array.isArray(rawRequests) ? rawRequests : (rawRequests.data || []);
 
+  // Unread count — subtract locally-viewed ones so the badge updates instantly
+  const unreadCount = clientUpdateRequests.filter(
+    req => req.is_unread && !locallyViewed.has(req.id)
+  ).length;
+
+  // ── Mark all unread requests as viewed when the requests tab is opened ──────
+  useEffect(() => {
+    if (activeTab !== 'requests') return;
+    if (markViewedCalled.current) return;
+
+    const unreadIds = clientUpdateRequests
+      .filter(req => req.is_unread && !locallyViewed.has(req.id))
+      .map(req => req.id);
+
+    if (unreadIds.length === 0) return;
+
+    markViewedCalled.current = true;
+
+    // Optimistic local update so the pulse dot disappears immediately
+    setLocallyViewed(prev => new Set([...prev, ...unreadIds]));
+
+    // Fire-and-forget — no toast, no blocking
+    fetch(route('project-management.client-update-requests.mark-viewed-bulk'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+      },
+      body: JSON.stringify({ ids: unreadIds }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to mark viewed');
+        // Reload milestoneData silently so the index reflects the updated read state
+        router.reload({ only: ['milestoneData'] });
+      })
+      .catch(() => {
+        // Silently revert optimistic state on failure
+        setLocallyViewed(prev => {
+          const next = new Set(prev);
+          unreadIds.forEach(id => next.delete(id));
+          return next;
+        });
+        markViewedCalled.current = false;
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Reset the "already called" flag if the task changes so re-opening works
+  useEffect(() => {
+    markViewedCalled.current = false;
+    setLocallyViewed(new Set());
+  }, [task?.id]);
+
   const getDownloadUrl = (update) => {
     if (!update.file_path || !currentTask.milestone) return null;
     const mId = currentTask.milestone.id || currentTask.milestone_id;
@@ -271,10 +317,16 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const dashOffset = circumference - (progressPct / 100) * circumference;
 
   const tabs = [
-    // { id: 'overview',  label: 'Overview',         icon: LayoutGrid,    count: null },
-    { id: 'progress',  label: 'Progress updates',  icon: Activity,      count: progressUpdates.length },
-    { id: 'requests',  label: 'Client requests',   icon: MessageSquare, count: clientUpdateRequests.length },
-    { id: 'issues',    label: 'Issues',             icon: AlertCircle,   count: issues.length },
+    { id: 'progress',  label: 'Progress updates',  icon: Activity,      count: progressUpdates.length,    unread: 0 },
+    {
+      id: 'requests',
+      label: 'Client requests',
+      icon: Bell,
+      count: clientUpdateRequests.length,
+      // unread drives the notification dot on the sidebar tab
+      unread: unreadCount,
+    },
+    { id: 'issues',    label: 'Issues',             icon: AlertCircle,   count: issues.length,             unread: 0 },
   ];
 
   return (
@@ -321,18 +373,29 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
             <div className="w-52 flex-shrink-0 border-r border-zinc-100 flex flex-col py-3 gap-0.5">
               <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-300 px-4 py-2">Sections</p>
 
-              {tabs.map(({ id, label, icon: Icon, count }) => (
+              {tabs.map(({ id, label, icon: Icon, count, unread }) => (
                 <button key={id} onClick={() => setActiveTab(id)}
                   className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-all text-left border-l-2 ${
                     activeTab === id
                       ? 'border-blue-500 bg-zinc-50 text-zinc-900 font-medium'
                       : 'border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'
                   }`}>
-                  <Icon size={14} className="flex-shrink-0" />
+                  <div className="relative flex-shrink-0">
+                    <Icon size={14} />
+                    {/* Pulsing dot for unread notifications */}
+                    {unread > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-500" />
+                      </span>
+                    )}
+                  </div>
                   <span className="flex-1 truncate">{label}</span>
                   {count !== null && (
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
-                      activeTab === id
+                      unread > 0
+                        ? 'bg-violet-100 text-violet-600'
+                        : activeTab === id
                         ? 'bg-blue-100 text-blue-600'
                         : 'bg-zinc-100 text-zinc-400'
                     }`}>{count}</span>
@@ -359,67 +422,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
             {/* MAIN CONTENT */}
             <div className="flex-1 overflow-y-auto">
-
-              {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
-              {activeTab === 'overview' && (
-                <div className="p-6 space-y-5">
-                  {/* Stat row */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Updates filed', value: progressUpdates.length, sub: 'progress entries' },
-                      { label: 'Client requests', value: clientUpdateRequests.length, sub: 'linked to task' },
-                      { label: 'Open issues', value: issues.filter(i => i.status === 'open').length, sub: `of ${issues.length} total` },
-                    ].map((s, i) => (
-                      <div key={i} className="bg-zinc-50 rounded-xl p-4">
-                        <p className="text-xs text-zinc-400 mb-1">{s.label}</p>
-                        <p className="text-2xl font-medium text-zinc-900">{s.value}</p>
-                        <p className="text-[11px] text-zinc-400 mt-0.5">{s.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Progress ring */}
-                  <div className="flex items-center gap-5 bg-zinc-50 rounded-xl p-4">
-                    <svg width="64" height="64" viewBox="0 0 64 64" className="flex-shrink-0">
-                      <circle cx="32" cy="32" r="26" fill="none" stroke="#e4e4e7" strokeWidth="5" />
-                      <circle cx="32" cy="32" r="26" fill="none" stroke="#3b82f6" strokeWidth="5"
-                        strokeDasharray={circumference} strokeDashoffset={dashOffset}
-                        strokeLinecap="round" transform="rotate(-90 32 32)" />
-                    </svg>
-                    <div>
-                      <p className="text-2xl font-medium text-zinc-900">{progressPct}%</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">Estimated completion · {progressUpdates.length} update{progressUpdates.length !== 1 ? 's' : ''} filed</p>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {currentTask.description && (
-                    <div className="text-sm text-zinc-500 leading-relaxed border-l-2 border-zinc-200 pl-4 py-1">
-                      {currentTask.description}
-                    </div>
-                  )}
-
-                  {/* Latest update preview */}
-                  {progressUpdates.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mb-3">Latest update</p>
-                      <div className="border border-zinc-200 rounded-xl p-4">
-                        <div className="flex items-center gap-2 text-xs text-zinc-400 mb-2">
-                          <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-medium">
-                            {(progressUpdates[0].created_by_name || 'U').charAt(0)}
-                          </div>
-                          <span className="text-zinc-500 font-medium">{progressUpdates[0].created_by_name || 'Unknown'}</span>
-                          <span>·</span>
-                          <span>{fmt(progressUpdates[0].created_at)}</span>
-                        </div>
-                        <p className="text-sm text-zinc-700 leading-relaxed line-clamp-3">
-                          {progressUpdates[0].description || '(No description)'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* ── PROGRESS UPDATES ─────────────────────────────────────────── */}
               {activeTab === 'progress' && (
@@ -468,33 +470,66 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                 <div className="p-6">
                   <div className="mb-5">
                     <h3 className="text-sm font-medium text-zinc-900">Client update requests</h3>
-                    <p className="text-xs text-zinc-400 mt-0.5">{clientUpdateRequests.length} request{clientUpdateRequests.length !== 1 ? 's' : ''} linked to this task</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {clientUpdateRequests.length} request{clientUpdateRequests.length !== 1 ? 's' : ''} linked to this task
+                      {unreadCount > 0 && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-violet-500 font-medium">
+                          · {unreadCount} new
+                        </span>
+                      )}
+                    </p>
                   </div>
 
                   {clientUpdateRequests.length > 0 ? (
                     <div className="space-y-3">
-                      {clientUpdateRequests.map((req) => (
-                        <div key={req.id} className="border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-300 transition-colors">
-                          {/* Request header */}
-                          <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
-                            <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-medium flex-shrink-0">
-                              {(req.client?.client_name || 'C').charAt(0).toUpperCase()}
+                      {clientUpdateRequests.map((req) => {
+                        const isUnread = req.is_unread && !locallyViewed.has(req.id);
+                        return (
+                          <div key={req.id}
+                            className={`border rounded-xl overflow-hidden transition-colors ${
+                              isUnread
+                                ? 'border-violet-200 bg-violet-50/40 hover:border-violet-300'
+                                : 'border-zinc-200 hover:border-zinc-300'
+                            }`}>
+                            {/* Request header */}
+                            <div className={`flex items-center gap-3 px-4 py-3 border-b ${
+                              isUnread ? 'border-violet-100 bg-violet-50/60' : 'border-zinc-100 bg-zinc-50/50'
+                            }`}>
+                              <div className="relative flex-shrink-0">
+                                <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-medium">
+                                  {(req.client?.client_name || 'C').charAt(0).toUpperCase()}
+                                </div>
+                                {/* Unread dot on the avatar */}
+                                {isUnread && (
+                                  <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-500" />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-zinc-800 truncate">{req.client?.client_name || 'Unknown Client'}</p>
+                                <p className="text-[10px] text-zinc-400">{fmtFull(req.created_at)}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {isUnread && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-600 border border-violet-200 rounded-full text-[10px] font-semibold">
+                                    NEW
+                                  </span>
+                                )}
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full text-[10px] font-medium">
+                                  <Mail size={9} /> Request
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-zinc-800 truncate">{req.client?.client_name || 'Unknown Client'}</p>
-                              <p className="text-[10px] text-zinc-400">{fmtFull(req.created_at)}</p>
+                            {/* Request body */}
+                            <div className="px-4 py-3.5">
+                              <p className="text-sm font-medium text-zinc-800 mb-1.5">{req.subject}</p>
+                              <p className="text-xs text-zinc-500 leading-relaxed">{req.message}</p>
                             </div>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full text-[10px] font-medium flex-shrink-0">
-                              <Mail size={9} /> Request
-                            </span>
                           </div>
-                          {/* Request body */}
-                          <div className="px-4 py-3.5">
-                            <p className="text-sm font-medium text-zinc-800 mb-1.5">{req.subject}</p>
-                            <p className="text-xs text-zinc-500 leading-relaxed">{req.message}</p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center py-16 gap-3 text-zinc-400">
@@ -528,7 +563,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                     <div className="space-y-2">
                       {issues.map((issue) => (
                         <div key={issue.id} className="group flex gap-3 border border-zinc-200 rounded-xl p-4 hover:border-zinc-300 transition-colors">
-                          {/* Severity bar */}
                           <div className={`w-0.5 rounded-full flex-shrink-0 self-stretch ${
                             issue.priority === 'high' || issue.priority === 'critical' ? 'bg-red-400' :
                             issue.priority === 'medium' ? 'bg-amber-400' : 'bg-zinc-300'

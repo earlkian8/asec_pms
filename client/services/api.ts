@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
-// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.221.77.31:8000/api';
+// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.246.193.31:8000/api';
 
 const TOKEN_KEY = 'auth_token';
 

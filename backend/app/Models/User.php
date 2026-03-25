@@ -15,7 +15,9 @@ class User extends Authenticatable
 
     protected $fillable = [
         // Auth
-        'name',
+        'first_name',
+        'middle_name',
+        'last_name',
         'email',
         'password',
 
@@ -64,6 +66,7 @@ class User extends Authenticatable
     ];
 
     protected $appends = [
+        'name',
         'profile_image_url',
         'sss_id_image_url',
         'philhealth_id_image_url',
@@ -78,6 +81,20 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'date_of_birth'     => 'date',
         ];
+    }
+
+    // ── Virtual full name accessor ────────────────────────────────────────────
+    // Format: "First M. Last" (middle initial only if middle_name is set)
+
+    public function getNameAttribute(): string
+    {
+        $parts = array_filter([
+            trim($this->first_name ?? ''),
+            $this->middle_name ? strtoupper(mb_substr(trim($this->middle_name), 0, 1)) . '.' : null,
+            trim($this->last_name ?? ''),
+        ]);
+
+        return implode(' ', $parts);
     }
 
     // ── Image URL Accessors ───────────────────────────────────────────────────

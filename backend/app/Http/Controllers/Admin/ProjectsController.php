@@ -151,7 +151,10 @@ class ProjectsController extends Controller
         $projectTypes = ProjectType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $clientTypes  = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        $users = User::with('roles')->orderBy('name')->get(['id', 'name', 'email'])->map(fn ($u) => [
+        $users = User::with('roles')
+            ->orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email'])
+            ->map(fn ($u) => [
             'id'    => $u->id,
             'name'  => $u->name,
             'email' => $u->email,

@@ -8,6 +8,7 @@ use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
 use App\Models\ClientUpdateRequest;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class ProjectMilestonesService
@@ -55,9 +56,9 @@ class ProjectMilestonesService
                         'issues' => function ($q) {
                             $q->with(['reportedBy', 'assignedTo'])->orderBy('created_at', 'desc');
                         },
-                        // ── NEW: load client update requests per task ──
                         'clientUpdateRequests' => function ($q) {
-                            $q->with('client')->orderBy('created_at', 'desc');
+                            // Load views so we can compute unread count per user
+                            $q->with(['client', 'views'])->orderBy('created_at', 'desc');
                         },
                     ])->orderBy('due_date', 'asc');
                 },
@@ -69,14 +70,17 @@ class ProjectMilestonesService
             ->paginate(10)
             ->withQueryString();
 
-        $milestones->getCollection()->each(function ($milestone) {
-            $milestone->tasks->each(function ($task) {
+        $userId = Auth::id();
+
+        $milestones->getCollection()->each(function ($milestone) use ($userId) {
+            $milestone->tasks->each(function ($task) use ($userId) {
+
+                // ── Progress updates ──────────────────────────────────────────
                 if (!$task->relationLoaded('progressUpdates')) {
                     $task->load(['progressUpdates' => function ($q) {
                         $q->with('createdBy')->orderBy('created_at', 'desc');
                     }]);
                 }
-
                 $task->progressUpdates->each(function ($update) {
                     if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
                         $update->file_url = Storage::disk('public')->url($update->file_path);
@@ -87,31 +91,41 @@ class ProjectMilestonesService
                     $update->created_by_name = $update->createdBy ? $update->createdBy->name : null;
                 });
 
+                // ── Issues ────────────────────────────────────────────────────
                 if (!$task->relationLoaded('issues')) {
                     $task->load(['issues' => function ($q) {
                         $q->with(['reportedBy', 'assignedTo'])->orderBy('created_at', 'desc');
                     }]);
                 }
 
-                $task->issues->each(function ($issue) {
-                    if (!$issue->relationLoaded('reportedBy') && $issue->reported_by) {
-                        $issue->load('reportedBy');
-                    }
-                    if (!$issue->relationLoaded('assignedTo') && $issue->assigned_to) {
-                        $issue->load('assignedTo');
-                    }
-                });
-
+                // ── Assigned user ─────────────────────────────────────────────
                 if (!$task->relationLoaded('assignedUser')) {
                     $task->load('assignedUser');
                 }
 
-                // ── NEW: ensure clientUpdateRequests are loaded ──
+                // ── Client update requests + unread count ─────────────────────
                 if (!$task->relationLoaded('clientUpdateRequests')) {
                     $task->load(['clientUpdateRequests' => function ($q) {
-                        $q->with('client')->orderBy('created_at', 'desc');
+                        $q->with(['client', 'views'])->orderBy('created_at', 'desc');
                     }]);
                 }
+
+                // Compute how many requests THIS user has NOT yet viewed
+                $unreadCount = $task->clientUpdateRequests->filter(function ($req) use ($userId) {
+                    // A request is "unread" if no view record exists for this user
+                    return $req->views->where('user_id', $userId)->isEmpty();
+                })->count();
+
+                // Attach as a plain attribute so the frontend can read it
+                $task->setAttribute('unread_client_requests_count', $unreadCount);
+
+                // Also flag each request individually so the modal can render dots
+                $task->clientUpdateRequests->each(function ($req) use ($userId) {
+                    $req->setAttribute(
+                        'is_unread',
+                        $req->views->where('user_id', $userId)->isEmpty()
+                    );
+                });
             });
         });
 

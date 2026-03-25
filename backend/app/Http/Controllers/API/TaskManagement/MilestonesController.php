@@ -7,7 +7,6 @@ use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Services\TaskManagementAuthorization;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class MilestonesController extends Controller
 {
@@ -80,7 +79,6 @@ class MilestonesController extends Controller
             'start_date'         => 'nullable|date',
             'due_date'           => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status'             => ['required', Rule::in(['pending', 'in_progress', 'completed'])],
         ]);
 
         // Billing % cap guard (same as admin)
@@ -101,7 +99,7 @@ class MilestonesController extends Controller
             }
         }
 
-        $milestone = $project->milestones()->create($data);
+        $milestone = $project->milestones()->create(array_merge($data, ['status' => 'pending']));
 
         return response()->json([
             'success' => true,
@@ -139,7 +137,6 @@ class MilestonesController extends Controller
             'start_date'         => 'nullable|date',
             'due_date'           => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status'             => ['required', Rule::in(['pending', 'in_progress', 'completed'])],
         ]);
 
         // Billing % cap guard (same as admin, exclude current milestone)
@@ -163,21 +160,22 @@ class MilestonesController extends Controller
             }
         }
 
-        // Cannot mark milestone as completed unless all tasks are completed
-        if (($data['status'] ?? null) === 'completed') {
-            $incomplete = $milestone->tasks()->where('status', '!=', 'completed')->count();
-            if ($incomplete > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot mark milestone as completed while tasks are incomplete',
-                    'errors' => [
-                        'status' => ["Cannot mark milestone as completed. {$incomplete} task(s) still need to be completed."],
-                    ],
-                ], 422);
-            }
+        // Auto-compute milestone status from its tasks (never manually set)
+        $tasks = $milestone->tasks()->get(['status']);
+        $taskCount = $tasks->count();
+
+        if ($taskCount === 0) {
+            // No tasks: stay at pending
+            $computedStatus = 'pending';
+        } elseif ($tasks->every(fn ($t) => $t->status === 'completed')) {
+            $computedStatus = 'completed';
+        } elseif ($tasks->contains(fn ($t) => in_array($t->status, ['in_progress', 'completed']))) {
+            $computedStatus = 'in_progress';
+        } else {
+            $computedStatus = 'pending';
         }
 
-        $milestone->update($data);
+        $milestone->update(array_merge($data, ['status' => $computedStatus]));
 
         return response()->json([
             'success' => true,

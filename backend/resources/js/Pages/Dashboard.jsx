@@ -4,7 +4,7 @@ import { usePermission } from '@/utils/permissions';
 import {
   FolderOpen,
   Users,
-  DollarSign,
+  PhilippinePeso,
   Package,
   TrendingUp,
   AlertCircle,
@@ -188,7 +188,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(statistics.billing.total_remaining)} remaining</p>
               </div>
               <div className="p-2.5 bg-green-100 rounded-full">
-                <DollarSign className="text-green-600" size={22} />
+                <PhilippinePeso className="text-green-600" size={22} />
               </div>
             </div>
           </div>
@@ -439,7 +439,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <DollarSign className="text-gray-600" size={18} />
+              <PhilippinePeso className="text-gray-600" size={18} />
               Billing Status Distribution
             </h3>
             {billingStatusData && billingStatusData.length > 0 ? (
@@ -465,7 +465,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
               </ResponsiveContainer>
             ) : (
               <div className="flex flex-col items-center justify-center h-[240px] text-gray-400">
-                <DollarSign className="w-12 h-12 mb-2 opacity-50" />
+                <PhilippinePeso className="w-12 h-12 mb-2 opacity-50" />
                 <p className="text-sm font-medium text-gray-500">No billing data available</p>
                 <p className="text-xs text-gray-400 mt-1">No billings found to display status distribution</p>
               </div>
@@ -599,7 +599,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <DollarSign className="text-gray-600" size={18} />
+                <PhilippinePeso className="text-gray-600" size={18} />
                 Recent Billings
               </h3>
               <button
@@ -627,7 +627,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-gray-900">{formatCurrency(billing.billing_amount)}</p>
-                        <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(billing.status)}`}>
+                        <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-semibold capitalize ${getBillingStatusColor(billing.status)}`}>
                           {billing.status}
                         </span>
                         </div>
@@ -636,7 +636,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 ))
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                  <DollarSign className="w-10 h-10 mb-2 opacity-50" />
+                  <PhilippinePeso className="w-10 h-10 mb-2 opacity-50" />
                   <p className="text-sm font-medium text-gray-500">No billings found</p>
                   <p className="text-xs text-gray-400 mt-1">No billing records available</p>
                 </div>
@@ -713,7 +713,7 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
         {/* Billing Summary */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
           <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <DollarSign className="text-gray-600" size={18} />
+            <PhilippinePeso className="text-gray-600" size={18} />
             Billing Summary
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

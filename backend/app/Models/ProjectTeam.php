@@ -22,7 +22,8 @@ class ProjectTeam extends Model
         'end_date',
         'is_active',
         'assignment_status',
-        'created_by',
+        'released_at',
+        'reactivated_at',
     ];
 
     protected $casts = [
@@ -31,6 +32,8 @@ class ProjectTeam extends Model
         'end_date'          => 'date',
         'is_active'         => 'boolean',
         'assignment_status' => AssignmentStatus::class,
+        'released_at'       => 'datetime',
+        'reactivated_at'    => 'datetime',
     ];
 
     protected $appends = [
@@ -170,5 +173,20 @@ class ProjectTeam extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Simple rule: any employee with an active assignment is fully occupied.
+     * One employee = one project at a time.
+     */
+    public static function fullyOccupiedEmployeeIds(): array
+    {
+        return static::where('assignment_status', AssignmentStatus::Active->value)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->unique()
+            ->filter()
+            ->values()
+            ->toArray();
     }
 }

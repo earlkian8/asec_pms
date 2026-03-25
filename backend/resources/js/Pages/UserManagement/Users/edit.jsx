@@ -29,7 +29,7 @@ const TABS = [
 ];
 
 const TAB_FIELDS = {
-  account:   ['name', 'email', 'password', 'password_confirmation', 'role'],
+  account:   ['first_name', 'middle_name', 'last_name', 'email', 'password', 'password_confirmation', 'role'],
   personal:  ['profile_image', 'phone', 'secondary_phone', 'gender', 'date_of_birth',
                'civil_status', 'nationality', 'region', 'province', 'city_municipality',
                'barangay', 'address', 'zip_code', 'notes'],
@@ -114,15 +114,16 @@ const EditUser = ({ setShowEditModal, user, roles }) => {
     _method: 'PUT',
 
     // Account
-    name:                  user?.name  || '',
+    first_name:            user?.first_name  || '',
+    middle_name:           user?.middle_name || '',
+    last_name:             user?.last_name   || '',
     email:                 user?.email || '',
     password:              '',
     password_confirmation: '',
     role:                  user?.roles?.[0]?.name || '',
-    // employee_id:           user?.employee_id || '',
 
     // Personal
-    profile_image: null,
+    profile_image:   null,
     phone:           user?.phone           || '',
     secondary_phone: user?.secondary_phone || '',
     gender:          user?.gender          || '',
@@ -130,13 +131,13 @@ const EditUser = ({ setShowEditModal, user, roles }) => {
     civil_status:    user?.civil_status    || '',
     nationality:     user?.nationality     || '',
 
-    // Address — plain strings, PhilippineAddressSelector manages { code, name } internally
+    // Address
     region:            user?.region            || '',
     province:          user?.province          || '',
     city_municipality: user?.city_municipality || '',
     barangay:          user?.barangay          || '',
-    address:  user?.address  || '',
-    zip_code: user?.zip_code || '',
+    address:           user?.address           || '',
+    zip_code:          user?.zip_code          || '',
 
     // Emergency
     emergency_contact_name:         user?.emergency_contact_name         || '',
@@ -187,7 +188,7 @@ const EditUser = ({ setShowEditModal, user, roles }) => {
         if (flash && flash.error) {
           toast.error(flash.error);
         } else {
-          toast.success(`User "${user.name}" updated successfully`);
+          toast.success(`User "${user.first_name} ${user.last_name}" updated successfully`);
         }
       },
       onError: () => {
@@ -240,19 +241,46 @@ const EditUser = ({ setShowEditModal, user, roles }) => {
             {/* ── ACCOUNT ───────────────────────────────────────── */}
             {activeTab === 'account' && (
               <div className="grid grid-cols-1 gap-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Login Credentials</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Full Name</p>
 
+                {/* First + Middle side by side */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-zinc-800">First Name <span className="text-red-500">*</span></Label>
+                    <Input
+                      type="text"
+                      value={data.first_name}
+                      onChange={e => setData('first_name', e.target.value)}
+                      placeholder="e.g. Juan"
+                      className={inputClass(errors.first_name)}
+                    />
+                    <InputError message={errors.first_name} />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-800">Middle Name <span className="text-zinc-400 font-normal text-xs">(optional)</span></Label>
+                    <Input
+                      type="text"
+                      value={data.middle_name}
+                      onChange={e => setData('middle_name', e.target.value)}
+                      placeholder="e.g. Domingo"
+                      className={inputClass(errors.middle_name)}
+                    />
+                    <InputError message={errors.middle_name} />
+                  </div>
+                </div>
                 <div>
-                  <Label className="text-zinc-800">Full Name</Label>
+                  <Label className="text-zinc-800">Last Name <span className="text-red-500">*</span></Label>
                   <Input
                     type="text"
-                    value={data.name}
-                    onChange={e => setData('name', e.target.value)}
-                    placeholder="Enter full name"
-                    className={inputClass(errors.name)}
+                    value={data.last_name}
+                    onChange={e => setData('last_name', e.target.value)}
+                    placeholder="e.g. Dela Cruz"
+                    className={inputClass(errors.last_name)}
                   />
-                  <InputError message={errors.name} />
+                  <InputError message={errors.last_name} />
                 </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Login Credentials</p>
 
                 <div>
                   <Label className="text-zinc-800">Email Address</Label>
@@ -321,16 +349,6 @@ const EditUser = ({ setShowEditModal, user, roles }) => {
                     </Select>
                     <InputError message={errors.role} />
                   </div>
-                  {/* <div>
-                    <Label className="text-zinc-800">Employee ID</Label>
-                    <Input
-                      value={data.employee_id}
-                      onChange={e => setData('employee_id', e.target.value)}
-                      placeholder="e.g. EMP-0001"
-                      className={inputClass(errors.employee_id)}
-                    />
-                    <InputError message={errors.employee_id} />
-                  </div> */}
                 </div>
               </div>
             )}

@@ -33,7 +33,9 @@ class DatabaseSeeder extends Seeder
         $adminUser = User::firstOrCreate(
             ['email' => $adminEmail],
             [
-                'name' => 'Earl Kian',
+                'first_name' => 'Earl Kian',
+                'middle_name' => 'Anastacio',
+                'last_name' => 'Bancayrin',
                 'password' => Hash::make('Password-12345'),
                 'email_verified_at' => now(),
             ]

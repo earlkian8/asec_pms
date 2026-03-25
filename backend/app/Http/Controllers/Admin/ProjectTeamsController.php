@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ProjectTeamsController extends Controller
 {
@@ -28,17 +29,10 @@ class ProjectTeamsController extends Controller
             'assignables.*.role'        => ['required', 'string', 'max:50'],
             'assignables.*.hourly_rate' => ['required', 'numeric', 'min:0'],
             'assignables.*.start_date'  => ['required', 'date'],
-            'assignables.*.end_date'    => ['required', 'date', 'after_or_equal:assignables.*.start_date'],
+            'assignables.*.end_date'    => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
 
-        // Validate IDs based on type
         foreach ($validated['assignables'] as $index => $assignable) {
-            if (!isset($assignable['id']) || !isset($assignable['type'])) {
-                return redirect()->back()->withErrors([
-                    "assignables.{$index}.id" => 'Invalid assignable data provided.',
-                ])->withInput();
-            }
-
             if ($assignable['type'] === 'user') {
                 $request->validate([
                     "assignables.{$index}.id" => ['required', 'integer', 'exists:users,id'],
@@ -49,7 +43,7 @@ class ProjectTeamsController extends Controller
                 ]);
             } else {
                 return redirect()->back()->withErrors([
-                    "assignables.{$index}.type" => 'Invalid assignable type. Must be "user" or "employee".',
+                    "assignables.{$index}.type" => 'Invalid assignable type.',
                 ])->withInput();
             }
         }
@@ -57,29 +51,25 @@ class ProjectTeamsController extends Controller
         // Validate assignment dates against project dates
         if ($project->start_date || $project->planned_end_date) {
             foreach ($validated['assignables'] as $index => $assignable) {
-                if ($assignable['start_date']) {
-                    if ($project->start_date && $assignable['start_date'] < $project->start_date) {
-                        return redirect()->back()->withErrors([
-                            "assignables.{$index}.start_date" => "Start date cannot be before project start date ({$project->start_date})",
-                        ])->withInput();
-                    }
-                    if ($project->planned_end_date && $assignable['start_date'] > $project->planned_end_date) {
-                        return redirect()->back()->withErrors([
-                            "assignables.{$index}.start_date" => "Start date cannot be after project end date ({$project->planned_end_date})",
-                        ])->withInput();
-                    }
+                if ($project->start_date && $assignable['start_date'] < $project->start_date) {
+                    return redirect()->back()->withErrors([
+                        "assignables.{$index}.start_date" => "Start date cannot be before project start date ({$project->start_date})",
+                    ])->withInput();
                 }
-                if ($assignable['end_date']) {
-                    if ($project->start_date && $assignable['end_date'] < $project->start_date) {
-                        return redirect()->back()->withErrors([
-                            "assignables.{$index}.end_date" => "End date cannot be before project start date ({$project->start_date})",
-                        ])->withInput();
-                    }
-                    if ($project->planned_end_date && $assignable['end_date'] > $project->planned_end_date) {
-                        return redirect()->back()->withErrors([
-                            "assignables.{$index}.end_date" => "End date cannot be after project end date ({$project->planned_end_date})",
-                        ])->withInput();
-                    }
+                if ($project->planned_end_date && $assignable['start_date'] > $project->planned_end_date) {
+                    return redirect()->back()->withErrors([
+                        "assignables.{$index}.start_date" => "Start date cannot be after project end date ({$project->planned_end_date})",
+                    ])->withInput();
+                }
+                if ($assignable['end_date'] && $project->start_date && $assignable['end_date'] < $project->start_date) {
+                    return redirect()->back()->withErrors([
+                        "assignables.{$index}.end_date" => "End date cannot be before project start date ({$project->start_date})",
+                    ])->withInput();
+                }
+                if ($assignable['end_date'] && $project->planned_end_date && $assignable['end_date'] > $project->planned_end_date) {
+                    return redirect()->back()->withErrors([
+                        "assignables.{$index}.end_date" => "End date cannot be after project end date ({$project->planned_end_date})",
+                    ])->withInput();
                 }
             }
         }
@@ -88,35 +78,26 @@ class ProjectTeamsController extends Controller
         $skipped = 0;
 
         foreach ($validated['assignables'] as $index => $assignable) {
-            if (!isset($assignable['id']) || !isset($assignable['type']) || !isset($assignable['role'])) {
-                $skipped++;
-                continue;
-            }
-
-            // ── Single-assignment constraint (employees only) ─────────────────
-            // Users (contractors) are exempt — they can work on multiple projects.
+            // ── Occupation guard (employees only) ─────────────────────────────
             if ($assignable['type'] === 'employee') {
-                $isOccupied = ProjectTeam::occupied()
-                    ->where('employee_id', $assignable['id'])
-                    ->exists();
-
-                if ($isOccupied) {
+                $occupiedIds = ProjectTeam::fullyOccupiedEmployeeIds();
+                if (in_array($assignable['id'], $occupiedIds)) {
                     $name = $this->resolveAssignableName($assignable);
                     return redirect()->back()->withErrors([
                         "assignables.{$index}.id" =>
-                            "{$name} already has an active project assignment. They must be released or their assignment must complete before being assigned to another project.",
+                            "{$name} is currently active on another project. Release them first before assigning here.",
                     ])->withInput();
                 }
             }
 
-            // Skip if already in this project with the same role
+            // Skip duplicate — only if there's already an ACTIVE assignment for this person on this project
             $exists = ProjectTeam::where('project_id', $project->id)
-                ->where('role', $assignable['role'])
-                ->where(function ($query) use ($assignable) {
+                ->where('assignment_status', \App\Enums\AssignmentStatus::Active->value)
+                ->where(function ($q) use ($assignable) {
                     if ($assignable['type'] === 'user') {
-                        $query->where('user_id', $assignable['id'])->whereNull('employee_id');
-                    } elseif ($assignable['type'] === 'employee') {
-                        $query->where('employee_id', $assignable['id'])->whereNull('user_id');
+                        $q->where('user_id', $assignable['id'])->whereNull('employee_id');
+                    } else {
+                        $q->where('employee_id', $assignable['id'])->whereNull('user_id');
                     }
                 })
                 ->exists();
@@ -127,9 +108,9 @@ class ProjectTeamsController extends Controller
             }
 
             try {
-                $teamMember = ProjectTeam::create([
+                ProjectTeam::create([
                     'project_id'        => $project->id,
-                    'user_id'           => $assignable['type'] === 'user' ? (int) $assignable['id'] : null,
+                    'user_id'           => $assignable['type'] === 'user'     ? (int) $assignable['id'] : null,
                     'employee_id'       => $assignable['type'] === 'employee' ? (int) $assignable['id'] : null,
                     'assignable_type'   => $assignable['type'],
                     'role'              => $assignable['role'],
@@ -140,126 +121,33 @@ class ProjectTeamsController extends Controller
                     'assignment_status' => AssignmentStatus::Active->value,
                 ]);
 
-                $assignableName = $this->resolveAssignableName($assignable);
-
-                if ($assignableName) {
-                    $this->createSystemNotification(
-                        'general',
-                        'Team Member Added',
-                        "{$assignableName} has been added to project '{$project->project_name}' as {$assignable['role']}.",
-                        $project,
-                        route('project-management.view', $project->id)
-                    );
-                }
+                $name = $this->resolveAssignableName($assignable);
+                $this->createSystemNotification(
+                    'general',
+                    'Team Member Added',
+                    "{$name} has been added to project '{$project->project_name}' as {$assignable['role']}.",
+                    $project,
+                    route('project-management.view', $project->id)
+                );
 
                 $added++;
             } catch (\Exception $e) {
-                \Log::error('Error creating project team member: ' . $e->getMessage());
+                Log::error('Error creating project team member: ' . $e->getMessage());
                 $skipped++;
-                continue;
             }
         }
 
         if ($skipped > 0 && $added === 0) {
-            return redirect()->back()->with('error', "No team members were added. {$skipped} member(s) were skipped (may already exist or have invalid data).");
+            return redirect()->back()->with('error',
+                "No team members were added. {$skipped} member(s) were skipped (already exist or invalid data)."
+            );
         }
+
+        $this->adminActivityLogs('Project Team', 'Add',
+            "Added {$added} team member(s) to Project {$project->project_name}"
+        );
 
         return redirect()->back()->with('success', "{$added} team member(s) assigned successfully.");
-    }
-
-    // ─── Release (replaces hard-delete) ──────────────────────────────────────
-
-    /**
-     * Releasing a team member sets their status to 'released' (historical record preserved).
-     * The person immediately becomes available for assignment to another project.
-     *
-     * Bulk release is supported via an `ids` array in the request body.
-     */
-    public function destroy(Request $request, Project $project, ProjectTeam $projectTeam = null)
-    {
-        // Bulk release
-        if ($request->has('ids') && is_array($request->ids)) {
-            $validated = $request->validate([
-                'ids'   => 'required|array|min:1',
-                'ids.*' => 'integer|exists:project_teams,id',
-            ]);
-
-            $teams = ProjectTeam::with(['user', 'employee'])
-                ->where('project_id', $project->id)
-                ->whereIn('id', $validated['ids'])
-                ->get();
-
-            foreach ($teams as $team) {
-                $this->releaseTeamMember($team, $project);
-            }
-
-            return redirect()->back()->with('success', 'Selected team members released successfully. They are now available for other projects.');
-        }
-
-        // Single release
-        if (!$projectTeam || $projectTeam->project_id !== $project->id) {
-            abort(404);
-        }
-
-        $this->releaseTeamMember($projectTeam, $project);
-
-        return redirect()->back()->with('success', 'Team member released successfully. They are now available for other projects.');
-    }
-
-    // ─── Handle Status ────────────────────────────────────────────────────────
-
-    /**
-     * Toggle assignment status between active <-> released.
-     * "Pausing" someone on a project sets them to released (available elsewhere).
-     * "Re-activating" brings them back to active on this project (blocks other assignments again).
-     */
-    public function handleStatus(Request $request, Project $project, ProjectTeam $projectTeam)
-    {
-        if ($projectTeam->project_id !== $project->id) {
-            abort(404);
-        }
-
-        $request->validate([
-            'assignment_status' => ['required', 'string', 'in:' . implode(',', AssignmentStatus::values())],
-        ]);
-
-        $newStatus = AssignmentStatus::from($request->assignment_status);
-
-        // If re-activating an employee, guard against double-booking.
-        // Users (contractors) are exempt from this check.
-        if ($newStatus === AssignmentStatus::Active && $projectTeam->assignable_type === 'employee') {
-            $conflict = ProjectTeam::occupied()
-                ->where('id', '!=', $projectTeam->id)
-                ->where('employee_id', $projectTeam->employee_id)
-                ->exists();
-
-            if ($conflict) {
-                return redirect()->back()->with('error',
-                    "{$projectTeam->assignable_name} already has an active assignment on another project. Release them there first."
-                );
-            }
-        }
-
-        $oldStatus = $projectTeam->assignment_status->label();
-        $projectTeam->update(['assignment_status' => $newStatus->value]);
-        $newStatusLabel = $newStatus->label();
-        $assignableName = $projectTeam->assignable_name;
-
-        $this->adminActivityLogs(
-            'Project Team',
-            'Update Status',
-            "Updated {$assignableName} assignment status from {$oldStatus} to {$newStatusLabel} in Project {$project->project_name}"
-        );
-
-        $this->createSystemNotification(
-            'general',
-            'Assignment Status Updated',
-            "{$assignableName}'s assignment status has been updated to {$newStatusLabel} in project '{$project->project_name}'.",
-            $project,
-            route('project-management.view', $project->id)
-        );
-
-        return redirect()->back()->with('success', "Assignment status updated to {$newStatusLabel}.");
     }
 
     // ─── Update ───────────────────────────────────────────────────────────────
@@ -279,44 +167,39 @@ class ProjectTeamsController extends Controller
             'assignment_status' => ['sometimes', 'string', 'in:' . implode(',', AssignmentStatus::values())],
         ]);
 
-        // Validate dates against project dates
+        // Date range validation against project
         if ($project->start_date || $project->planned_end_date) {
-            if ($validated['start_date']) {
-                if ($project->start_date && $validated['start_date'] < $project->start_date) {
-                    return redirect()->back()->withErrors([
-                        'start_date' => "Start date cannot be before project start date ({$project->start_date})",
-                    ])->withInput();
-                }
-                if ($project->planned_end_date && $validated['start_date'] > $project->planned_end_date) {
-                    return redirect()->back()->withErrors([
-                        'start_date' => "Start date cannot be after project end date ({$project->planned_end_date})",
-                    ])->withInput();
-                }
+            if ($project->start_date && $validated['start_date'] < $project->start_date) {
+                return redirect()->back()->withErrors([
+                    'start_date' => "Start date cannot be before project start date ({$project->start_date})",
+                ])->withInput();
             }
-            if ($validated['end_date']) {
-                if ($project->start_date && $validated['end_date'] < $project->start_date) {
-                    return redirect()->back()->withErrors([
-                        'end_date' => "End date cannot be before project start date ({$project->start_date})",
-                    ])->withInput();
-                }
-                if ($project->planned_end_date && $validated['end_date'] > $project->planned_end_date) {
-                    return redirect()->back()->withErrors([
-                        'end_date' => "End date cannot be after project end date ({$project->planned_end_date})",
-                    ])->withInput();
-                }
+            if ($project->planned_end_date && $validated['start_date'] > $project->planned_end_date) {
+                return redirect()->back()->withErrors([
+                    'start_date' => "Start date cannot be after project end date ({$project->planned_end_date})",
+                ])->withInput();
+            }
+            if ($project->start_date && $validated['end_date'] < $project->start_date) {
+                return redirect()->back()->withErrors([
+                    'end_date' => "End date cannot be before project start date ({$project->start_date})",
+                ])->withInput();
+            }
+            if ($project->planned_end_date && $validated['end_date'] > $project->planned_end_date) {
+                return redirect()->back()->withErrors([
+                    'end_date' => "End date cannot be after project end date ({$project->planned_end_date})",
+                ])->withInput();
             }
         }
 
-        // If updating an employee to 'active', guard against double-booking
-        // Users (contractors) are exempt
+        // If re-activating, check no other active assignment
         if (
             isset($validated['assignment_status'])
             && $validated['assignment_status'] === AssignmentStatus::Active->value
             && $projectTeam->assignable_type === 'employee'
         ) {
-            $conflict = ProjectTeam::occupied()
+            $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
+                ->where('assignment_status', AssignmentStatus::Active->value)
                 ->where('id', '!=', $projectTeam->id)
-                ->where('employee_id', $projectTeam->employee_id)
                 ->exists();
 
             if ($conflict) {
@@ -326,34 +209,28 @@ class ProjectTeamsController extends Controller
             }
         }
 
-        $oldAssignable = $projectTeam->assignable_name;
-        $oldRole       = $projectTeam->role;
-        $oldRate       = $projectTeam->hourly_rate;
-        $oldDates      = ($projectTeam->start_date ?? '---') . ' - ' . ($projectTeam->end_date ?? '---');
-        $oldStatus     = $projectTeam->assignment_status->label();
+        $old = [
+            'role'   => $projectTeam->role,
+            'rate'   => $projectTeam->hourly_rate,
+            'dates'  => ($projectTeam->start_date ?? '—') . ' → ' . ($projectTeam->end_date ?? '—'),
+            'status' => $projectTeam->assignment_status instanceof \BackedEnum
+                ? $projectTeam->assignment_status->label()
+                : $projectTeam->assignment_status,
+        ];
 
         $projectTeam->update($validated);
         $projectTeam->refresh();
 
-        $newRole   = $validated['role'];
-        $newRate   = $validated['hourly_rate'] ?? '---';
-        $newDates  = ($validated['start_date'] ?? '---') . ' - ' . ($validated['end_date'] ?? '---');
-        $newStatus = $projectTeam->assignment_status->label();
-
-        $this->adminActivityLogs(
-            'Project Team',
-            'Update',
-            "Updated team member {$oldAssignable} in Project {$project->project_name}: " .
-            "Role: {$oldRole} → {$newRole}, " .
-            "Rate: {$oldRate} → {$newRate}, " .
-            "Dates: {$oldDates} → {$newDates}, " .
-            "Status: {$oldStatus} → {$newStatus}"
+        $this->adminActivityLogs('Project Team', 'Update',
+            "Updated {$projectTeam->assignable_name} in Project {$project->project_name}: "
+            . "Role: {$old['role']} → {$validated['role']}, "
+            . "Rate: {$old['rate']} → {$validated['hourly_rate']}, "
+            . "Status: {$old['status']} → {$projectTeam->assignment_status->label()}"
         );
 
         $this->createSystemNotification(
-            'general',
-            'Team Member Updated',
-            "Team member {$oldAssignable} has been updated in project '{$project->project_name}'.",
+            'general', 'Team Member Updated',
+            "{$projectTeam->assignable_name} has been updated in project '{$project->project_name}'.",
             $project,
             route('project-management.view', $project->id)
         );
@@ -361,88 +238,224 @@ class ProjectTeamsController extends Controller
         return redirect()->back()->with('success', 'Team member updated successfully.');
     }
 
-    // ─── Private Helpers ──────────────────────────────────────────────────────
+    // ─── Handle Status (toggle active ↔ released) ────────────────────────────
 
-    /**
-     * Set a team member's assignment_status to 'released' and unassign their tasks.
-     * The DB row is KEPT — this is the rotation/history mechanism.
-     */
-    private function releaseTeamMember(ProjectTeam $team, Project $project): void
+    public function handleStatus(Request $request, Project $project, ProjectTeam $projectTeam)
     {
-        $assignableName = $team->assignable_name;
-        $role           = $team->role;
-
-        // Unassign open tasks (only applicable for user-type team members)
-        if ($team->user_id) {
-            ProjectTask::where('assigned_to', $team->user_id)
-                ->whereHas('milestone', function ($query) use ($project) {
-                    $query->where('project_id', $project->id);
-                })
-                ->update(['assigned_to' => null]);
+        if ($projectTeam->project_id !== $project->id) {
+            abort(404);
         }
 
-        $team->update(['assignment_status' => AssignmentStatus::Released->value]);
+        $request->validate([
+            'assignment_status' => ['required', 'string', 'in:' . implode(',', AssignmentStatus::values())],
+        ]);
 
-        $this->adminActivityLogs(
-            'Project Team',
-            'Release',
-            "Released {$assignableName} ({$role}) from Project {$project->project_name} - now available for other projects"
+        $newStatus = AssignmentStatus::from($request->assignment_status);
+
+        // Re-activating an employee — check for conflicts
+        if ($newStatus === AssignmentStatus::Active && $projectTeam->assignable_type === 'employee') {
+            $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
+                ->where('assignment_status', AssignmentStatus::Active->value)
+                ->where('id', '!=', $projectTeam->id)
+                ->exists();
+
+            if ($conflict) {
+                return redirect()->back()->with('error',
+                    "{$projectTeam->assignable_name} already has an active assignment on another project. Release them there first."
+                );
+            }
+        }
+
+        $oldLabel = $projectTeam->assignment_status instanceof \BackedEnum
+            ? $projectTeam->assignment_status->label()
+            : $projectTeam->assignment_status;
+
+        // Record timestamps
+        $updateData = ['assignment_status' => $newStatus->value];
+
+        if ($newStatus === AssignmentStatus::Released) {
+            $updateData['released_at'] = now();
+        } elseif ($newStatus === AssignmentStatus::Active && $projectTeam->assignment_status === AssignmentStatus::Released) {
+            $updateData['reactivated_at'] = now();
+        }
+
+        $projectTeam->update($updateData);
+
+        $this->adminActivityLogs('Project Team', 'Update Status',
+            "Updated {$projectTeam->assignable_name} assignment status from {$oldLabel} to {$newStatus->label()} "
+            . "in Project {$project->project_name}"
         );
 
         $this->createSystemNotification(
-            'general',
-            'Team Member Released',
-            "{$assignableName} ({$role}) has been released from project '{$project->project_name}' and is now available for re-assignment.",
+            'general', 'Assignment Status Updated',
+            "{$projectTeam->assignable_name}'s status updated to {$newStatus->label()} in '{$project->project_name}'.",
             $project,
             route('project-management.view', $project->id)
         );
+
+        return redirect()->back()->with('success', "Assignment status updated to {$newStatus->label()}.");
     }
 
-    // ─── Force Remove (real delete) ───────────────────────────────────────
+    // ─── Destroy (bulk or single release) ────────────────────────────────────
 
-    /**
-     * Permanently remove a team member from the project (hard delete).
-     * Use this when someone was assigned by mistake.
-     */
+    public function destroy(Request $request, Project $project, ProjectTeam $projectTeam = null)
+    {
+        // Bulk release
+        if ($request->has('ids') && is_array($request->ids)) {
+            $validated = $request->validate([
+                'ids'   => 'required|array|min:1',
+                'ids.*' => 'integer|exists:project_teams,id',
+            ]);
+
+            $teams = ProjectTeam::with(['user', 'employee'])
+                ->where('project_id', $project->id)
+                ->whereIn('id', $validated['ids'])
+                ->get();
+
+            foreach ($teams as $team) {
+                $this->releaseTeamMember($team, $project);
+            }
+
+            return redirect()->back()->with('success',
+                'Selected team members released. They are now available for other projects.'
+            );
+        }
+
+        // Single release
+        if (!$projectTeam || $projectTeam->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $this->releaseTeamMember($projectTeam, $project);
+
+        return redirect()->back()->with('success',
+            'Team member released. They are now available for other projects.'
+        );
+    }
+
+    // ─── Force Remove (permanent delete) ─────────────────────────────────────
+
     public function forceRemove(Request $request, Project $project, ProjectTeam $projectTeam)
     {
         if ($projectTeam->project_id !== $project->id) {
             abort(404);
         }
 
-        $assignableName = $projectTeam->assignable_name;
-        $role           = $projectTeam->role;
+        $name = $projectTeam->assignable_name;
+        $role = $projectTeam->role;
 
-        // Unassign open tasks first
         if ($projectTeam->user_id) {
             ProjectTask::where('assigned_to', $projectTeam->user_id)
-                ->whereHas('milestone', function ($query) use ($project) {
-                    $query->where('project_id', $project->id);
-                })
+                ->whereHas('milestone', fn ($q) => $q->where('project_id', $project->id))
                 ->update(['assigned_to' => null]);
         }
 
         $projectTeam->forceDelete();
 
-        $this->adminActivityLogs(
-            'Project Team',
-            'Remove',
-            "Permanently removed {$assignableName} ({$role}) from Project {$project->project_name}"
+        $this->adminActivityLogs('Project Team', 'Remove',
+            "Permanently removed {$name} ({$role}) from Project {$project->project_name}"
         );
 
         $this->createSystemNotification(
-            'general',
-            'Team Member Removed',
-            "{$assignableName} ({$role}) has been permanently removed from project '{$project->project_name}'.",
+            'general', 'Team Member Removed',
+            "{$name} ({$role}) has been permanently removed from '{$project->project_name}'.",
             $project,
             route('project-management.view', $project->id)
         );
 
-        return redirect()->back()->with('success', "{$assignableName} has been permanently removed from the project.");
+        return redirect()->back()->with('success', "{$name} has been permanently removed from the project.");
+    }
+
+    // ─── History ──────────────────────────────────────────────────────────────
+
+    /**
+     * Return all ProjectTeam records for a given employee or user.
+     * Used by the eye-icon "View Assignment History" modal.
+     *
+     * GET /project-management/project-teams/history?employee_id=X
+     * GET /project-management/project-teams/history?user_id=X
+     */
+    public function history(Request $request)
+    {
+        $request->validate([
+            'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
+            'user_id'     => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        if (!$request->employee_id && !$request->user_id) {
+            return response()->json(['assignments' => []]);
+        }
+
+        $query = ProjectTeam::with(['project:id,project_name,start_date,planned_end_date'])
+            ->orderByRaw("CASE WHEN assignment_status = 'active' THEN 0 ELSE 1 END")
+            ->orderBy('created_at', 'desc');
+
+        if ($request->employee_id) {
+            $query->where('employee_id', $request->employee_id);
+        } else {
+            $query->where('user_id', $request->user_id);
+        }
+
+        $assignments = $query->get()->map(fn ($team) => [
+            'id'                => $team->id,
+            'project_id'        => $team->project_id,
+            'project'           => $team->project ? [
+                'id'               => $team->project->id,
+                'project_name'     => $team->project->project_name,
+                'start_date'       => $team->project->start_date,
+                'planned_end_date' => $team->project->planned_end_date,
+            ] : null,
+            'role'              => $team->role,
+            'hourly_rate'       => $team->hourly_rate,
+            'start_date'        => $team->start_date,
+            'end_date'          => $team->end_date,
+            'assignment_status' => $team->assignment_status instanceof \BackedEnum
+                ? $team->assignment_status->value
+                : $team->assignment_status,
+            'released_at'       => $team->released_at?->toISOString(),
+            'reactivated_at'    => $team->reactivated_at?->toISOString(),
+            'created_at'        => $team->created_at?->toISOString(),
+        ]);
+
+        return response()->json(['assignments' => $assignments]);
+    }
+
+    // ─── Private Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Release a team member: sets assignment_status → released.
+     * Row is KEPT for history. Unassigns open tasks for user-type members.
+     */
+    private function releaseTeamMember(ProjectTeam $team, Project $project): void
+    {
+        $name = $team->assignable_name;
+        $role = $team->role;
+
+        if ($team->user_id) {
+            ProjectTask::where('assigned_to', $team->user_id)
+                ->whereHas('milestone', fn ($q) => $q->where('project_id', $project->id))
+                ->update(['assigned_to' => null]);
+        }
+
+        $team->update([
+            'assignment_status' => AssignmentStatus::Released->value,
+            'released_at'       => now(),
+        ]);
+
+        $this->adminActivityLogs('Project Team', 'Release',
+            "Released {$name} ({$role}) from Project {$project->project_name}"
+        );
+
+        $this->createSystemNotification(
+            'general', 'Team Member Released',
+            "{$name} ({$role}) has been released from '{$project->project_name}' and is now available.",
+            $project,
+            route('project-management.view', $project->id)
+        );
     }
 
     /**
-     * Resolve a display name from an assignable array (used before the model is created).
+     * Resolve display name from assignable array (before model is created).
      */
     private function resolveAssignableName(array $assignable): string
     {
@@ -451,6 +464,8 @@ class ProjectTeamsController extends Controller
         }
 
         $employee = Employee::find($assignable['id']);
-        return $employee ? trim($employee->first_name . ' ' . $employee->last_name) : 'Unknown Employee';
+        return $employee
+            ? trim($employee->first_name . ' ' . $employee->last_name)
+            : 'Unknown Employee';
     }
 }

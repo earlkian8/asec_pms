@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, ArrowRight, FolderKanban, MapPin, Filter, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { Search, ArrowRight, FolderKanban, MapPin, Filter, SlidersHorizontal, X, Check, Calendar, Flag } from 'lucide-react-native';
 import { D } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -123,6 +123,29 @@ export default function ProjectsScreen() {
   };
 
   const renderItem = ({ item }: { item: Project }) => {
+    const statusMap: Record<string, { color: string; bg: string }> = {
+      active:    { color: D.green, bg: D.greenBg },
+      planning:  { color: D.amber, bg: D.amberBg },
+      completed: { color: D.blue,  bg: D.blueBg  },
+      on_hold:   { color: D.red,   bg: '#FEF2F2' },
+    };
+    const st = (item.status ?? '').toLowerCase();
+    const sc = statusMap[st] || { color: D.inkMid, bg: '#F0EFED' };
+
+    const priorityMap: Record<string, { color: string; bg: string }> = {
+      high:     { color: D.red,   bg: '#FEF2F2' },
+      medium:   { color: D.amber, bg: D.amberBg },
+      low:      { color: D.green, bg: D.greenBg },
+      critical: { color: '#9333EA', bg: '#F5F3FF' },
+    };
+    const pr = (item.priority ?? '').toLowerCase();
+    const pc = priorityMap[pr];
+
+    const fmtDate = (d?: string | null) => {
+      if (!d) return null;
+      try { return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return d; }
+    };
+
     return (
       <TouchableOpacity
         style={styles.card}
@@ -131,36 +154,53 @@ export default function ProjectsScreen() {
       >
         <View style={styles.cardHeader}>
           <View style={styles.iconWrap}>
-            <FolderKanban size={16} color={D.blue} strokeWidth={2} />
+            <FolderKanban size={16} color={sc.color} strokeWidth={2} />
           </View>
           <View style={styles.cardTitleWrap}>
             <Text style={styles.title} numberOfLines={1}>
               {item.projectName}
             </Text>
-            <Text style={styles.sub} numberOfLines={1}>
-              {(item.projectCode ? `${item.projectCode} • ` : '') + (item.status ?? '—')}
-            </Text>
+            {item.projectCode ? (
+              <Text style={styles.sub} numberOfLines={1}>{item.projectCode}</Text>
+            ) : null}
           </View>
           <ArrowRight size={16} color={D.inkLight} strokeWidth={2.5} />
         </View>
 
-        {(item.location || item.milestonesCount !== undefined || item.teamCount !== undefined) && (
-          <View style={styles.metaRow}>
-            {item.location ? (
-              <View style={styles.metaItem}>
-                <MapPin size={12} color={D.inkLight} strokeWidth={2} />
-                <Text style={styles.metaText} numberOfLines={1}>
-                  {item.location}
-                </Text>
-              </View>
-            ) : (
-              <View />
-            )}
-            <Text style={styles.counts}>
-              {`${item.milestonesCount ?? 0} milestones • ${item.teamCount ?? 0} team`}
-            </Text>
+        {/* Status + Priority row */}
+        <View style={styles.pillRow}>
+          <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
+            <View style={[styles.statusDot, { backgroundColor: sc.color }]} />
+            <Text style={[styles.statusPillText, { color: sc.color }]}>{item.status || '—'}</Text>
           </View>
-        )}
+          {pc && (
+            <View style={[styles.statusPill, { backgroundColor: pc.bg }]}>
+              <Flag size={10} color={pc.color} strokeWidth={2.5} />
+              <Text style={[styles.statusPillText, { color: pc.color }]}>{(item.priority ?? '').toUpperCase()}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Meta row: dates, milestones, team */}
+        <View style={styles.metaRow}>
+          {(item.startDate || item.plannedEndDate) ? (
+            <View style={styles.metaItem}>
+              <Calendar size={12} color={D.inkLight} strokeWidth={2} />
+              <Text style={styles.metaText} numberOfLines={1}>
+                {fmtDate(item.startDate) || '—'} → {fmtDate(item.plannedEndDate) || '—'}
+              </Text>
+            </View>
+          ) : null}
+          {item.location ? (
+            <View style={styles.metaItem}>
+              <MapPin size={12} color={D.inkLight} strokeWidth={2} />
+              <Text style={styles.metaText} numberOfLines={1}>{item.location}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.counts}>
+          {`${item.milestonesCount ?? 0} milestones · ${item.teamCount ?? 0} team`}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -416,10 +456,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 14, fontWeight: '800', color: D.ink, lineHeight: 20 },
   sub: { fontSize: 11, color: D.inkLight, marginTop: 2 },
 
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, gap: 12 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   metaText: { fontSize: 11, color: D.inkLight, flex: 1 },
-  counts: { fontSize: 11, color: D.inkLight, fontWeight: '600' },
+  counts: { fontSize: 11, color: D.inkLight, fontWeight: '600', marginTop: 6 },
+  pillRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusPillText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
 
   emptyCard: {
     backgroundColor: D.surface,

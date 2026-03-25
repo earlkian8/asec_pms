@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\RolesController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ChatController;
+use App\Http\Controllers\Admin\ClientUpdateRequestViewController;
 use App\Http\Controllers\Admin\TrashBinController;
 use App\Http\Controllers\ProfileController;
 use App\Models\ActivityLogs;
@@ -51,11 +52,29 @@ Route::middleware('auth')->group(function () {
         Route::post('/project-management/{project}/unarchive', [ProjectsController::class, 'unarchive'])->middleware('permission:projects.archive')->name('unarchive');
         // Project Teams
         Route::prefix('project-teams')->name('project-teams.')->group(function(){
-            Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])->middleware('permission:project-teams.create')->name('store');
-            Route::post('/delete/{project}/{projectTeam?}', [ProjectTeamsController::class, 'destroy'])->middleware('permission:project-teams.delete')->name('destroy');
-            Route::put('/update-status/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'handleStatus'])->middleware('permission:project-teams.update')->name('update-status');
-            Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])->middleware('permission:project-teams.update')->name('update');
-            Route::delete('/force-remove/{project}/{projectTeam}', [ProjectTeamsController::class, 'forceRemove'])->middleware('permission:project-teams.delete')->name('force-remove');
+            Route::post('/store/{project}', [ProjectTeamsController::class, 'store'])
+                ->middleware('permission:project-teams.create')
+                ->name('store');
+
+            Route::post('/delete/{project}/{projectTeam?}', [ProjectTeamsController::class, 'destroy'])
+                ->middleware('permission:project-teams.delete')
+                ->name('destroy');
+
+            Route::put('/update-status/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'handleStatus'])
+                ->middleware('permission:project-teams.update')
+                ->name('update-status');
+
+            Route::put('/update/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'update'])
+                ->middleware('permission:project-teams.update')
+                ->name('update');
+
+            Route::delete('/force-remove/{project}/{projectTeam}', [ProjectTeamsController::class, 'forceRemove'])
+                ->middleware('permission:project-teams.delete')
+                ->name('force-remove');
+
+            Route::get('/history', [ProjectTeamsController::class, 'history'])
+                ->middleware('permission:project-teams.view')
+                ->name('history');
         });
 
         // Project Files
@@ -125,6 +144,18 @@ Route::middleware('auth')->group(function () {
         Route::prefix('request-updates')->name('request-updates.')->group(function(){
             Route::delete('/delete/{project}/{clientUpdateRequest}', [ProjectsController::class, 'destroyRequestUpdate'])->middleware('permission:projects.delete')->name('destroy');
         }); 
+
+        Route::prefix('client-update-requests')->name('client-update-requests.')->group(function(){
+            // Mark a single request as viewed
+            Route::post('{clientUpdateRequest}/mark-viewed', [ClientUpdateRequestViewController::class, 'markViewed'])
+                ->middleware('permission:projects.update')
+                ->name('mark-viewed');
+            
+            // Bulk-mark multiple requests as viewed (used by TaskDetailModal on tab open)
+            Route::post('mark-viewed-bulk', [ClientUpdateRequestViewController::class, 'markViewedBulk'])
+                ->middleware('permission:projects.update')
+                ->name('mark-viewed-bulk');
+        });
     });
 
     // Employee Management

@@ -34,7 +34,6 @@ import { formatDate, formatDateTime, isOverdue, getDaysUntilDue } from '@/utils/
 import { apiService, API_BASE_URL } from '@/services/api';
 import ProgressUpdateModal from '@/components/ProgressUpdateModal';
 import IssueReportModal from '@/components/IssueReportModal';
-import StatusSelectorModal from '@/components/StatusSelectorModal';
 import { ArrowLeft } from 'lucide-react-native';
 import AnimatedCard from '@/components/AnimatedCard';
 import AnimatedView from '@/components/AnimatedView';
@@ -61,7 +60,6 @@ export default function TaskDetailScreen() {
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
   const [fabExpanded, setFabExpanded] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [showStatusSelector, setShowStatusSelector] = useState(false);
   
   // Animation values for FAB options - start from bottom (0) and move up (negative values)
   const progressUpdateOpacity = useSharedValue(0);
@@ -318,17 +316,19 @@ export default function TaskDetailScreen() {
     }
   };
 
-  const openStatusSelector = () => {
-    if (!task || updatingStatus) return;
-    setShowStatusSelector(true);
-  };
-
-  const handleStatusSelect = (newStatus: 'pending' | 'in_progress' | 'completed') => {
-    if (!task || task.status === newStatus || updatingStatus) {
+  const handleMarkCompleted = () => {
+    if (!task || task.status === 'completed' || updatingStatus) return;
+    if (progressUpdates.length === 0) {
+      dialog.showError('Cannot mark task as completed. Please add at least one progress update first.', 'Progress Update Required');
       return;
     }
-
-    handleUpdateStatus(newStatus);
+    dialog.showConfirm(
+      'Are you sure you want to mark this task as completed? This action cannot be undone.',
+      () => handleUpdateStatus('completed'),
+      'Mark as Completed',
+      'Complete',
+      'Cancel'
+    );
   };
 
   if (loading && !task) {
@@ -385,36 +385,30 @@ export default function TaskDetailScreen() {
           <View style={styles.taskHeader}>
             <View style={styles.taskTitleRow}>
               <Text style={styles.taskTitle}>{task.title}</Text>
-              <TouchableOpacity
-                onPress={openStatusSelector}
-                disabled={updatingStatus}
-                activeOpacity={0.7}
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: statusColor + '20',
+                    opacity: updatingStatus ? 0.6 : 1,
+                  },
+                ]}
               >
-                <View
-                  style={[
-                    styles.statusBadge,
-                    {
-                      backgroundColor: statusColor + '20',
-                      opacity: updatingStatus ? 0.6 : 1,
-                    },
-                  ]}
-                >
-                  {updatingStatus ? (
-                    <ActivityIndicator size="small" color={statusColor} />
-                  ) : (
-                    <>
-                      <View
-                        style={[styles.statusDot, { backgroundColor: statusColor }]}
-                      />
-                      <Text
-                        style={[styles.statusText, { color: statusColor }]}
-                      >
-                        {task.status.replace('_', ' ').toUpperCase()}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </TouchableOpacity>
+                {updatingStatus ? (
+                  <ActivityIndicator size="small" color={statusColor} />
+                ) : (
+                  <>
+                    <View
+                      style={[styles.statusDot, { backgroundColor: statusColor }]}
+                    />
+                    <Text
+                      style={[styles.statusText, { color: statusColor }]}
+                    >
+                      {task.status.replace('_', ' ').toUpperCase()}
+                    </Text>
+                  </>
+                )}
+              </View>
             </View>
           </View>
 
@@ -460,42 +454,45 @@ export default function TaskDetailScreen() {
               <CheckCircle2 size={18} color={statusColor} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Status</Text>
-                <TouchableOpacity
-                  onPress={openStatusSelector}
-                  disabled={updatingStatus}
-                  activeOpacity={0.7}
-                  style={styles.statusUpdateButton}
+                <View
+                  style={[
+                    styles.statusBadgeSmall,
+                    { backgroundColor: statusColor + '20' },
+                  ]}
                 >
-                  <View
-                    style={[
-                      styles.statusBadgeSmall,
-                      {
-                        backgroundColor: statusColor + '20',
-                        opacity: updatingStatus ? 0.6 : 1,
-                      },
-                    ]}
+                  <Text
+                    style={[styles.statusTextSmall, { color: statusColor }]}
                   >
-                    {updatingStatus ? (
-                      <ActivityIndicator size="small" color={statusColor} />
-                    ) : (
-                      <>
-                        <Text
-                          style={[
-                            styles.statusTextSmall,
-                            { color: statusColor },
-                          ]}
-                        >
-                          {task.status.replace('_', ' ').toUpperCase()}
-                        </Text>
-                        <Text style={[styles.statusChangeHint, { color: statusColor }]}>
-                          Tap to change
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                    {task.status.replace('_', ' ').toUpperCase()}
+                  </Text>
+                  {task.status === 'completed' && (
+                    <Text style={styles.statusLockedHint}>Final</Text>
+                  )}
+                </View>
               </View>
             </View>
+
+            {/* Mark as Completed button — only when in_progress and has progress updates */}
+            {task.status === 'in_progress' && (
+              <TouchableOpacity
+                onPress={handleMarkCompleted}
+                disabled={updatingStatus}
+                activeOpacity={0.7}
+                style={[
+                  styles.completeButton,
+                  updatingStatus && { opacity: 0.6 },
+                ]}
+              >
+                {updatingStatus ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} color="#fff" />
+                    <Text style={styles.completeButtonText}>Mark as Completed</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
           </AnimatedCard>
         </AnimatedView>
@@ -916,6 +913,7 @@ export default function TaskDetailScreen() {
                 setShowProgressModal(false);
                 setEditingProgressUpdate(null);
                 loadProgressUpdates();
+                loadTask(); // Reload task to reflect auto-status change (pending → in_progress)
               } else {
                 const errorMessage = response.message || (response.errors ? Object.values(response.errors).flat().join(', ') : 'Failed to save progress update');
                 dialog.showError(errorMessage);
@@ -976,16 +974,7 @@ export default function TaskDetailScreen() {
         }}
       />
 
-      {/* Status Selector Modal */}
-      {task && (
-        <StatusSelectorModal
-          visible={showStatusSelector}
-          currentStatus={task.status}
-          progressUpdatesCount={progressUpdates.length}
-          onClose={() => setShowStatusSelector(false)}
-          onSelect={handleStatusSelect}
-        />
-      )}
+
     </View>
   );
 }
@@ -1128,14 +1117,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  statusUpdateButton: {
-    alignSelf: 'flex-start',
-  },
-  statusChangeHint: {
+  statusLockedHint: {
     fontSize: 9,
-    fontWeight: '400',
-    fontStyle: 'italic',
+    fontWeight: '600',
+    color: AppColors.textSecondary,
     marginLeft: 4,
+  },
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#16a34a',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  completeButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   fabContainer: {
     position: 'absolute',

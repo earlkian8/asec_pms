@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck } from 'lucide-react-native';
+import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info } from 'lucide-react-native';
 import { D } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -100,7 +100,6 @@ export default function ProjectDetailScreen() {
   const [mStartDate, setMStartDate] = useState('');
   const [mDueDate, setMDueDate] = useState('');
   const [mBillingPercentage, setMBillingPercentage] = useState('');
-  const [mStatus, setMStatus] = useState<Milestone['status']>('pending');
 
   // Team assign modal (admin-like assignables)
   const [teamModalOpen, setTeamModalOpen] = useState(false);
@@ -160,7 +159,6 @@ export default function ProjectDetailScreen() {
     setMStartDate(project?.startDate ?? '');
     setMDueDate(project?.plannedEndDate ?? '');
     setMBillingPercentage('');
-    setMStatus('pending');
     setMilestoneModalOpen(true);
   };
 
@@ -173,7 +171,6 @@ export default function ProjectDetailScreen() {
     setMBillingPercentage(
       m.billingPercentage !== null && m.billingPercentage !== undefined ? String(m.billingPercentage) : ''
     );
-    setMStatus(m.status);
     setMilestoneModalOpen(true);
   };
 
@@ -184,7 +181,6 @@ export default function ProjectDetailScreen() {
       start_date: mStartDate.trim() ? mStartDate.trim() : null,
       due_date: mDueDate.trim() ? mDueDate.trim() : null,
       billing_percentage: mBillingPercentage.trim() ? Number(mBillingPercentage.trim()) : null,
-      status: mStatus,
     };
     if (!payload.name) return;
 
@@ -209,6 +205,18 @@ export default function ProjectDetailScreen() {
   const milestoneCards = useMemo(() => {
     return milestones.map((m) => {
       const progress = m.progress ?? 0;
+      const statusMap: Record<string, {c: string; bg: string}> = {
+        pending: {c: D.amber, bg: D.amberBg},
+        in_progress: {c: D.blue, bg: D.blueBg},
+        completed: {c: D.green, bg: D.greenBg},
+      };
+      const ms = statusMap[m.status] || {c: D.inkMid, bg: '#F0EFED'};
+
+      const fmtDate = (d?: string | null) => {
+        if (!d) return null;
+        try { return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }); } catch { return d; }
+      };
+
       return (
         <TouchableOpacity
           key={m.id}
@@ -221,19 +229,38 @@ export default function ProjectDetailScreen() {
           }
         >
           <View style={styles.cardTopRow}>
-            <View style={styles.cardIconWrap}>
-              <Flag size={16} color={D.green} strokeWidth={2} />
+            <View style={[styles.cardIconWrap, {backgroundColor: ms.bg}]}>
+              <Flag size={16} color={ms.c} strokeWidth={2} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {m.name}
               </Text>
-              <Text style={styles.cardSub} numberOfLines={2}>
-                {m.description || 'No description'}
-              </Text>
-              <Text style={styles.cardMeta}>
-                {`${m.status.toUpperCase()} • ${m.completedTasks ?? 0}/${m.totalTasks ?? 0} tasks • ${progress}%`}
-              </Text>
+              {m.description ? (
+                <Text style={styles.cardSub} numberOfLines={2}>
+                  {m.description}
+                </Text>
+              ) : null}
+              {/* Status badge + dates */}
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap'}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: ms.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6}}>
+                  <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: ms.c}} />
+                  <Text style={{fontSize: 10, fontWeight: '700', color: ms.c}}>{m.status.replace('_',' ').toUpperCase()}</Text>
+                </View>
+                {(m.startDate || m.dueDate) && (
+                  <Text style={{fontSize: 10, color: D.inkLight}}>{fmtDate(m.startDate) || '\u2014'} \ {fmtDate(m.dueDate) || '\u2014'}</Text>
+                )}
+              </View>
+              {/* Progress bar */}
+              <View style={{marginTop: 8}}>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4}}>
+                  <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>{m.completedTasks ?? 0}/{m.totalTasks ?? 0} tasks</Text>
+                  <Text style={{fontSize: 10, color: ms.c, fontWeight: '800'}}>{progress}%</Text>
+                </View>
+                <View style={{height: 6, backgroundColor: D.chalk, borderRadius: 3, overflow: 'hidden'}}>
+                  <View style={{height: '100%', width: `${Math.min(progress, 100)}%`, backgroundColor: ms.c, borderRadius: 3}} />
+                </View>
+              </View>
             </View>
 
             {canManageMilestones && (
@@ -261,16 +288,11 @@ export default function ProjectDetailScreen() {
               </View>
             )}
           </View>
-
-          {!canShowTaskActions && (
-            <View style={styles.cardBottomRow}>
-              <Text style={styles.hintText}>Grant `tm.tasks.manage` to edit tasks</Text>
-            </View>
-          )}
         </TouchableOpacity>
       );
     });
   }, [milestones, canManageMilestones, canShowTaskActions]);
+
 
   const updateTeamStatus = async (memberId: number, assignment_status: string) => {
     await apiService.put(`/task-management/projects/${projectId}/team/${memberId}/status`, { assignment_status });
@@ -411,21 +433,84 @@ export default function ProjectDetailScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      {/* Header: back button only */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-          <ArrowLeft size={22} color={D.ink} strokeWidth={2.5} />
+          <ArrowLeft size={20} color={D.ink} strokeWidth={2.5} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {project?.projectName || 'Project'}
-          </Text>
-          <Text style={styles.headerSub} numberOfLines={1}>
-            {project?.projectCode ? `${project.projectCode} • ` : ''}
-            {project?.status ?? '—'}
-          </Text>
-        </View>
+        <Text style={styles.headerTitle} numberOfLines={1}>{project?.projectName || 'Project'}</Text>
       </View>
 
+      {/* Hero section — project identity + metadata */}
+      {project && (
+        <View style={styles.hero}>
+          {/* Top line: name + code */}
+          <View style={styles.heroTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heroName} numberOfLines={2}>{project.projectName}</Text>
+              {project.projectCode ? (
+                <Text style={styles.heroCode}>{project.projectCode}</Text>
+              ) : null}
+            </View>
+            {/* Status badge */}
+            {project.status && (() => {
+              const sm: Record<string, {c: string; bg: string}> = {
+                active: {c: D.green, bg: D.greenBg},
+                planning: {c: D.amber, bg: D.amberBg},
+                completed: {c: D.blue, bg: D.blueBg},
+                on_hold: {c: D.red, bg: '#FEF2F2'},
+              };
+              const s = sm[(project.status ?? '').toLowerCase()] || {c: D.inkMid, bg: '#F0EFED'};
+              return (
+                <View style={[styles.heroStatusBadge, {backgroundColor: s.bg}]}>
+                  <View style={{width: 7, height: 7, borderRadius: 4, backgroundColor: s.c}} />
+                  <Text style={[styles.heroStatusText, {color: s.c}]}>{project.status.replace('_', ' ')}</Text>
+                </View>
+              );
+            })()}
+          </View>
+
+          {/* Description */}
+          {project.description ? (
+            <Text style={styles.heroDesc}>{project.description}</Text>
+          ) : null}
+
+          {/* Meta chips row */}
+          <View style={styles.heroMeta}>
+            {project.priority && (() => {
+              const pm: Record<string, {c: string; bg: string}> = {
+                high: {c: D.red, bg: '#FEF2F2'},
+                medium: {c: D.amber, bg: D.amberBg},
+                low: {c: D.green, bg: D.greenBg},
+                critical: {c: '#9333EA', bg: '#F5F3FF'},
+              };
+              const p = pm[(project.priority ?? '').toLowerCase()];
+              return p ? (
+                <View style={[styles.heroChip, {backgroundColor: p.bg}]}>
+                  <Flag size={10} color={p.c} strokeWidth={2.5} />
+                  <Text style={[styles.heroChipText, {color: p.c}]}>{project.priority}</Text>
+                </View>
+              ) : null;
+            })()}
+            {(project.startDate || project.plannedEndDate) && (
+              <View style={styles.heroChip}>
+                <Calendar size={10} color={D.inkMid} strokeWidth={2} />
+                <Text style={styles.heroChipText}>
+                  {project.startDate || '—'} – {project.plannedEndDate || '—'}
+                </Text>
+              </View>
+            )}
+            {project.location && (
+              <View style={styles.heroChip}>
+                <MapPin size={10} color={D.inkMid} strokeWidth={2} />
+                <Text style={styles.heroChipText}>{project.location}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Tabs */}
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tab, tab === 'milestones' && styles.tabActive]}
@@ -451,6 +536,7 @@ export default function ProjectDetailScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />}
         showsVerticalScrollIndicator={false}
       >
+
         {tab === 'milestones' && (
           <>
             <View style={styles.sectionHeader}>
@@ -481,23 +567,38 @@ export default function ProjectDetailScreen() {
             {!canViewTeam && <Text style={styles.hintText}>Grant `tm.team.view` to view team.</Text>}
 
             {canViewTeam &&
-              team.map((m) => (
-                <View key={m.id} style={styles.card}>
-                  <View style={styles.cardTopRow}>
-                    <View style={[styles.cardIconWrap, { backgroundColor: D.blueBg }]}>
-                      <Users size={16} color={D.blue} strokeWidth={2} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>
-                        {m.name}
-                      </Text>
-                      <Text style={styles.cardSub} numberOfLines={1}>
-                        {m.role} • {m.assignableType ?? '—'}
-                      </Text>
-                      <Text style={styles.cardMeta} numberOfLines={1}>
-                        Status: {(m.assignmentStatus ?? '—').toString()}
-                      </Text>
-                    </View>
+              team.map((m) => {
+                const assignSt = (m.assignmentStatus ?? '').toString().toLowerCase();
+                const aMap: Record<string, {c: string; bg: string; label: string}> = {
+                  active: {c: D.green, bg: D.greenBg, label: 'Active'},
+                  released: {c: D.amber, bg: D.amberBg, label: 'Released'},
+                  completed: {c: D.blue, bg: D.blueBg, label: 'Completed'},
+                };
+                const as = aMap[assignSt] || {c: D.inkMid, bg: '#F0EFED', label: assignSt || '—'};
+
+                return (
+                  <View key={m.id} style={styles.card}>
+                    <View style={styles.cardTopRow}>
+                      <View style={[styles.cardIconWrap, { backgroundColor: as.bg }]}>
+                        <Users size={16} color={as.c} strokeWidth={2} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {m.name}
+                        </Text>
+                        <Text style={styles.cardSub} numberOfLines={1}>
+                          {m.role || 'No role'} · {m.assignableType === 'employee' ? 'Employee' : 'User'}
+                        </Text>
+                        <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6}}>
+                          <View style={[styles.infoPill, {backgroundColor: as.bg}]}>
+                            <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: as.c}} />
+                            <Text style={[styles.infoPillText, {color: as.c}]}>{as.label}</Text>
+                          </View>
+                          {m.hourlyRate && (
+                            <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>₱{m.hourlyRate}/hr</Text>
+                          )}
+                        </View>
+                      </View>
 
                     <View style={styles.rowActions}>
                       {canAssignTeam && (
@@ -570,7 +671,8 @@ export default function ProjectDetailScreen() {
                     </View>
                   </View>
                 </View>
-              ))}
+                );
+              })}
           </>
         )}
       </ScrollView>
@@ -625,18 +727,6 @@ export default function ProjectDetailScreen() {
               onChangeText={setMBillingPercentage}
               keyboardType="numeric"
             />
-            <Text style={styles.fieldLabel}>Status</Text>
-            <View style={styles.statusRow}>
-              {(['pending', 'in_progress', 'completed'] as const).map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.chip, mStatus === s && styles.chipActive]}
-                  onPress={() => setMStatus(s)}
-                >
-                  <Text style={[styles.chipText, mStatus === s && styles.chipTextActive]}>{s.replace('_', ' ')}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setMilestoneModalOpen(false)}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
@@ -872,8 +962,8 @@ const styles = StyleSheet.create({
     borderBottomColor: D.hairline,
   },
   backBtn: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -881,8 +971,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: D.hairline,
   },
-  headerTitle: { fontSize: 16, fontWeight: '900', color: D.ink },
-  headerSub: { fontSize: 11, color: D.inkLight, marginTop: 2 },
+  headerTitle: { fontSize: 15, fontWeight: '900', color: D.ink, flex: 1 },
+
+  // Hero section
+  hero: {
+    backgroundColor: D.surface,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: D.hairline,
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
+  heroName: { fontSize: 18, fontWeight: '900', color: D.ink, lineHeight: 24 },
+  heroCode: { fontSize: 11, color: D.inkLight, marginTop: 2, fontWeight: '700', letterSpacing: 0.5 },
+  heroStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginTop: 2,
+  },
+  heroStatusText: { fontSize: 11, fontWeight: '800', textTransform: 'capitalize' },
+  heroDesc: { fontSize: 12, color: D.inkMid, lineHeight: 18, marginBottom: 10, marginTop: 2 },
+  heroMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  heroChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: D.chalk,
+    borderWidth: 1,
+    borderColor: D.hairline,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  heroChipText: { fontSize: 10, fontWeight: '700', color: D.inkMid },
 
   tabRow: { flexDirection: 'row', gap: 10, padding: 16, backgroundColor: D.surface },
   tab: {
@@ -925,6 +1051,21 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 11, color: D.inkLight, marginTop: 8, fontWeight: '700' },
   rowActions: { flexDirection: 'row', gap: 6 },
   iconBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline, justifyContent: 'center', alignItems: 'center' },
+
+  infoCard: {
+    backgroundColor: D.surface,
+    borderWidth: 1,
+    borderColor: D.hairline,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+  },
+  infoDesc: { fontSize: 12, color: D.inkMid, lineHeight: 18, marginBottom: 8 },
+  infoRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  infoPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  infoPillText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+  infoMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  infoMetaText: { fontSize: 11, color: D.inkLight },
 
   cardBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12 },
   primaryBtn: {

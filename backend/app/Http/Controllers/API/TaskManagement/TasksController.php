@@ -91,8 +91,10 @@ class TasksController extends Controller
             ], 404);
         }
 
-        $requestData = $request->all();
-        if (isset($requestData['assigned_to']) && (empty($requestData['assigned_to']) || $requestData['assigned_to'] === 'none' || $requestData['assigned_to'] === 0)) {
+        // Only null out assigned_to if it's explicitly empty string, 'none', or boolean false
+        // Do NOT use empty() — empty(0) is true in PHP and would wipe out valid user IDs
+        $rawAssignedTo = $request->input('assigned_to');
+        if (is_string($rawAssignedTo) && in_array(trim($rawAssignedTo), ['', 'none'])) {
             $request->merge(['assigned_to' => null]);
         }
 
@@ -113,6 +115,7 @@ class TasksController extends Controller
             'status' => $data['status'],
         ]);
 
+        $task->load('assignedUser');
         $this->syncMilestoneStatus($milestone);
 
         return response()->json([
@@ -124,6 +127,7 @@ class TasksController extends Controller
                 'title' => $task->title,
                 'description' => $task->description,
                 'assignedTo' => $task->assigned_to,
+                'assignedToName' => $task->assignedUser?->name,
                 'dueDate' => $task->due_date,
                 'status' => $task->status,
                 'createdAt' => $task->created_at?->toISOString(),
@@ -152,8 +156,9 @@ class TasksController extends Controller
             ], 404);
         }
 
-        $requestData = $request->all();
-        if (isset($requestData['assigned_to']) && (empty($requestData['assigned_to']) || $requestData['assigned_to'] === 'none' || $requestData['assigned_to'] === 0)) {
+        // Only null out assigned_to if it's explicitly empty string or 'none'
+        $rawAssignedTo = $request->input('assigned_to');
+        if (is_string($rawAssignedTo) && in_array(trim($rawAssignedTo), ['', 'none'])) {
             $request->merge(['assigned_to' => null]);
         }
 
@@ -185,6 +190,7 @@ class TasksController extends Controller
             'status' => $data['status'],
         ]);
 
+        $task->load('assignedUser');
         $this->syncMilestoneStatus($milestone);
 
         return response()->json([
@@ -196,6 +202,7 @@ class TasksController extends Controller
                 'title' => $task->title,
                 'description' => $task->description,
                 'assignedTo' => $task->assigned_to,
+                'assignedToName' => $task->assignedUser?->name,
                 'dueDate' => $task->due_date,
                 'status' => $task->status,
                 'createdAt' => $task->created_at?->toISOString(),

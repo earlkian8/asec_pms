@@ -11,12 +11,14 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Plus, Trash2, Pencil, Calendar, User } from 'lucide-react-native';
+import { ArrowLeft, Plus, Trash2, Pencil, Calendar, User, ChevronDown, X } from 'lucide-react-native';
 import { D, getStatusColor, getStatusBg } from '@/utils/colors';
 import { apiService } from '@/services/api';
+import { formatDate, isOverdue } from '@/utils/dateUtils';
 
 type Task = {
   id: number;
@@ -32,8 +34,9 @@ type Task = {
 export default function MilestoneTasksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { milestoneId, milestoneName } = useLocalSearchParams<{ milestoneId: string; milestoneName?: string }>();
+  const { milestoneId, milestoneName, projectId } = useLocalSearchParams<{ milestoneId: string; milestoneName?: string; projectId?: string }>();
   const mid = Number(milestoneId || 0);
+  const pid = Number(projectId || 0);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,15 +46,40 @@ export default function MilestoneTasksScreen() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
-  const [status, setStatus] = useState<Task['status']>('pending');
   const [dueDate, setDueDate] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
+  const [assignedTo, setAssignedTo] = useState<number | null>(null);
+  const [showUserPicker, setShowUserPicker] = useState(false);
+
+  // Only users (not employees) can be assigned to tasks
+  type TeamUser = { id: number; userId: number; name: string; role: string };
+  const [teamMembers, setTeamMembers] = useState<TeamUser[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+
+  const loadTeamMembers = async () => {
+    if (!pid) return;
+    try {
+      setTeamLoading(true);
+      const res = await apiService.get<any[]>(`/task-management/projects/${pid}/team`);
+      if (typeof res === 'object' && 'success' in res && res.success && res.data) {
+        const users = (Array.isArray(res.data) ? res.data : [])
+          .filter((m: any) => m.assignableType === 'user' && m.userId)
+          .map((m: any) => ({ id: m.id, userId: m.userId, name: m.name, role: m.role }));
+        setTeamMembers(users);
+      }
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeamMembers();
+  }, [pid]);
 
   const loadTasks = async () => {
     try {
       setLoading(true);
       const res = await apiService.get<Task[]>(`/task-management/milestones/${mid}/tasks`);
-      if (res.success && res.data) setTasks(Array.isArray(res.data) ? res.data : []);
+      if (typeof res === 'object' && 'success' in res && res.success && res.data) setTasks(Array.isArray(res.data) ? res.data : []);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -71,9 +99,8 @@ export default function MilestoneTasksScreen() {
     setEditing(null);
     setTitle('');
     setDesc('');
-    setStatus('pending');
     setDueDate('');
-    setAssignedTo('');
+    setAssignedTo(null);
     setModalOpen(true);
   };
 
@@ -81,9 +108,8 @@ export default function MilestoneTasksScreen() {
     setEditing(t);
     setTitle(t.title || '');
     setDesc(t.description || '');
-    setStatus(t.status);
     setDueDate(t.dueDate || '');
-    setAssignedTo(t.assignedTo ? String(t.assignedTo) : '');
+    setAssignedTo(t.assignedTo ?? null);
     setModalOpen(true);
   };
 
@@ -92,9 +118,9 @@ export default function MilestoneTasksScreen() {
     const payload = {
       title: title.trim(),
       description: desc.trim() ? desc.trim() : null,
-      status,
+      status: editing ? editing.status : 'pending',
       due_date: dueDate.trim() ? dueDate.trim() : null,
-      assigned_to: assignedTo.trim() ? Number(assignedTo.trim()) : null,
+      assigned_to: assignedTo || null,
     };
 
     if (editing) {
@@ -165,7 +191,10 @@ export default function MilestoneTasksScreen() {
           </View>
           <View style={styles.metaItem}>
             <Calendar size={12} color={D.inkLight} strokeWidth={2} />
-            <Text style={styles.metaText}>{item.dueDate || 'No due date'}</Text>
+            <Text style={[styles.metaText, item.dueDate && isOverdue(item.dueDate) && { color: D.red, fontWeight: '700' }]}>
+              {item.dueDate ? formatDate(item.dueDate) : 'No due date'}
+              {item.dueDate && isOverdue(item.dueDate) ? ' · Overdue' : ''}
+            </Text>
           </View>
           <View style={styles.metaItem}>
             <User size={12} color={D.inkLight} strokeWidth={2} />
@@ -239,18 +268,6 @@ export default function MilestoneTasksScreen() {
               onChangeText={setDesc}
               multiline
             />
-            <Text style={styles.fieldLabel}>Status</Text>
-            <View style={styles.statusRow}>
-              {(['pending', 'in_progress', 'completed'] as const).map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.chip, status === s && styles.chipActive]}
-                  onPress={() => setStatus(s)}
-                >
-                  <Text style={[styles.chipText, status === s && styles.chipTextActive]}>{s.replace('_', ' ')}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
             <Text style={styles.fieldLabel}>Due Date</Text>
             <TextInput
               style={styles.input}
@@ -259,15 +276,55 @@ export default function MilestoneTasksScreen() {
               value={dueDate}
               onChangeText={setDueDate}
             />
-            <Text style={styles.fieldLabel}>Assigned To (User ID)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Assign to User ID (optional)"
-              placeholderTextColor={D.inkLight}
-              value={assignedTo}
-              onChangeText={setAssignedTo}
-              keyboardType="numeric"
-            />
+            <Text style={styles.fieldLabel}>Assign To</Text>
+            <TouchableOpacity
+              style={styles.userPickerButton}
+              onPress={() => setShowUserPicker(!showUserPicker)}
+              activeOpacity={0.7}
+            >
+              <User size={14} color={D.inkMid} strokeWidth={2} />
+              <Text style={[styles.userPickerText, !assignedTo && { color: D.inkLight }]}>
+                {assignedTo
+                  ? teamMembers.find(m => m.userId === assignedTo)?.name || `User #${assignedTo}`
+                  : 'Unassigned'}
+              </Text>
+              <ChevronDown size={14} color={D.inkLight} strokeWidth={2} />
+            </TouchableOpacity>
+            {showUserPicker && (
+              <View style={styles.userPickerDropdown}>
+                <TouchableOpacity
+                  style={[styles.userPickerItem, !assignedTo && styles.userPickerItemActive]}
+                  onPress={() => { setAssignedTo(null); setShowUserPicker(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.userPickerItemText, !assignedTo && styles.userPickerItemTextActive]}>Unassigned</Text>
+                </TouchableOpacity>
+                {teamLoading ? (
+                  <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={D.ink} />
+                  </View>
+                ) : (
+                  <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
+                    {teamMembers.map(m => (
+                      <TouchableOpacity
+                        key={m.userId}
+                        style={[styles.userPickerItem, assignedTo === m.userId && styles.userPickerItemActive]}
+                        onPress={() => { setAssignedTo(m.userId); setShowUserPicker(false); }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.userPickerItemText, assignedTo === m.userId && styles.userPickerItemTextActive]} numberOfLines={1}>{m.name}</Text>
+                          <Text style={styles.userPickerItemSub}>{m.role}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                    {teamMembers.length === 0 && (
+                      <Text style={styles.userPickerEmpty}>No users in this project's team</Text>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            )}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setModalOpen(false)}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
@@ -358,5 +415,37 @@ const styles = StyleSheet.create({
   modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline, alignItems: 'center' },
   modalBtnPrimary: { backgroundColor: D.ink, borderColor: D.ink },
   modalBtnText: { fontSize: 13, fontWeight: '900', color: D.ink },
+  userPickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: D.hairline,
+    backgroundColor: D.chalk,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  userPickerText: { flex: 1, fontSize: 13, fontWeight: '600', color: D.ink },
+  userPickerDropdown: {
+    borderWidth: 1,
+    borderColor: D.hairline,
+    borderRadius: 12,
+    backgroundColor: D.surface,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  userPickerItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: D.hairline,
+  },
+  userPickerItemActive: { backgroundColor: D.chalk },
+  userPickerItemText: { fontSize: 13, fontWeight: '700', color: D.ink },
+  userPickerItemTextActive: { color: D.blue },
+  userPickerItemSub: { fontSize: 10, color: D.inkLight, marginTop: 2 },
+  userPickerEmpty: { fontSize: 12, color: D.inkLight, textAlign: 'center', paddingVertical: 14 },
 });
 

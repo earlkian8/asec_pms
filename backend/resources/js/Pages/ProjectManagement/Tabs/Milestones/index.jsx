@@ -443,6 +443,17 @@ export default function MilestonesTab({ project, milestoneData }) {
     return statusMap[status] || { label: status || '---', color: 'gray', icon: Clock };
   };
 
+  const getStatusBadgeClassName = (status) => {
+    const info = formatStatus(status);
+    const map = {
+      yellow: 'bg-amber-100 text-amber-700 border-amber-200',
+      blue: 'bg-blue-100 text-blue-700 border-blue-200',
+      green: 'bg-green-100 text-green-700 border-green-200',
+      gray: 'bg-gray-100 text-gray-600 border-gray-200'
+    };
+    return `inline-flex items-center px-2.5 py-1 w-[140px] text-xs font-medium border ${map[info.color] || map.gray}`;
+  };
+
   const getStatusSelectClassName = (status) => {
     const info = formatStatus(status);
     const base = 'w-[140px] h-8 text-xs border-0 rounded font-medium';
@@ -467,19 +478,6 @@ export default function MilestonesTab({ project, milestoneData }) {
     const tasks = milestone.tasks || [];
     if (!tasks.length) return 0;
     return Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100);
-  };
-
-  const handleMilestoneStatusChange = (milestone, newStatus) => {
-    if (newStatus === 'completed' && !areAllTasksCompleted(milestone)) {
-      const incomplete = (milestone.tasks || []).filter(t => t.status !== 'completed').length;
-      toast.error(`Cannot mark milestone as completed. ${incomplete} task(s) still need to be completed.`);
-      return;
-    }
-    router.put(
-      route('project-management.project-milestones.update', [project.id, milestone.id]),
-      { name: milestone.name, description: milestone.description || '', start_date: milestone.start_date || '', due_date: milestone.due_date || '', billing_percentage: milestone.billing_percentage || '', status: newStatus },
-      { preserveScroll: true, onSuccess: () => toast.success('Milestone status updated successfully'), onError: (errors) => toast.error(errors?.status || 'Failed to update milestone status') }
-    );
   };
 
   const handleTaskStatusChange = (task, newStatus) => {
@@ -740,7 +738,6 @@ export default function MilestonesTab({ project, milestoneData }) {
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Due Date</TableHead>
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Progress</TableHead>
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
-                {/* Urgency — header label */}
                 Alerts
               </TableHead>
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Actions</TableHead>
@@ -781,28 +778,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
-                        {has('project-milestones.update') ? (
-                          <Select value={milestone.status} onValueChange={v => handleMilestoneStatusChange(milestone, v)}>
-                            <SelectTrigger className={getStatusSelectClassName(milestone.status)}>
-                              <SelectValue>{formatStatus(milestone.status).label}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500"></span>Pending</span></SelectItem>
-                              <SelectItem value="in_progress"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500"></span>In Progress</span></SelectItem>
-                              <SelectItem value="completed" disabled={!areAllTasksCompleted(milestone)}>
-                                <span className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                  Completed
-                                  {!areAllTasksCompleted(milestone) && <span className="text-xs text-gray-400">(All tasks must be completed)</span>}
-                                </span>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${formatStatus(milestone.status).color === 'green' ? 'bg-green-100 text-green-800' : formatStatus(milestone.status).color === 'blue' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                            {formatStatus(milestone.status).label}
-                          </span>
-                        )}
+                        <span className={getStatusBadgeClassName(milestone.status)}>
+                          {formatStatus(milestone.status).label}
+                        </span>
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm text-gray-600">{formatDate(milestone.due_date)}</TableCell>
                       <TableCell className="text-xs sm:text-sm">

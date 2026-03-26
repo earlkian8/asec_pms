@@ -6,7 +6,7 @@ import {
   Plus, Download, SquarePen, Trash2, FileText,
   Image as ImageIcon, Calendar, User, AlertCircle,
   Flag, CheckCircle2, XCircle, MessageSquare, Mail,
-  LayoutGrid, Activity, Clock, X, Bell,
+  LayoutGrid, Activity, Clock, X, Bell, Lock,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import { router } from '@inertiajs/react';
@@ -89,6 +89,7 @@ const taskStatusBadge = (status) => {
   const label = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed' };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${map[status] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+      {status === 'completed' && <CheckCircle2 size={11} className="mr-1.5 flex-shrink-0" />}
       {label[status] || status}
     </span>
   );
@@ -192,9 +193,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const { has }   = usePermission();
   const { props } = usePage();
   const [activeTab, setActiveTab] = useState('progress');
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
 
-  // Track locally which request IDs this user has already viewed this session
-  // (optimistic — server is the source of truth on reload)
   const [locallyViewed, setLocallyViewed] = useState(new Set());
   const markViewedCalled = useRef(false);
 
@@ -225,6 +225,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const currentTask = getFreshTask();
   if (!currentTask) return null;
 
+  const isCompleted = currentTask.status === 'completed';
+
   const rawPU = currentTask.progressUpdates || currentTask.progress_updates || [];
   const progressUpdates = Array.isArray(rawPU) ? rawPU : (rawPU.data || []);
 
@@ -234,12 +236,10 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   const rawRequests = currentTask.clientUpdateRequests || currentTask.client_update_requests || [];
   const clientUpdateRequests = Array.isArray(rawRequests) ? rawRequests : (rawRequests.data || []);
 
-  // Unread count — subtract locally-viewed ones so the badge updates instantly
   const unreadCount = clientUpdateRequests.filter(
     req => req.is_unread && !locallyViewed.has(req.id)
   ).length;
 
-  // ── Mark all unread requests as viewed when the requests tab is opened ──────
   useEffect(() => {
     if (activeTab !== 'requests') return;
     if (markViewedCalled.current) return;
@@ -251,11 +251,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     if (unreadIds.length === 0) return;
 
     markViewedCalled.current = true;
-
-    // Optimistic local update so the pulse dot disappears immediately
     setLocallyViewed(prev => new Set([...prev, ...unreadIds]));
 
-    // Fire-and-forget — no toast, no blocking
     fetch(route('project-management.client-update-requests.mark-viewed-bulk'), {
       method: 'POST',
       headers: {
@@ -266,11 +263,9 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     })
       .then(res => {
         if (!res.ok) throw new Error('Failed to mark viewed');
-        // Reload milestoneData silently so the index reflects the updated read state
         router.reload({ only: ['milestoneData'] });
       })
       .catch(() => {
-        // Silently revert optimistic state on failure
         setLocallyViewed(prev => {
           const next = new Set(prev);
           unreadIds.forEach(id => next.delete(id));
@@ -281,7 +276,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Reset the "already called" flag if the task changes so re-opening works
   useEffect(() => {
     markViewedCalled.current = false;
     setLocallyViewed(new Set());
@@ -299,6 +293,40 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     if (!value) setTimeout(() => onRefresh?.(), 100);
   };
 
+  // ── Set as completed handler ──────────────────────────────────────────────
+  const handleSetCompleted = () => {
+    if (isMarkingComplete || isCompleted) return;
+
+    if (progressUpdates.length === 0) {
+      toast.error('Cannot mark task as completed. Please add at least one progress update first.');
+      return;
+    }
+
+    const milestoneId = currentTask.milestone?.id || currentTask.project_milestone_id;
+    if (!milestoneId) {
+      toast.error('Unable to find milestone for this task.');
+      return;
+    }
+
+    setIsMarkingComplete(true);
+    router.put(
+      route('project-management.project-tasks.update-status', [milestoneId, currentTask.id]),
+      { status: 'completed' },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          toast.success('Task marked as completed');
+          onRefresh?.();
+          setIsMarkingComplete(false);
+        },
+        onError: (errors) => {
+          toast.error(errors?.status || 'Failed to update task status');
+          setIsMarkingComplete(false);
+        },
+      }
+    );
+  };
+
   const handleResolveIssue = (issue) => {
     if (!issue?.id || !project) return;
     const newStatus = issue.status === 'resolved' ? 'open' : 'resolved';
@@ -309,24 +337,12 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
     );
   };
 
-  // Progress ring calc
-  const progressPct = progressUpdates.length > 0
-    ? currentTask.status === 'completed' ? 100 : Math.min(progressUpdates.length * 25, 90)
-    : 0;
   const circumference = 2 * Math.PI * 26;
-  const dashOffset = circumference - (progressPct / 100) * circumference;
 
   const tabs = [
-    { id: 'progress',  label: 'Progress updates',  icon: Activity,      count: progressUpdates.length,    unread: 0 },
-    {
-      id: 'requests',
-      label: 'Client requests',
-      icon: Bell,
-      count: clientUpdateRequests.length,
-      // unread drives the notification dot on the sidebar tab
-      unread: unreadCount,
-    },
-    { id: 'issues',    label: 'Issues',             icon: AlertCircle,   count: issues.length,             unread: 0 },
+    { id: 'progress',  label: 'Progress updates',  icon: Activity,    count: progressUpdates.length,       unread: 0 },
+    { id: 'requests',  label: 'Client requests',    icon: Bell,        count: clientUpdateRequests.length,  unread: unreadCount },
+    { id: 'issues',    label: 'Issues',             icon: AlertCircle, count: issues.length,                unread: 0 },
   ];
 
   return (
@@ -336,8 +352,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
 
           {/* ── HEADER ───────────────────────────────────────────────────────── */}
           <div className="flex items-start gap-3.5 px-6 py-5 border-b border-zinc-100">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 size={18} className="text-blue-600" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isCompleted ? 'bg-green-50' : 'bg-blue-50'}`}>
+              <CheckCircle2 size={18} className={isCompleted ? 'text-green-600' : 'text-blue-600'} />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-medium text-zinc-900 leading-snug mb-1">
@@ -361,8 +377,35 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Status badge */}
               {taskStatusBadge(currentTask.status)}
-              <div className='mx-2'></div>
+
+              {/* Set as completed button — only shown when not completed and user has permission */}
+              {!isCompleted && has('project-tasks.update-status') && (
+                <Button
+                  size="sm"
+                  onClick={handleSetCompleted}
+                  disabled={isMarkingComplete || progressUpdates.length === 0}
+                  title={progressUpdates.length === 0 ? 'Add a progress update first' : 'Mark task as completed'}
+                  className="h-8 text-xs px-3 gap-1.5 bg-green-600 hover:bg-green-700 text-white border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isMarkingComplete ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={12} />
+                  )}
+                  {isMarkingComplete ? 'Saving…' : 'Set as completed'}
+                </Button>
+              )}
+
+              {/* Locked indicator when completed */}
+              {isCompleted && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400 px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-full">
+                  <Lock size={10} /> Locked
+                </span>
+              )}
+
+              <div className='mx-1'></div>
             </div>
           </div>
 
@@ -382,7 +425,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                   }`}>
                   <div className="relative flex-shrink-0">
                     <Icon size={14} />
-                    {/* Pulsing dot for unread notifications */}
                     {unread > 0 && (
                       <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
@@ -417,6 +459,13 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                   <p className="text-[10px] text-zinc-300 mb-0.5">Due date</p>
                   <p className="text-xs text-zinc-700">{fmt(currentTask.due_date)}</p>
                 </div>
+                {/* Completed-at date if available */}
+                {isCompleted && currentTask.updated_at && (
+                  <div>
+                    <p className="text-[10px] text-zinc-300 mb-0.5">Completed</p>
+                    <p className="text-xs text-green-600 font-medium">{fmt(currentTask.updated_at)}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -431,7 +480,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                       <h3 className="text-sm font-medium text-zinc-900">Progress updates</h3>
                       <p className="text-xs text-zinc-400 mt-0.5">{progressUpdates.length} {progressUpdates.length === 1 ? 'entry' : 'entries'} · most recent first</p>
                     </div>
-                    {has('progress-updates.create') && (
+                    {/* Only allow adding progress updates if task is not completed */}
+                    {!isCompleted && has('progress-updates.create') && (
                       <Button onClick={() => setShowAddProgressModal(true)} size="sm"
                         className="h-8 text-xs px-3 gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-none">
                         <Plus size={12} /> Add update
@@ -491,7 +541,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 ? 'border-violet-200 bg-violet-50/40 hover:border-violet-300'
                                 : 'border-zinc-200 hover:border-zinc-300'
                             }`}>
-                            {/* Request header */}
                             <div className={`flex items-center gap-3 px-4 py-3 border-b ${
                               isUnread ? 'border-violet-100 bg-violet-50/60' : 'border-zinc-100 bg-zinc-50/50'
                             }`}>
@@ -499,7 +548,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-medium">
                                   {(req.client?.client_name || 'C').charAt(0).toUpperCase()}
                                 </div>
-                                {/* Unread dot on the avatar */}
                                 {isUnread && (
                                   <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
@@ -522,7 +570,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                                 </span>
                               </div>
                             </div>
-                            {/* Request body */}
                             <div className="px-4 py-3.5">
                               <p className="text-sm font-medium text-zinc-800 mb-1.5">{req.subject}</p>
                               <p className="text-xs text-zinc-500 leading-relaxed">{req.message}</p>

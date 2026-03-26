@@ -26,7 +26,8 @@ import {
   TrendingUp,
   X,
   ArrowUpDown,
-  Receipt
+  Receipt,
+  PhilippinePeso
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddMiscellaneousExpense from './add';
@@ -303,7 +304,7 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
                 <p className="text-2xl font-bold text-blue-900 mt-1">{formatCurrency(totalExpenses)}</p>
               </div>
               <div className="bg-blue-200 rounded-full p-3">
-                <DollarSign className="h-5 w-5 text-blue-700" />
+                <PhilippinePeso className="h-5 w-5 text-blue-700" />
               </div>
             </div>
           </div>

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import {
   Trash2, SquarePen, DollarSign, CreditCard, Filter, X, Search,
   Calendar, TrendingUp, ArrowUpDown, Archive, Smartphone,
+  PhilippinePeso,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -297,9 +298,9 @@ export default function BillingManagement() {
                 <div className="mb-6 pb-6 border-b border-gray-200">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                     {[
-                      { label: 'Total Billings', value: totalBillings, icon: DollarSign,  color: 'blue',   fmt: 'count' },
+                      { label: 'Total Billings', value: totalBillings, icon: PhilippinePeso,  color: 'blue',   fmt: 'count' },
                       { label: 'Total Amount',   value: totalAmount,   icon: TrendingUp,  color: 'green',  fmt: 'currency' },
-                      { label: 'Total Paid',     value: totalPaid,     icon: DollarSign,  color: 'purple', fmt: 'currency' },
+                      { label: 'Total Paid',     value: totalPaid,     icon: PhilippinePeso,  color: 'purple', fmt: 'currency' },
                       { label: 'Unpaid',         value: unpaidCount,   icon: CreditCard,  color: 'red',    fmt: 'count' },
                     ].map(({ label, value, icon: Icon, color, fmt }) => (
                       <div key={label} className={`bg-gradient-to-br from-${color}-50 to-${color}-100 rounded-lg p-3 sm:p-4 border border-${color}-200`}>

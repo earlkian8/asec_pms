@@ -78,12 +78,12 @@ const getDatePresets = (projectStartDate, projectEndDate) => {
 };
 
 // ─── Time Slot Presets ─────────────────────────────────────────────────────────
-const TIME_SLOTS = [
-  { id: "morning", label: "Morning", time: "08:00–12:00", icon: SunMedium, color: "amber" },
-  { id: "afternoon", label: "Afternoon", time: "13:00–17:00", icon: Sunset, color: "orange" },
-  { id: "evening", label: "Evening", time: "18:00–22:00", icon: Moon, color: "indigo" },
-  { id: "fullday", label: "Full Day", time: "08:00–17:00", icon: Calendar, color: "green" },
-];
+// const TIME_SLOTS = [
+//   { id: "morning", label: "Morning", time: "08:00–12:00", icon: SunMedium, color: "amber" },
+//   { id: "afternoon", label: "Afternoon", time: "13:00–17:00", icon: Sunset, color: "orange" },
+//   { id: "evening", label: "Evening", time: "18:00–22:00", icon: Moon, color: "indigo" },
+//   { id: "fullday", label: "Full Day", time: "08:00–17:00", icon: Calendar, color: "green" },
+// ];
 
 // ─── Color map ─────────────────────────────────────────────────────────────────
 const COLOR = {
@@ -322,7 +322,7 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
           </div>
 
           {/* Work Hours / Time Slot */}
-          <div>
+          {/* <div>
             <label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-1.5">
               <Clock size={12} className="text-indigo-500" />
               Work Shift
@@ -349,7 +349,7 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
                   </button>
                 );
               })}
-            </div>
+            </div> */}
           </div>
         </div>
       )}

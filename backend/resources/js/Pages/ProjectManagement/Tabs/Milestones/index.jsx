@@ -57,7 +57,6 @@ import DeleteIssue from '../Issues/delete';
 import TaskDetailModal from '../Tasks/TaskDetailModal';
 
 // ─── Urgency chip ─────────────────────────────────────────────────────────────
-// A tiny pill with an icon + optional count. color = 'red' | 'amber' | 'violet' | 'blue'
 const UrgencyChip = ({ icon: Icon, count, color, title, pulse = false }) => {
   const colorMap = {
     red:    'bg-red-50 text-red-600 border-red-200',
@@ -84,72 +83,37 @@ const UrgencyChip = ({ icon: Icon, count, color, title, pulse = false }) => {
 };
 
 // ─── Task urgency cluster ─────────────────────────────────────────────────────
-// Shows up to 4 chips inline on a task row.
 const TaskUrgencyCluster = ({ task, today }) => {
   const chips = [];
 
-  // 1. Unread client requests — notification-style with pulse dot
   const unread = task.unread_client_requests_count ?? 0;
   if (unread > 0) {
     chips.push(
-      <UrgencyChip
-        key="client"
-        icon={Bell}
-        count={unread}
-        color="violet"
-        title={`${unread} unread client request${unread > 1 ? 's' : ''}`}
-        pulse
-      />
+      <UrgencyChip key="client" icon={Bell} count={unread} color="violet"
+        title={`${unread} unread client request${unread > 1 ? 's' : ''}`} pulse />
     );
   }
 
-  // 2. Open issues
   const rawIssues  = task.issues || [];
   const taskIssues = Array.isArray(rawIssues) ? rawIssues : (rawIssues.data || []);
   const openIssues = taskIssues.filter(i => i.status === 'open' || i.status === 'in_progress').length;
   if (openIssues > 0) {
     chips.push(
-      <UrgencyChip
-        key="issues"
-        icon={AlertCircle}
-        count={openIssues}
-        color="red"
-        title={`${openIssues} open issue${openIssues > 1 ? 's' : ''}`}
-      />
+      <UrgencyChip key="issues" icon={AlertCircle} count={openIssues} color="red"
+        title={`${openIssues} open issue${openIssues > 1 ? 's' : ''}`} />
     );
   }
 
-  // 3. Overdue (due date in the past, not completed)
-  const isOverdue =
-    task.due_date &&
-    task.status !== 'completed' &&
-    new Date(task.due_date) < today;
+  const isOverdue = task.due_date && task.status !== 'completed' && new Date(task.due_date) < today;
   if (isOverdue) {
-    chips.push(
-      <UrgencyChip
-        key="overdue"
-        icon={AlertTriangle}
-        color="amber"
-        title="Overdue"
-      />
-    );
+    chips.push(<UrgencyChip key="overdue" icon={AlertTriangle} color="amber" title="Overdue" />);
   }
 
-  // 4. Stalled — no progress updates and not completed
-  const rawPU  = task.progressUpdates || task.progress_updates;
-  const puCount = Array.isArray(rawPU)
-    ? rawPU.length
-    : (rawPU?.data ? rawPU.data.length : 0);
+  const rawPU   = task.progressUpdates || task.progress_updates;
+  const puCount = Array.isArray(rawPU) ? rawPU.length : (rawPU?.data ? rawPU.data.length : 0);
   const isStalled = task.status !== 'completed' && puCount === 0;
   if (isStalled) {
-    chips.push(
-      <UrgencyChip
-        key="stalled"
-        icon={Activity}
-        color="blue"
-        title="No progress updates yet"
-      />
-    );
+    chips.push(<UrgencyChip key="stalled" icon={Activity} color="blue" title="No progress updates yet" />);
   }
 
   if (chips.length === 0) return null;
@@ -157,25 +121,15 @@ const TaskUrgencyCluster = ({ task, today }) => {
 };
 
 // ─── Milestone urgency roll-up badge ─────────────────────────────────────────
-// Compact summary badge shown on the collapsed milestone row.
 const MilestoneUrgencyRollup = ({ milestone, today }) => {
   const tasks = milestone.tasks || [];
-
-  let unreadTotal  = 0;
-  let openIssues   = 0;
-  let overdueCount = 0;
-  let stalledCount = 0;
+  let unreadTotal = 0, openIssues = 0, overdueCount = 0, stalledCount = 0;
 
   tasks.forEach(task => {
-    unreadTotal  += task.unread_client_requests_count ?? 0;
-
+    unreadTotal += task.unread_client_requests_count ?? 0;
     const rawIssues = Array.isArray(task.issues) ? task.issues : (task.issues?.data || []);
     openIssues += rawIssues.filter(i => i.status === 'open' || i.status === 'in_progress').length;
-
-    if (task.due_date && task.status !== 'completed' && new Date(task.due_date) < today) {
-      overdueCount++;
-    }
-
+    if (task.due_date && task.status !== 'completed' && new Date(task.due_date) < today) overdueCount++;
     const rawPU = task.progressUpdates || task.progress_updates;
     const puCount = Array.isArray(rawPU) ? rawPU.length : (rawPU?.data ? rawPU.data.length : 0);
     if (task.status !== 'completed' && puCount === 0) stalledCount++;
@@ -186,22 +140,10 @@ const MilestoneUrgencyRollup = ({ milestone, today }) => {
 
   return (
     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-      {unreadTotal > 0 && (
-        <UrgencyChip icon={Bell} count={unreadTotal} color="violet"
-          title={`${unreadTotal} unread client request${unreadTotal > 1 ? 's' : ''}`} pulse />
-      )}
-      {openIssues > 0 && (
-        <UrgencyChip icon={AlertCircle} count={openIssues} color="red"
-          title={`${openIssues} open issue${openIssues > 1 ? 's' : ''}`} />
-      )}
-      {overdueCount > 0 && (
-        <UrgencyChip icon={AlertTriangle} count={overdueCount} color="amber"
-          title={`${overdueCount} overdue task${overdueCount > 1 ? 's' : ''}`} />
-      )}
-      {stalledCount > 0 && (
-        <UrgencyChip icon={Activity} count={stalledCount} color="blue"
-          title={`${stalledCount} task${stalledCount > 1 ? 's' : ''} with no progress updates`} />
-      )}
+      {unreadTotal > 0 && <UrgencyChip icon={Bell} count={unreadTotal} color="violet" title={`${unreadTotal} unread client request${unreadTotal > 1 ? 's' : ''}`} pulse />}
+      {openIssues > 0 && <UrgencyChip icon={AlertCircle} count={openIssues} color="red" title={`${openIssues} open issue${openIssues > 1 ? 's' : ''}`} />}
+      {overdueCount > 0 && <UrgencyChip icon={AlertTriangle} count={overdueCount} color="amber" title={`${overdueCount} overdue task${overdueCount > 1 ? 's' : ''}`} />}
+      {stalledCount > 0 && <UrgencyChip icon={Activity} count={stalledCount} color="blue" title={`${stalledCount} task${stalledCount > 1 ? 's' : ''} with no progress updates`} />}
     </div>
   );
 };
@@ -210,7 +152,6 @@ export default function MilestonesTab({ project, milestoneData }) {
   const { has } = usePermission();
   const { props } = usePage();
 
-  // Stable "today" reference — only date portion, no time jitter
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -226,7 +167,6 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [editMilestone, setEditMilestone] = useState(null);
   const [deleteMilestone, setDeleteMilestone] = useState(null);
   
-  // Task modals
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
@@ -234,7 +174,6 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [deleteTask, setDeleteTask] = useState(null);
   const [selectedMilestoneForTask, setSelectedMilestoneForTask] = useState(null);
   
-  // Progress update modals
   const [showAddProgressModal, setShowAddProgressModal] = useState(false);
   const [showEditProgressModal, setShowEditProgressModal] = useState(false);
   const [showDeleteProgressModal, setShowDeleteProgressModal] = useState(false);
@@ -242,21 +181,17 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [deleteProgressUpdate, setDeleteProgressUpdate] = useState(null);
   const [selectedTaskForProgress, setSelectedTaskForProgress] = useState(null);
 
-  // Issue modals
   const [showAddIssueModal, setShowAddIssueModal] = useState(false);
   const [showEditIssueModal, setShowEditIssueModal] = useState(false);
   const [showDeleteIssueModal, setShowDeleteIssueModal] = useState(false);
   const [editIssue, setEditIssue] = useState(null);
   const [deleteIssue, setDeleteIssue] = useState(null);
   
-  // Task detail modal
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
   
-  // Export state
   const [isExporting, setIsExporting] = useState(false);
   
-  // Filter / sort / search
   const [searchInput, setSearchInput] = useState(milestoneData?.search || '');
   const [showFilterCard, setShowFilterCard] = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
@@ -264,7 +199,6 @@ export default function MilestonesTab({ project, milestoneData }) {
   
   const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
 
-  // Handle both paginated and non-paginated milestone data
   const milestones = Array.isArray(milestoneData.milestones) 
     ? milestoneData.milestones 
     : (milestoneData.milestones?.data || []);
@@ -274,7 +208,6 @@ export default function MilestonesTab({ project, milestoneData }) {
   const filters = milestoneData?.filters || {};
   const filterOptions = milestoneData?.filterOptions || {};
 
-  // ── Initialise local state from server-returned values ──────────────────────
   const initializeFilters = (fp) => ({
     status:     fp?.status     || 'all',
     start_date: fp?.start_date || '',
@@ -285,12 +218,10 @@ export default function MilestonesTab({ project, milestoneData }) {
   const [sortBy,       setSortBy]       = useState(milestoneData?.sort_by    || 'due_date');
   const [sortOrder,    setSortOrder]    = useState(milestoneData?.sort_order || 'asc');
 
-  // Get all tasks from all milestones
   const allTasks = useMemo(() => {
     return milestones.flatMap(m => (m.tasks || []).map(t => ({ ...t, milestone: m })));
   }, [milestones]);
 
-  // ── Sync local state whenever server props change ────────────────────────────
   useEffect(() => {
     setLocalFilters(initializeFilters(filters));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,8 +235,6 @@ export default function MilestonesTab({ project, milestoneData }) {
   useEffect(() => {
     setSearchInput(milestoneData?.search || '');
   }, [milestoneData?.search]);
-
-  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   const buildParams = (overrides = {}) => ({
     sort_by:    sortBy,
@@ -451,7 +380,7 @@ export default function MilestonesTab({ project, milestoneData }) {
       green: 'bg-green-100 text-green-700 border-green-200',
       gray: 'bg-gray-100 text-gray-600 border-gray-200'
     };
-    return `inline-flex items-center px-2.5 py-1 w-[140px] text-xs font-medium border ${map[info.color] || map.gray}`;
+    return `inline-flex items-center px-2.5 py-1 w-[140px] text-xs font-medium border rounded ${map[info.color] || map.gray}`;
   };
 
   const getStatusSelectClassName = (status) => {
@@ -509,13 +438,11 @@ export default function MilestonesTab({ project, milestoneData }) {
     return route('project-management.progress-updates.download', [milestoneId, taskId, update.id]);
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────────────────
   const totalMilestones      = milestones.length;
   const pendingMilestones    = milestones.filter(m => m.status === 'pending').length;
   const inProgressMilestones = milestones.filter(m => m.status === 'in_progress').length;
   const completedMilestones  = milestones.filter(m => m.status === 'completed').length;
 
-  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="w-full">
       {/* Quick Stats */}
@@ -573,7 +500,6 @@ export default function MilestonesTab({ project, milestoneData }) {
             />
           </div>
           <div className="flex gap-2 relative z-50">
-            {/* ── Filter dropdown ──────────────────────────────────────────── */}
             <DropdownMenu open={showFilterCard} onOpenChange={(open) => { setShowFilterCard(open); if (open) setShowSortCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -597,7 +523,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                   </div>
                   <button onClick={() => setShowFilterCard(false)} className="text-white hover:bg-zinc-900 rounded-lg p-1"><X className="h-4 w-4" /></button>
                 </div>
-
                 <div className="p-4 overflow-y-auto flex-1">
                   <div className="mb-4">
                     <Label className="text-xs font-semibold text-gray-700 mb-2 block">Status</Label>
@@ -611,7 +536,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="mb-4">
                     <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2 block">
                       <Calendar className="h-3 w-3" /> Date Range
@@ -632,7 +556,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                     </div>
                   </div>
                 </div>
-
                 <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex gap-2 flex-shrink-0">
                   <Button type="button" onClick={resetFilters} variant="outline"
                     className="flex-1 border-gray-300 hover:bg-gray-100 text-sm h-9"
@@ -647,7 +570,6 @@ export default function MilestonesTab({ project, milestoneData }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* ── Sort dropdown ────────────────────────────────────────────── */}
             <DropdownMenu open={showSortCard} onOpenChange={(open) => { setShowSortCard(open); if (open) setShowFilterCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline"
@@ -664,7 +586,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                   </div>
                   <button onClick={() => setShowSortCard(false)} className="text-white hover:bg-zinc-900 rounded-lg p-1"><X className="h-4 w-4" /></button>
                 </div>
-
                 <div className="p-4 overflow-y-auto flex-1">
                   <div className="mb-4">
                     <Label className="text-xs font-semibold text-gray-700 mb-2 block">Sort By</Label>
@@ -690,7 +611,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                     </Select>
                   </div>
                 </div>
-
                 <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex-shrink-0">
                   <Button type="button" onClick={applySort}
                     className="w-full bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white text-sm h-9">
@@ -737,9 +657,7 @@ export default function MilestonesTab({ project, milestoneData }) {
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Status</TableHead>
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Due Date</TableHead>
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Progress</TableHead>
-              <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">
-                Alerts
-              </TableHead>
+              <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Alerts</TableHead>
               <TableHead className="font-semibold text-gray-700 text-left px-2 py-2 sm:px-4 md:px-6 text-xs sm:text-sm">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -791,12 +709,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                           <span className={`text-xs font-semibold w-8 ${progress === 100 ? 'text-green-600' : progress >= 50 ? 'text-blue-600' : progress > 0 ? 'text-yellow-600' : 'text-gray-500'}`}>{progress}%</span>
                         </div>
                       </TableCell>
-
-                      {/* ── Milestone-level rolled-up urgency badges ───── */}
                       <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
                         <MilestoneUrgencyRollup milestone={milestone} today={today} />
                       </TableCell>
-
                       <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1 items-center">
                           {has('project-tasks.create') && (
@@ -812,7 +727,6 @@ export default function MilestonesTab({ project, milestoneData }) {
                       </TableCell>
                     </TableRow>
 
-                    {/* Tasks under milestone */}
                     {isExpanded && tasks.length > 0 && (
                       <TableRow className="bg-gray-50 hover:bg-gray-50 border-0">
                         <TableCell colSpan={7} className="p-0 h-2 bg-gray-50">
@@ -826,18 +740,17 @@ export default function MilestonesTab({ project, milestoneData }) {
                       const taskWithMilestone = { ...task, milestone: task.milestone || milestone, assignedUser, assigned_user: assignedUser };
                       const rawPU             = task.progressUpdates || task.progress_updates;
                       let progressUpdates     = [];
-                      if (Array.isArray(rawPU))                              progressUpdates = rawPU;
-                      else if (rawPU?.data && Array.isArray(rawPU.data))    progressUpdates = rawPU.data;
+                      if (Array.isArray(rawPU))                                    progressUpdates = rawPU;
+                      else if (rawPU?.data && Array.isArray(rawPU.data))          progressUpdates = rawPU.data;
                       else if (rawPU?.data?.data && Array.isArray(rawPU.data.data)) progressUpdates = rawPU.data.data;
 
                       const rawIssues  = task.issues || task.task_issues || [];
                       const taskIssues = Array.isArray(rawIssues) ? rawIssues : [];
 
-                      // Determine if this task has any urgency so we can subtly tint the row
-                      const hasUnread   = (task.unread_client_requests_count ?? 0) > 0;
+                      const hasUnread    = (task.unread_client_requests_count ?? 0) > 0;
                       const hasOpenIssue = taskIssues.some(i => i.status === 'open' || i.status === 'in_progress');
-                      const isOverdue   = task.due_date && task.status !== 'completed' && new Date(task.due_date) < today;
-                      const hasUrgency  = hasUnread || hasOpenIssue || isOverdue;
+                      const isOverdue    = task.due_date && task.status !== 'completed' && new Date(task.due_date) < today;
+                      const isCompleted  = taskWithMilestone.status === 'completed';
 
                       return (
                         <TableRow
@@ -849,6 +762,8 @@ export default function MilestonesTab({ project, milestoneData }) {
                               ? 'border-l-red-300 bg-red-50/20 hover:bg-red-50/40'
                               : isOverdue
                               ? 'border-l-amber-300 bg-amber-50/20 hover:bg-amber-50/40'
+                              : isCompleted
+                              ? 'border-l-green-300 bg-green-50/10 hover:bg-green-50/20'
                               : 'border-l-blue-200 bg-white hover:bg-blue-50/30'
                           }`}
                           onClick={() => { setSelectedTaskForDetail(taskWithMilestone); setShowTaskDetailModal(true); }}
@@ -870,32 +785,15 @@ export default function MilestonesTab({ project, milestoneData }) {
                               {task.description && <div className="text-xs text-gray-500 line-clamp-1 mt-0.5">{task.description}</div>}
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
-                            {has('project-tasks.update-status') ? (
-                              <Select value={taskWithMilestone.status} onValueChange={v => handleTaskStatusChange(taskWithMilestone, v)}>
-                                <SelectTrigger className={getStatusSelectClassName(taskWithMilestone.status)}>
-                                  <SelectValue>{formatStatus(taskWithMilestone.status).label}</SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500"></span>Pending</span></SelectItem>
-                                  <SelectItem value="in_progress"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500"></span>In Progress</span></SelectItem>
-                                  <SelectItem value="completed" disabled={progressUpdates.length === 0}>
-                                    <span className="flex items-center gap-2">
-                                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                      Completed
-                                      {progressUpdates.length === 0 && <span className="text-xs text-gray-400">(Requires progress update)</span>}
-                                    </span>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${formatStatus(taskWithMilestone.status).color === 'green' ? 'bg-green-100 text-green-800' : formatStatus(taskWithMilestone.status).color === 'blue' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                {formatStatus(taskWithMilestone.status).label}
-                              </span>
-                            )}
+
+                          {/* ── Status cell: read-only badge (same as milestone) ── */}
+                          <TableCell className="text-xs sm:text-sm">
+                            <span className={getStatusBadgeClassName(taskWithMilestone.status)}>
+                              {formatStatus(taskWithMilestone.status).label}
+                            </span>
                           </TableCell>
+
                           <TableCell className="text-xs sm:text-sm text-gray-600">{formatDate(taskWithMilestone.due_date)}</TableCell>
-                          {/* Progress col repurposed to show assignee on task rows */}
                           <TableCell className="text-xs sm:text-sm">
                             <div className="flex items-center gap-1.5 text-sm text-gray-600">
                               {taskWithMilestone.assignedUser?.name || taskWithMilestone.assigned_user?.name ? (
@@ -905,12 +803,9 @@ export default function MilestonesTab({ project, milestoneData }) {
                               )}
                             </div>
                           </TableCell>
-
-                          {/* ── Task urgency chips ───────────────────────── */}
                           <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
                             <TaskUrgencyCluster task={task} today={today} />
                           </TableCell>
-
                           <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
                             <div className="flex gap-1">
                               {has('project-tasks.update') && (

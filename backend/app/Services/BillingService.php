@@ -31,7 +31,7 @@ class BillingService
             'project:id,project_code,project_name,client_id',
             'project.client:id,client_name',
             'milestone:id,name',
-            'createdBy:id,name'
+            'createdBy:id,first_name,middle_name,last_name'
         ])
             ->withCount('payments')
             ->whereNull('archived_at')

@@ -383,7 +383,7 @@ function BulkPresetBar({ selectedIds, onApplyAll, projectData }) {
         ))}
       </div>
       <div className="ml-auto flex gap-1.5">
-        {TIME_SLOTS.map((slot) => (
+        {/* {TIME_SLOTS.map((slot) => (
           <button
             key={slot.id}
             type="button"
@@ -393,7 +393,7 @@ function BulkPresetBar({ selectedIds, onApplyAll, projectData }) {
           >
             <Clock size={11} /> {slot.label}
           </button>
-        ))}
+        ))} */}
       </div>
     </div>
   );

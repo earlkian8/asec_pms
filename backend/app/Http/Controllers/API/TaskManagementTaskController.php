@@ -64,6 +64,20 @@ class TaskManagementTaskController extends Controller
             $milestone->update(['status' => 'in_progress']);
         }
     }
+
+    /**
+     * Helper to generate a file URL from a file path.
+     * Uses Storage::disk('public')->url() which respects APP_URL from .env,
+     * avoiding proxy/scheme issues on DigitalOcean.
+     */
+    private function getFileUrl(?string $filePath): ?string
+    {
+        if ($filePath && Storage::disk('public')->exists($filePath)) {
+            return Storage::disk('public')->url($filePath);
+        }
+        return null;
+    }
+
     /**
      * Get task detail with related data
      */
@@ -234,24 +248,13 @@ class TaskManagementTaskController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Generate storage URL using request host (works for mobile apps, not just localhost)
-        $scheme = $request->getScheme();
-        $host = $request->getHost();
-        $port = $request->getPort();
-        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
-
-        $formattedUpdates = $updates->map(function ($update) use ($baseUrl) {
-            $fileUrl = null;
-            if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                $fileUrl = $baseUrl . '/storage/' . $update->file_path;
-            }
-
+        $formattedUpdates = $updates->map(function ($update) {
             return [
                 'id' => $update->id,
                 'project_task_id' => $update->project_task_id,
                 'description' => $update->description,
                 'file_path' => $update->file_path,
-                'file_url' => $fileUrl,
+                'file_url' => $this->getFileUrl($update->file_path),
                 'original_name' => $update->original_name,
                 'file_type' => $update->file_type,
                 'file_size' => $update->file_size,
@@ -305,11 +308,10 @@ class TaskManagementTaskController extends Controller
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $directory = "progress_updates/{$task->id}";
-            
-            // Store in storage/app/public
+
             $filename = time() . '_' . $file->getClientOriginalName();
             $file->storeAs($directory, $filename, 'public');
-            
+
             $filePath = $directory . '/' . $filename;
             $originalName = $file->getClientOriginalName();
             $fileType = $file->getMimeType();
@@ -338,23 +340,12 @@ class TaskManagementTaskController extends Controller
         if ($task->milestone && $task->milestone->project) {
             $project = $task->milestone->project;
             $this->createSystemNotification(
-                        'update',
-                        'New Progress Update',
-                        "A new progress update has been added for task '{$task->title}' in milestone '{$task->milestone->name}' for project '{$project->project_name}'.",
-                        $project,
-                        null // API doesn't have web routes
-                    );
-        }
-
-        // Generate storage URL using request host (works for mobile apps, not just localhost)
-        $scheme = $request->getScheme();
-        $host = $request->getHost();
-        $port = $request->getPort();
-        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
-
-        $fileUrl = null;
-        if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            $fileUrl = $baseUrl . '/storage/' . $progressUpdate->file_path;
+                'update',
+                'New Progress Update',
+                "A new progress update has been added for task '{$task->title}' in milestone '{$task->milestone->name}' for project '{$project->project_name}'.",
+                $project,
+                null // API doesn't have web routes
+            );
         }
 
         return response()->json([
@@ -365,7 +356,7 @@ class TaskManagementTaskController extends Controller
                 'project_task_id' => $progressUpdate->project_task_id,
                 'description' => $progressUpdate->description,
                 'file_path' => $progressUpdate->file_path,
-                'file_url' => $fileUrl,
+                'file_url' => $this->getFileUrl($progressUpdate->file_path),
                 'original_name' => $progressUpdate->original_name,
                 'file_type' => $progressUpdate->file_type,
                 'file_size' => $progressUpdate->file_size,
@@ -418,10 +409,8 @@ class TaskManagementTaskController extends Controller
             'file' => 'nullable|file|max:20480',
         ]);
 
-        // Update description
         $progressUpdate->description = $request->description;
 
-        // Handle file update
         if ($request->hasFile('file')) {
             // Delete old file if exists
             if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
@@ -430,10 +419,10 @@ class TaskManagementTaskController extends Controller
 
             $file = $request->file('file');
             $directory = "progress_updates/{$task->id}";
-            
+
             $filename = time() . '_' . $file->getClientOriginalName();
             $file->storeAs($directory, $filename, 'public');
-            
+
             $progressUpdate->file_path = $directory . '/' . $filename;
             $progressUpdate->original_name = $file->getClientOriginalName();
             $progressUpdate->file_type = $file->getMimeType();
@@ -443,17 +432,6 @@ class TaskManagementTaskController extends Controller
         $progressUpdate->save();
         $progressUpdate->load('createdBy');
 
-        // Generate storage URL using request host (works for mobile apps, not just localhost)
-        $scheme = $request->getScheme();
-        $host = $request->getHost();
-        $port = $request->getPort();
-        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
-
-        $fileUrl = null;
-        if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            $fileUrl = $baseUrl . '/storage/' . $progressUpdate->file_path;
-        }
-
         return response()->json([
             'success' => true,
             'message' => 'Progress update updated successfully',
@@ -462,7 +440,7 @@ class TaskManagementTaskController extends Controller
                 'project_task_id' => $progressUpdate->project_task_id,
                 'description' => $progressUpdate->description,
                 'file_path' => $progressUpdate->file_path,
-                'file_url' => $fileUrl,
+                'file_url' => $this->getFileUrl($progressUpdate->file_path),
                 'original_name' => $progressUpdate->original_name,
                 'file_type' => $progressUpdate->file_type,
                 'file_size' => $progressUpdate->file_size,
@@ -510,7 +488,6 @@ class TaskManagementTaskController extends Controller
             ], 404);
         }
 
-        // Delete file if exists
         if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
             Storage::disk('public')->delete($progressUpdate->file_path);
         }
@@ -684,12 +661,12 @@ class TaskManagementTaskController extends Controller
         if ($task->milestone && $task->milestone->project) {
             $project = $task->milestone->project;
             $this->createSystemNotification(
-                        'issue',
-                        'New Issue Reported',
-                        "A new issue '{$request->title}' has been reported for task '{$task->title}' in project '{$project->project_name}'.",
-                        $project,
-                        null // API doesn't have web routes
-                    );
+                'issue',
+                'New Issue Reported',
+                "A new issue '{$request->title}' has been reported for task '{$task->title}' in project '{$project->project_name}'.",
+                $project,
+                null // API doesn't have web routes
+            );
         }
 
         return response()->json([
@@ -897,7 +874,7 @@ class TaskManagementTaskController extends Controller
     private function getTaskPriority($task)
     {
         $projectPriority = $task->milestone->project->priority ?? null;
-        
+
         switch ($projectPriority) {
             case 'high':
                 return 'critical';
@@ -910,4 +887,3 @@ class TaskManagementTaskController extends Controller
         }
     }
 }
-

@@ -75,12 +75,23 @@ class ProjectOverviewService
         $pendingMilestones   = $milestones->where('status', 'pending')->count();
 
         // ── Tasks ─────────────────────────────────────────────────────────────
-        $tasks          = ProjectTask::whereHas('milestone', fn ($q) => $q->where('project_id', $project->id))->get();
+        $milestoneIds   = $milestones->pluck('id');
+        $tasks          = ProjectTask::whereIn('project_milestone_id', $milestoneIds)->get();
         $totalTasks     = $tasks->count();
         $completedTasks = $tasks->where('status', 'completed')->count();
         $inProgressTasks= $tasks->where('status', 'in_progress')->count();
         $pendingTasks   = $tasks->where('status', 'pending')->count();
 
+        $overallProgress = 0;
+        if ($milestones->count() > 0) {
+            $milestoneProgressValues = $milestones->map(function ($milestone) use ($tasks) {
+                $milestoneTasks = $tasks->where('project_milestone_id', $milestone->id);
+                $total          = $milestoneTasks->count();
+                if ($total === 0) return 0.0;
+                return ($milestoneTasks->where('status', 'completed')->count() / $total) * 100;
+            });
+            $overallProgress = round($milestoneProgressValues->avg(), 2);
+        }
         // ── Monthly Breakdown (last 6 months) ─────────────────────────────────
 
         // Labor — group by period_start month, sum gross_pay
@@ -132,6 +143,7 @@ class ProjectOverviewService
 
         return [
             'project' => $project,
+            'overall_progress' => $overallProgress,
             'budget'  => [
                 'contract_amount'               => $contractAmount,
                 'total_labor_cost'              => $totalLaborCost,

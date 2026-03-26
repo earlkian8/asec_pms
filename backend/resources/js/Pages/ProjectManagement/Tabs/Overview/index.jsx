@@ -103,6 +103,7 @@ export default function OverviewTab({ project, overviewData }) {
               <Sparkles className="text-yellow-500" size={18} />
             </div>
             <p className="text-xs text-gray-500 font-medium">Code: {project.project_code}</p>
+            
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             <span className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize ${getStatusColor(project.status)}`}>
@@ -159,6 +160,30 @@ export default function OverviewTab({ project, overviewData }) {
             <p className="text-sm text-gray-700 leading-relaxed">{project.description}</p>
           </div>
         )}
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Overall Progress</span>
+            <span className={`text-sm font-bold ${
+              overviewData.overall_progress === 100 ? 'text-green-700' :
+              overviewData.overall_progress >= 50   ? 'text-blue-700'  :
+              overviewData.overall_progress > 0     ? 'text-yellow-700': 'text-gray-400'
+            }`}>
+              {overviewData.overall_progress ?? 0}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner border border-gray-300 overflow-hidden">
+            <div
+              className={`h-3 rounded-full transition-all duration-700 ${
+                overviewData.overall_progress === 100 ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                overviewData.overall_progress >= 50   ? 'bg-gradient-to-r from-blue-500 to-blue-600'  :
+                overviewData.overall_progress > 0     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600':
+                                                        'bg-gray-300'
+              }`}
+              style={{ width: `${Math.min(overviewData.overall_progress ?? 0, 100)}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1 font-medium">Based on milestone task completion</p>
+        </div>
       </div>
 
       {/* Key Metrics Grid */}

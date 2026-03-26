@@ -12,8 +12,8 @@ export default defineConfig({
     ],
     server: {
         hmr: {
-            host: 'https://asec-pms-3dfex.ondigitalocean.app/',
-            // host: 'localhost',
+            // host: 'https://asec-pms-3dfex.ondigitalocean.app/',
+            host: 'localhost',
         },
     },
 });

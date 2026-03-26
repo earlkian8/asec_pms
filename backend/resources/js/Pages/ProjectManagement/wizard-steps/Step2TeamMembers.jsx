@@ -349,8 +349,8 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
                   </button>
                 );
               })}
-            </div> */}
-          </div>
+            </div>
+          </div> */}
         </div>
       )}
     </div>

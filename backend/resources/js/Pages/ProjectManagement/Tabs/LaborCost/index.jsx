@@ -11,8 +11,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Compon
 import { toast } from 'sonner';
 import {
   Trash2, SquarePen, Plus, Filter, Search, Calendar,
-  X, ArrowUpDown, DollarSign, Users, CheckCircle2,
+  X, ArrowUpDown, Users, CheckCircle2,
   Clock, Lock, Send, ChevronDown, ChevronRight,
+  PhilippinePeso,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddLaborCost from './add';
@@ -148,7 +149,7 @@ export default function LaborCostTab({ project, laborCostData }) {
       <div className="mb-6 pb-6 border-b border-gray-200">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total Gross Pay',  value: formatCurrency(totalGrossPay), icon: DollarSign, from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
+            { label: 'Total Gross Pay',  value: formatCurrency(totalGrossPay), icon: PhilippinePeso, from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
             { label: 'Total Days',       value: totalDays.toFixed(1) + ' days', icon: Calendar,   from: 'from-blue-50',   to: 'to-blue-100',   border: 'border-blue-200',   text: 'text-blue-700',   num: 'text-blue-900',   iconBg: 'bg-blue-200',   iconColor: 'text-blue-700'   },
             { label: 'Draft Entries',    value: totalDraft,                     icon: Clock,      from: 'from-yellow-50', to: 'to-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', num: 'text-yellow-900', iconBg: 'bg-yellow-200', iconColor: 'text-yellow-700' },
             { label: 'Submitted',        value: totalSubmitted,                 icon: CheckCircle2,from:'from-indigo-50', to: 'to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-700', num: 'text-indigo-900', iconBg: 'bg-indigo-200', iconColor: 'text-indigo-700' },

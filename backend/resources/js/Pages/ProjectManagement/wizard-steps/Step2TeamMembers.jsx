@@ -579,14 +579,14 @@ export default function Step2TeamMembers({ users }) {
       )}
 
       {/* ── Rotation Notice ── */}
-      <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800">
+      {/* <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800">
         <AlertCircle size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
         <span>
           <strong>Employees</strong> follow a single-assignment rule — only one active project at a time. Use{" "}
           <strong>Work Shift</strong> to enable partial-day rotation (e.g. 8am–12pm on Project A, 1pm–5pm on Project B).{" "}
           <strong>Users/contractors</strong> can be on multiple projects simultaneously.
         </span>
-      </div>
+      </div> */}
 
       {/* ── Search + Filter Row ── */}
       <div className="flex gap-2 flex-wrap items-center">

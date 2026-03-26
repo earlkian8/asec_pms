@@ -10,6 +10,7 @@ import { Label } from "@/Components/ui/label";
 import {
   Archive, SquarePen, Eye, Filter, X, Search, Calendar,
   TrendingUp, Users, DollarSign, ArrowUpDown, FolderOpen, Trash2,
+  PhilippinePeso,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -298,7 +299,7 @@ export default function ProjectsIndex() {
                       </p>
                     </div>
                     <div className="bg-amber-200 rounded-full p-2 sm:p-3">
-                      <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-amber-700" />
+                      <PhilippinePeso className="h-4 w-4 sm:h-5 sm:w-5 text-amber-700" />
                     </div>
                   </div>
                 </div>

@@ -503,13 +503,13 @@ export default function TeamTab({ project, teamData }) {
                     <div className="flex gap-1.5 flex-wrap">
 
                       {/* Eye — assignment history */}
-                      <button
+                      {/* <button
                         onClick={() => handleViewHistory(team)}
                         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-all border border-slate-200 hover:border-slate-300"
                         title="View assignment history"
                       >
                         <Eye size={15} />
-                      </button>
+                      </button> */}
 
                       {/* Edit */}
                       {has('project-teams.update') && (
@@ -523,7 +523,7 @@ export default function TeamTab({ project, teamData }) {
                       )}
 
                       {/* Release (employees only) */}
-                      {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'active' && (
+                      {/* {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'active' && (
                         <button
                           onClick={() => handleChangeStatus(team, 'released')}
                           className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-all border border-amber-200 hover:border-amber-300"
@@ -531,10 +531,10 @@ export default function TeamTab({ project, teamData }) {
                         >
                           <LogOut size={15} />
                         </button>
-                      )}
+                      )} */}
 
                       {/* Re-activate (employees only) */}
-                      {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'released' && (
+                      {/* {has('project-teams.delete') && team.assignable_type === 'employee' && team.assignment_status === 'released' && (
                         <button
                           onClick={() => handleChangeStatus(team, 'active')}
                           className="p-1.5 rounded-lg hover:bg-green-100 text-green-600 hover:text-green-700 transition-all border border-green-200 hover:border-green-300"
@@ -542,7 +542,7 @@ export default function TeamTab({ project, teamData }) {
                         >
                           <UserCheck size={15} />
                         </button>
-                      )}
+                      )} */}
 
                       {/* Remove (hard delete) */}
                       {has('project-teams.delete') && (

@@ -64,7 +64,7 @@ class ProjectTeamService
             ->withQueryString();
 
         // ── Available assignables ─────────────────────────────────────────────
-        $occupiedEmployeeIds = ProjectTeam::fullyOccupiedEmployeeIds();
+        // $occupiedEmployeeIds = ProjectTeam::fullyOccupiedEmployeeIds();
 
         $existingUserIds = ProjectTeam::where('project_id', $project->id)
             ->whereNotNull('user_id')
@@ -85,8 +85,14 @@ class ProjectTeamService
                 'type'  => 'user',
             ]);
 
+        $existingEmployeeIds = ProjectTeam::where('project_id', $project->id)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->filter()
+            ->toArray();
         $employees = Employee::where('is_active', true)
-            ->whereNotIn('id', $occupiedEmployeeIds)
+            ->whereNotIn('id', $existingEmployeeIds)
+            // ->whereNotIn('id', $occupiedEmployeeIds)
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get()

@@ -164,13 +164,13 @@ class ProjectsController extends Controller
 
         // Employees with an active assignment in ANY project are excluded (rotation rule)
         // Users (contractors) are exempt — they can be on multiple projects
-        $occupiedEmployeeIds = ProjectTeam::occupied()
-            ->whereNotNull('employee_id')
-            ->pluck('employee_id')
-            ->unique()->filter()->toArray();
+        // $occupiedEmployeeIds = ProjectTeam::occupied()
+        //     ->whereNotNull('employee_id')
+        //     ->pluck('employee_id')
+        //     ->unique()->filter()->toArray();
 
         $employees = Employee::where('is_active', true)
-            ->whereNotIn('id', $occupiedEmployeeIds)
+            // ->whereNotIn('id', $occupiedEmployeeIds)
             ->orderBy('first_name')->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'email', 'position'])
             ->map(fn ($e) => [
@@ -379,16 +379,16 @@ class ProjectsController extends Controller
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid employee.']]);
                     }
                     // Rotation guard: employees cannot be on two projects at once
-                    if ($member['type'] === 'employee') {
-                        $occupied = ProjectTeam::occupied()
-                            ->where('employee_id', $member['id'])
-                            ->exists();
-                        if ($occupied) {
-                            throw \Illuminate\Validation\ValidationException::withMessages([
-                                "team_members.{$index}.id" => ['This employee already has an active project assignment.'],
-                            ]);
-                        }
-                    }
+                    // if ($member['type'] === 'employee') {
+                    //     $occupied = ProjectTeam::occupied()
+                    //         ->where('employee_id', $member['id'])
+                    //         ->exists();
+                    //     if ($occupied) {
+                    //         throw \Illuminate\Validation\ValidationException::withMessages([
+                    //             "team_members.{$index}.id" => ['This employee already has an active project assignment.'],
+                    //         ]);
+                    //     }
+                    // }
                 }
                 foreach ($validated['team_members'] as $member) {
                     ProjectTeam::create([

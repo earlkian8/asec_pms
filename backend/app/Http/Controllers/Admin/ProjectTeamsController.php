@@ -79,16 +79,16 @@ class ProjectTeamsController extends Controller
 
         foreach ($validated['assignables'] as $index => $assignable) {
             // ── Occupation guard (employees only) ─────────────────────────────
-            if ($assignable['type'] === 'employee') {
-                $occupiedIds = ProjectTeam::fullyOccupiedEmployeeIds();
-                if (in_array($assignable['id'], $occupiedIds)) {
-                    $name = $this->resolveAssignableName($assignable);
-                    return redirect()->back()->withErrors([
-                        "assignables.{$index}.id" =>
-                            "{$name} is currently active on another project. Release them first before assigning here.",
-                    ])->withInput();
-                }
-            }
+            // if ($assignable['type'] === 'employee') {
+            //     $occupiedIds = ProjectTeam::fullyOccupiedEmployeeIds();
+            //     if (in_array($assignable['id'], $occupiedIds)) {
+            //         $name = $this->resolveAssignableName($assignable);
+            //         return redirect()->back()->withErrors([
+            //             "assignables.{$index}.id" =>
+            //                 "{$name} is currently active on another project. Release them first before assigning here.",
+            //         ])->withInput();
+            //     }
+            // }
 
             // Skip duplicate — only if there's already an ACTIVE assignment for this person on this project
             $exists = ProjectTeam::where('project_id', $project->id)
@@ -192,22 +192,22 @@ class ProjectTeamsController extends Controller
         }
 
         // If re-activating, check no other active assignment
-        if (
-            isset($validated['assignment_status'])
-            && $validated['assignment_status'] === AssignmentStatus::Active->value
-            && $projectTeam->assignable_type === 'employee'
-        ) {
-            $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
-                ->where('assignment_status', AssignmentStatus::Active->value)
-                ->where('id', '!=', $projectTeam->id)
-                ->exists();
+        // if (
+        //     isset($validated['assignment_status'])
+        //     && $validated['assignment_status'] === AssignmentStatus::Active->value
+        //     && $projectTeam->assignable_type === 'employee'
+        // ) {
+        //     $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
+        //         ->where('assignment_status', AssignmentStatus::Active->value)
+        //         ->where('id', '!=', $projectTeam->id)
+        //         ->exists();
 
-            if ($conflict) {
-                return redirect()->back()->withErrors([
-                    'assignment_status' => "{$projectTeam->assignable_name} already has an active assignment on another project.",
-                ])->withInput();
-            }
-        }
+        //     if ($conflict) {
+        //         return redirect()->back()->withErrors([
+        //             'assignment_status' => "{$projectTeam->assignable_name} already has an active assignment on another project.",
+        //         ])->withInput();
+        //     }
+        // }
 
         $old = [
             'role'   => $projectTeam->role,
@@ -253,18 +253,18 @@ class ProjectTeamsController extends Controller
         $newStatus = AssignmentStatus::from($request->assignment_status);
 
         // Re-activating an employee — check for conflicts
-        if ($newStatus === AssignmentStatus::Active && $projectTeam->assignable_type === 'employee') {
-            $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
-                ->where('assignment_status', AssignmentStatus::Active->value)
-                ->where('id', '!=', $projectTeam->id)
-                ->exists();
+        // if ($newStatus === AssignmentStatus::Active && $projectTeam->assignable_type === 'employee') {
+        //     $conflict = ProjectTeam::where('employee_id', $projectTeam->employee_id)
+        //         ->where('assignment_status', AssignmentStatus::Active->value)
+        //         ->where('id', '!=', $projectTeam->id)
+        //         ->exists();
 
-            if ($conflict) {
-                return redirect()->back()->with('error',
-                    "{$projectTeam->assignable_name} already has an active assignment on another project. Release them there first."
-                );
-            }
-        }
+        //     if ($conflict) {
+        //         return redirect()->back()->with('error',
+        //             "{$projectTeam->assignable_name} already has an active assignment on another project. Release them there first."
+        //         );
+        //     }
+        // }
 
         $oldLabel = $projectTeam->assignment_status instanceof \BackedEnum
             ? $projectTeam->assignment_status->label()

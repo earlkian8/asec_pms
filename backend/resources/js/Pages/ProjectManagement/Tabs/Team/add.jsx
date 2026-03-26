@@ -396,14 +396,14 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
         </div>
 
         {/* ── Info notice ── */}
-        <div className="mx-6 mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 text-xs text-amber-800 flex-shrink-0">
+        {/* <div className="mx-6 mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 text-xs text-amber-800 flex-shrink-0">
           <AlertCircle size={13} className="flex-shrink-0 mt-0.5 text-amber-500" />
           <span>
             <strong>Employees</strong> can only be active on one project at a time. To move an employee here,
             release them from their current project first.{" "}
             <strong>Users/contractors</strong> can appear on multiple projects.
           </span>
-        </div>
+        </div> */}
 
         {/* ── Search + Filter ── */}
         <div className="px-6 pt-3 pb-2 space-y-2 flex-shrink-0">

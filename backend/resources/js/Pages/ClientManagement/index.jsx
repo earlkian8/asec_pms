@@ -29,8 +29,7 @@ export default function ClientsIndex() {
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Client Management", href: route('client-management.index') },
-    { title: "Clients" },
+    { title: "Client Management" },
   ];
 
   const columns = [

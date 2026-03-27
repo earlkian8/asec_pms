@@ -16,9 +16,14 @@ import { Button } from "@/Components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 
-const AddReceivingReport = ({ setShowAddModal, project, allocation }) => {
+const AddReceivingReport = ({ setShowAddModal, project, allocation, budgetSummary }) => {
   const remaining = (allocation.quantity_allocated || 0) - (allocation.quantity_received || 0);
   const inventoryItem = allocation.inventoryItem || allocation.inventory_item || {};
+
+  const fmt = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n ?? 0);
+  const thisItemCost = (allocation.quantity_allocated || 0) * (inventoryItem.unit_price || 0);
+  const budgetRemaining = budgetSummary?.budget_remaining ?? (project?.contract_amount ?? 0);
+  const isOverBudget = budgetRemaining < 0;
 
   const { data, setData, post, errors, processing } = useForm({
     quantity_received: "",
@@ -73,6 +78,30 @@ const AddReceivingReport = ({ setShowAddModal, project, allocation }) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+          {/* Budget Comparison Strip */}
+          {budgetSummary && (
+            <div className={`rounded-lg border px-3 py-2 text-xs ${isOverBudget ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <span className="text-gray-500">Contract: <span className="font-semibold text-gray-800">{fmt(budgetSummary.contract_amount)}</span></span>
+                <span className="text-blue-600">Allocated Cost: <span className="font-semibold">{fmt(budgetSummary.total_allocated_cost)}</span></span>
+                <span className={isOverBudget ? 'text-red-600' : 'text-emerald-600'}>
+                  Remaining: <span className="font-semibold">{fmt(budgetRemaining)}</span>
+                </span>
+                {inventoryItem.unit_price > 0 && (
+                  <span className="text-purple-600">This Item Cost: <span className="font-semibold">{fmt(thisItemCost)}</span></span>
+                )}
+              </div>
+              {budgetSummary.contract_amount > 0 && (
+                <div className="mt-1.5 w-full bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full ${isOverBudget ? 'bg-red-500' : 'bg-blue-500'}`}
+                    style={{ width: `${Math.min(Math.round((budgetSummary.total_allocated_cost / budgetSummary.contract_amount) * 100), 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Item Info */}
           <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
             <div className="text-sm text-gray-600 space-y-1">

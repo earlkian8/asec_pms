@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/Components/ui/dialog";
 import { usePermission } from '@/utils/permissions';
 import AddProjectTeam from './add';
 import EditProjectTeam from './edit';
@@ -29,15 +30,17 @@ export default function TeamTab({ project, teamData }) {
   const filterOptions    = teamData?.filterOptions || {};
   const initialSearch    = teamData?.search || '';
 
-  const [selectedIds,         setSelectedIds]         = useState([]);
-  const [showAddModal,        setShowAddModal]        = useState(false);
-  const [showEditModal,       setShowEditModal]       = useState(false);
-  const [showUnassignModal,   setShowUnassignModal]   = useState(false);
-  const [editProjectTeam,     setEditProjectTeam]     = useState(null);
-  const [showRemoveModal,     setShowRemoveModal]     = useState(false);
-  const [removeTeamMember,    setRemoveTeamMember]    = useState(null);
-  const [showHistoryModal,    setShowHistoryModal]    = useState(false);
-  const [historyTeamMember,   setHistoryTeamMember]   = useState(null);
+  const [selectedIds,           setSelectedIds]           = useState([]);
+  const [showAddModal,          setShowAddModal]          = useState(false);
+  const [showEditModal,         setShowEditModal]         = useState(false);
+  const [showUnassignModal,     setShowUnassignModal]     = useState(false);
+  const [showBulkReactivate,    setShowBulkReactivate]    = useState(false);
+  const [showBulkRemoveModal,   setShowBulkRemoveModal]   = useState(false);
+  const [editProjectTeam,       setEditProjectTeam]       = useState(null);
+  const [showRemoveModal,       setShowRemoveModal]       = useState(false);
+  const [removeTeamMember,      setRemoveTeamMember]      = useState(null);
+  const [showHistoryModal,      setShowHistoryModal]      = useState(false);
+  const [historyTeamMember,     setHistoryTeamMember]     = useState(null);
   const [searchInput,         setSearchInput]         = useState(initialSearch);
   const [showFilterCard,      setShowFilterCard]      = useState(false);
   const [showSortCard,        setShowSortCard]        = useState(false);
@@ -182,6 +185,53 @@ export default function TeamTab({ project, teamData }) {
   const handleForceRemove = (team) => { setRemoveTeamMember(team); setShowRemoveModal(true); };
   const handleViewHistory = (team) => { setHistoryTeamMember(team); setShowHistoryModal(true); };
 
+  const handleBulkStatus = (newStatus) => {
+    router.put(
+      route('project-management.project-teams.bulk-status', project.id),
+      { ids: selectedIds, assignment_status: newStatus },
+      {
+        preserveScroll: true,
+        onSuccess: (page) => {
+          const flash = page.props.flash;
+          if (flash?.error) toast.error(flash.error);
+          else {
+            const label = newStatus === 'active' ? 'reactivated' : 'released';
+            toast.success(`${selectedIds.length} member(s) ${label} successfully.`);
+            setSelectedIds([]);
+          }
+          setShowUnassignModal(false);
+          setShowBulkReactivate(false);
+        },
+        onError: () => toast.error('Failed to update status.'),
+      }
+    );
+  };
+
+  const handleBulkForceRemove = () => {
+    router.delete(
+      route('project-management.project-teams.force-remove', project.id),
+      {
+        data: { ids: selectedIds },
+        preserveScroll: true,
+        onSuccess: (page) => {
+          const flash = page.props.flash;
+          if (flash?.error) toast.error(flash.error);
+          else {
+            toast.success(`${selectedIds.length} member(s) permanently removed.`);
+            setSelectedIds([]);
+          }
+          setShowBulkRemoveModal(false);
+        },
+        onError: () => toast.error('Failed to remove members.'),
+      }
+    );
+  };
+
+  // Derived selection info for bulk action labels
+  const selectedMembers       = projectTeams.filter(t => selectedIds.includes(t.id));
+  const selectedActiveCount   = selectedMembers.filter(t => t.assignment_status === 'active').length;
+  const selectedReleasedCount = selectedMembers.filter(t => t.assignment_status === 'released').length;
+
   const STATUS_CONFIG = {
     active:    { label: 'Active',    bg: 'bg-green-100',  text: 'text-green-800',  border: 'border-green-200' },
     completed: { label: 'Completed', bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-200'  },
@@ -210,60 +260,60 @@ export default function TeamTab({ project, teamData }) {
 
       {/* Quick Stats */}
       <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+        <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Members</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{totalMembers}</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-900 mt-1">{totalMembers}</p>
               </div>
-              <div className="bg-blue-200 rounded-full p-3"><Users className="h-5 w-5 text-blue-700" /></div>
+              <div className="bg-blue-200 rounded-full p-2 sm:p-3"><Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-700" /></div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-4 border border-green-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Active</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">{activeMembers}</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-900 mt-1">{activeMembers}</p>
               </div>
-              <div className="bg-green-200 rounded-full p-3"><UserCheck className="h-5 w-5 text-green-700" /></div>
+              <div className="bg-green-200 rounded-full p-2 sm:p-3"><UserCheck className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" /></div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 sm:p-4 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Released</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{releasedMembers}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-800 mt-1">{releasedMembers}</p>
               </div>
-              <div className="bg-gray-200 rounded-full p-3"><UserX className="h-5 w-5 text-gray-600" /></div>
+              <div className="bg-gray-200 rounded-full p-2 sm:p-3"><UserX className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" /></div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Search + Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between relative z-50">
-        <div className="flex flex-col sm:flex-row gap-3 items-center flex-1 relative z-50">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-center justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search team members..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
+              className="pl-10 h-11 w-full border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
-          <div className="flex gap-2 relative z-50">
+          <div className="flex gap-2 relative">
             {/* Filter */}
             <DropdownMenu open={showFilterCard} onOpenChange={(open) => { setShowFilterCard(open); if (open) setShowSortCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" title="Filters"
-                  className={`h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center relative ${
+                  className={`h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center relative ${
                     activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}>
                   <Filter className="h-4 w-4" />
                   {activeFiltersCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-4 w-4 flex items-center justify-center">
                       {activeFiltersCount()}
                     </span>
                   )}
@@ -337,7 +387,7 @@ export default function TeamTab({ project, teamData }) {
             <DropdownMenu open={showSortCard} onOpenChange={(open) => { setShowSortCard(open); if (open) setShowFilterCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" title="Sort"
-                  className="h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
+                  className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -386,18 +436,32 @@ export default function TeamTab({ project, teamData }) {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {has('project-teams.delete') && selectedIds.length > 0 && (
+        <div className="flex gap-2 flex-wrap w-full sm:w-auto justify-end">
+          {has('project-teams.delete') && selectedIds.length > 0 && selectedActiveCount > 0 && (
             <Button onClick={() => setShowUnassignModal(true)}
-              className="bg-amber-600 hover:bg-amber-700 text-white shadow-md px-5 h-11 whitespace-nowrap">
-              <LogOut className="mr-2 h-4 w-4" />
-              Release Selected ({selectedIds.length})
+              className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white shadow-md px-4 h-11 whitespace-nowrap flex items-center justify-center gap-2">
+              <LogOut className="h-4 w-4" />
+              Release ({selectedActiveCount})
+            </Button>
+          )}
+          {has('project-teams.update') && selectedIds.length > 0 && selectedReleasedCount > 0 && (
+            <Button onClick={() => setShowBulkReactivate(true)}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-md px-4 h-11 whitespace-nowrap flex items-center justify-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Reactivate ({selectedReleasedCount})
+            </Button>
+          )}
+          {has('project-teams.delete') && selectedIds.length > 0 && (
+            <Button onClick={() => setShowBulkRemoveModal(true)}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white shadow-md px-4 h-11 whitespace-nowrap flex items-center justify-center gap-2">
+              <Trash2 className="h-4 w-4" />
+              Remove ({selectedIds.length})
             </Button>
           )}
           {has('project-teams.create') && (
             <Button onClick={() => setShowAddModal(true)}
-              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-5 h-11 whitespace-nowrap">
-              <SquarePen className="mr-2 h-4 w-4" />
+              className="w-full sm:w-auto bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-5 h-11 whitespace-nowrap flex items-center justify-center gap-2">
+              <SquarePen className="h-4 w-4" />
               Add Member
             </Button>
           )}
@@ -449,15 +513,36 @@ export default function TeamTab({ project, teamData }) {
 
                   {/* Member name */}
                   <TableCell className="px-4 py-4 text-sm font-medium text-gray-900">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {team.assignable_name || '---'}
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
-                        team.assignable_type === 'employee'
-                          ? 'bg-orange-50 text-orange-700 border-orange-200'
-                          : 'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}>
-                        {team.assignable_type === 'employee' ? 'Employee' : 'User'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      {/* Avatar */}
+                      {(() => {
+                        const imgUrl = team.assignable_type === 'employee'
+                          ? team.employee?.profile_image_url
+                          : team.user?.profile_image_url;
+                        const name = team.assignable_name || '?';
+                        const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                        const isEmployee = team.assignable_type === 'employee';
+                        return imgUrl ? (
+                          <img src={imgUrl} alt={name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-200" />
+                        ) : (
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                            isEmployee ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {initials}
+                          </div>
+                        );
+                      })()}
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{team.assignable_name || '---'}</p>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                          team.assignable_type === 'employee'
+                            ? 'bg-orange-50 text-orange-700 border-orange-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                          {team.assignable_type === 'employee' ? 'Employee' : 'User'}
+                        </span>
+                      </div>
                     </div>
                   </TableCell>
 
@@ -578,20 +663,20 @@ export default function TeamTab({ project, teamData }) {
 
       {/* Pagination */}
       {showPagination && (
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
-          <div className="text-sm text-gray-600">
-            Showing <span className="font-semibold">{projectTeams.length}</span> of{' '}
-            <span className="font-semibold">{teamData?.projectTeams?.total || 0}</span> members
-          </div>
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-3">
+          <p className="text-sm text-gray-600 order-2 sm:order-1">
+            Showing <span className="font-semibold text-gray-900">{projectTeams.length}</span> of{' '}
+            <span className="font-semibold text-gray-900">{teamData?.projectTeams?.total || 0}</span> members
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
             <button disabled={!prevLink?.url} onClick={() => handlePageClick(prevLink?.url)}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
                 !prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'
               }`}>Previous</button>
             {pageLinks.map((link, idx) => (
               <button key={idx} disabled={!link?.url} onClick={() => handlePageClick(link?.url)}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium min-w-[40px] transition-all ${
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all min-w-[36px] ${
                   link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'
                 } ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}>
@@ -599,7 +684,7 @@ export default function TeamTab({ project, teamData }) {
               </button>
             ))}
             <button disabled={!nextLink?.url} onClick={() => handlePageClick(nextLink?.url)}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
                 !nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'
               }`}>Next</button>
@@ -619,9 +704,61 @@ export default function TeamTab({ project, teamData }) {
           setShowUnassignModal={setShowUnassignModal}
           project={project}
           teamMembers={projectTeams}
-          selectedIds={selectedIds}
+          selectedIds={selectedIds.filter(id => projectTeams.find(t => t.id === id)?.assignment_status === 'active')}
           onSuccess={() => { setSelectedIds([]); setShowUnassignModal(false); }}
         />
+      )}
+
+      {/* Bulk Reactivate Confirm */}
+      {showBulkReactivate && (
+        <Dialog open onOpenChange={setShowBulkReactivate}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-green-100 rounded-full p-2"><UserCheck className="h-6 w-6 text-green-600" /></div>
+                <DialogTitle className="text-green-900">Reactivate {selectedReleasedCount} Member(s)</DialogTitle>
+              </div>
+              <DialogDescription className="text-gray-600 pt-2">
+                Are you sure you want to reactivate <span className="font-semibold text-gray-900">{selectedReleasedCount} released member(s)</span> on this project?
+                <br /><br />
+                Their assignment status will be set back to <span className="font-semibold">Active</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2 justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowBulkReactivate(false)} className="border-gray-300">Cancel</Button>
+              <Button onClick={() => handleBulkStatus('active')}
+                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
+                <UserCheck size={16} /> Reactivate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Bulk Force Remove Confirm */}
+      {showBulkRemoveModal && (
+        <Dialog open onOpenChange={setShowBulkRemoveModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-red-100 rounded-full p-2"><Trash2 className="h-6 w-6 text-red-600" /></div>
+                <DialogTitle className="text-red-900">Permanently Remove {selectedIds.length} Member(s)</DialogTitle>
+              </div>
+              <DialogDescription className="text-gray-600 pt-2">
+                Are you sure you want to permanently remove <span className="font-semibold text-gray-900">{selectedIds.length} member(s)</span> from this project?
+                <br /><br />
+                <span className="text-red-600 font-medium">This action cannot be undone.</span> All records will be deleted.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2 justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowBulkRemoveModal(false)} className="border-gray-300">Cancel</Button>
+              <Button onClick={handleBulkForceRemove}
+                className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2">
+                <Trash2 size={16} /> Remove Permanently
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
       {showRemoveModal && removeTeamMember && (
         <RemoveTeamMember

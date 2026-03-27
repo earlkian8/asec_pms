@@ -522,6 +522,7 @@ class ProjectsController extends Controller
 
         if ($hasBillings) {
             $validated['contract_amount'] = $project->contract_amount;
+            $validated['billing_type']    = $project->billing_type;
         }
 
         $project->update($validated);

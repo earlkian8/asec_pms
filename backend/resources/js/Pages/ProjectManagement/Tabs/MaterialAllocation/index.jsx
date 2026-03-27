@@ -68,6 +68,12 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
   const paginationLinks = pagination?.links || [];
   const filters = materialAllocationData?.filters || {};
   const initialSearch = materialAllocationData?.search || '';
+  const budgetSummary = materialAllocationData?.budgetSummary || {
+    contract_amount: 0,
+    total_allocated_cost: 0,
+    total_received_cost: 0,
+    budget_remaining: 0,
+  };
 
   // Only allocations that still have remaining qty can be bulk-received
   const receivableAllocations = allocations.filter(a => {
@@ -237,21 +243,21 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
 
       {/* ── Quick Stats ── */}
       <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: 'Total Allocations', value: totalAllocations,   icon: Package,       from: 'from-blue-50',   to: 'to-blue-100',   border: 'border-blue-200',   text: 'text-blue-700',   num: 'text-blue-900',   iconBg: 'bg-blue-200',   iconColor: 'text-blue-700'   },
             { label: 'Pending',           value: pendingAllocations,  icon: Clock,         from: 'from-yellow-50', to: 'to-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', num: 'text-yellow-900', iconBg: 'bg-yellow-200', iconColor: 'text-yellow-700' },
             { label: 'Partial',           value: partialAllocations,  icon: PackageSearch, from: 'from-indigo-50', to: 'to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-700', num: 'text-indigo-900', iconBg: 'bg-indigo-200', iconColor: 'text-indigo-700' },
             { label: 'Received',          value: receivedAllocations, icon: PackageCheck,  from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
           ].map(({ label, value, icon: Icon, from, to, border, text, num, iconBg, iconColor }) => (
-            <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-lg p-4 border ${border}`}>
+            <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-lg p-3 sm:p-4 border ${border}`}>
               <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-xs font-medium ${text} uppercase tracking-wide`}>{label}</p>
-                  <p className={`text-2xl font-bold ${num} mt-1`}>{value}</p>
+                <div className="min-w-0">
+                  <p className={`text-xs font-medium ${text} uppercase tracking-wide truncate`}>{label}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${num} mt-1`}>{value}</p>
                 </div>
-                <div className={`${iconBg} rounded-full p-3`}>
-                  <Icon className={`h-5 w-5 ${iconColor}`} />
+                <div className={`${iconBg} rounded-full p-2 sm:p-3 flex-shrink-0`}>
+                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
                 </div>
               </div>
             </div>
@@ -292,28 +298,28 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
       )}
 
       {/* ── Search + Filter Bar ── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between relative z-50">
-        <div className="flex flex-col sm:flex-row gap-3 items-center flex-1 relative z-50">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search allocations by item name, code, or notes..."
               value={searchInput}
               onChange={handleSearch}
-              className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
+              className="pl-10 h-11 w-full border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
-          <div className="flex gap-2 relative z-50">
+          <div className="flex gap-2">
 
             {/* Filter */}
             <DropdownMenu open={showFilterCard} onOpenChange={(open) => { setShowFilterCard(open); if (open) setShowSortCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline"
-                  className={`h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center relative ${activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                  className={`h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center relative ${activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
                   title="Filters">
                   <Filter className="h-4 w-4" />
                   {activeFiltersCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-4 w-4 flex items-center justify-center">
                       {activeFiltersCount()}
                     </span>
                   )}
@@ -378,7 +384,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
             <DropdownMenu open={showSortCard} onOpenChange={(open) => { setShowSortCard(open); if (open) setShowFilterCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline"
-                  className="h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                   title="Sort">
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
@@ -577,22 +583,22 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
 
       {/* ── Pagination ── */}
       {showPagination && (
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
-          <div className="text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-3">
+          <p className="text-sm text-gray-600 order-2 sm:order-1">
             Showing <span className="font-semibold text-gray-900">{allocations.length}</span> of{' '}
             <span className="font-semibold text-gray-900">{pagination?.total || 0}</span> allocations
-          </div>
-          <div className="flex items-center space-x-2">
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
             <button disabled={!prevLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
               onClick={() => handlePageClick(prevLink?.url)}>Previous</button>
             {pageLinks.map((link, idx) => (
               <button key={idx} disabled={!link?.url}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all min-w-[40px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all min-w-[36px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
                 onClick={() => handlePageClick(link?.url)}>{link?.label || ''}</button>
             ))}
             <button disabled={!nextLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
               onClick={() => handlePageClick(nextLink?.url)}>Next</button>
           </div>
         </div>
@@ -600,10 +606,10 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
 
       {/* ── Modals ── */}
       {showAddModal && selectedAllocation && (
-        <AddReceivingReport setShowAddModal={setShowAddModal} project={project} allocation={selectedAllocation} />
+        <AddReceivingReport setShowAddModal={setShowAddModal} project={project} allocation={selectedAllocation} budgetSummary={budgetSummary} />
       )}
       {showEditModal && editReceivingReport && (
-        <EditReceivingReport setShowEditModal={setShowEditModal} project={project} allocation={editReceivingReport.allocation} receivingReport={editReceivingReport} />
+        <EditReceivingReport setShowEditModal={setShowEditModal} project={project} allocation={editReceivingReport.allocation} receivingReport={editReceivingReport} budgetSummary={budgetSummary} />
       )}
       {showDeleteModal && deleteReceivingReport && (
         <DeleteReceivingReport setShowDeleteModal={setShowDeleteModal} project={project} allocation={deleteReceivingReport.allocation} receivingReport={deleteReceivingReport} />

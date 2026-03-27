@@ -200,7 +200,7 @@ export default function ClientTypesIndex() {
             
             {/* Quick Stats — server-driven totals */}
             <div className="mb-6 pb-6 border-b border-gray-200">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div>

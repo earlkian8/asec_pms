@@ -21,7 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, AlertTriangle } from "lucide-react";
+
+const fmt = (n) => parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const AddBilling = ({ setShowAddModal, projects = [] }) => {
   const [selectedProject, setSelectedProject] = useState(null);
@@ -38,44 +40,65 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
     description: "",
   });
 
+  // When project changes, reset fields and set billing_type from project
   useEffect(() => {
     if (data.project_id) {
       const project = projects.find(p => p.id.toString() === data.project_id.toString());
       if (project) {
         setSelectedProject(project);
-        setData('billing_type', project.billing_type);
+        setData(prev => ({ ...prev, billing_type: project.billing_type, milestone_id: '', billing_amount: '' }));
         setMilestones(project.milestones || []);
-        if (project.billing_type !== 'milestone') {
-          setData('milestone_id', '');
-          setData('billing_amount', '');
-          setBillingAmountDisplay('');
-        }
-        if (project.billing_type === 'fixed_price' && project.contract_amount) {
-          const amount = parseFloat(project.contract_amount).toFixed(2);
-          setData('billing_amount', amount);
-          setBillingAmountDisplay(formatNumberWithCommas(amount));
-        } else {
-          setData('billing_amount', '');
-          setBillingAmountDisplay('');
-        }
+        setBillingAmountDisplay('');
       }
     } else {
       setSelectedProject(null);
       setMilestones([]);
-      setData('billing_type', '');
-      setData('milestone_id', '');
-      setData('billing_amount', '');
+      setData(prev => ({ ...prev, billing_type: '', milestone_id: '', billing_amount: '' }));
       setBillingAmountDisplay('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.project_id]);
 
-  useEffect(() => {
-    if (data.billing_amount) {
-      setBillingAmountDisplay(formatNumberWithCommas(data.billing_amount));
-    } else {
-      setBillingAmountDisplay('');
+  const contractAmount    = selectedProject ? parseFloat(selectedProject.contract_amount || 0) : 0;
+  const totalBilled       = selectedProject ? parseFloat(selectedProject.total_billed || 0) : 0;
+  const remainingBillable = contractAmount > 0 ? contractAmount - totalBilled : null;
+  const enteredAmount     = parseFloat(data.billing_amount) || 0;
+  const wouldExceed       = contractAmount > 0 && enteredAmount > 0 && (totalBilled + enteredAmount) > contractAmount;
+
+  const setAmount = (raw) => {
+    setBillingAmountDisplay(formatNumberWithCommas(raw));
+    setData('billing_amount', parseFormattedNumber(raw));
+  };
+
+  const handleAmountChange = (e) => {
+    let v = e.target.value;
+    if (v === '') { setBillingAmountDisplay(''); setData('billing_amount', ''); return; }
+    v = v.replace(/[^\d.]/g, '');
+    const parts = v.split('.');
+    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+    if (parts.length === 2 && parts[1].length > 2) v = parts[0] + '.' + parts[1].substring(0, 2);
+    setAmount(v);
+  };
+
+  // Preset helpers
+  const presets = [];
+  if (selectedProject && contractAmount > 0) {
+    if (remainingBillable !== null && remainingBillable > 0) {
+      presets.push({ label: 'Remaining', value: remainingBillable.toFixed(2) });
     }
-  }, [data.billing_amount]);
+    presets.push({ label: 'Full', value: contractAmount.toFixed(2) });
+    [75, 50, 25].forEach(pct => {
+      presets.push({ label: `${pct}%`, value: ((contractAmount * pct) / 100).toFixed(2) });
+    });
+  }
+
+  // Milestone preset (only when milestone selected and has billing_percentage)
+  const selectedMilestone = data.milestone_id
+    ? milestones.find(m => m.id.toString() === data.milestone_id.toString())
+    : null;
+  const milestonePresetAmount = selectedMilestone?.billing_percentage && contractAmount > 0
+    ? ((contractAmount * parseFloat(selectedMilestone.billing_percentage)) / 100).toFixed(2)
+    : null;
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -90,27 +113,13 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
       onSuccess: (page) => {
         setShowAddModal(false);
         const flash = page.props.flash;
-        if (flash && flash.error) {
-          toast.error(flash.error);
-        } else {
-          toast.success("Billing created successfully!");
-        }
+        if (flash?.error) { toast.error(flash.error); return; }
+        if (flash?.warning) toast.warning(flash.warning);
+        toast.success("Billing created successfully!");
       },
-      onError: (errors) => {
-        if (errors.error) {
-          toast.error(errors.error);
-        } else {
-          toast.error("Please check the form for errors");
-        }
-      },
+      onError: () => toast.error("Please check the form for errors"),
     });
   };
-
-  // Derive remaining billable amount from the total_billed sent by the backend
-  const contractAmount  = selectedProject ? parseFloat(selectedProject.contract_amount || 0) : 0;
-  const totalBilled     = selectedProject ? parseFloat(selectedProject.total_billed || 0) : 0;
-  const remainingBillable = contractAmount - totalBilled;
-  const isFullyBilled   = selectedProject && contractAmount > 0 && remainingBillable <= 0;
 
   return (
     <Dialog open onOpenChange={setShowAddModal}>
@@ -123,10 +132,7 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
           {/* Project */}
           <div className="col-span-2">
             <Label className="text-zinc-800">Project <span className="text-red-500">*</span></Label>
-            <Select
-              value={data.project_id}
-              onValueChange={(value) => setData("project_id", value)}
-            >
+            <Select value={data.project_id} onValueChange={(v) => setData("project_id", v)}>
               <SelectTrigger className={inputClass(errors.project_id)}>
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
@@ -141,41 +147,33 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.project_id} />
           </div>
 
-          {/* Billing Type (auto-filled from project) */}
+          {/* Billing Type (read-only, derived from project) */}
           {selectedProject && (
             <div className="col-span-2">
-              <Label className="text-zinc-800">Billing Type <span className="text-red-500">*</span></Label>
+              <Label className="text-zinc-800">Billing Type</Label>
               <Input
                 value={data.billing_type === 'fixed_price' ? 'Fixed Price' : data.billing_type === 'milestone' ? 'Milestone' : ''}
                 readOnly
                 className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
               />
-              <InputError message={errors.billing_type} />
             </div>
           )}
 
-          {/* Milestone */}
+          {/* Milestone selector */}
           {data.billing_type === 'milestone' && (
             <div className="col-span-2">
               <Label className="text-zinc-800">Milestone <span className="text-red-500">*</span></Label>
               <Select
                 value={data.milestone_id}
-                onValueChange={(value) => {
-                  setData("milestone_id", value);
-                  const selectedMilestone = milestones.find(m => m.id.toString() === value);
-                  if (selectedMilestone && selectedProject && selectedMilestone.billing_percentage) {
-                    const calculatedAmount = (parseFloat(selectedProject.contract_amount || 0) * parseFloat(selectedMilestone.billing_percentage)) / 100;
-                    setData("billing_amount", calculatedAmount.toFixed(2));
-                  }
-                }}
+                onValueChange={(v) => setData("milestone_id", v)}
               >
                 <SelectTrigger className={inputClass(errors.milestone_id)}>
                   <SelectValue placeholder="Select milestone" />
                 </SelectTrigger>
                 <SelectContent>
-                  {milestones.map((milestone) => (
-                    <SelectItem key={milestone.id} value={milestone.id.toString()}>
-                      {milestone.name} {milestone.billing_percentage ? `(${milestone.billing_percentage}%)` : ''}
+                  {milestones.map((m) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>
+                      {m.name}{m.billing_percentage ? ` (${m.billing_percentage}%)` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -184,39 +182,25 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             </div>
           )}
 
-          {/* Contract Amount + remaining billable info */}
+          {/* Contract amount info bar */}
           {selectedProject && contractAmount > 0 && (
             <div className="col-span-2">
               <Label className="text-zinc-800">Contract Amount</Label>
               <Input
-                value={`₱${contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                value={`₱${fmt(contractAmount)}`}
                 readOnly
                 className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
               />
               <div className={`mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs rounded-lg px-3 py-2 border ${
-                isFullyBilled
-                  ? 'bg-red-50 border-red-200 text-red-700'
-                  : totalBilled > 0
+                totalBilled >= contractAmount
                   ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : totalBilled > 0
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
                   : 'bg-gray-50 border-gray-200 text-gray-500'
               }`}>
-                <span>
-                  Already billed:{' '}
-                  <span className="font-semibold">
-                    ₱{totalBilled.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                  </span>
-                </span>
-                {isFullyBilled ? (
-                  <span className="font-semibold text-red-600">
-                    Fully billed — you can still submit, but it will be rejected unless a previous billing was deleted
-                  </span>
-                ) : (
-                  <span>
-                    Remaining billable:{' '}
-                    <span className="font-semibold">
-                      ₱{remainingBillable.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                    </span>
-                  </span>
+                <span>Already billed: <span className="font-semibold">₱{fmt(totalBilled)}</span></span>
+                {remainingBillable !== null && (
+                  <span>Remaining billable: <span className="font-semibold">₱{fmt(remainingBillable)}</span></span>
                 )}
               </div>
             </div>
@@ -228,46 +212,46 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <Input
               type="text"
               value={billingAmountDisplay}
-              onChange={(e) => {
-                if (data.billing_type !== 'milestone' && !(data.billing_type === 'fixed_price' && selectedProject)) {
-                  let inputValue = e.target.value;
-                  if (inputValue === '') {
-                    setBillingAmountDisplay('');
-                    setData("billing_amount", '');
-                    return;
-                  }
-                  inputValue = inputValue.replace(/[^\d.]/g, '');
-                  const parts = inputValue.split('.');
-                  if (parts.length > 2) inputValue = parts[0] + '.' + parts.slice(1).join('');
-                  if (parts.length === 2 && parts[1].length > 2) inputValue = parts[0] + '.' + parts[1].substring(0, 2);
-                  setBillingAmountDisplay(formatNumberWithCommas(inputValue));
-                  setData("billing_amount", parseFormattedNumber(inputValue));
-                }
-              }}
-              readOnly={data.billing_type === 'milestone' || (data.billing_type === 'fixed_price' && selectedProject)}
+              onChange={handleAmountChange}
               placeholder="0.00"
-              className={data.billing_type === 'fixed_price' || data.billing_type === 'milestone'
-                ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
-                : inputClass(errors.billing_amount)}
+              className={inputClass(errors.billing_amount)}
             />
-            {selectedProject && data.billing_type === 'fixed_price' && contractAmount > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                Fixed at contract amount: ₱{contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-              </p>
-            )}
-            {data.billing_type === 'milestone' && selectedProject && data.milestone_id && (() => {
-              const selectedMilestone = milestones.find(m => m.id.toString() === data.milestone_id.toString());
-              if (selectedMilestone?.billing_percentage && contractAmount) {
-                const calculatedAmount = (contractAmount * parseFloat(selectedMilestone.billing_percentage)) / 100;
-                return (
-                  <p className="text-xs text-gray-500 mt-1">
-                    ₱{contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} × {selectedMilestone.billing_percentage}% = ₱{calculatedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                  </p>
-                );
-              }
-              return null;
-            })()}
             <InputError message={errors.billing_amount} />
+
+            {/* Presets */}
+            {(presets.length > 0 || milestonePresetAmount) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {milestonePresetAmount && (
+                  <button
+                    type="button"
+                    onClick={() => setAmount(milestonePresetAmount)}
+                    className="px-2.5 py-1 text-xs rounded-md border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium"
+                  >
+                    Milestone ({selectedMilestone?.billing_percentage}%) = ₱{fmt(milestonePresetAmount)}
+                  </button>
+                )}
+                {presets.map(({ label, value }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setAmount(value)}
+                    className="px-2.5 py-1 text-xs rounded-md border border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition-colors font-medium"
+                  >
+                    {label} {label !== 'Full' && label !== 'Remaining' ? '' : ''} ₱{fmt(value)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Over-contract warning */}
+            {wouldExceed && (
+              <div className="mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2 border bg-amber-50 border-amber-200 text-amber-700">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                <span>
+                  This billing will bring total billed to <strong>₱{fmt(totalBilled + enteredAmount)}</strong>, exceeding the contract amount of <strong>₱{fmt(contractAmount)}</strong> by <strong>₱{fmt((totalBilled + enteredAmount) - contractAmount)}</strong>. You can still proceed.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Billing Date */}
@@ -308,7 +292,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.description} />
           </div>
 
-          {/* Footer */}
           <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
             <Button
               type="button"

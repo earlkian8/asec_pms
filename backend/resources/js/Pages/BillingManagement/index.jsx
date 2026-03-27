@@ -199,14 +199,17 @@ export default function BillingManagement() {
     } catch (e) { /* noop */ }
   };
 
+  const handleFlash = (page, fallbackSuccess) => {
+    const flash = page.props.flash;
+    if (flash?.error) { toast.error(flash.error); return; }
+    if (flash?.warning) toast.warning(flash.warning);
+    toast.success(fallbackSuccess);
+  };
+
   const handleArchive = (billing) => {
     router.post(route('billing-management.archive', billing.id), {}, {
       preserveScroll: true,
-      onSuccess: (page) => {
-        const flash = page.props.flash;
-        if (flash?.error) toast.error(flash.error);
-        else toast.success(`Billing "${billing.billing_code}" archived`);
-      },
+      onSuccess: (page) => handleFlash(page, `Billing "${billing.billing_code}" archived`),
       onError: () => toast.error('Failed to archive billing.'),
     });
   };
@@ -296,7 +299,7 @@ export default function BillingManagement() {
               <>
                 {/* Stats */}
                 <div className="mb-6 pb-6 border-b border-gray-200">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
                     {[
                       { label: 'Total Billings', value: totalBillings, icon: PhilippinePeso,  color: 'blue',   fmt: 'count' },
                       { label: 'Total Amount',   value: totalAmount,   icon: TrendingUp,  color: 'green',  fmt: 'currency' },

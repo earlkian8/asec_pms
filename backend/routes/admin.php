@@ -68,9 +68,13 @@ Route::middleware('auth')->group(function () {
                 ->middleware('permission:project-teams.update')
                 ->name('update');
 
-            Route::delete('/force-remove/{project}/{projectTeam}', [ProjectTeamsController::class, 'forceRemove'])
+            Route::delete('/force-remove/{project}/{projectTeam?}', [ProjectTeamsController::class, 'forceRemove'])
                 ->middleware('permission:project-teams.delete')
                 ->name('force-remove');
+
+            Route::put('/bulk-status/{project}', [ProjectTeamsController::class, 'bulkStatus'])
+                ->middleware('permission:project-teams.update')
+                ->name('bulk-status');
 
             Route::get('/history', [ProjectTeamsController::class, 'history'])
                 ->middleware('permission:project-teams.view')

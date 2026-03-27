@@ -90,7 +90,7 @@ class InventoryService
             $transactions = InventoryTransaction::with([
                 'inventoryItem',
                 'project:id,project_code,project_name',
-                'createdBy:id,name',
+                'createdBy:id,first_name,middle_name,last_name',
                 'materialAllocation'
             ])
                 ->when($itemId, function ($query, $itemId) {
@@ -145,7 +145,7 @@ class InventoryService
                     ]);
                 },
                 'receivedBy' => function ($query) {
-                    $query->select('id', 'name')->with('roles:id,name');
+                    $query->select('id', 'first_name', 'middle_name', 'last_name')->with('roles:id,name');
                 }
             ])
                 ->when($search, function ($query, $search) {

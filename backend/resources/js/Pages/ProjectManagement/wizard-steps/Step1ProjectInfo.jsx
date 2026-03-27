@@ -248,8 +248,11 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
 
             {/* Billing Type */}
             <div>
-              <Label className="text-zinc-800">Billing Type</Label>
-              <Select value={projectData.billing_type} onValueChange={(v) => updateProjectData({ billing_type: v })}>
+              <Label className="text-zinc-800">
+                Billing Type{' '}
+                <span className="text-gray-400 font-normal text-xs">(optional)</span>
+              </Label>
+              <Select value={projectData.billing_type || ''} onValueChange={(v) => updateProjectData({ billing_type: v })}>
                 <SelectTrigger className={inputClass(false)}>
                   <SelectValue placeholder="Select billing type" />
                 </SelectTrigger>
@@ -258,6 +261,7 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                   <SelectItem value="milestone">Milestone</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-gray-400 mt-1">For workflow guidance only. Does not restrict billing creation.</p>
             </div>
 
             {/* Location */}

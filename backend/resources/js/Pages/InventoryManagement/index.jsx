@@ -836,7 +836,7 @@ export default function InventoryManagement() {
                                 ? <div><div className="font-medium text-gray-900">{trans.project.project_code}</div><div className="text-xs text-gray-500">{trans.project.project_name}</div></div>
                                 : <span className="text-gray-400">---</span>}
                             </TableCell>
-                            <TableCell className="text-left px-4 py-4 text-sm text-gray-700">{trans.created_by?.name || '---'}</TableCell>
+                            <TableCell className="text-left px-4 py-4 text-sm text-gray-700">{trans.created_by?.name || [trans.created_by?.first_name, trans.created_by?.last_name].filter(Boolean).join(' ') || '---'}</TableCell>
                             <TableCell className="text-left px-4 py-4 text-sm text-gray-700 max-w-xs truncate">{trans.notes || '---'}</TableCell>
                           </TableRow>
                         ))
@@ -931,9 +931,13 @@ export default function InventoryManagement() {
                                   : <span className="text-gray-400">---</span>}
                               </TableCell>
                               <TableCell className="text-left px-4 py-4 text-sm">
-                                {receivedBy.name
-                                  ? <div><div className="font-medium text-gray-900">{receivedBy.name}</div>{receivedBy.roles?.length > 0 && <div className="text-xs text-gray-500">{receivedBy.roles.map(r => r.name).join(', ')}</div>}</div>
-                                  : <span className="text-gray-400">---</span>}
+                                {(() => {
+                                  const rb = report.received_by || report.receivedBy || {};
+                                  const fullName = rb.name || [rb.first_name, rb.last_name].filter(Boolean).join(' ');
+                                  return fullName
+                                    ? <div><div className="font-medium text-gray-900">{fullName}</div>{rb.roles?.length > 0 && <div className="text-xs text-gray-500">{rb.roles.map(r => r.name).join(', ')}</div>}</div>
+                                    : <span className="text-gray-400">---</span>;
+                                })()}
                               </TableCell>
                               <TableCell className="text-left px-4 py-4 text-sm text-gray-700 max-w-xs truncate">{report.notes || '---'}</TableCell>
                             </TableRow>

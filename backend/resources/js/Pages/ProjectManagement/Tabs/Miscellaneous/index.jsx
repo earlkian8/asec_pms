@@ -296,37 +296,37 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
     <div className="w-full">
       {/* Quick Stats */}
       <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Expenses</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{formatCurrency(totalExpenses)}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide truncate">Total Expenses</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-900 mt-1">{formatCurrency(totalExpenses)}</p>
               </div>
-              <div className="bg-blue-200 rounded-full p-3">
-                <PhilippinePeso className="h-5 w-5 text-blue-700" />
+              <div className="bg-blue-200 rounded-full p-2 sm:p-3 flex-shrink-0">
+                <PhilippinePeso className="h-4 w-4 sm:h-5 sm:w-5 text-blue-700" />
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-4 border border-green-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Total Entries</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">{totalEntries}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-green-700 uppercase tracking-wide truncate">Total Entries</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-900 mt-1">{totalEntries}</p>
               </div>
-              <div className="bg-green-200 rounded-full p-3">
-                <Receipt className="h-5 w-5 text-green-700" />
+              <div className="bg-green-200 rounded-full p-2 sm:p-3 flex-shrink-0">
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" />
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 sm:p-4 border border-purple-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Average Expense</p>
-                <p className="text-2xl font-bold text-purple-900 mt-1">{formatCurrency(averageExpense)}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-purple-700 uppercase tracking-wide truncate">Average Expense</p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-900 mt-1">{formatCurrency(averageExpense)}</p>
               </div>
-              <div className="bg-purple-200 rounded-full p-3">
-                <TrendingUp className="h-5 w-5 text-purple-700" />
+              <div className="bg-purple-200 rounded-full p-2 sm:p-3 flex-shrink-0">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-700" />
               </div>
             </div>
           </div>
@@ -334,18 +334,18 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
       </div>
 
       {/* Search + Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between relative z-50">
-        <div className="flex flex-col sm:flex-row gap-3 items-center flex-1 relative z-50">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-center justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Search expenses by name, type, description, or notes..."
+              placeholder="Search expenses..."
               value={searchInput}
               onChange={handleSearch}
-              className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
+              className="pl-10 h-11 w-full border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
-          <div className="flex gap-2 relative z-50">
+          <div className="flex gap-2">
             {/* Filter Button and Card */}
             <DropdownMenu open={showFilterCard} onOpenChange={(open) => {
               setShowFilterCard(open);
@@ -354,16 +354,16 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center relative ${
+                  className={`h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center relative ${
                     activeFiltersCount() > 0
-                      ? 'bg-zinc-100 border-zinc-400 text-zinc-700 hover:bg-zinc-200'
+                      ? 'bg-zinc-100 border-zinc-400 text-zinc-700'
                       : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                   title="Filters"
                 >
                   <Filter className="h-4 w-4" />
                   {activeFiltersCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-4 w-4 flex items-center justify-center">
                       {activeFiltersCount()}
                     </span>
                   )}
@@ -476,7 +476,7 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-11 w-11 p-0 border-2 rounded-lg transition-all duration-200 flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50 relative"
+                  className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                   title="Sort"
                 >
                   <ArrowUpDown className="h-4 w-4" />
@@ -553,9 +553,9 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
         {has('miscellaneous-expenses.create') && (
           <Button
             onClick={() => setShowAddModal(true)}
-            className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md hover:shadow-lg transition-all duration-200 px-6 h-11 whitespace-nowrap"
+            className="w-full sm:w-auto bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-5 h-11 whitespace-nowrap flex items-center justify-center gap-2"
           >
-            <SquarePen className="mr-2 h-4 w-4" />
+            <SquarePen className="h-4 w-4" />
             Add Expense
           </Button>
         )}
@@ -670,45 +670,37 @@ export default function MiscellaneousExpenseTab({ project, miscellaneousExpenseD
 
       {/* Pagination */}
       {showPagination && (
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
-          <div className="text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-3">
+          <p className="text-sm text-gray-600 order-2 sm:order-1">
             Showing <span className="font-semibold text-gray-900">{expenses.length}</span> of{' '}
             <span className="font-semibold text-gray-900">{pagination?.total || 0}</span> expenses
-          </div>
-          <div className="flex items-center space-x-2">
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
             <button
               disabled={!prevLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
-                !prevLink?.url
-                  ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm hover:shadow'
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                !prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'
               }`}
               onClick={() => handlePageClick(prevLink?.url)}
             >
               Previous
             </button>
-
             {pageLinks.map((link, idx) => (
               <button
                 key={idx}
                 disabled={!link?.url}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 min-w-[40px] ${
-                  link?.active
-                    ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white hover:from-zinc-800 hover:to-zinc-900 shadow-md'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm hover:shadow'
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all min-w-[36px] ${
+                  link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'
                 } ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
                 onClick={() => handlePageClick(link?.url)}
               >
                 {link?.label || ''}
               </button>
             ))}
-
             <button
               disabled={!nextLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
-                !nextLink?.url
-                  ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm hover:shadow'
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                !nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'
               }`}
               onClick={() => handlePageClick(nextLink?.url)}
             >

@@ -82,7 +82,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
       isSelected
         ? hasErrors
           ? "border-red-300 bg-red-50/30"
-          : "border-indigo-400 bg-gradient-to-br from-indigo-50/60 to-white shadow-md"
+          : "border-zinc-400 bg-gradient-to-br from-zinc-50/60 to-white shadow-md"
         : "border-gray-200 bg-white hover:border-gray-300"
     }`}>
       {/* Row header — always visible */}
@@ -92,7 +92,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
       >
         {/* Checkbox */}
         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-          isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 hover:border-indigo-400"
+          isSelected ? "bg-zinc-700 border-zinc-700" : "border-gray-300 hover:border-zinc-400"
         }`}>
           {isSelected && (
             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +131,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
               </span>
             )}
             {activePreset && activePreset !== "custom" && (
-              <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-full px-2 py-0.5">
+              <span className="text-xs bg-zinc-100 text-zinc-600 border border-zinc-200 rounded-full px-2 py-0.5">
                 ⚡ {presets.find(p => p.id === activePreset)?.label}
               </span>
             )}
@@ -144,7 +144,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
             type="button"
             onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
             className={`p-1.5 rounded-lg transition flex-shrink-0 ${
-              hasErrors ? "text-red-500 hover:bg-red-50" : "text-indigo-500 hover:bg-indigo-50"
+              hasErrors ? "text-red-500 hover:bg-red-50" : "text-zinc-500 hover:bg-zinc-50"
             }`}
           >
             {hasErrors
@@ -157,7 +157,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
 
       {/* Expanded form */}
       {isSelected && expanded && (
-        <div className="border-t border-indigo-100 bg-gradient-to-b from-indigo-50/40 to-transparent p-4 space-y-4">
+        <div className="border-t border-zinc-100 bg-gradient-to-b from-zinc-50/40 to-transparent p-4 space-y-4">
 
           {/* Hourly Rate */}
           <div className="grid grid-cols-2 gap-4">
@@ -175,7 +175,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
                   value={formData?.hourly_rate || ""}
                   onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
                   onClick={(e) => e.stopPropagation()}
-                  className={`pl-7 text-sm ${errors?.hourly_rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400"}`}
+                  className={`pl-7 text-sm ${errors?.hourly_rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-zinc-500"}`}
                 />
               </div>
               {errors?.hourly_rate && <InputError message={errors.hourly_rate} className="mt-1" />}
@@ -227,7 +227,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
                   onClick={(e) => e.stopPropagation()}
                   min={project?.start_date || undefined}
                   max={project?.planned_end_date || undefined}
-                  className={`text-sm ${errors?.start_date ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400"}`}
+                  className={`text-sm ${errors?.start_date ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-zinc-500"}`}
                 />
                 {errors?.start_date && <InputError message={errors.start_date} className="mt-1" />}
               </div>
@@ -240,7 +240,7 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
                   onClick={(e) => e.stopPropagation()}
                   min={formData?.start_date || project?.start_date || undefined}
                   max={project?.planned_end_date || undefined}
-                  className="text-sm border-gray-300 focus:border-indigo-400"
+                  className="text-sm border-gray-300 focus:border-zinc-500"
                 />
               </div>
             </div>
@@ -376,12 +376,12 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
       <DialogContent className="w-[96vw] max-w-3xl max-h-[92vh] overflow-hidden flex flex-col rounded-3xl p-0">
 
         {/* ── Header ── */}
-        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 pt-6 pb-5 flex-shrink-0">
+        <div className="bg-gradient-to-r from-zinc-700 to-zinc-800 px-6 pt-6 pb-5 flex-shrink-0">
           <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
             <Users size={20} />
             Add Team Members
           </DialogTitle>
-          <p className="text-indigo-200 text-sm mt-1">
+          <p className="text-zinc-300 text-sm mt-1">
             Select people and configure their assignment. Use ⚡ presets to set dates in one click.
           </p>
 
@@ -414,7 +414,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                 placeholder="Search name, email, role..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 border-gray-300 rounded-xl h-9 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="pl-10 border-gray-300 rounded-xl h-9 text-sm focus:border-zinc-500 focus:ring-2 focus:ring-zinc-100"
               />
             </div>
 
@@ -430,7 +430,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
                   type="button"
                   onClick={() => setTypeFilter(tab.id)}
                   className={`px-3 py-1.5 font-medium transition-all ${
-                    typeFilter === tab.id ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"
+                    typeFilter === tab.id ? "bg-zinc-700 text-white" : "text-gray-600 hover:bg-gray-50"
                   }`}
                 >
                   {tab.label}
@@ -450,7 +450,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
 
           {/* Bulk preset bar */}
           {selectedIds.length >= 2 && (
-            <div className="bg-indigo-600 rounded-2xl px-3 py-2 flex items-center gap-2 flex-wrap">
+            <div className="bg-zinc-700 rounded-2xl px-3 py-2 flex items-center gap-2 flex-wrap">
               <span className="text-white text-xs font-medium whitespace-nowrap">
                 Apply to {selectedIds.length}:
               </span>
@@ -508,7 +508,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
         <DialogFooter className="flex-shrink-0 border-t border-gray-100 bg-gray-50/80 px-6 py-4 flex items-center justify-between gap-3 rounded-b-3xl">
           <div className="text-sm text-gray-500">
             {selectedIds.length > 0 ? (
-              <span className="font-semibold text-indigo-700">{selectedIds.length} selected</span>
+              <span className="font-semibold text-zinc-700">{selectedIds.length} selected</span>
             ) : (
               <span>Select members to add</span>
             )}
@@ -527,7 +527,7 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
               type="button"
               onClick={handleSubmit}
               disabled={processing || selectedIds.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 h-9 text-sm font-medium shadow-md shadow-indigo-200 flex items-center gap-2 disabled:opacity-50"
+              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white rounded-xl px-5 h-9 text-sm font-medium shadow-md flex items-center gap-2 disabled:opacity-50"
             >
               {processing ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Adding...</>

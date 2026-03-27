@@ -14,6 +14,7 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMaterialAllocation;
+use App\Models\ProjectMiscellaneousExpense;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -138,7 +139,9 @@ class DashboardController extends Controller
                 return 0;
             });
 
-        $totalBudgetUsed = $totalLaborCost + $totalMaterialCost;
+        $totalMiscCost = (float) ProjectMiscellaneousExpense::sum('amount');
+
+        $totalBudgetUsed = $totalLaborCost + $totalMaterialCost + $totalMiscCost;
 
         // Monthly Revenue (last 6 months) - Only count paid payments
         $monthlyRevenue = BillingPayment::where('payment_status', 'paid')
@@ -182,6 +185,18 @@ class DashboardController extends Controller
                 });
             });
 
+        $monthlyMiscCosts = ProjectMiscellaneousExpense::select(
+                DB::raw("DATE_TRUNC('month', expense_date) as month"),
+                DB::raw('SUM(amount) as total')
+            )
+            ->where('expense_date', '>=', now()->subMonths(6))
+            ->groupBy('month')
+            ->orderBy('month', 'asc')
+            ->get()
+            ->keyBy(function ($item) {
+                return Carbon::parse($item->month)->format('Y-m');
+            });
+
         // Generate last 6 months array
         $last6Months = [];
         for ($i = 5; $i >= 0; $i--) {
@@ -191,6 +206,7 @@ class DashboardController extends Controller
             
             $revenueData = $monthlyRevenue->get($monthKey);
             $laborData = $monthlyLaborCosts->get($monthKey);
+            $miscData = $monthlyMiscCosts->get($monthKey);
             
             $last6Months[] = [
                 'month' => $monthLabel,
@@ -198,6 +214,7 @@ class DashboardController extends Controller
                 'revenue' => $revenueData ? (float) $revenueData->total : 0,
                 'labor_cost' => $laborData ? (float) $laborData->total : 0,
                 'material_cost' => (float) ($monthlyMaterialCosts->get($monthKey) ?? 0),
+                'misc_cost' => $miscData ? (float) $miscData->total : 0,
             ];
         }
 
@@ -266,6 +283,7 @@ class DashboardController extends Controller
                 'budget' => [
                     'total_labor_cost' => $totalLaborCost,
                     'total_material_cost' => $totalMaterialCost,
+                    'total_misc_cost' => $totalMiscCost,
                     'total_budget_used' => $totalBudgetUsed,
                 ],
             ],

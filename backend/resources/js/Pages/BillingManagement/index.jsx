@@ -299,7 +299,7 @@ export default function BillingManagement() {
               <>
                 {/* Stats */}
                 <div className="mb-6 pb-6 border-b border-gray-200">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
                     {[
                       { label: 'Total Billings', value: totalBillings, icon: PhilippinePeso,  color: 'blue',   fmt: 'count' },
                       { label: 'Total Amount',   value: totalAmount,   icon: TrendingUp,  color: 'green',  fmt: 'currency' },

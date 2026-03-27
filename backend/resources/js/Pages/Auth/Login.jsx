@@ -20,11 +20,11 @@ export default function Login({ status }) {
     const hasError = errors.email || errors.password;
 
     return (
-        <div className="min-h-screen grid grid-cols-2">
+        <div className="min-h-screen flex flex-col lg:grid lg:grid-cols-2">
             <Head title="Sign In" />
 
-            {/* ── Left panel ── */}
-            <div className="relative flex flex-col justify-between p-14 bg-gradient-to-br from-neutral-800 via-neutral-800 to-black overflow-hidden">
+            {/* ── Left panel — hidden on mobile, visible on lg+ ── */}
+            <div className="hidden lg:flex relative flex-col justify-between p-14 bg-gradient-to-br from-neutral-800 via-neutral-800 to-black overflow-hidden">
                 {/* Subtle radial sheen */}
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute bottom-0 left-0 w-96 h-96 bg-white opacity-[0.03] rounded-full blur-3xl" />
@@ -59,20 +59,27 @@ export default function Login({ status }) {
             </div>
 
             {/* ── Right panel ── */}
-            <div className="relative flex items-center justify-center p-14 bg-gradient-to-br from-neutral-200 via-neutral-300 to-neutral-400">
+            <div className="relative flex items-center justify-center min-h-screen lg:min-h-0 p-6 sm:p-10 lg:p-14 bg-gradient-to-br from-neutral-200 via-neutral-300 to-neutral-400">
                 {/* Top metallic edge */}
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-neutral-500 to-transparent opacity-40" />
 
                 <div className="w-full max-w-sm">
+                    {/* Mobile-only top branding */}
+                    <div className="flex items-center gap-3 mb-8 lg:hidden">
+                        <img src="/logo.svg" alt="ASEC Logo" className="h-7 opacity-80" />
+                        <div className="h-5 w-px bg-neutral-400/50" />
+                        <span className="text-xs font-bold tracking-widest uppercase text-neutral-600">Admin Portal</span>
+                    </div>
+
                     {/* Header */}
-                    <div className="mb-10">
-                        <div className="flex items-center gap-3 mb-3">
+                    <div className="mb-8 sm:mb-10">
+                        <div className="hidden lg:flex items-center gap-3 mb-3">
                             <span className="text-xs font-bold tracking-[0.2em] uppercase text-neutral-500">
                                 Abdurauf Sawadjaan Engineering Consultancy
                             </span>
                         </div>
-                        <div className="h-px bg-neutral-400 opacity-30 mb-4" />
-                        <h1 className="text-5xl font-black uppercase tracking-tight text-neutral-900 leading-none">
+                        <div className="hidden lg:block h-px bg-neutral-400 opacity-30 mb-4" />
+                        <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tight text-neutral-900 leading-none">
                             Sign In
                         </h1>
                     </div>

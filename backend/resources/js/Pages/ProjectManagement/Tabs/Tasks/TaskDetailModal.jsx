@@ -348,7 +348,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[95vw] max-w-[920px] max-h-[92vh] overflow-hidden p-0 bg-white rounded-2xl border border-zinc-200 shadow-2xl">
+        <DialogContent className="w-[95vw] max-w-[920px] max-h-[92vh] overflow-hidden p-0 bg-white rounded-2xl border border-zinc-200 shadow-2xl flex flex-col">
 
           {/* ── HEADER ───────────────────────────────────────────────────────── */}
           <div className="flex items-start gap-3.5 px-6 py-5 border-b border-zinc-100">
@@ -380,24 +380,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               {/* Status badge */}
               {taskStatusBadge(currentTask.status)}
 
-              {/* Set as completed button — only shown when not completed and user has permission */}
-              {!isCompleted && has('project-tasks.update-status') && (
-                <Button
-                  size="sm"
-                  onClick={handleSetCompleted}
-                  disabled={isMarkingComplete || progressUpdates.length === 0}
-                  title={progressUpdates.length === 0 ? 'Add a progress update first' : 'Mark task as completed'}
-                  className="h-8 text-xs px-3 gap-1.5 bg-green-600 hover:bg-green-700 text-white border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isMarkingComplete ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={12} />
-                  )}
-                  {isMarkingComplete ? 'Saving…' : 'Set as completed'}
-                </Button>
-              )}
-
               {/* Locked indicator when completed */}
               {isCompleted && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400 px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-full">
@@ -409,8 +391,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
             </div>
           </div>
 
-          {/* ── BODY: sidebar + main ─────────────────────────────────────────── */}
-          <div className="flex overflow-hidden" style={{ height: 'calc(92vh - 90px)' }}>
+          <div className="flex flex-1 overflow-hidden">
 
             {/* SIDEBAR */}
             <div className="w-52 flex-shrink-0 border-r border-zinc-100 flex flex-col py-3 gap-0.5">
@@ -676,6 +657,43 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                 </div>
               )}
 
+            </div>
+          </div>
+
+          {/* ── FOOTER ───────────────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between px-6 py-3 border-t border-zinc-100 bg-gray-50/60">
+            <div className="flex items-center gap-2">
+              {isCompleted && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                  <CheckCircle2 size={13} /> Task completed
+                  {currentTask.updated_at && <span className="text-zinc-400 font-normal">· {fmt(currentTask.updated_at)}</span>}
+                </span>
+              )}
+              {!isCompleted && progressUpdates.length === 0 && (
+                <span className="text-xs text-zinc-400">Add a progress update before marking as completed.</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}
+                className="h-8 text-xs px-4 border-zinc-200 text-zinc-600 hover:bg-zinc-50">
+                Close
+              </Button>
+              {!isCompleted && has('project-tasks.update-status') && (
+                <Button
+                  size="sm"
+                  onClick={handleSetCompleted}
+                  disabled={isMarkingComplete || progressUpdates.length === 0}
+                  title={progressUpdates.length === 0 ? 'Add a progress update first' : 'Mark task as completed'}
+                  className="h-8 text-xs px-4 gap-1.5 bg-green-600 hover:bg-green-700 text-white border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isMarkingComplete ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={12} />
+                  )}
+                  {isMarkingComplete ? 'Saving…' : 'Set as Completed'}
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>

@@ -62,15 +62,19 @@ class ProjectLaborCostsController extends Controller
     public function store(Project $project, Request $request)
     {
         $data = $request->validate([
-            'assignable_id'   => ['required', 'integer'],
-            'assignable_type' => ['required', 'in:user,employee'],
-            'period_start'    => ['required', 'date'],
-            'period_end'      => ['required', 'date', 'after_or_equal:period_start'],
-            'daily_rate'      => ['required', 'numeric', 'min:0'],
-            'attendance'      => ['required', 'array'],
-            'attendance.*'    => ['required', 'in:P,A,HD'],
-            'description'     => ['nullable', 'string', 'max:500'],
-            'notes'           => ['nullable', 'string'],
+            'assignable_id'              => ['required', 'integer'],
+            'assignable_type'            => ['required', 'in:user,employee'],
+            'period_start'               => ['required', 'date'],
+            'period_end'                 => ['required', 'date', 'after_or_equal:period_start'],
+            'daily_rate'                 => ['required', 'numeric', 'min:0'],
+            'attendance'                 => ['required', 'array'],
+            'attendance.*'               => ['required', 'array'],
+            'attendance.*.status'        => ['required', 'in:P,A,HD,NW'],
+            'attendance.*.time_in'       => ['nullable', 'date_format:H:i'],
+            'attendance.*.time_out'      => ['nullable', 'date_format:H:i'],
+            'attendance.*.break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'description'                => ['nullable', 'string', 'max:500'],
+            'notes'                      => ['nullable', 'string'],
         ]);
 
         if ($data['assignable_type'] === 'user') {
@@ -83,14 +87,12 @@ class ProjectLaborCostsController extends Controller
             $employeeId = $data['assignable_id'];
         }
 
-        // ── Guard: period must fall within the worker's assignment dates ──────
         $teamMember    = $this->getTeamMember($project, $data['assignable_type'], $userId, $employeeId);
         $boundaryError = $this->validateAssignmentBoundary($data, $teamMember);
         if ($boundaryError) {
             return back()->withErrors($boundaryError)->withInput();
         }
 
-        // ── Guard: no overlapping period for the same worker ──────────────────
         $overlap = ProjectLaborCost::where('project_id', $project->id)
             ->where('assignable_type', $data['assignable_type'])
             ->where(function ($q) use ($userId, $employeeId, $data) {
@@ -165,9 +167,13 @@ class ProjectLaborCostsController extends Controller
             'period_end'      => ['required', 'date', 'after_or_equal:period_start'],
             'daily_rate'      => ['required', 'numeric', 'min:0'],
             'attendance'      => ['required', 'array'],
-            'attendance.*'    => ['required', 'in:P,A,HD'],
-            'description'     => ['nullable', 'string', 'max:500'],
-            'notes'           => ['nullable', 'string'],
+            'attendance.*'    => ['required', 'array'],
+            'attendance.*.status'        => ['required', 'in:P,A,HD,NW'],
+            'attendance.*.time_in'       => ['nullable', 'date_format:H:i'],
+            'attendance.*.time_out'      => ['nullable', 'date_format:H:i'],
+            'attendance.*.break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'description'                => ['nullable', 'string', 'max:500'],
+            'notes'                      => ['nullable', 'string'],
         ]);
 
         if ($data['assignable_type'] === 'user') {
@@ -180,14 +186,12 @@ class ProjectLaborCostsController extends Controller
             $employeeId = $data['assignable_id'];
         }
 
-        // ── Guard: period must fall within the worker's assignment dates ──────
         $teamMember    = $this->getTeamMember($project, $data['assignable_type'], $userId, $employeeId);
         $boundaryError = $this->validateAssignmentBoundary($data, $teamMember);
         if ($boundaryError) {
             return back()->withErrors($boundaryError)->withInput();
         }
 
-        // ── Overlap guard — exclude self ──────────────────────────────────────
         $overlap = ProjectLaborCost::where('project_id', $project->id)
             ->where('id', '!=', $laborCost->id)
             ->where('assignable_type', $data['assignable_type'])
@@ -300,7 +304,13 @@ class ProjectLaborCostsController extends Controller
             );
         }
 
-        $laborCost->update(['status' => 'submitted']);
+        $laborCost->update([
+            'status'            => 'submitted',
+            'payroll_breakdown' => ProjectLaborCost::computeBreakdown(
+                $laborCost->attendance ?? [],
+                (float) $laborCost->daily_rate
+            ),
+        ]);
         $laborCost->load(['user', 'employee']);
 
         $this->adminActivityLogs(

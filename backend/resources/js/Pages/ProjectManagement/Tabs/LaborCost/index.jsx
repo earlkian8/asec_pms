@@ -13,12 +13,13 @@ import {
   Trash2, SquarePen, Plus, Filter, Search, Calendar,
   X, ArrowUpDown, Users, CheckCircle2,
   Clock, Lock, Send, ChevronDown, ChevronRight,
-  PhilippinePeso,
+  PhilippinePeso, Eye,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddLaborCost from './add';
 import EditLaborCost from './edit';
 import DeleteLaborCost from './delete';
+import ViewLaborCost from './view';
 
 export default function LaborCostTab({ project, laborCostData }) {
   const { has } = usePermission();
@@ -26,8 +27,10 @@ export default function LaborCostTab({ project, laborCostData }) {
   const [showAddModal,    setShowAddModal]    = useState(false);
   const [showEditModal,   setShowEditModal]   = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal,   setShowViewModal]   = useState(false);
   const [editLaborCost,   setEditLaborCost]   = useState(null);
   const [deleteLaborCost, setDeleteLaborCost] = useState(null);
+  const [viewLaborCost,   setViewLaborCost]   = useState(null);
   const [expandedRows,    setExpandedRows]    = useState(new Set());
 
   const pagination   = laborCostData?.laborCosts;
@@ -118,7 +121,10 @@ export default function LaborCostTab({ project, laborCostData }) {
   const getAttendanceSummary = (attendance) => {
     if (!attendance) return { P: 0, A: 0, HD: 0 };
     const counts = { P: 0, A: 0, HD: 0 };
-    Object.values(attendance).forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+    Object.values(attendance).forEach(v => {
+      const s = typeof v === 'string' ? v : v?.status;
+      if (counts[s] !== undefined) counts[s]++;
+    });
     return counts;
   };
 
@@ -390,7 +396,12 @@ export default function LaborCostTab({ project, laborCostData }) {
                           </button>
                         )}
                         {isSubmitted && (
-                          <span className="text-xs text-gray-400 italic">Locked</span>
+                          <button
+                            onClick={() => { setViewLaborCost(entry); setShowViewModal(true); }}
+                            className="p-2 rounded-lg hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-all border border-indigo-200"
+                            title="View Payroll Slip">
+                            <Eye size={15} />
+                          </button>
                         )}
                       </div>
                     </TableCell>
@@ -405,7 +416,11 @@ export default function LaborCostTab({ project, laborCostData }) {
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {dates.map(date => {
-                            const status = attendance[date];
+                            const raw    = attendance[date];
+                            const status = typeof raw === 'string' ? raw : (raw?.status ?? 'A');
+                            const timeIn  = raw?.time_in  || null;
+                            const timeOut = raw?.time_out || null;
+                            const breakM  = raw?.break_minutes ?? null;
                             const colorMap = {
                               P:  'bg-green-100 text-green-700 border-green-200',
                               A:  'bg-red-100 text-red-700 border-red-200',
@@ -413,9 +428,15 @@ export default function LaborCostTab({ project, laborCostData }) {
                             };
                             const labelMap = { P: 'Present', A: 'Absent', HD: 'Half Day' };
                             return (
-                              <div key={date} className={`flex flex-col items-center px-3 py-2 rounded-lg border text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                              <div key={date} className={`flex flex-col px-3 py-2 rounded-lg border text-xs font-medium min-w-[90px] ${colorMap[status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                                 <span className="font-bold">{new Date(date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span>
                                 <span className="mt-0.5 opacity-80">{labelMap[status] || status}</span>
+                                {timeIn && timeOut && (
+                                  <span className="mt-1 text-xs opacity-70">{timeIn} – {timeOut}</span>
+                                )}
+                                {breakM != null && breakM > 0 && (
+                                  <span className="text-xs opacity-60">{breakM}m break</span>
+                                )}
                               </div>
                             );
                           })}
@@ -477,6 +498,9 @@ export default function LaborCostTab({ project, laborCostData }) {
       )}
 
       {/* ── Modals ── */}
+      {showViewModal && viewLaborCost && (
+        <ViewLaborCost setShowViewModal={setShowViewModal} project={project} laborCost={viewLaborCost} />
+      )}
       {showAddModal && (
         <AddLaborCost setShowAddModal={setShowAddModal} project={project} teamMembers={laborCostData?.teamMembers || []} />
       )}

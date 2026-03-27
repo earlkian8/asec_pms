@@ -513,15 +513,36 @@ export default function TeamTab({ project, teamData }) {
 
                   {/* Member name */}
                   <TableCell className="px-4 py-4 text-sm font-medium text-gray-900">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {team.assignable_name || '---'}
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
-                        team.assignable_type === 'employee'
-                          ? 'bg-orange-50 text-orange-700 border-orange-200'
-                          : 'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}>
-                        {team.assignable_type === 'employee' ? 'Employee' : 'User'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      {/* Avatar */}
+                      {(() => {
+                        const imgUrl = team.assignable_type === 'employee'
+                          ? team.employee?.profile_image_url
+                          : team.user?.profile_image_url;
+                        const name = team.assignable_name || '?';
+                        const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                        const isEmployee = team.assignable_type === 'employee';
+                        return imgUrl ? (
+                          <img src={imgUrl} alt={name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-200" />
+                        ) : (
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                            isEmployee ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {initials}
+                          </div>
+                        );
+                      })()}
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{team.assignable_name || '---'}</p>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                          team.assignable_type === 'employee'
+                            ? 'bg-orange-50 text-orange-700 border-orange-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                          {team.assignable_type === 'employee' ? 'Employee' : 'User'}
+                        </span>
+                      </div>
                     </div>
                   </TableCell>
 

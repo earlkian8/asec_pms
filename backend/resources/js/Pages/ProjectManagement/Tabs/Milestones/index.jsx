@@ -376,21 +376,14 @@ export default function MilestonesTab({ project, milestoneData }) {
     const info = formatStatus(status);
     const map = {
       yellow: 'bg-amber-100 text-amber-700 border-amber-200',
-      blue: 'bg-blue-100 text-blue-700 border-blue-200',
-      green: 'bg-green-100 text-green-700 border-green-200',
-      gray: 'bg-gray-100 text-gray-600 border-gray-200'
+      blue:   'bg-blue-100 text-blue-700 border-blue-200',
+      green:  'bg-green-100 text-green-700 border-green-200',
+      gray:   'bg-gray-100 text-gray-600 border-gray-200',
     };
-    return `inline-flex items-center px-2.5 py-1 w-[140px] text-xs font-medium border rounded ${map[info.color] || map.gray}`;
+    return `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium border rounded-full ${map[info.color] || map.gray}`;
   };
 
-  const getStatusSelectClassName = (status) => {
-    const info = formatStatus(status);
-    const base = 'w-[140px] h-8 text-xs border-0 rounded font-medium';
-    const map  = { yellow: 'bg-amber-100 text-amber-700 hover:bg-amber-200', blue: 'bg-blue-100 text-blue-700 hover:bg-blue-200', green: 'bg-green-100 text-green-700 hover:bg-green-200', red: 'bg-red-100 text-red-700 hover:bg-red-200' };
-    return `${base} ${map[info.color] || 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`;
-  };
-
-  const areAllTasksCompleted = (milestone) => {
+const areAllTasksCompleted = (milestone) => {
     const tasks = milestone.tasks || [];
     return tasks.length === 0 || tasks.every(t => t.status === 'completed');
   };
@@ -447,69 +440,69 @@ export default function MilestonesTab({ project, milestoneData }) {
     <div className="w-full">
       {/* Quick Stats */}
       <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-4 border border-blue-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Milestones</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{totalMilestones}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide truncate">Total Milestones</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-900 mt-1">{totalMilestones}</p>
               </div>
-              <div className="bg-blue-200 rounded-full p-3"><Target className="h-5 w-5 text-blue-700" /></div>
+              <div className="bg-blue-200 rounded-full p-2 sm:p-3 flex-shrink-0"><Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-700" /></div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200">
+          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-3 sm:p-4 border border-yellow-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-yellow-700 uppercase tracking-wide">Pending</p>
-                <p className="text-2xl font-bold text-yellow-900 mt-1">{pendingMilestones}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-yellow-700 uppercase tracking-wide truncate">Pending</p>
+                <p className="text-xl sm:text-2xl font-bold text-yellow-900 mt-1">{pendingMilestones}</p>
               </div>
-              <div className="bg-yellow-200 rounded-full p-3"><Clock className="h-5 w-5 text-yellow-700" /></div>
+              <div className="bg-yellow-200 rounded-full p-2 sm:p-3 flex-shrink-0"><Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-700" /></div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 border border-indigo-200">
+          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-3 sm:p-4 border border-indigo-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">In Progress</p>
-                <p className="text-2xl font-bold text-indigo-900 mt-1">{inProgressMilestones}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide truncate">In Progress</p>
+                <p className="text-xl sm:text-2xl font-bold text-indigo-900 mt-1">{inProgressMilestones}</p>
               </div>
-              <div className="bg-indigo-200 rounded-full p-3"><Circle className="h-5 w-5 text-indigo-700" /></div>
+              <div className="bg-indigo-200 rounded-full p-2 sm:p-3 flex-shrink-0"><Circle className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-700" /></div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-4 border border-green-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Completed</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">{completedMilestones}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-green-700 uppercase tracking-wide truncate">Completed</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-900 mt-1">{completedMilestones}</p>
               </div>
-              <div className="bg-green-200 rounded-full p-3"><CheckCircle className="h-5 w-5 text-green-700" /></div>
+              <div className="bg-green-200 rounded-full p-2 sm:p-3 flex-shrink-0"><CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" /></div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Search + Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between relative z-50">
-        <div className="flex flex-col sm:flex-row gap-3 items-center flex-1 relative z-50">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-center justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search milestones or tasks..."
               value={searchInput}
               onChange={handleSearch}
-              className="pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full h-11 border-gray-300 rounded-lg"
+              className="pl-10 h-11 w-full border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
-          <div className="flex gap-2 relative z-50">
+          <div className="flex gap-2">
             <DropdownMenu open={showFilterCard} onOpenChange={(open) => { setShowFilterCard(open); if (open) setShowSortCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center relative ${activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                  className={`h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center relative ${activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
                   title="Filters"
                 >
                   <Filter className="h-4 w-4" />
                   {activeFiltersCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-4 w-4 flex items-center justify-center">
                       {activeFiltersCount()}
                     </span>
                   )}
@@ -573,7 +566,7 @@ export default function MilestonesTab({ project, milestoneData }) {
             <DropdownMenu open={showSortCard} onOpenChange={(open) => { setShowSortCard(open); if (open) setShowFilterCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline"
-                  className="h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                   title="Sort">
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
@@ -622,26 +615,26 @@ export default function MilestonesTab({ project, milestoneData }) {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           {has('project-milestones.view') && (
             <Button
-              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-6 h-11 whitespace-nowrap"
+              className="flex-1 sm:flex-none bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-4 h-11 whitespace-nowrap flex items-center justify-center gap-2"
               onClick={handleExportPdf}
               disabled={isExporting}
             >
               {isExporting ? (
-                <><div className="mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Exporting...</>
+                <><div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Exporting...</>
               ) : (
-                <><FileText className="mr-2 h-4 w-4" />Export PDF</>
+                <><FileText className="h-4 w-4" />Export PDF</>
               )}
             </Button>
           )}
           {has('project-milestones.create') && (
             <Button
-              className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-6 h-11 whitespace-nowrap"
+              className="flex-1 sm:flex-none bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-4 h-11 whitespace-nowrap flex items-center justify-center gap-2"
               onClick={() => setShowAddModal(true)}
             >
-              <SquarePen className="mr-2 h-4 w-4" />Add Milestone
+              <SquarePen className="h-4 w-4" />Add Milestone
             </Button>
           )}
         </div>
@@ -697,7 +690,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm" onClick={e => e.stopPropagation()}>
                         <span className={getStatusBadgeClassName(milestone.status)}>
-                          {formatStatus(milestone.status).label}
+                          {(() => { const s = formatStatus(milestone.status); const Icon = s.icon; return <><Icon size={11} />{s.label}</>; })()}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm text-gray-600">{formatDate(milestone.due_date)}</TableCell>
@@ -789,7 +782,7 @@ export default function MilestonesTab({ project, milestoneData }) {
                           {/* ── Status cell: read-only badge (same as milestone) ── */}
                           <TableCell className="text-xs sm:text-sm">
                             <span className={getStatusBadgeClassName(taskWithMilestone.status)}>
-                              {formatStatus(taskWithMilestone.status).label}
+                              {(() => { const s = formatStatus(taskWithMilestone.status); const Icon = s.icon; return <><Icon size={11} />{s.label}</>; })()}
                             </span>
                           </TableCell>
 
@@ -898,22 +891,22 @@ export default function MilestonesTab({ project, milestoneData }) {
 
       {/* Pagination */}
       {showPagination && (
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
-          <div className="text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-3">
+          <p className="text-sm text-gray-600 order-2 sm:order-1">
             Showing <span className="font-semibold text-gray-900">{milestones.length}</span> of{' '}
             <span className="font-semibold text-gray-900">{milestoneData?.milestones?.total || 0}</span> milestones
-          </div>
-          <div className="flex items-center space-x-2">
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
             <button disabled={!prevLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
               onClick={() => handlePageClick(prevLink?.url)}>Previous</button>
             {pageLinks.map((link, idx) => (
               <button key={idx} disabled={!link?.url}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all min-w-[40px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all min-w-[36px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
                 onClick={() => handlePageClick(link?.url)}>{link?.label || ''}</button>
             ))}
             <button disabled={!nextLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
               onClick={() => handlePageClick(nextLink?.url)}>Next</button>
           </div>
         </div>

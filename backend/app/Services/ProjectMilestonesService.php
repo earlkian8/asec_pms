@@ -88,7 +88,8 @@ class ProjectMilestonesService
                     if (!$update->relationLoaded('createdBy') && $update->created_by) {
                         $update->load('createdBy');
                     }
-                    $update->created_by_name = $update->createdBy ? $update->createdBy->name : null;
+                    $update->created_by_name   = $update->createdBy ? $update->createdBy->name : null;
+                    $update->created_by_avatar = $update->createdBy ? $update->createdBy->profile_image_url : null;
                 });
 
                 // ── Issues ────────────────────────────────────────────────────

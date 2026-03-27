@@ -150,9 +150,14 @@ const UpdateCard = ({ update, currentTask, onEdit, onDelete, downloadUrl, isFirs
       )}
       <div className="p-3.5">
         <div className="flex items-center gap-2 mb-2.5 text-xs text-zinc-400">
-          <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-medium text-[10px] flex-shrink-0">
-            {(update.created_by_name || 'U').charAt(0).toUpperCase()}
-          </div>
+          {update.created_by_avatar ? (
+            <img src={update.created_by_avatar} alt={update.created_by_name || 'User'}
+              className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-zinc-200" />
+          ) : (
+            <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-medium text-[10px] flex-shrink-0">
+              {(update.created_by_name || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
           <span className="text-zinc-500 font-medium">{update.created_by_name || 'Unknown'}</span>
           <span>·</span>
           <span>{fmt(update.created_at)}</span>
@@ -526,8 +531,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                               isUnread ? 'border-violet-100 bg-violet-50/60' : 'border-zinc-100 bg-zinc-50/50'
                             }`}>
                               <div className="relative flex-shrink-0">
-                                <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-medium">
-                                  {(req.client?.client_name || 'C').charAt(0).toUpperCase()}
+                                <div className="w-8 h-8 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center">
+                                  <Mail size={14} className="text-violet-400" />
                                 </div>
                                 {isUnread && (
                                   <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/Components/ui/dialog";
 import { usePermission } from '@/utils/permissions';
 import AddProjectTeam from './add';
 import EditProjectTeam from './edit';
@@ -29,15 +30,17 @@ export default function TeamTab({ project, teamData }) {
   const filterOptions    = teamData?.filterOptions || {};
   const initialSearch    = teamData?.search || '';
 
-  const [selectedIds,         setSelectedIds]         = useState([]);
-  const [showAddModal,        setShowAddModal]        = useState(false);
-  const [showEditModal,       setShowEditModal]       = useState(false);
-  const [showUnassignModal,   setShowUnassignModal]   = useState(false);
-  const [editProjectTeam,     setEditProjectTeam]     = useState(null);
-  const [showRemoveModal,     setShowRemoveModal]     = useState(false);
-  const [removeTeamMember,    setRemoveTeamMember]    = useState(null);
-  const [showHistoryModal,    setShowHistoryModal]    = useState(false);
-  const [historyTeamMember,   setHistoryTeamMember]   = useState(null);
+  const [selectedIds,           setSelectedIds]           = useState([]);
+  const [showAddModal,          setShowAddModal]          = useState(false);
+  const [showEditModal,         setShowEditModal]         = useState(false);
+  const [showUnassignModal,     setShowUnassignModal]     = useState(false);
+  const [showBulkReactivate,    setShowBulkReactivate]    = useState(false);
+  const [showBulkRemoveModal,   setShowBulkRemoveModal]   = useState(false);
+  const [editProjectTeam,       setEditProjectTeam]       = useState(null);
+  const [showRemoveModal,       setShowRemoveModal]       = useState(false);
+  const [removeTeamMember,      setRemoveTeamMember]      = useState(null);
+  const [showHistoryModal,      setShowHistoryModal]      = useState(false);
+  const [historyTeamMember,     setHistoryTeamMember]     = useState(null);
   const [searchInput,         setSearchInput]         = useState(initialSearch);
   const [showFilterCard,      setShowFilterCard]      = useState(false);
   const [showSortCard,        setShowSortCard]        = useState(false);
@@ -181,6 +184,53 @@ export default function TeamTab({ project, teamData }) {
 
   const handleForceRemove = (team) => { setRemoveTeamMember(team); setShowRemoveModal(true); };
   const handleViewHistory = (team) => { setHistoryTeamMember(team); setShowHistoryModal(true); };
+
+  const handleBulkStatus = (newStatus) => {
+    router.put(
+      route('project-management.project-teams.bulk-status', project.id),
+      { ids: selectedIds, assignment_status: newStatus },
+      {
+        preserveScroll: true,
+        onSuccess: (page) => {
+          const flash = page.props.flash;
+          if (flash?.error) toast.error(flash.error);
+          else {
+            const label = newStatus === 'active' ? 'reactivated' : 'released';
+            toast.success(`${selectedIds.length} member(s) ${label} successfully.`);
+            setSelectedIds([]);
+          }
+          setShowUnassignModal(false);
+          setShowBulkReactivate(false);
+        },
+        onError: () => toast.error('Failed to update status.'),
+      }
+    );
+  };
+
+  const handleBulkForceRemove = () => {
+    router.delete(
+      route('project-management.project-teams.force-remove', project.id),
+      {
+        data: { ids: selectedIds },
+        preserveScroll: true,
+        onSuccess: (page) => {
+          const flash = page.props.flash;
+          if (flash?.error) toast.error(flash.error);
+          else {
+            toast.success(`${selectedIds.length} member(s) permanently removed.`);
+            setSelectedIds([]);
+          }
+          setShowBulkRemoveModal(false);
+        },
+        onError: () => toast.error('Failed to remove members.'),
+      }
+    );
+  };
+
+  // Derived selection info for bulk action labels
+  const selectedMembers       = projectTeams.filter(t => selectedIds.includes(t.id));
+  const selectedActiveCount   = selectedMembers.filter(t => t.assignment_status === 'active').length;
+  const selectedReleasedCount = selectedMembers.filter(t => t.assignment_status === 'released').length;
 
   const STATUS_CONFIG = {
     active:    { label: 'Active',    bg: 'bg-green-100',  text: 'text-green-800',  border: 'border-green-200' },
@@ -386,12 +436,26 @@ export default function TeamTab({ project, teamData }) {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {has('project-teams.delete') && selectedIds.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {has('project-teams.delete') && selectedIds.length > 0 && selectedActiveCount > 0 && (
             <Button onClick={() => setShowUnassignModal(true)}
-              className="bg-amber-600 hover:bg-amber-700 text-white shadow-md px-5 h-11 whitespace-nowrap">
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-md px-4 h-11 whitespace-nowrap">
               <LogOut className="mr-2 h-4 w-4" />
-              Release Selected ({selectedIds.length})
+              Release ({selectedActiveCount})
+            </Button>
+          )}
+          {has('project-teams.update') && selectedIds.length > 0 && selectedReleasedCount > 0 && (
+            <Button onClick={() => setShowBulkReactivate(true)}
+              className="bg-green-600 hover:bg-green-700 text-white shadow-md px-4 h-11 whitespace-nowrap">
+              <UserCheck className="mr-2 h-4 w-4" />
+              Reactivate ({selectedReleasedCount})
+            </Button>
+          )}
+          {has('project-teams.delete') && selectedIds.length > 0 && (
+            <Button onClick={() => setShowBulkRemoveModal(true)}
+              className="bg-red-600 hover:bg-red-700 text-white shadow-md px-4 h-11 whitespace-nowrap">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Remove ({selectedIds.length})
             </Button>
           )}
           {has('project-teams.create') && (
@@ -619,9 +683,61 @@ export default function TeamTab({ project, teamData }) {
           setShowUnassignModal={setShowUnassignModal}
           project={project}
           teamMembers={projectTeams}
-          selectedIds={selectedIds}
+          selectedIds={selectedIds.filter(id => projectTeams.find(t => t.id === id)?.assignment_status === 'active')}
           onSuccess={() => { setSelectedIds([]); setShowUnassignModal(false); }}
         />
+      )}
+
+      {/* Bulk Reactivate Confirm */}
+      {showBulkReactivate && (
+        <Dialog open onOpenChange={setShowBulkReactivate}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-green-100 rounded-full p-2"><UserCheck className="h-6 w-6 text-green-600" /></div>
+                <DialogTitle className="text-green-900">Reactivate {selectedReleasedCount} Member(s)</DialogTitle>
+              </div>
+              <DialogDescription className="text-gray-600 pt-2">
+                Are you sure you want to reactivate <span className="font-semibold text-gray-900">{selectedReleasedCount} released member(s)</span> on this project?
+                <br /><br />
+                Their assignment status will be set back to <span className="font-semibold">Active</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2 justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowBulkReactivate(false)} className="border-gray-300">Cancel</Button>
+              <Button onClick={() => handleBulkStatus('active')}
+                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
+                <UserCheck size={16} /> Reactivate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Bulk Force Remove Confirm */}
+      {showBulkRemoveModal && (
+        <Dialog open onOpenChange={setShowBulkRemoveModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-red-100 rounded-full p-2"><Trash2 className="h-6 w-6 text-red-600" /></div>
+                <DialogTitle className="text-red-900">Permanently Remove {selectedIds.length} Member(s)</DialogTitle>
+              </div>
+              <DialogDescription className="text-gray-600 pt-2">
+                Are you sure you want to permanently remove <span className="font-semibold text-gray-900">{selectedIds.length} member(s)</span> from this project?
+                <br /><br />
+                <span className="text-red-600 font-medium">This action cannot be undone.</span> All records will be deleted.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2 justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowBulkRemoveModal(false)} className="border-gray-300">Cancel</Button>
+              <Button onClick={handleBulkForceRemove}
+                className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2">
+                <Trash2 size={16} /> Remove Permanently
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
       {showRemoveModal && removeTeamMember && (
         <RemoveTeamMember

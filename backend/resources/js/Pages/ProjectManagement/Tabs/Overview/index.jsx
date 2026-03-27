@@ -506,7 +506,7 @@ export default function OverviewTab({ project, overviewData }) {
                       : 'Unknown')}
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5 font-medium">{member.role || '---'}</p>
-                <span className={`inline-block mt-1.5 px-1.5 py-0.5 rounded text-xs font-bold ${
+                <span className={`inline-block mt-1.5 px-1.5 py-0.5 rounded text-xs font-bold capitalize ${
                   member.status === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
                 }`}>{member.status}</span>
               </div>

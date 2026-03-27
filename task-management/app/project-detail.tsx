@@ -12,6 +12,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info } from 'lucide-react-native';
@@ -69,6 +70,57 @@ type Assignable = {
 };
 
 type TabKey = 'milestones' | 'team';
+
+// ─── Reusable date picker field ───────────────────────────────────────────────
+function DatePickerField({
+  label,
+  value,
+  onChange,
+  minimumDate,
+  maximumDate,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  minimumDate?: Date;
+  maximumDate?: Date;
+}) {
+  const [show, setShow] = useState(false);
+
+  // Normalize any ISO string to plain YYYY-MM-DD so appending T00:00:00 is safe
+  const toYMD = (v: string) => (v ? v.split('T')[0] : '');
+  const ymd = toYMD(value);
+  const dateObj = ymd ? new Date(ymd + 'T00:00:00') : new Date();
+
+  const fmt = (d: string) => {
+    const clean = toYMD(d);
+    if (!clean) return 'Select date';
+    try { return new Date(clean + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch { return clean; }
+  };
+
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TouchableOpacity style={styles.dateBtn} onPress={() => setShow(true)} activeOpacity={0.75}>
+        <Text style={[styles.dateBtnText, !ymd && { color: D.inkLight }]}>{fmt(value)}</Text>
+      </TouchableOpacity>
+      {show && (
+        <DateTimePicker
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          value={dateObj}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+          onChange={(_e, selected) => {
+            setShow(Platform.OS === 'ios');
+            if (selected) onChange(selected.toISOString().split('T')[0]);
+          }}
+        />
+      )}
+    </View>
+  );
+}
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -683,12 +735,12 @@ export default function ProjectDetailScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalCard}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>{editingMilestone ? 'Edit Milestone' : 'Add Milestone'}</Text>
-            <Text style={styles.fieldLabel}>Name</Text>
+            <Text style={styles.fieldLabel}>Name <Text style={{ color: D.red }}>*</Text></Text>
             <TextInput
               style={styles.input}
-              placeholder="Name"
+              placeholder="Milestone name"
               placeholderTextColor={D.inkLight}
               value={mName}
               onChangeText={setMName}
@@ -702,32 +754,30 @@ export default function ProjectDetailScreen() {
               onChangeText={setMDesc}
               multiline
             />
-            <Text style={styles.fieldLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Start Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="Start Date"
               value={mStartDate}
-              onChangeText={setMStartDate}
+              onChange={setMStartDate}
+              minimumDate={project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
-            <Text style={styles.fieldLabel}>Due Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Due Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="Due Date"
               value={mDueDate}
-              onChangeText={setMDueDate}
+              onChange={setMDueDate}
+              minimumDate={mStartDate ? new Date(mStartDate + 'T00:00:00') : (project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined)}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
-            <Text style={styles.fieldLabel}>Billing Percentage</Text>
+            <Text style={styles.fieldLabel}>Billing Percentage (%)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Billing % (optional)"
+              placeholder="e.g. 25 (optional)"
               placeholderTextColor={D.inkLight}
               value={mBillingPercentage}
               onChangeText={setMBillingPercentage}
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { marginTop: 6 }]}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setMilestoneModalOpen(false)}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -735,7 +785,7 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -808,7 +858,7 @@ export default function ProjectDetailScreen() {
                   return (
                     <View key={cid} style={styles.assignFormCard}>
                       <Text style={styles.assignFormTitle} numberOfLines={1}>{a.name}</Text>
-                      <Text style={styles.fieldLabel}>Role</Text>
+                      <Text style={styles.fieldLabel}>Role <Text style={{ color: D.red }}>*</Text></Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Role"
@@ -816,30 +866,28 @@ export default function ProjectDetailScreen() {
                         value={assignFormData[cid]?.role ?? ''}
                         onChangeText={(v) => setAssignField(cid, 'role', v)}
                       />
-                      <Text style={styles.fieldLabel}>Hourly Rate</Text>
+                      <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
                       <TextInput
                         style={styles.input}
-                        placeholder="Hourly Rate"
+                        placeholder="e.g. 150.00"
                         placeholderTextColor={D.inkLight}
                         value={assignFormData[cid]?.hourly_rate ?? ''}
                         onChangeText={(v) => setAssignField(cid, 'hourly_rate', v)}
-                        keyboardType="numeric"
+                        keyboardType="decimal-pad"
                       />
-                      <Text style={styles.fieldLabel}>Start Date</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Start Date (YYYY-MM-DD)"
-                        placeholderTextColor={D.inkLight}
+                      <DatePickerField
+                        label="Start Date *"
                         value={assignFormData[cid]?.start_date ?? ''}
-                        onChangeText={(v) => setAssignField(cid, 'start_date', v)}
+                        onChange={(v) => setAssignField(cid, 'start_date', v)}
+                        minimumDate={project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined}
+                        maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
                       />
-                      <Text style={styles.fieldLabel}>End Date</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="End Date (YYYY-MM-DD)"
-                        placeholderTextColor={D.inkLight}
+                      <DatePickerField
+                        label="End Date *"
                         value={assignFormData[cid]?.end_date ?? ''}
-                        onChangeText={(v) => setAssignField(cid, 'end_date', v)}
+                        onChange={(v) => setAssignField(cid, 'end_date', v)}
+                        minimumDate={assignFormData[cid]?.start_date ? new Date(assignFormData[cid].start_date + 'T00:00:00') : (project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined)}
+                        maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
                       />
                     </View>
                   );
@@ -861,13 +909,13 @@ export default function ProjectDetailScreen() {
       {/* Edit team member modal */}
       <Modal visible={teamEditOpen} transparent animationType="slide" onRequestClose={() => setTeamEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Edit Team Member</Text>
             <Text style={styles.modalHint} numberOfLines={2}>
               Update assignment details for {editingTeamMember?.name ?? 'team member'}.
             </Text>
 
-            <Text style={styles.fieldLabel}>Role</Text>
+            <Text style={styles.fieldLabel}>Role <Text style={{ color: D.red }}>*</Text></Text>
             <TextInput
               style={styles.input}
               placeholder="Role"
@@ -875,33 +923,31 @@ export default function ProjectDetailScreen() {
               value={teRole}
               onChangeText={setTeRole}
             />
-            <Text style={styles.fieldLabel}>Hourly Rate</Text>
+            <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
             <TextInput
               style={styles.input}
-              placeholder="Hourly Rate"
+              placeholder="e.g. 150.00"
               placeholderTextColor={D.inkLight}
               value={teHourlyRate}
               onChangeText={setTeHourlyRate}
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
-            <Text style={styles.fieldLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Start Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="Start Date *"
               value={teStartDate}
-              onChangeText={setTeStartDate}
+              onChange={setTeStartDate}
+              minimumDate={project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
-            <Text style={styles.fieldLabel}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="End Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="End Date *"
               value={teEndDate}
-              onChangeText={setTeEndDate}
+              onChange={setTeEndDate}
+              minimumDate={teStartDate ? new Date(teStartDate + 'T00:00:00') : (project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined)}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { marginTop: 6 }]}>
               <TouchableOpacity
                 style={styles.modalBtn}
                 onPress={() => {
@@ -915,7 +961,7 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1144,6 +1190,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   assignFormTitle: { fontSize: 12, fontWeight: '900', color: D.ink, marginBottom: 8 },
+
+  dateBtn: {
+    borderWidth: 1,
+    borderColor: D.hairline,
+    backgroundColor: D.chalk,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  dateBtnText: { fontSize: 14, color: D.ink },
 
   confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 18 },
   confirmCard: { width: '100%', backgroundColor: D.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: D.hairline },

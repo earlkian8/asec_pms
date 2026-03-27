@@ -203,9 +203,6 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
   const showPagination = pageLinks.length > 0 || prevLink?.url || nextLink?.url;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount ?? 0);
-
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('en-PH', {
     year: 'numeric', month: 'short', day: 'numeric',
   }) : '---';
@@ -246,7 +243,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
 
       {/* ── Quick Stats ── */}
       <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: 'Total Allocations', value: totalAllocations,   icon: Package,       from: 'from-blue-50',   to: 'to-blue-100',   border: 'border-blue-200',   text: 'text-blue-700',   num: 'text-blue-900',   iconBg: 'bg-blue-200',   iconColor: 'text-blue-700'   },
             { label: 'Pending',           value: pendingAllocations,  icon: Clock,         from: 'from-yellow-50', to: 'to-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', num: 'text-yellow-900', iconBg: 'bg-yellow-200', iconColor: 'text-yellow-700' },
@@ -255,11 +252,11 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
           ].map(({ label, value, icon: Icon, from, to, border, text, num, iconBg, iconColor }) => (
             <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-lg p-3 sm:p-4 border ${border}`}>
               <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-xs font-medium ${text} uppercase tracking-wide`}>{label}</p>
+                <div className="min-w-0">
+                  <p className={`text-xs font-medium ${text} uppercase tracking-wide truncate`}>{label}</p>
                   <p className={`text-xl sm:text-2xl font-bold ${num} mt-1`}>{value}</p>
                 </div>
-                <div className={`${iconBg} rounded-full p-2 sm:p-3`}>
+                <div className={`${iconBg} rounded-full p-2 sm:p-3 flex-shrink-0`}>
                   <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
                 </div>
               </div>
@@ -301,7 +298,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
       )}
 
       {/* ── Search + Filter Bar ── */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -436,6 +433,8 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
           </div>
         </div>
       </div>
+
+      {/* ── Table ── */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white relative z-0">
         <Table className="min-w-[1060px] w-full">
           <TableHeader>
@@ -584,22 +583,22 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
 
       {/* ── Pagination ── */}
       {showPagination && (
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
-          <div className="text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-3">
+          <p className="text-sm text-gray-600 order-2 sm:order-1">
             Showing <span className="font-semibold text-gray-900">{allocations.length}</span> of{' '}
             <span className="font-semibold text-gray-900">{pagination?.total || 0}</span> allocations
-          </div>
-          <div className="flex items-center space-x-2">
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
             <button disabled={!prevLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
               onClick={() => handlePageClick(prevLink?.url)}>Previous</button>
             {pageLinks.map((link, idx) => (
               <button key={idx} disabled={!link?.url}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all min-w-[40px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all min-w-[36px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400 bg-gray-50' : ''}`}
                 onClick={() => handlePageClick(link?.url)}>{link?.label || ''}</button>
             ))}
             <button disabled={!nextLink?.url}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}
               onClick={() => handlePageClick(nextLink?.url)}>Next</button>
           </div>
         </div>

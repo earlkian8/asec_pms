@@ -51,8 +51,9 @@ class TeamController extends Controller
             ->whereNull('deleted_at')
             ->when(count($existingUserIds) > 0, fn ($q) => $q->whereNotIn('id', $existingUserIds))
             ->with('roles')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email'])
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email'])
             ->map(fn (User $u) => [
                 'id' => $u->id,
                 'type' => 'user',

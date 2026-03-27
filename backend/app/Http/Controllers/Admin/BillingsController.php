@@ -43,20 +43,24 @@ class BillingsController extends Controller
             $data = array_merge($data, $transactionsData);
         }
 
-        // Only show projects that still have remaining billable amount
-        // (contract_amount > sum of existing active billings).
-        // Fully-paid/fully-billed projects are excluded — nothing left to bill.
+        // All active projects are available for billing — no cap enforcement.
         $projects = Project::with(['milestones:id,project_id,name,billing_percentage'])
             ->withSum(['billings as total_billed' => function ($q) {
-                $q->whereNull('archived_at'); // only count active billings
+                $q->whereNull('archived_at');
             }], 'billing_amount')
+            ->withSum(['billings as total_paid' => function ($q) {
+                $q->whereNull('archived_at')
+                  ->whereHas('payments', fn($p) => $p->where('payment_status', 'paid'));
+            }], 'billing_amount')
+            ->whereNull('archived_at')
             ->orderBy('project_name', 'asc')
             ->get(['id', 'project_code', 'project_name', 'billing_type', 'contract_amount'])
-            ->filter(function ($project) {
+            ->map(function ($project) {
                 $contract    = (float) $project->contract_amount;
                 $totalBilled = (float) ($project->total_billed ?? 0);
-                // Show project if nothing has been billed yet, or if there's still room
-                return $contract <= 0 || $totalBilled < $contract;
+                $project->remaining_billable = $contract > 0 ? $contract - $totalBilled : null;
+                $project->variance           = $totalBilled - $contract;
+                return $project;
             })
             ->values();
 
@@ -144,28 +148,19 @@ class BillingsController extends Controller
             if (!$milestone) {
                 return back()->with('error', 'Milestone does not belong to this project.');
             }
-
-            if ($milestone->billing_percentage && $project->contract_amount) {
-                $calculatedAmount = ($project->contract_amount * $milestone->billing_percentage) / 100;
-                if (empty($validated['billing_amount']) || abs($validated['billing_amount'] - $calculatedAmount) < 0.01) {
-                    $validated['billing_amount'] = $calculatedAmount;
-                }
-            }
         }
 
-        if ($validated['billing_type'] === 'fixed_price') {
-            if ($validated['billing_amount'] > $project->contract_amount) {
-                return back()->with('error', 'Billing amount cannot exceed contract amount (₱' . number_format($project->contract_amount, 2) . ').');
-            }
-
+        // Soft warning: check if billing exceeds contract amount (non-blocking)
+        $warning = null;
+        if ($project->contract_amount > 0) {
             $totalBilled = Billing::where('project_id', $project->id)
                 ->whereNull('archived_at')
-                ->where('billing_type', 'fixed_price')
                 ->sum('billing_amount');
 
-            if (($totalBilled + $validated['billing_amount']) > $project->contract_amount) {
-                $remaining = $project->contract_amount - $totalBilled;
-                return back()->with('error', 'Total billings would exceed contract amount. Remaining billable amount: ₱' . number_format($remaining, 2) . '.');
+            $newTotal = $totalBilled + $validated['billing_amount'];
+            if ($newTotal > $project->contract_amount) {
+                $over = $newTotal - $project->contract_amount;
+                $warning = 'Billing created. Note: total billed (₱' . number_format($newTotal, 2) . ') now exceeds contract amount (₱' . number_format($project->contract_amount, 2) . ') by ₱' . number_format($over, 2) . '.';
             }
         }
 
@@ -181,6 +176,10 @@ class BillingsController extends Controller
         $this->createSystemNotification('general', 'New Billing Created',
             "A new billing '{$billing->billing_code}' (₱" . number_format($billing->billing_amount, 2) . ") has been created for project '{$project->project_name}'.",
             $project, route('billing-management.show', $billing->id));
+
+        if ($warning) {
+            return back()->with('success', 'Billing created successfully.')->with('warning', $warning);
+        }
 
         return back()->with('success', 'Billing created successfully.');
     }
@@ -200,10 +199,6 @@ class BillingsController extends Controller
             'description'    => ['nullable', 'string'],
         ]);
 
-        if ($billing->billing_type === 'fixed_price') {
-            $validated['billing_amount'] = $billing->billing_amount;
-        }
-
         $totalPaid = $billing->total_paid;
         if ($validated['billing_amount'] < $totalPaid) {
             return back()->with('error', 'Billing amount cannot be less than total paid amount (₱' . number_format($totalPaid, 2) . ').');
@@ -219,6 +214,22 @@ class BillingsController extends Controller
         $this->createSystemNotification('general', 'Billing Updated',
             "Billing '{$billing->billing_code}' has been updated" . ($project ? " for project '{$project->project_name}'" : "") . ".",
             $project, route('billing-management.show', $billing->id));
+
+        // Soft warning if updated amount exceeds contract
+        $warning = null;
+        if ($project && $project->contract_amount > 0) {
+            $totalBilled = Billing::where('project_id', $project->id)
+                ->whereNull('archived_at')
+                ->sum('billing_amount');
+            if ($totalBilled > $project->contract_amount) {
+                $over = $totalBilled - $project->contract_amount;
+                $warning = 'Billing updated. Note: total billed (₱' . number_format($totalBilled, 2) . ') exceeds contract amount (₱' . number_format($project->contract_amount, 2) . ') by ₱' . number_format($over, 2) . '.';
+            }
+        }
+
+        if ($warning) {
+            return back()->with('success', 'Billing updated successfully.')->with('warning', $warning);
+        }
 
         return back()->with('success', 'Billing updated successfully.');
     }

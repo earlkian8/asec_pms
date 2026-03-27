@@ -1,7 +1,8 @@
 import {
   DollarSign, Users, Calendar, TrendingUp, Package, Clock,
   CheckCircle2, AlertCircle, FileText, BarChart3, Target, Wallet,
-  Receipt, Building2, MapPin, Tag, Activity, Sparkles, Download, ExternalLink
+  Receipt, Building2, MapPin, Tag, Activity, Sparkles, Download, ExternalLink,
+  TrendingDown, AlertTriangle, ShieldCheck, Zap
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 
@@ -295,67 +296,181 @@ export default function OverviewTab({ project, overviewData }) {
           </div>
         </div>
 
-        {/* Billing Summary */}
+        {/* Financial Summary */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <div className="p-1.5 bg-green-100 rounded-lg"><Receipt className="text-green-600" size={18} /></div>
-              Billing Summary
+              Financial Summary
             </h3>
+            {/* Financial health badge */}
+            {(() => {
+              const contract = billing.contract_amount || 0;
+              const billed   = billing.total_billed || 0;
+              const variance = billing.variance || 0;
+              if (contract <= 0) return null;
+              const pct = (billed / contract) * 100;
+              if (variance > 0) return (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                  <TrendingUp size={12} /> Over Contract
+                </span>
+              );
+              if (pct >= 90) return (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                  <AlertTriangle size={12} /> Near Limit
+                </span>
+              );
+              if (billed === 0) return (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">
+                  <Zap size={12} /> Not Yet Billed
+                </span>
+              );
+              return (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                  <ShieldCheck size={12} /> Within Contract
+                </span>
+              );
+            })()}
           </div>
-          <div className="space-y-3">
+
+          {/* Billing progress bar vs contract */}
+          {(billing.contract_amount || 0) > 0 && (() => {
+            const contract  = billing.contract_amount;
+            const billed    = billing.total_billed || 0;
+            const paid      = billing.total_paid || 0;
+            const billedPct = Math.min((billed / contract) * 100, 100);
+            const paidPct   = Math.min((paid / contract) * 100, 100);
+            const isOver    = billed > contract;
+            return (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="text-gray-600 font-semibold">Billed vs Contract</span>
+                  <span className={`font-bold ${isOver ? 'text-red-600' : 'text-gray-900'}`}>
+                    {formatPercentage((billed / contract) * 100)}
+                  </span>
+                </div>
+                <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-visible">
+                  {/* Paid portion */}
+                  <div
+                    className="absolute top-0 left-0 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-500"
+                    style={{ width: `${paidPct}%` }}
+                  />
+                  {/* Billed-but-unpaid portion */}
+                  {billedPct > paidPct && (
+                    <div
+                      className="absolute top-0 h-3 bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500"
+                      style={{ left: `${paidPct}%`, width: `${billedPct - paidPct}%` }}
+                    />
+                  )}
+                  {/* Over-contract marker */}
+                  {isOver && (
+                    <div className="absolute top-0 right-0 h-3 w-1.5 rounded-r-full bg-red-500" />
+                  )}
+                </div>
+                <div className="flex gap-3 mt-1.5 text-xs text-gray-500 font-medium">
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500" />Paid</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400" />Billed (unpaid)</span>
+                  {isOver && <span className="flex items-center gap-1 text-red-600 font-semibold"><div className="w-2 h-2 rounded-full bg-red-500" />Over contract</span>}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Key figures grid */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-2.5 border border-gray-200">
+              <p className="text-xs text-gray-500 font-semibold mb-0.5">Contract Amount</p>
+              <p className="text-sm font-bold text-gray-900">{formatCurrency(billing.contract_amount || 0)}</p>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2.5 border border-blue-200">
+              <p className="text-xs text-gray-500 font-semibold mb-0.5">Total Billed</p>
+              <p className="text-sm font-bold text-blue-800">{formatCurrency(billing.total_billed || 0)}</p>
+            </div>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2.5 border border-green-200">
+              <p className="text-xs text-gray-500 font-semibold mb-0.5">Total Paid</p>
+              <p className="text-sm font-bold text-green-700">{formatCurrency(billing.total_paid || 0)}</p>
+            </div>
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2.5 border border-orange-200">
+              <p className="text-xs text-gray-500 font-semibold mb-0.5">Remaining Balance</p>
+              <p className="text-sm font-bold text-orange-700">{formatCurrency(billing.total_remaining || 0)}</p>
+            </div>
+          </div>
+
+          {/* Variance row */}
+          {(billing.contract_amount || 0) > 0 && (() => {
+            const variance = billing.variance || 0;
+            const isOver   = variance > 0;
+            const isUnder  = variance < 0;
+            return (
+              <div className={`flex items-center justify-between rounded-lg p-3 border ${
+                isOver  ? 'bg-red-50 border-red-200' :
+                isUnder ? 'bg-green-50 border-green-200' :
+                          'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {isOver  ? <TrendingUp  className="text-red-600"   size={16} /> :
+                   isUnder ? <TrendingDown className="text-green-600" size={16} /> :
+                             <ShieldCheck  className="text-gray-500"  size={16} />}
+                  <span className={`text-sm font-bold ${
+                    isOver ? 'text-red-700' : isUnder ? 'text-green-700' : 'text-gray-600'
+                  }`}>
+                    {isOver  ? 'Over-billed by' :
+                     isUnder ? 'Under-billed by' :
+                               'Exactly on contract'}
+                  </span>
+                </div>
+                {variance !== 0 && (
+                  <span className={`text-sm font-bold ${
+                    isOver ? 'text-red-700' : 'text-green-700'
+                  }`}>
+                    {formatCurrency(Math.abs(variance))}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Payment progress + status counts */}
+          <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
             <div>
               <div className="flex justify-between text-xs mb-1.5">
                 <span className="text-gray-600 font-semibold">Payment Progress</span>
                 <span className="font-bold text-gray-900">{formatPercentage(billing.payment_percentage)}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                <div className="bg-gradient-to-r from-green-500 to-emerald-600 h-2.5 rounded-full transition-all duration-500 shadow-sm"
-                  style={{ width: `${Math.min(billing.payment_percentage, 100)}%` }} />
+                <div
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 h-2.5 rounded-full transition-all duration-500 shadow-sm"
+                  style={{ width: `${Math.min(billing.payment_percentage, 100)}%` }}
+                />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-2.5 border border-gray-200">
-                <p className="text-xs text-gray-600 mb-0.5 font-semibold">Total Billed</p>
-                <p className="text-base font-bold text-gray-900">{formatCurrency(billing.total_billed)}</p>
-              </div>
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2.5 border border-green-200">
-                <p className="text-xs text-gray-600 mb-0.5 font-semibold">Total Paid</p>
-                <p className="text-base font-bold text-green-700">{formatCurrency(billing.total_paid)}</p>
-              </div>
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2.5 border border-orange-200">
-                <p className="text-xs text-gray-600 mb-0.5 font-semibold">Remaining</p>
-                <p className="text-base font-bold text-orange-700">{formatCurrency(billing.total_remaining)}</p>
-              </div>
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2.5 border border-blue-200">
-                <p className="text-xs text-gray-600 mb-0.5 font-semibold">Status</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${getBillingStatusColor('paid')}`}>{billing.status_counts.paid} Paid</span>
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${getBillingStatusColor('partial')}`}>{billing.status_counts.partial} Partial</span>
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${getBillingStatusColor('unpaid')}`}>{billing.status_counts.unpaid} Unpaid</span>
-                </div>
-              </div>
+            <div className="flex gap-2">
+              <span className={`flex-1 text-center px-2 py-1.5 rounded-lg text-xs font-bold ${getBillingStatusColor('paid')}`}>{billing.status_counts.paid} Paid</span>
+              <span className={`flex-1 text-center px-2 py-1.5 rounded-lg text-xs font-bold ${getBillingStatusColor('partial')}`}>{billing.status_counts.partial} Partial</span>
+              <span className={`flex-1 text-center px-2 py-1.5 rounded-lg text-xs font-bold ${getBillingStatusColor('unpaid')}`}>{billing.status_counts.unpaid} Unpaid</span>
             </div>
-            {billing.recent_billings?.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <p className="text-xs font-bold text-gray-700 mb-2">Recent Billings</p>
-                <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                  {billing.recent_billings.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg p-2 border border-gray-200">
-                      <div>
-                        <p className="font-bold text-gray-900">{b.billing_code}</p>
-                        <p className="text-gray-600">{formatDate(b.billing_date)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-900">{formatCurrency(b.billing_amount)}</p>
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(b.status)}`}>{b.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
+
+          {/* Recent billings */}
+          {billing.recent_billings?.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <p className="text-xs font-bold text-gray-700 mb-2">Recent Billings</p>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                {billing.recent_billings.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg p-2 border border-gray-200">
+                    <div>
+                      <p className="font-bold text-gray-900">{b.billing_code}</p>
+                      <p className="text-gray-500">{formatDate(b.billing_date)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{formatCurrency(b.billing_amount)}</p>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getBillingStatusColor(b.status)}`}>{b.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

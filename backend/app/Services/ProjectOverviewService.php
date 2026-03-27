@@ -157,9 +157,11 @@ class ProjectOverviewService
                 'monthly_breakdown'             => $last6Months,
             ],
             'billing' => [
+                'contract_amount'    => $contractAmount,
                 'total_billed'       => $totalBilled,
                 'total_paid'         => $totalPaid,
                 'total_remaining'    => $totalRemaining,
+                'variance'           => $totalBilled - $contractAmount,
                 'payment_percentage' => round($paymentPercentage, 2),
                 'status_counts'      => $billingStatusCounts,
                 'recent_billings'    => $recentBillings->map(fn ($b) => [

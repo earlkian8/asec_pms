@@ -199,14 +199,17 @@ export default function BillingManagement() {
     } catch (e) { /* noop */ }
   };
 
+  const handleFlash = (page, fallbackSuccess) => {
+    const flash = page.props.flash;
+    if (flash?.error) { toast.error(flash.error); return; }
+    if (flash?.warning) toast.warning(flash.warning);
+    toast.success(fallbackSuccess);
+  };
+
   const handleArchive = (billing) => {
     router.post(route('billing-management.archive', billing.id), {}, {
       preserveScroll: true,
-      onSuccess: (page) => {
-        const flash = page.props.flash;
-        if (flash?.error) toast.error(flash.error);
-        else toast.success(`Billing "${billing.billing_code}" archived`);
-      },
+      onSuccess: (page) => handleFlash(page, `Billing "${billing.billing_code}" archived`),
       onError: () => toast.error('Failed to archive billing.'),
     });
   };

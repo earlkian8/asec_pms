@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api\TaskManagement;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 
 class PermissionDelegationController extends Controller
 {
-    // Permissions that an Engineer (TM) can delegate to another user
     private const DELEGATABLE = [
         'tm.access',
         'tm.projects.view-assigned',
@@ -34,7 +34,7 @@ class PermissionDelegationController extends Controller
     ];
 
     /**
-     * List all users the authenticated user has granted TM access to.
+     * Users that the authenticated user personally granted access to.
      */
     public function grantedUsers(Request $request)
     {
@@ -44,24 +44,23 @@ class PermissionDelegationController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        // Users who have tm.access as a direct permission (granted by delegation)
-        // We identify them by having tm.access directly on the user model (not just via role)
-        $granted = User::whereHas('permissions', fn ($q) => $q->where('name', 'tm.access'))
-            ->whereNull('deleted_at')
-            ->with('permissions')
+        $granted = DB::table('permission_delegations')
+            ->where('granted_by', $user->id)
+            ->join('users', 'users.id', '=', 'permission_delegations.granted_to')
+            ->whereNull('users.deleted_at')
+            ->select('users.id', 'users.first_name', 'users.middle_name', 'users.last_name', 'users.email')
             ->get()
-            ->map(fn (User $u) => [
+            ->map(fn ($u) => [
                 'id'    => $u->id,
-                'name'  => $u->name,
+                'name'  => collect([$u->first_name, $u->middle_name ? mb_substr($u->middle_name, 0, 1).'.' : null, $u->last_name])->filter()->implode(' '),
                 'email' => $u->email,
-                'permissions' => $u->permissions->pluck('name')->filter(fn ($p) => str_starts_with($p, 'tm.'))->values(),
             ]);
 
         return response()->json(['success' => true, 'data' => $granted]);
     }
 
     /**
-     * List users eligible to receive TM access (don't already have tm.access via any means).
+     * Users eligible to receive access — don't already have tm.access by any means.
      */
     public function eligibleUsers(Request $request)
     {
@@ -71,7 +70,6 @@ class PermissionDelegationController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        // Exclude self and users who already have tm.access (via role or direct permission)
         $alreadyHaveAccess = User::permission('tm.access')->pluck('id');
 
         $eligible = User::whereNull('deleted_at')
@@ -90,7 +88,7 @@ class PermissionDelegationController extends Controller
     }
 
     /**
-     * Grant TM permissions to a user.
+     * Grant TM access to a user and record the delegation row.
      */
     public function grant(Request $request)
     {
@@ -100,9 +98,7 @@ class PermissionDelegationController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
-        ]);
+        $request->validate(['user_id' => ['required', 'integer', 'exists:users,id']]);
 
         $target = User::findOrFail($request->user_id);
 
@@ -113,6 +109,13 @@ class PermissionDelegationController extends Controller
         if ($target->can('tm.access')) {
             return response()->json(['success' => false, 'message' => "{$target->name} already has Task Management access."], 422);
         }
+
+        DB::table('permission_delegations')->insertOrIgnore([
+            'granted_by' => $user->id,
+            'granted_to' => $target->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $permissions = Permission::whereIn('name', self::DELEGATABLE)->get();
         $target->givePermissionTo($permissions);
@@ -127,7 +130,8 @@ class PermissionDelegationController extends Controller
     }
 
     /**
-     * Revoke TM permissions from a user.
+     * Revoke TM access — only if YOU were the one who granted it.
+     * Permissions are only removed when no other delegator still trusts this user.
      */
     public function revoke(Request $request)
     {
@@ -137,16 +141,29 @@ class PermissionDelegationController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
-        ]);
+        $request->validate(['user_id' => ['required', 'integer', 'exists:users,id']]);
 
         $target = User::findOrFail($request->user_id);
 
-        $permissions = Permission::whereIn('name', self::DELEGATABLE)->get();
-        $target->revokePermissionTo($permissions);
+        $deleted = DB::table('permission_delegations')
+            ->where('granted_by', $user->id)
+            ->where('granted_to', $target->id)
+            ->delete();
 
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        if (!$deleted) {
+            return response()->json(['success' => false, 'message' => 'You did not grant access to this user.'], 403);
+        }
+
+        // Only revoke permissions if no other delegator still trusts this user
+        $otherDelegations = DB::table('permission_delegations')
+            ->where('granted_to', $target->id)
+            ->exists();
+
+        if (!$otherDelegations) {
+            $permissions = Permission::whereIn('name', self::DELEGATABLE)->get();
+            $target->revokePermissionTo($permissions);
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        }
 
         return response()->json([
             'success' => true,

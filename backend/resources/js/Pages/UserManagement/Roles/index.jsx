@@ -25,8 +25,7 @@ export default function RolesIndex() {
 
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "User Management", href: route('user-management.roles-and-permissions.index') },
-    { title: "Roles" },
+    { title: "Roles & Permissions" },
   ];
 
   const columns = [

@@ -100,10 +100,11 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
     ? monthlyData.map(month => ({
         month: month.month,
         revenue: month.revenue || 0,
-        expenses: (month.labor_cost || 0) + (month.material_cost || 0),
+        expenses: (month.labor_cost || 0) + (month.material_cost || 0) + (month.misc_cost || 0),
         labor: month.labor_cost || 0,
         materials: month.material_cost || 0,
-        net: (month.revenue || 0) - ((month.labor_cost || 0) + (month.material_cost || 0))
+        misc: month.misc_cost || 0,
+        net: (month.revenue || 0) - ((month.labor_cost || 0) + (month.material_cost || 0) + (month.misc_cost || 0))
       }))
     : [];
 
@@ -200,8 +201,9 @@ export default function Dashboard({ statistics, recentProjects, recentBillings, 
                 <p className="text-xs text-gray-600 mb-1">Budget Used</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(statistics.budget.total_budget_used)}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Labor: {formatCurrency(statistics.budget.total_labor_cost)} | 
-                  Materials: {formatCurrency(statistics.budget.total_material_cost)}
+                  Labor: {formatCurrency(statistics.budget.total_labor_cost)} · 
+                  Materials: {formatCurrency(statistics.budget.total_material_cost)} · 
+                  Misc: {formatCurrency(statistics.budget.total_misc_cost)}
                 </p>
               </div>
               <div className="p-2.5 bg-orange-100 rounded-full">

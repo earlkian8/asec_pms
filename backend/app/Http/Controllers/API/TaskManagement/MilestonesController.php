@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\TaskManagement;
 
 use App\Http\Controllers\Controller;
+use App\Models\Notification;
 use App\Models\Project;
 use App\Models\ProjectMilestone;
 use App\Services\TaskManagementAuthorization;
@@ -176,6 +177,23 @@ class MilestonesController extends Controller
         }
 
         $milestone->update(array_merge($data, ['status' => $computedStatus]));
+
+        // Notify project team if milestone just completed
+        if ($computedStatus === 'completed' && $milestone->status !== 'completed' && $project) {
+            $teamUserIds = \App\Models\ProjectTeam::where('project_id', $project->id)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')->unique();
+            foreach ($teamUserIds as $uid) {
+                Notification::create([
+                    'user_id'    => $uid,
+                    'project_id' => $project->id,
+                    'type'       => 'milestone',
+                    'title'      => 'Milestone Completed',
+                    'message'    => "Milestone '{$milestone->name}' has been completed in project '{$project->project_name}'.",
+                    'read'       => false,
+                ]);
+            }
+        }
 
         return response()->json([
             'success' => true,

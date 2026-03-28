@@ -5,12 +5,21 @@ import 'react-native-reanimated';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { DialogProvider } from '@/contexts/DialogContext';
 import { AuthGuard } from '@/components/AuthGuard';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
+
+function NotificationManager() {
+  const { isAuthenticated } = useAuth();
+  useNotifications(isAuthenticated);
+  return null;
+}
 
 export default function RootLayout() {
   return (
     <AuthProvider>
       <DialogProvider>
         <AuthGuard>
+          <NotificationManager />
           <Stack>
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

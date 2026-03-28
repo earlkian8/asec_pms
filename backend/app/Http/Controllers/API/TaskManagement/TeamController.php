@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\TaskManagement;
 use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\Notification;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\ProjectTeam;
@@ -243,6 +244,18 @@ class TeamController extends Controller
             ]);
 
             $created[] = $teamMember->id;
+
+            // Notify the user if they have a user account
+            if ($assignable['type'] === 'user') {
+                Notification::create([
+                    'user_id'    => (int) $assignable['id'],
+                    'project_id' => $project->id,
+                    'type'       => 'team',
+                    'title'      => 'Added to Project Team',
+                    'message'    => "You have been added to the team for project '{$project->project_name}' as {$assignable['role']}.",
+                    'read'       => false,
+                ]);
+            }
         }
 
         return response()->json([

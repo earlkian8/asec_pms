@@ -17,6 +17,7 @@ use App\Http\Controllers\API\TaskManagement\MilestonesController as TaskManageme
 use App\Http\Controllers\API\TaskManagement\TasksController as TaskManagementTasksController;
 use App\Http\Controllers\API\TaskManagement\TeamController as TaskManagementTeamController;
 use App\Http\Controllers\API\TaskManagement\PermissionDelegationController as TaskManagementPermissionDelegationController;
+use App\Http\Controllers\API\TaskManagement\NotificationController as TaskManagementNotificationController;
 use App\Http\Controllers\API\TaskManagement\MaterialAllocationsController as TaskManagementMaterialAllocationsController;
 
 // PayMongo webhook (public - verify signature in production)
@@ -175,6 +176,12 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::get('/permissions/eligible-users', [TaskManagementPermissionDelegationController::class, 'eligibleUsers']);
     Route::post('/permissions/grant', [TaskManagementPermissionDelegationController::class, 'grant']);
     Route::post('/permissions/revoke', [TaskManagementPermissionDelegationController::class, 'revoke']);
+
+    // Notifications
+    Route::get('/notifications', [TaskManagementNotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [TaskManagementNotificationController::class, 'unreadCount']);
+    Route::put('/notifications/{id}/read', [TaskManagementNotificationController::class, 'markAsRead']);
+    Route::put('/notifications/read-all', [TaskManagementNotificationController::class, 'markAllAsRead']);
 
     // Material allocations (project-scoped)
     Route::get('/projects/{project}/material-allocations', [TaskManagementMaterialAllocationsController::class, 'index'])->middleware('permission:tm.projects.view-assigned');

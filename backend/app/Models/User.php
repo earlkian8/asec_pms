@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -101,27 +102,27 @@ class User extends Authenticatable
 
     public function getProfileImageUrlAttribute(): ?string
     {
-        return $this->profile_image ? asset('storage/' . $this->profile_image) : null;
+        return $this->profile_image ? Storage::url($this->profile_image) : null;
     }
 
     public function getSssIdImageUrlAttribute(): ?string
     {
-        return $this->sss_id_image ? asset('storage/' . $this->sss_id_image) : null;
+        return $this->sss_id_image ? Storage::url($this->sss_id_image) : null;
     }
 
     public function getPhilhealthIdImageUrlAttribute(): ?string
     {
-        return $this->philhealth_id_image ? asset('storage/' . $this->philhealth_id_image) : null;
+        return $this->philhealth_id_image ? Storage::url($this->philhealth_id_image) : null;
     }
 
     public function getPagibigIdImageUrlAttribute(): ?string
     {
-        return $this->pagibig_id_image ? asset('storage/' . $this->pagibig_id_image) : null;
+        return $this->pagibig_id_image ? Storage::url($this->pagibig_id_image) : null;
     }
 
     public function getTinIdImageUrlAttribute(): ?string
     {
-        return $this->tin_id_image ? asset('storage/' . $this->tin_id_image) : null;
+        return $this->tin_id_image ? Storage::url($this->tin_id_image) : null;
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────

@@ -52,7 +52,7 @@ class ProgressUpdatesController extends Controller
         if ($request->hasFile('file')) {
             $file         = $request->file('file');
             $directory    = "progress_updates/{$task->id}";
-            $filePath     = $file->store($directory, 'public');
+            $filePath     = $file->store($directory, config('filesystems.default'));
             $originalName = $file->getClientOriginalName();
             $fileType     = $file->getMimeType();
             $fileSize     = $file->getSize();
@@ -111,12 +111,12 @@ class ProgressUpdatesController extends Controller
 
         if ($request->hasFile('file')) {
             if ($progressUpdate->file_path) {
-                Storage::disk('public')->delete($progressUpdate->file_path);
+                Storage::disk(config('filesystems.default'))->delete($progressUpdate->file_path);
             }
 
             $file                  = $request->file('file');
             $directory             = "progress_updates/{$task->id}";
-            $data['file_path']     = $file->store($directory, 'public');
+            $data['file_path']     = $file->store($directory, config('filesystems.default'));
             $data['original_name'] = $file->getClientOriginalName();
             $data['file_type']     = $file->getMimeType();
             $data['file_size']     = $file->getSize();
@@ -150,7 +150,7 @@ class ProgressUpdatesController extends Controller
         }
 
         if ($progressUpdate->file_path) {
-            Storage::disk('public')->delete($progressUpdate->file_path);
+            Storage::disk(config('filesystems.default'))->delete($progressUpdate->file_path);
         }
 
         $progressUpdate->delete();
@@ -185,7 +185,7 @@ class ProgressUpdatesController extends Controller
             return redirect()->back()->with('error', 'No file attached to this progress update.');
         }
 
-        if (!Storage::disk('public')->exists($progressUpdate->file_path)) {
+        if (!Storage::disk(config('filesystems.default'))->exists($progressUpdate->file_path)) {
             return redirect()->back()->with('error', 'File not found on server.');
         }
 
@@ -195,6 +195,6 @@ class ProgressUpdatesController extends Controller
             'Downloaded file "' . $progressUpdate->original_name . '" from progress update for task "' . $task->title . '"'
         );
 
-        return Storage::disk('public')->download($progressUpdate->file_path, $progressUpdate->original_name);
+        return Storage::disk(config('filesystems.default'))->download($progressUpdate->file_path, $progressUpdate->original_name);
     }
 }

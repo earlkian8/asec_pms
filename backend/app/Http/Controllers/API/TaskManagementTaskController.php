@@ -72,8 +72,8 @@ class TaskManagementTaskController extends Controller
      */
     private function getFileUrl(?string $filePath): ?string
     {
-        if ($filePath && Storage::disk('public')->exists($filePath)) {
-            return Storage::disk('public')->url($filePath);
+        if ($filePath && Storage::disk(config('filesystems.default'))->exists($filePath)) {
+            return Storage::disk(config('filesystems.default'))->url($filePath);
         }
         return null;
     }
@@ -310,7 +310,7 @@ class TaskManagementTaskController extends Controller
             $directory = "progress_updates/{$task->id}";
 
             $filename = time() . '_' . $file->getClientOriginalName();
-            $file->storeAs($directory, $filename, 'public');
+            $file->storeAs($directory, $filename, config('filesystems.default'));
 
             $filePath = $directory . '/' . $filename;
             $originalName = $file->getClientOriginalName();
@@ -413,15 +413,15 @@ class TaskManagementTaskController extends Controller
 
         if ($request->hasFile('file')) {
             // Delete old file if exists
-            if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-                Storage::disk('public')->delete($progressUpdate->file_path);
+            if ($progressUpdate->file_path && Storage::disk(config('filesystems.default'))->exists($progressUpdate->file_path)) {
+                Storage::disk(config('filesystems.default'))->delete($progressUpdate->file_path);
             }
 
             $file = $request->file('file');
             $directory = "progress_updates/{$task->id}";
 
             $filename = time() . '_' . $file->getClientOriginalName();
-            $file->storeAs($directory, $filename, 'public');
+            $file->storeAs($directory, $filename, config('filesystems.default'));
 
             $progressUpdate->file_path = $directory . '/' . $filename;
             $progressUpdate->original_name = $file->getClientOriginalName();
@@ -488,8 +488,8 @@ class TaskManagementTaskController extends Controller
             ], 404);
         }
 
-        if ($progressUpdate->file_path && Storage::disk('public')->exists($progressUpdate->file_path)) {
-            Storage::disk('public')->delete($progressUpdate->file_path);
+        if ($progressUpdate->file_path && Storage::disk(config('filesystems.default'))->exists($progressUpdate->file_path)) {
+            Storage::disk(config('filesystems.default'))->delete($progressUpdate->file_path);
         }
 
         $progressUpdate->delete();
@@ -535,14 +535,14 @@ class TaskManagementTaskController extends Controller
             ], 404);
         }
 
-        if (!Storage::disk('public')->exists($progressUpdate->file_path)) {
+        if (!Storage::disk(config('filesystems.default'))->exists($progressUpdate->file_path)) {
             return response()->json([
                 'success' => false,
                 'message' => 'File does not exist',
             ], 404);
         }
 
-        return Storage::disk('public')->download(
+        return Storage::disk(config('filesystems.default'))->download(
             $progressUpdate->file_path,
             $progressUpdate->original_name ?? 'file'
         );

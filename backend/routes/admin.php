@@ -250,6 +250,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/destroy/{directSupply}', [DirectSuppliesController::class, 'destroy'])->middleware('permission:direct-supply.delete')->name('destroy');
         Route::put('/update-status/{directSupply}', [DirectSuppliesController::class, 'updateStatus'])->middleware('permission:direct-supply.update')->name('update-status');
         Route::post('/allocate/{directSupply}', [DirectSuppliesController::class, 'allocate'])->middleware('permission:direct-supply.allocate')->name('allocate');
+        Route::put('/archive/{directSupply}', [DirectSuppliesController::class, 'archive'])->middleware('permission:direct-supply.delete')->name('archive');
+        Route::put('/restore/{directSupply}', [DirectSuppliesController::class, 'restore'])->middleware('permission:direct-supply.update')->name('restore');
     });
 
     // Inventory Management

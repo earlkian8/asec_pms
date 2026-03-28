@@ -20,12 +20,16 @@ class DirectSupply extends Model
         'supplier_name',
         'supplier_contact',
         'is_active',
+        'is_archived',
+        'archived_at',
         'created_by',
     ];
 
     protected $casts = [
-        'unit_price' => 'decimal:2',
-        'is_active' => 'boolean',
+        'unit_price'  => 'decimal:2',
+        'is_active'   => 'boolean',
+        'is_archived' => 'boolean',
+        'archived_at' => 'datetime',
     ];
 
     public function createdBy()
@@ -33,8 +37,18 @@ class DirectSupply extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function allocations()
+    {
+        return $this->hasMany(ProjectMaterialAllocation::class, 'direct_supply_id');
+    }
+
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('is_active', true)->where('is_archived', false);
+    }
+
+    public function scopeNotArchived($query)
+    {
+        return $query->where('is_archived', false);
     }
 }

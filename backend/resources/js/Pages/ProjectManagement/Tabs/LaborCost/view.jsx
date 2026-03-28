@@ -29,12 +29,15 @@ function fmtHours(h) {
 const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
   const breakdown  = laborCost.payroll_breakdown || {};
   const attendance = laborCost.attendance || {};
+  const payType    = laborCost.pay_type || 'hourly';
   const dailyRate  = parseFloat(laborCost.daily_rate) || 0;
-  const hourlyRate = dailyRate / STANDARD_HOURS;
+  const monthlySalary = parseFloat(laborCost.monthly_salary) || 0;
+  const isFixed    = payType === 'fixed';
+  const isSalary   = payType === 'salary';
 
   // Use breakdown if available (submitted), else compute display from attendance
   const dates = Object.keys(breakdown).length > 0
-    ? Object.keys(breakdown).sort()
+    ? Object.keys(breakdown).filter(k => k !== 'fixed').sort()
     : Object.keys(attendance).sort();
 
   // Aggregate totals from breakdown
@@ -50,10 +53,14 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
     return acc;
   }, { workedHours: 0, deductionHours: 0, deductionAmount: 0, grossPay: 0, present: 0, absent: 0 });
 
-  // Fallback to stored gross_pay if breakdown not available
-  const displayGrossPay = Object.keys(breakdown).length > 0
-    ? totals.grossPay
-    : parseFloat(laborCost.gross_pay) || 0;
+  const displayGrossPay = isFixed
+    ? parseFloat(laborCost.gross_pay) || 0
+    : Object.keys(breakdown).length > 0
+      ? totals.grossPay
+      : parseFloat(laborCost.gross_pay) || 0;
+
+  const PAY_TYPE_LABEL = { hourly: 'Hourly', salary: 'Monthly Salary', fixed: 'Fixed' };
+  const PAY_TYPE_COLOR = { hourly: 'bg-blue-100 text-blue-700', salary: 'bg-purple-100 text-purple-700', fixed: 'bg-amber-100 text-amber-700' };
 
   return (
     <Dialog open onOpenChange={setShowViewModal}>
@@ -92,10 +99,26 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
                   {fmtDate(laborCost.period_start)} – {fmtDate(laborCost.period_end)}
                 </p>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Daily Rate: <span className="font-semibold text-gray-700">{fmt(dailyRate)}</span>
-                <span className="ml-2 text-gray-400">({fmt(hourlyRate)}/hr)</span>
-              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${PAY_TYPE_COLOR[payType] || PAY_TYPE_COLOR.hourly}`}>
+                  {PAY_TYPE_LABEL[payType] || 'Hourly'}
+                </span>
+                {payType === 'hourly' && dailyRate > 0 && (
+                  <span className="text-xs text-gray-500">
+                    Daily: <span className="font-semibold text-gray-700">{fmt(dailyRate)}</span>
+                    <span className="ml-1 text-gray-400">({fmt(dailyRate / STANDARD_HOURS)}/hr)</span>
+                  </span>
+                )}
+                {payType === 'salary' && monthlySalary > 0 && (
+                  <span className="text-xs text-gray-500">
+                    Monthly: <span className="font-semibold text-gray-700">{fmt(monthlySalary)}</span>
+                    <span className="ml-1 text-gray-400">({fmt(dailyRate)}/day)</span>
+                  </span>
+                )}
+                {payType === 'fixed' && (
+                  <span className="text-xs text-gray-500">Flat amount</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -114,7 +137,8 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
             ))}
           </div>
 
-          {/* Per-day breakdown table */}
+          {/* Per-day breakdown table — hidden for fixed pay type */}
+          {!isFixed && (
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Daily Breakdown</p>
             <div className="rounded-xl border border-gray-200 overflow-hidden">
@@ -214,6 +238,7 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Description / Notes */}
           {(laborCost.description || laborCost.notes) && (

@@ -8,17 +8,15 @@ use App\Models\ProjectLaborCost;
 use App\Models\ProjectTeam;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
-use Carbon\Carbon;
-use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 
 class ProjectLaborCostsController extends Controller
 {
     use ActivityLogsTrait, NotificationTrait;
 
-    // ── Shared helper ─────────────────────────────────────────────────────────
+    // ── Shared helpers ────────────────────────────────────────────────────────
 
-    private function getTeamMember(Project $project, string $assignableType, ?int $userId, ?int $employeeId): ?\App\Models\ProjectTeam
+    private function getTeamMember(Project $project, string $assignableType, ?int $userId, ?int $employeeId): ?ProjectTeam
     {
         return ProjectTeam::where('project_id', $project->id)
             ->where('assignable_type', $assignableType)
@@ -27,34 +25,41 @@ class ProjectLaborCostsController extends Controller
             ->first();
     }
 
-    private function validateAssignmentBoundary(array $data, ?\App\Models\ProjectTeam $teamMember): ?array
+    private function validateAssignmentBoundary(array $data, ?ProjectTeam $teamMember): ?array
     {
         if (!$teamMember) {
             return ['assignable_id' => 'This worker is not assigned to this project.'];
         }
 
-        if (
-            $teamMember->start_date &&
-            $data['period_start'] < $teamMember->start_date->format('Y-m-d')
-        ) {
-            return [
-                'period_start' => 'Period start cannot be before the worker\'s assignment start date ('
-                    . $teamMember->start_date->format('M d, Y') . ').',
-            ];
+        if ($teamMember->start_date && $data['period_start'] < $teamMember->start_date->format('Y-m-d')) {
+            return ['period_start' => 'Period start cannot be before the worker\'s assignment start date ('
+                . $teamMember->start_date->format('M d, Y') . ').'];
         }
 
-        if (
-            $teamMember->end_date &&
-            $data['period_end'] > $teamMember->end_date->format('Y-m-d')
-        ) {
-            return [
-                'period_end' => 'Period end cannot be after the worker\'s assignment end date ('
-                    . $teamMember->end_date->format('M d, Y') . '). '
-                    . 'Extend the team member\'s end date first if needed.',
-            ];
+        if ($teamMember->end_date && $data['period_end'] > $teamMember->end_date->format('Y-m-d')) {
+            return ['period_end' => 'Period end cannot be after the worker\'s assignment end date ('
+                . $teamMember->end_date->format('M d, Y') . '). Extend the team member\'s end date first if needed.'];
         }
 
         return null;
+    }
+
+    /**
+     * Resolve the effective daily_rate from the validated request data.
+     * - hourly:  hourly_rate * 8
+     * - salary:  monthly_salary / 26
+     * - fixed:   0 (gross_pay is stored directly)
+     */
+    private function resolveDailyRateFromRequest(string $payType, array $data): float
+    {
+        if ($payType === 'salary') {
+            return $data['monthly_salary'] ? round((float) $data['monthly_salary'] / 26, 4) : 0;
+        }
+        if ($payType === 'fixed') {
+            return 0;
+        }
+        // hourly
+        return $data['daily_rate'] ? (float) $data['daily_rate'] : 0;
     }
 
     // ── Store ─────────────────────────────────────────────────────────────────
@@ -66,7 +71,10 @@ class ProjectLaborCostsController extends Controller
             'assignable_type'            => ['required', 'in:user,employee'],
             'period_start'               => ['required', 'date'],
             'period_end'                 => ['required', 'date', 'after_or_equal:period_start'],
-            'daily_rate'                 => ['required', 'numeric', 'min:0'],
+            'pay_type'                   => ['required', 'in:hourly,salary,fixed'],
+            'daily_rate'                 => ['nullable', 'numeric', 'min:0'],
+            'monthly_salary'             => ['nullable', 'numeric', 'min:0'],
+            'gross_pay'                  => ['nullable', 'numeric', 'min:0'],
             'attendance'                 => ['required', 'array'],
             'attendance.*'               => ['required', 'array'],
             'attendance.*.status'        => ['required', 'in:P,A,HD,NW'],
@@ -118,6 +126,11 @@ class ProjectLaborCostsController extends Controller
             ])->withInput();
         }
 
+        $payType       = $data['pay_type'];
+        $monthlySalary = (float) ($data['monthly_salary'] ?? 0);
+        $dailyRate     = $this->resolveDailyRateFromRequest($payType, $data);
+        $grossPay      = $payType === 'fixed' ? (float) ($data['gross_pay'] ?? 0) : null;
+
         $entry = ProjectLaborCost::create([
             'project_id'      => $project->id,
             'user_id'         => $userId,
@@ -126,7 +139,10 @@ class ProjectLaborCostsController extends Controller
             'period_start'    => $data['period_start'],
             'period_end'      => $data['period_end'],
             'status'          => 'draft',
-            'daily_rate'      => $data['daily_rate'],
+            'pay_type'        => $payType,
+            'daily_rate'      => $dailyRate,
+            'monthly_salary'  => $monthlySalary ?: null,
+            'gross_pay'       => $grossPay,
             'attendance'      => $data['attendance'],
             'description'     => $data['description'] ?? null,
             'notes'           => $data['notes']        ?? null,
@@ -161,13 +177,16 @@ class ProjectLaborCostsController extends Controller
         }
 
         $data = $request->validate([
-            'assignable_id'   => ['required', 'integer'],
-            'assignable_type' => ['required', 'in:user,employee'],
-            'period_start'    => ['required', 'date'],
-            'period_end'      => ['required', 'date', 'after_or_equal:period_start'],
-            'daily_rate'      => ['required', 'numeric', 'min:0'],
-            'attendance'      => ['required', 'array'],
-            'attendance.*'    => ['required', 'array'],
+            'assignable_id'              => ['required', 'integer'],
+            'assignable_type'            => ['required', 'in:user,employee'],
+            'period_start'               => ['required', 'date'],
+            'period_end'                 => ['required', 'date', 'after_or_equal:period_start'],
+            'pay_type'                   => ['required', 'in:hourly,salary,fixed'],
+            'daily_rate'                 => ['nullable', 'numeric', 'min:0'],
+            'monthly_salary'             => ['nullable', 'numeric', 'min:0'],
+            'gross_pay'                  => ['nullable', 'numeric', 'min:0'],
+            'attendance'                 => ['required', 'array'],
+            'attendance.*'               => ['required', 'array'],
             'attendance.*.status'        => ['required', 'in:P,A,HD,NW'],
             'attendance.*.time_in'       => ['nullable', 'date_format:H:i'],
             'attendance.*.time_out'      => ['nullable', 'date_format:H:i'],
@@ -218,13 +237,21 @@ class ProjectLaborCostsController extends Controller
             ])->withInput();
         }
 
+        $payType       = $data['pay_type'];
+        $monthlySalary = (float) ($data['monthly_salary'] ?? 0);
+        $dailyRate     = $this->resolveDailyRateFromRequest($payType, $data);
+        $grossPay      = $payType === 'fixed' ? (float) ($data['gross_pay'] ?? 0) : null;
+
         $laborCost->update([
             'user_id'         => $userId,
             'employee_id'     => $employeeId,
             'assignable_type' => $data['assignable_type'],
             'period_start'    => $data['period_start'],
             'period_end'      => $data['period_end'],
-            'daily_rate'      => $data['daily_rate'],
+            'pay_type'        => $payType,
+            'daily_rate'      => $dailyRate,
+            'monthly_salary'  => $monthlySalary ?: null,
+            'gross_pay'       => $grossPay,
             'attendance'      => $data['attendance'],
             'description'     => $data['description'] ?? null,
             'notes'           => $data['notes']        ?? null,
@@ -256,7 +283,6 @@ class ProjectLaborCostsController extends Controller
             return back()->with('error', 'This payroll entry is already submitted.');
         }
 
-        // ── Guard: period must still fall within the worker's assignment dates ──
         $teamMember = $this->getTeamMember(
             $project,
             $laborCost->assignable_type,
@@ -274,7 +300,6 @@ class ProjectLaborCostsController extends Controller
             return back()->with('error', array_values($boundaryError)[0]);
         }
 
-        // ── Guard: no overlap with other already-submitted entries ───────────────
         $overlap = ProjectLaborCost::where('project_id', $project->id)
             ->where('id', '!=', $laborCost->id)
             ->where('status', 'submitted')
@@ -290,11 +315,11 @@ class ProjectLaborCostsController extends Controller
                 $start = $laborCost->period_start->format('Y-m-d');
                 $end   = $laborCost->period_end->format('Y-m-d');
                 $q->whereBetween('period_start', [$start, $end])
-                ->orWhereBetween('period_end',  [$start, $end])
-                ->orWhere(function ($q2) use ($start, $end) {
-                    $q2->where('period_start', '<=', $start)
-                        ->where('period_end',   '>=', $end);
-                });
+                  ->orWhereBetween('period_end',  [$start, $end])
+                  ->orWhere(function ($q2) use ($start, $end) {
+                      $q2->where('period_start', '<=', $start)
+                         ->where('period_end',   '>=', $end);
+                  });
             })
             ->exists();
 
@@ -304,12 +329,26 @@ class ProjectLaborCostsController extends Controller
             );
         }
 
+        $payType = $laborCost->pay_type ?? 'hourly';
+
+        // For fixed pay type, breakdown is just a summary entry
+        if ($payType === 'fixed') {
+            $breakdown = ['fixed' => [
+                'status'    => 'fixed',
+                'gross_pay' => (float) $laborCost->gross_pay,
+            ]];
+        } else {
+            $breakdown = ProjectLaborCost::computeBreakdown(
+                $laborCost->attendance ?? [],
+                (float) $laborCost->daily_rate,
+                $payType,
+                (float) ($laborCost->monthly_salary ?? 0)
+            );
+        }
+
         $laborCost->update([
             'status'            => 'submitted',
-            'payroll_breakdown' => ProjectLaborCost::computeBreakdown(
-                $laborCost->attendance ?? [],
-                (float) $laborCost->daily_rate
-            ),
+            'payroll_breakdown' => $breakdown,
         ]);
         $laborCost->load(['user', 'employee']);
 

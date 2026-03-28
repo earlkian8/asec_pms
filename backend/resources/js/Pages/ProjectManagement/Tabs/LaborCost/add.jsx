@@ -191,7 +191,10 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
     assignable_type: 'user',
     period_start:    today,
     period_end:      today,
+    pay_type:        'hourly',
     daily_rate:      '',
+    monthly_salary:  '',
+    gross_pay:       '',
     attendance:      {},
     description:     '',
     notes:           '',
@@ -236,24 +239,48 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
     const id = parseInt(rest.join('-'), 10);
     const member = teamMembers.find(m => m.id === id && (m.type || 'user') === type);
     if (!member) return;
-    setData(prev => ({ ...prev, assignable_id: member.id, assignable_type: member.type || 'user', daily_rate: member.daily_rate || prev.daily_rate }));
+    setData(prev => ({
+      ...prev,
+      assignable_id:   member.id,
+      assignable_type: member.type || 'user',
+      pay_type:        member.pay_type || 'hourly',
+      daily_rate:      member.pay_type === 'hourly' ? (member.daily_rate || prev.daily_rate) : prev.daily_rate,
+      monthly_salary:  member.pay_type === 'salary' ? (member.monthly_salary || prev.monthly_salary) : prev.monthly_salary,
+    }));
   };
 
   const summary = useMemo(() => {
-    const rate = parseFloat(data.daily_rate) || 0;
-    const hourlyRate = rate / STANDARD_HOURS;
-    let totalHours = 0, present = 0, absent = 0, deducted = 0;
-    workingDates.forEach(d => {
-      const day = data.attendance[d];
-      if (!day?.time_in) { absent++; return; }
-      present++;
-      const h = computeDayHours(day);
-      totalHours += h;
-      const s = STANDARD_HOURS - h;
-      if (s > 0.01) deducted += s;
-    });
-    return { present, absent, totalHours, deducted, grossPay: totalHours * hourlyRate };
-  }, [data.attendance, data.daily_rate, workingDates]);
+    const payType = data.pay_type || 'hourly';
+    let totalHours = 0, present = 0, absent = 0, deducted = 0, grossPay = 0;
+
+    if (payType === 'fixed') {
+      present = workingDates.filter(d => data.attendance[d]?.time_in).length;
+      absent  = workingDates.length - present;
+      grossPay = parseFloat(data.gross_pay) || 0;
+    } else if (payType === 'salary') {
+      const dailyRate = data.monthly_salary ? (parseFloat(data.monthly_salary) / 26) : 0;
+      workingDates.forEach(d => {
+        const day = data.attendance[d];
+        if (!day?.time_in) { absent++; return; }
+        present++;
+        grossPay += dailyRate;
+      });
+    } else {
+      const rate = parseFloat(data.daily_rate) || 0;
+      const hourlyRate = rate / STANDARD_HOURS;
+      workingDates.forEach(d => {
+        const day = data.attendance[d];
+        if (!day?.time_in) { absent++; return; }
+        present++;
+        const h = computeDayHours(day);
+        totalHours += h;
+        const s = STANDARD_HOURS - h;
+        if (s > 0.01) deducted += s;
+      });
+      grossPay = totalHours * hourlyRate;
+    }
+    return { present, absent, totalHours, deducted, grossPay };
+  }, [data.attendance, data.daily_rate, data.monthly_salary, data.gross_pay, data.pay_type, workingDates]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -306,6 +333,44 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
               </Select>
               <InputError message={errors.assignable_id} />
             </div>
+
+            {/* Pay Type */}
+            <div>
+              <Label className="text-zinc-800 mb-1 block text-sm">Pay Type <span className="text-red-500">*</span></Label>
+              <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white h-10">
+                {[{id:'hourly',label:'Hourly'},{id:'salary',label:'Salary'},{id:'fixed',label:'Fixed'}].map(pt => (
+                  <button key={pt.id} type="button" onClick={() => setData('pay_type', pt.id)}
+                    className={`flex-1 font-medium transition-all ${
+                      data.pay_type === pt.id ? 'bg-zinc-700 text-white' : 'text-gray-600 hover:bg-gray-50'
+                    }`}>{pt.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Rate field — conditional on pay_type */}
+          {data.pay_type === 'fixed' ? (
+            <div>
+              <Label className="text-zinc-800 mb-1 block text-sm">Gross Pay (Fixed Amount) <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0" value={data.gross_pay}
+                onChange={e => setData('gross_pay', e.target.value)}
+                placeholder="e.g. 15000.00" className={inputCls(errors.gross_pay)} />
+              <InputError message={errors.gross_pay} />
+            </div>
+          ) : data.pay_type === 'salary' ? (
+            <div>
+              <Label className="text-zinc-800 mb-1 block text-sm">Monthly Salary <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0" value={data.monthly_salary}
+                onChange={e => setData('monthly_salary', e.target.value)}
+                placeholder="e.g. 25000.00" className={inputCls(errors.monthly_salary)} />
+              <InputError message={errors.monthly_salary} />
+              {data.monthly_salary && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  = {fmt((parseFloat(data.monthly_salary) || 0) / 26)}/day ÷ 26 working days
+                </p>
+              )}
+            </div>
+          ) : (
             <div>
               <Label className="text-zinc-800 mb-1 block text-sm">
                 Daily Rate <span className="text-red-500">*</span>
@@ -317,7 +382,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
               <InputError message={errors.daily_rate} />
               {data.daily_rate && <p className="text-xs text-gray-400 mt-0.5">= {fmt((parseFloat(data.daily_rate) || 0) / STANDARD_HOURS)}/hr</p>}
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -340,13 +405,14 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             </div>
           )}
 
-          {workingDates.length > 0 && data.daily_rate && (
+          {workingDates.length > 0 && (data.daily_rate || data.monthly_salary || data.gross_pay) && (
             <div className="grid grid-cols-4 gap-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
               {[
                 { label: 'Present',     value: summary.present,              color: 'text-green-700' },
                 { label: 'Absent',      value: summary.absent,               color: 'text-red-600'   },
-                { label: 'Total Hours', value: fmtHours(summary.totalHours), color: summary.deducted > 0 ? 'text-amber-600' : 'text-blue-700',
-                  sub: summary.deducted > 0 ? `−${fmtHours(summary.deducted)} late` : null },
+                { label: 'Total Hours', value: data.pay_type === 'fixed' || data.pay_type === 'salary' ? '—' : fmtHours(summary.totalHours),
+                  color: summary.deducted > 0 ? 'text-amber-600' : 'text-blue-700',
+                  sub: data.pay_type === 'hourly' && summary.deducted > 0 ? `−${fmtHours(summary.deducted)} late` : null },
                 { label: 'Gross Pay',   value: fmt(summary.grossPay),        color: 'text-zinc-900'  },
               ].map(({ label, value, color, sub }) => (
                 <div key={label} className="text-center">

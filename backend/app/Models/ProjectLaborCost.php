@@ -19,7 +19,9 @@ class ProjectLaborCost extends Model
         'period_start',
         'period_end',
         'status',
+        'pay_type',
         'daily_rate',
+        'monthly_salary',
         'attendance',
         'payroll_breakdown',
         'days_present',
@@ -30,12 +32,13 @@ class ProjectLaborCost extends Model
     ];
 
     protected $casts = [
-        'period_start' => 'date',
-        'period_end'   => 'date',
-        'daily_rate'   => 'decimal:2',
-        'days_present' => 'decimal:2',
-        'gross_pay'    => 'decimal:2',
-        'attendance'   => 'array',
+        'period_start'   => 'date',
+        'period_end'     => 'date',
+        'daily_rate'     => 'decimal:2',
+        'monthly_salary' => 'decimal:2',
+        'days_present'   => 'decimal:2',
+        'gross_pay'      => 'decimal:2',
+        'attendance'     => 'array',
         'payroll_breakdown' => 'array',
     ];
 
@@ -110,63 +113,86 @@ class ProjectLaborCost extends Model
     /**
      * Compute the immutable per-day payroll breakdown snapshot.
      * Called at submit time. Returns array keyed by date.
+     *
+     * pay_type:
+     *   'hourly'  — daily_rate / 8 * worked_hours  (existing behaviour)
+     *   'salary'  — monthly_salary / working_days_in_month * attendance_factor
+     *               attendance just marks presence; day_pay = daily_rate (monthly/working_days)
+     *   'fixed'   — gross_pay is a flat amount; no per-day breakdown needed
      */
-    public static function computeBreakdown(array $attendance, float $dailyRate): array
-    {
+    public static function computeBreakdown(
+        array $attendance,
+        float $dailyRate,
+        string $payType = 'hourly',
+        float $monthlySalary = 0
+    ): array {
         $standardHours = 8.0;
-        $hourlyRate    = $dailyRate / $standardHours;
         $breakdown     = [];
 
         foreach ($attendance as $date => $day) {
             if (is_string($day)) {
-                // Legacy string format
                 $status      = $day;
                 $workedHours = $status === 'P' ? $standardHours : ($status === 'HD' ? 4.0 : 0.0);
+            } else {
+                $status    = $day['status'] ?? 'A';
+                $timeIn    = $day['time_in']       ?? null;
+                $timeOut   = $day['time_out']      ?? null;
+                $breakMins = (int) ($day['break_minutes'] ?? 0);
+
+                if (in_array($status, ['A', 'NW'])) {
+                    $workedHours = 0.0;
+                } elseif (!empty($timeIn) && !empty($timeOut)) {
+                    [$inH,  $inM]  = array_map('intval', explode(':', $timeIn));
+                    [$outH, $outM] = array_map('intval', explode(':', $timeOut));
+                    $workedMins  = ($outH * 60 + $outM) - ($inH * 60 + $inM) - $breakMins;
+                    $workedHours = min(max($workedMins, 0) / 60.0, $standardHours);
+                } else {
+                    $workedHours = $status === 'HD' ? 4.0 : $standardHours;
+                }
+            }
+
+            $timeIn    = is_array($day) ? ($day['time_in']  ?? null) : null;
+            $timeOut   = is_array($day) ? ($day['time_out'] ?? null) : null;
+            $breakMins = is_array($day) ? (int) ($day['break_minutes'] ?? 0) : 0;
+
+            if ($payType === 'salary') {
+                // For salary: day_pay = daily_rate (pre-computed as monthly/working_days)
+                // Absent days still get 0 pay; no partial deduction for late
+                $isPresent       = !in_array($status, ['A', 'NW']);
+                $dayPay          = $isPresent ? round($dailyRate, 2) : 0.0;
+                $deductionHours  = $isPresent ? 0.0 : $standardHours;
+                $deductionAmount = $isPresent ? 0.0 : round($dailyRate, 2);
+
                 $breakdown[$date] = [
                     'status'           => $status,
-                    'time_in'          => null,
-                    'time_out'         => null,
-                    'break_minutes'    => 0,
+                    'time_in'          => $timeIn,
+                    'time_out'         => $timeOut,
+                    'break_minutes'    => $breakMins,
+                    'standard_hours'   => $standardHours,
+                    'worked_hours'     => $isPresent ? $standardHours : 0.0,
+                    'deduction_hours'  => $deductionHours,
+                    'deduction_amount' => $deductionAmount,
+                    'day_pay'          => $dayPay,
+                ];
+            } else {
+                // hourly (default)
+                $hourlyRate      = $dailyRate / $standardHours;
+                $deductionHours  = max(0, $standardHours - $workedHours);
+                $deductionAmount = round($deductionHours * $hourlyRate, 2);
+                $dayPay          = round($workedHours * $hourlyRate, 2);
+
+                $breakdown[$date] = [
+                    'status'           => $status,
+                    'time_in'          => $timeIn,
+                    'time_out'         => $timeOut,
+                    'break_minutes'    => $breakMins,
                     'standard_hours'   => $standardHours,
                     'worked_hours'     => round($workedHours, 4),
-                    'deduction_hours'  => round(max(0, $standardHours - $workedHours), 4),
-                    'deduction_amount' => round(max(0, $standardHours - $workedHours) * $hourlyRate, 2),
-                    'day_pay'          => round($workedHours * $hourlyRate, 2),
+                    'deduction_hours'  => round($deductionHours, 4),
+                    'deduction_amount' => $deductionAmount,
+                    'day_pay'          => $dayPay,
                 ];
-                continue;
             }
-
-            $status     = $day['status'] ?? 'A';
-            $timeIn     = $day['time_in']       ?? null;
-            $timeOut    = $day['time_out']      ?? null;
-            $breakMins  = (int) ($day['break_minutes'] ?? 0);
-
-            if (in_array($status, ['A', 'NW'])) {
-                $workedHours = 0.0;
-            } elseif ($timeIn && $timeOut) {
-                [$inH,  $inM]  = array_map('intval', explode(':', $timeIn));
-                [$outH, $outM] = array_map('intval', explode(':', $timeOut));
-                $workedMins  = ($outH * 60 + $outM) - ($inH * 60 + $inM) - $breakMins;
-                $workedHours = min(max($workedMins, 0) / 60.0, $standardHours);
-            } else {
-                $workedHours = $status === 'HD' ? 4.0 : $standardHours;
-            }
-
-            $deductionHours  = max(0, $standardHours - $workedHours);
-            $deductionAmount = round($deductionHours * $hourlyRate, 2);
-            $dayPay          = round($workedHours * $hourlyRate, 2);
-
-            $breakdown[$date] = [
-                'status'           => $status,
-                'time_in'          => $timeIn,
-                'time_out'         => $timeOut,
-                'break_minutes'    => $breakMins,
-                'standard_hours'   => $standardHours,
-                'worked_hours'     => round($workedHours, 4),
-                'deduction_hours'  => round($deductionHours, 4),
-                'deduction_amount' => $deductionAmount,
-                'day_pay'          => $dayPay,
-            ];
         }
 
         ksort($breakdown);
@@ -202,45 +228,61 @@ class ProjectLaborCost extends Model
     /**
      * Core pay computation — shared by recomputePay() and boot().
      * Returns [days_present, gross_pay].
+     *
+     * pay_type:
+     *   'hourly'  — pay per worked hour (daily_rate / 8 * hours)
+     *   'salary'  — pay per day present (daily_rate per present day, no partial deduction)
+     *   'fixed'   — gross_pay is stored directly; attendance only tracks presence
      */
-    public static function computePayFromAttendance(array $attendance, float $dailyRate): array
-    {
+    public static function computePayFromAttendance(
+        array $attendance,
+        float $dailyRate,
+        string $payType = 'hourly',
+        float $monthlySalary = 0
+    ): array {
         $standardHours = 8.0;
-        $hourlyRate    = $dailyRate / $standardHours;
         $totalHours    = 0.0;
+        $daysPresent   = 0.0;
 
         foreach ($attendance as $day) {
-            // Support both old format (string) and new format (array)
-            if (is_string($day)) {
-                if ($day === 'P')  $totalHours += $standardHours;
-                if ($day === 'HD') $totalHours += $standardHours / 2;
+            $status = is_string($day) ? $day : ($day['status'] ?? 'A');
+            if ($status === 'A' || $status === 'NW') continue;
+
+            if ($payType === 'salary') {
+                // Salary: count present days only, no partial deduction
+                $daysPresent += ($status === 'HD') ? 0.5 : 1.0;
                 continue;
             }
 
-            $status = $day['status'] ?? 'A';
-            if ($status === 'A' || $status === 'NW') continue;
+            // hourly
+            if (is_string($day)) {
+                if ($status === 'P')  $totalHours += $standardHours;
+                if ($status === 'HD') $totalHours += $standardHours / 2;
+                continue;
+            }
 
-            $timeIn      = $day['time_in']       ?? null;
-            $timeOut     = $day['time_out']      ?? null;
-            $breakMins   = (int) ($day['break_minutes'] ?? 0);
+            $timeIn    = $day['time_in']       ?? null;
+            $timeOut   = $day['time_out']      ?? null;
+            $breakMins = (int) ($day['break_minutes'] ?? 0);
 
             if ($timeIn && $timeOut) {
                 [$inH,  $inM]  = array_map('intval', explode(':', $timeIn));
                 [$outH, $outM] = array_map('intval', explode(':', $timeOut));
-
-                $workedMins = ($outH * 60 + $outM) - ($inH * 60 + $inM) - $breakMins;
-                $workedMins = max(0, $workedMins);
-                $workedHours = $workedMins / 60.0;
-
-                // Cap at standard hours — no overtime bonus
-                $totalHours += min($workedHours, $standardHours);
+                $workedMins  = max(0, ($outH * 60 + $outM) - ($inH * 60 + $inM) - $breakMins);
+                $totalHours += min($workedMins / 60.0, $standardHours);
             } else {
-                // No times provided — fall back to status
                 if ($status === 'P')  $totalHours += $standardHours;
                 if ($status === 'HD') $totalHours += $standardHours / 2;
             }
         }
 
+        if ($payType === 'salary') {
+            $grossPay = round($daysPresent * $dailyRate, 2);
+            return [$daysPresent, $grossPay];
+        }
+
+        // hourly
+        $hourlyRate  = $dailyRate > 0 ? $dailyRate / $standardHours : 0;
         $daysPresent = round($totalHours / $standardHours, 4);
         $grossPay    = round($totalHours * $hourlyRate, 2);
 
@@ -254,10 +296,21 @@ class ProjectLaborCost extends Model
         parent::boot();
 
         static::saving(function ($model) {
-            // Always keep days_present and gross_pay in sync
+            $payType = $model->pay_type ?? 'hourly';
+
+            // 'fixed' pay type: gross_pay is set directly, skip recompute
+            if ($payType === 'fixed') {
+                $model->days_present = collect($model->attendance ?? [])
+                    ->filter(fn ($d) => !in_array(is_string($d) ? $d : ($d['status'] ?? 'A'), ['A', 'NW']))
+                    ->count();
+                return;
+            }
+
             [$days, $pay] = self::computePayFromAttendance(
                 $model->attendance ?? [],
-                (float) $model->daily_rate
+                (float) $model->daily_rate,
+                $payType,
+                (float) ($model->monthly_salary ?? 0)
             );
             $model->days_present = $days;
             $model->gross_pay    = $pay;

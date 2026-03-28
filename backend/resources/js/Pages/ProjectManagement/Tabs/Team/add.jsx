@@ -74,8 +74,8 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
     }
   }
 
-  const hasErrors  = errors?.role || errors?.hourly_rate || errors?.start_date
-  const hasData    = formData?.hourly_rate || formData?.start_date
+  const hasErrors  = errors?.role || errors?.rate || errors?.start_date
+  const hasData    = formData?.hourly_rate || formData?.monthly_salary || formData?.start_date
 
   return (
     <div className={`rounded-2xl border-2 transition-all duration-200 overflow-hidden ${
@@ -125,10 +125,18 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
         {/* Summary chips when selected and collapsed */}
         {isSelected && !expanded && hasData && (
           <div className="hidden sm:flex items-center gap-1.5 flex-wrap">
-            {formData?.hourly_rate && (
+            {formData?.pay_type === 'salary' && formData?.monthly_salary && (
+              <span className="text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 font-medium">
+                ₱{parseFloat(formData.monthly_salary || 0).toFixed(2)}/mo
+              </span>
+            )}
+            {(!formData?.pay_type || formData?.pay_type === 'hourly') && formData?.hourly_rate && (
               <span className="text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 font-medium">
                 ₱{parseFloat(formData.hourly_rate || 0).toFixed(2)}/hr
               </span>
+            )}
+            {formData?.pay_type === 'fixed' && (
+              <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2 py-0.5 font-medium">Fixed</span>
             )}
             {activePreset && activePreset !== "custom" && (
               <span className="text-xs bg-zinc-100 text-zinc-600 border border-zinc-200 rounded-full px-2 py-0.5">
@@ -159,37 +167,81 @@ function AssignableCard({ assignable, isSelected, onToggle, formData, errors, on
       {isSelected && expanded && (
         <div className="border-t border-zinc-100 bg-gradient-to-b from-zinc-50/40 to-transparent p-4 space-y-4">
 
-          {/* Hourly Rate */}
+          {/* Pay Type + Role */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                Hourly Rate (₱) <span className="text-red-500">*</span>
+                Pay Type <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₱</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={formData?.hourly_rate || ""}
-                  onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className={`pl-7 text-sm ${errors?.hourly_rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-zinc-500"}`}
-                />
+              <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white">
+                {[
+                  { id: "hourly",  label: "Hourly"  },
+                  { id: "salary", label: "Salary"  },
+                  { id: "fixed",  label: "Fixed"   },
+                ].map(pt => (
+                  <button
+                    key={pt.id}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onFormChange(compositeId, "pay_type", pt.id) }}
+                    className={`flex-1 py-1.5 font-medium transition-all ${
+                      (formData?.pay_type || "hourly") === pt.id
+                        ? "bg-zinc-700 text-white"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {pt.label}
+                  </button>
+                ))}
               </div>
-              {errors?.hourly_rate && <InputError message={errors.hourly_rate} className="mt-1" />}
             </div>
-
-            {/* Role (read-only) */}
             <div>
               <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Role</label>
-              <Input
-                readOnly
-                value={role}
-                className="text-sm bg-gray-50 border-gray-200 text-gray-600 cursor-default"
-              />
+              <Input readOnly value={role} className="text-sm bg-gray-50 border-gray-200 text-gray-600 cursor-default" />
             </div>
+          </div>
+
+          {/* Rate field — conditional on pay_type */}
+          <div>
+            {(formData?.pay_type || "hourly") === "hourly" && (
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                  Hourly Rate (₱) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₱</span>
+                  <Input type="number" step="0.01" min="0" placeholder="0.00"
+                    value={formData?.hourly_rate || ""}
+                    onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-zinc-500"}`}
+                  />
+                </div>
+                {errors?.rate && <InputError message={errors.rate} className="mt-1" />}
+              </div>
+            )}
+            {(formData?.pay_type) === "salary" && (
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                  Monthly Salary (₱) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₱</span>
+                  <Input type="number" step="0.01" min="0" placeholder="0.00"
+                    value={formData?.monthly_salary || ""}
+                    onChange={(e) => onFormChange(compositeId, "monthly_salary", e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-zinc-500"}`}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">Daily equivalent: ₱{formData?.monthly_salary ? (parseFloat(formData.monthly_salary)/26).toFixed(2) : "0.00"}/day (÷26 working days)</p>
+                {errors?.rate && <InputError message={errors.rate} className="mt-1" />}
+              </div>
+            )}
+            {(formData?.pay_type) === "fixed" && (
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                Fixed pay — gross amount will be entered per payroll period.
+              </p>
+            )}
           </div>
 
           {/* Duration Presets */}
@@ -322,8 +374,12 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
       const role = fd.role || (a?.type === "user" ? a.role : null) || (a?.type === "employee" ? a.position : null) || ""
       if (!role.trim()) validationErrors[`assignable_${compositeId}_role`] = `Role required for ${name}`
 
-      if (!fd.hourly_rate || parseFloat(fd.hourly_rate) < 0) {
-        validationErrors[`assignable_${compositeId}_hourly_rate`] = `Hourly rate required for ${name}`
+      const payType = fd.pay_type || "hourly"
+      if (payType === "hourly" && (!fd.hourly_rate || parseFloat(fd.hourly_rate) < 0)) {
+        validationErrors[`assignable_${compositeId}_rate`] = `Hourly rate required for ${name}`
+      }
+      if (payType === "salary" && (!fd.monthly_salary || parseFloat(fd.monthly_salary) < 0)) {
+        validationErrors[`assignable_${compositeId}_rate`] = `Monthly salary required for ${name}`
       }
       if (!fd.start_date) validationErrors[`assignable_${compositeId}_start_date`] = `Start date required for ${name}`
     }
@@ -340,12 +396,14 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
       const fd   = formData[compositeId] || {}
       const role = fd.role || (a?.type === "user" ? a.role : null) || (a?.type === "employee" ? a.position : null) || ""
       return {
-        id:          parseInt(a.id, 10),
-        type:        a.type || "user",
-        role:        role,
-        hourly_rate: parseFloat(fd.hourly_rate) || 0,
-        start_date:  fd.start_date,
-        end_date:    fd.end_date || null,
+        id:             parseInt(a.id, 10),
+        type:           a.type || "user",
+        role:           role,
+        pay_type:       fd.pay_type || "hourly",
+        hourly_rate:    fd.pay_type === "hourly"  ? (parseFloat(fd.hourly_rate) || 0)    : null,
+        monthly_salary: fd.pay_type === "salary"  ? (parseFloat(fd.monthly_salary) || 0) : null,
+        start_date:     fd.start_date,
+        end_date:       fd.end_date || null,
       }
     }).filter(Boolean)
 
@@ -476,9 +534,9 @@ export default function AddProjectTeam({ setShowAddModal, assignables = [], proj
               const compositeId = getCompositeId(a)
               const isSelected  = selectedIds.includes(compositeId)
               const memberErrors = {
-                role:        errors[`assignable_${compositeId}_role`],
-                hourly_rate: errors[`assignable_${compositeId}_hourly_rate`],
-                start_date:  errors[`assignable_${compositeId}_start_date`],
+                role:       errors[`assignable_${compositeId}_role`],
+                rate:       errors[`assignable_${compositeId}_rate`],
+                start_date: errors[`assignable_${compositeId}_start_date`],
               }
               return (
                 <AssignableCard

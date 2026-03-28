@@ -150,9 +150,14 @@ const UpdateCard = ({ update, currentTask, onEdit, onDelete, downloadUrl, isFirs
       )}
       <div className="p-3.5">
         <div className="flex items-center gap-2 mb-2.5 text-xs text-zinc-400">
-          <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-medium text-[10px] flex-shrink-0">
-            {(update.created_by_name || 'U').charAt(0).toUpperCase()}
-          </div>
+          {update.created_by_avatar ? (
+            <img src={update.created_by_avatar} alt={update.created_by_name || 'User'}
+              className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-zinc-200" />
+          ) : (
+            <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-medium text-[10px] flex-shrink-0">
+              {(update.created_by_name || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
           <span className="text-zinc-500 font-medium">{update.created_by_name || 'Unknown'}</span>
           <span>·</span>
           <span>{fmt(update.created_at)}</span>
@@ -348,7 +353,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[95vw] max-w-[920px] max-h-[92vh] overflow-hidden p-0 bg-white rounded-2xl border border-zinc-200 shadow-2xl">
+        <DialogContent className="w-[95vw] max-w-[920px] max-h-[92vh] overflow-hidden p-0 bg-white rounded-2xl border border-zinc-200 shadow-2xl flex flex-col">
 
           {/* ── HEADER ───────────────────────────────────────────────────────── */}
           <div className="flex items-start gap-3.5 px-6 py-5 border-b border-zinc-100">
@@ -380,24 +385,6 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
               {/* Status badge */}
               {taskStatusBadge(currentTask.status)}
 
-              {/* Set as completed button — only shown when not completed and user has permission */}
-              {!isCompleted && has('project-tasks.update-status') && (
-                <Button
-                  size="sm"
-                  onClick={handleSetCompleted}
-                  disabled={isMarkingComplete || progressUpdates.length === 0}
-                  title={progressUpdates.length === 0 ? 'Add a progress update first' : 'Mark task as completed'}
-                  className="h-8 text-xs px-3 gap-1.5 bg-green-600 hover:bg-green-700 text-white border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isMarkingComplete ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={12} />
-                  )}
-                  {isMarkingComplete ? 'Saving…' : 'Set as completed'}
-                </Button>
-              )}
-
               {/* Locked indicator when completed */}
               {isCompleted && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400 px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-full">
@@ -409,8 +396,7 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
             </div>
           </div>
 
-          {/* ── BODY: sidebar + main ─────────────────────────────────────────── */}
-          <div className="flex overflow-hidden" style={{ height: 'calc(92vh - 90px)' }}>
+          <div className="flex flex-1 overflow-hidden">
 
             {/* SIDEBAR */}
             <div className="w-52 flex-shrink-0 border-r border-zinc-100 flex flex-col py-3 gap-0.5">
@@ -545,8 +531,8 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                               isUnread ? 'border-violet-100 bg-violet-50/60' : 'border-zinc-100 bg-zinc-50/50'
                             }`}>
                               <div className="relative flex-shrink-0">
-                                <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-medium">
-                                  {(req.client?.client_name || 'C').charAt(0).toUpperCase()}
+                                <div className="w-8 h-8 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center">
+                                  <Mail size={14} className="text-violet-400" />
                                 </div>
                                 {isUnread && (
                                   <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
@@ -676,6 +662,43 @@ const TaskDetailModal = ({ task, isOpen, onClose, project, milestones, users, al
                 </div>
               )}
 
+            </div>
+          </div>
+
+          {/* ── FOOTER ───────────────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between px-6 py-3 border-t border-zinc-100 bg-gray-50/60">
+            <div className="flex items-center gap-2">
+              {isCompleted && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                  <CheckCircle2 size={13} /> Task completed
+                  {currentTask.updated_at && <span className="text-zinc-400 font-normal">· {fmt(currentTask.updated_at)}</span>}
+                </span>
+              )}
+              {!isCompleted && progressUpdates.length === 0 && (
+                <span className="text-xs text-zinc-400">Add a progress update before marking as completed.</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}
+                className="h-8 text-xs px-4 border-zinc-200 text-zinc-600 hover:bg-zinc-50">
+                Close
+              </Button>
+              {!isCompleted && has('project-tasks.update-status') && (
+                <Button
+                  size="sm"
+                  onClick={handleSetCompleted}
+                  disabled={isMarkingComplete || progressUpdates.length === 0}
+                  title={progressUpdates.length === 0 ? 'Add a progress update first' : 'Mark task as completed'}
+                  className="h-8 text-xs px-4 gap-1.5 bg-green-600 hover:bg-green-700 text-white border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isMarkingComplete ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={12} />
+                  )}
+                  {isMarkingComplete ? 'Saving…' : 'Set as Completed'}
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>

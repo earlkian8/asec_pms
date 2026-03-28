@@ -13,12 +13,13 @@ import {
   Trash2, SquarePen, Plus, Filter, Search, Calendar,
   X, ArrowUpDown, Users, CheckCircle2,
   Clock, Lock, Send, ChevronDown, ChevronRight,
-  PhilippinePeso,
+  PhilippinePeso, Eye,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddLaborCost from './add';
 import EditLaborCost from './edit';
 import DeleteLaborCost from './delete';
+import ViewLaborCost from './view';
 
 export default function LaborCostTab({ project, laborCostData }) {
   const { has } = usePermission();
@@ -26,8 +27,10 @@ export default function LaborCostTab({ project, laborCostData }) {
   const [showAddModal,    setShowAddModal]    = useState(false);
   const [showEditModal,   setShowEditModal]   = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showViewModal,   setShowViewModal]   = useState(false);
   const [editLaborCost,   setEditLaborCost]   = useState(null);
   const [deleteLaborCost, setDeleteLaborCost] = useState(null);
+  const [viewLaborCost,   setViewLaborCost]   = useState(null);
   const [expandedRows,    setExpandedRows]    = useState(new Set());
 
   const pagination   = laborCostData?.laborCosts;
@@ -118,7 +121,10 @@ export default function LaborCostTab({ project, laborCostData }) {
   const getAttendanceSummary = (attendance) => {
     if (!attendance) return { P: 0, A: 0, HD: 0 };
     const counts = { P: 0, A: 0, HD: 0 };
-    Object.values(attendance).forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+    Object.values(attendance).forEach(v => {
+      const s = typeof v === 'string' ? v : v?.status;
+      if (counts[s] !== undefined) counts[s]++;
+    });
     return counts;
   };
 
@@ -147,21 +153,21 @@ export default function LaborCostTab({ project, laborCostData }) {
 
       {/* ── Stats ── */}
       <div className="mb-6 pb-6 border-b border-gray-200">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {[
-            { label: 'Total Gross Pay',  value: formatCurrency(totalGrossPay), icon: PhilippinePeso, from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
-            { label: 'Total Days',       value: totalDays.toFixed(1) + ' days', icon: Calendar,   from: 'from-blue-50',   to: 'to-blue-100',   border: 'border-blue-200',   text: 'text-blue-700',   num: 'text-blue-900',   iconBg: 'bg-blue-200',   iconColor: 'text-blue-700'   },
-            { label: 'Draft Entries',    value: totalDraft,                     icon: Clock,      from: 'from-yellow-50', to: 'to-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', num: 'text-yellow-900', iconBg: 'bg-yellow-200', iconColor: 'text-yellow-700' },
-            { label: 'Submitted',        value: totalSubmitted,                 icon: CheckCircle2,from:'from-indigo-50', to: 'to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-700', num: 'text-indigo-900', iconBg: 'bg-indigo-200', iconColor: 'text-indigo-700' },
+            { label: 'Total Gross Pay', value: formatCurrency(totalGrossPay), icon: PhilippinePeso, from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
+            { label: 'Total Days',      value: totalDays.toFixed(1) + ' days', icon: Calendar,      from: 'from-blue-50',   to: 'to-blue-100',   border: 'border-blue-200',   text: 'text-blue-700',   num: 'text-blue-900',   iconBg: 'bg-blue-200',   iconColor: 'text-blue-700'   },
+            { label: 'Draft Entries',   value: totalDraft,                     icon: Clock,         from: 'from-yellow-50', to: 'to-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', num: 'text-yellow-900', iconBg: 'bg-yellow-200', iconColor: 'text-yellow-700' },
+            { label: 'Submitted',       value: totalSubmitted,                 icon: CheckCircle2,  from: 'from-indigo-50', to: 'to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-700', num: 'text-indigo-900', iconBg: 'bg-indigo-200', iconColor: 'text-indigo-700' },
           ].map(({ label, value, icon: Icon, from, to, border, text, num, iconBg, iconColor }) => (
-            <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-lg p-4 border ${border}`}>
+            <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-lg p-3 sm:p-4 border ${border}`}>
               <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-xs font-medium ${text} uppercase tracking-wide`}>{label}</p>
-                  <p className={`text-xl font-bold ${num} mt-1`}>{value}</p>
+                <div className="min-w-0">
+                  <p className={`text-xs font-medium ${text} uppercase tracking-wide truncate`}>{label}</p>
+                  <p className={`text-xl sm:text-2xl font-bold ${num} mt-1`}>{value}</p>
                 </div>
-                <div className={`${iconBg} rounded-full p-3`}>
-                  <Icon className={`h-5 w-5 ${iconColor}`} />
+                <div className={`${iconBg} rounded-full p-2 sm:p-3 flex-shrink-0`}>
+                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor}`} />
                 </div>
               </div>
             </div>
@@ -170,15 +176,15 @@ export default function LaborCostTab({ project, laborCostData }) {
       </div>
 
       {/* ── Search + Filter + Sort + Add ── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-center justify-between relative z-50">
-        <div className="flex flex-col sm:flex-row gap-3 items-center flex-1">
-          <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row gap-2 mb-6 items-center justify-between">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search by name, description, notes..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              className="pl-10 h-11 border-gray-300 rounded-lg"
+              className="pl-10 h-11 w-full border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
           <div className="flex gap-2">
@@ -186,10 +192,10 @@ export default function LaborCostTab({ project, laborCostData }) {
             <DropdownMenu open={showFilterCard} onOpenChange={o => { setShowFilterCard(o); if (o) setShowSortCard(false); }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline"
-                  className={`h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center relative ${activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                  className={`h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center relative ${activeFiltersCount() > 0 ? 'bg-zinc-100 border-zinc-400 text-zinc-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
                   <Filter className="h-4 w-4" />
                   {activeFiltersCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-5 w-5 flex items-center justify-center">{activeFiltersCount()}</span>
+                    <span className="absolute -top-1 -right-1 bg-zinc-700 text-white text-xs font-semibold rounded-full h-4 w-4 flex items-center justify-center">{activeFiltersCount()}</span>
                   )}
                 </Button>
               </DropdownMenuTrigger>
@@ -234,7 +240,7 @@ export default function LaborCostTab({ project, laborCostData }) {
             {/* Sort */}
             <DropdownMenu open={showSortCard} onOpenChange={o => { setShowSortCard(o); if (o) setShowFilterCard(false); }}>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-11 w-11 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
+                <Button variant="outline" className="h-10 w-10 p-0 border-2 rounded-lg flex items-center justify-center bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -278,8 +284,8 @@ export default function LaborCostTab({ project, laborCostData }) {
 
         {has('labor-costs.create') && (
           <Button onClick={() => setShowAddModal(true)}
-            className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-6 h-11 whitespace-nowrap">
-            <Plus className="mr-2 h-4 w-4" />Add Payroll Entry
+            className="w-full sm:w-auto bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md px-5 h-11 whitespace-nowrap flex items-center justify-center gap-2">
+            <Plus className="h-4 w-4" />Add Payroll Entry
           </Button>
         )}
       </div>
@@ -390,7 +396,12 @@ export default function LaborCostTab({ project, laborCostData }) {
                           </button>
                         )}
                         {isSubmitted && (
-                          <span className="text-xs text-gray-400 italic">Locked</span>
+                          <button
+                            onClick={() => { setViewLaborCost(entry); setShowViewModal(true); }}
+                            className="p-2 rounded-lg hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-all border border-indigo-200"
+                            title="View Payroll Slip">
+                            <Eye size={15} />
+                          </button>
                         )}
                       </div>
                     </TableCell>
@@ -405,7 +416,11 @@ export default function LaborCostTab({ project, laborCostData }) {
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {dates.map(date => {
-                            const status = attendance[date];
+                            const raw    = attendance[date];
+                            const status = typeof raw === 'string' ? raw : (raw?.status ?? 'A');
+                            const timeIn  = raw?.time_in  || null;
+                            const timeOut = raw?.time_out || null;
+                            const breakM  = raw?.break_minutes ?? null;
                             const colorMap = {
                               P:  'bg-green-100 text-green-700 border-green-200',
                               A:  'bg-red-100 text-red-700 border-red-200',
@@ -413,9 +428,15 @@ export default function LaborCostTab({ project, laborCostData }) {
                             };
                             const labelMap = { P: 'Present', A: 'Absent', HD: 'Half Day' };
                             return (
-                              <div key={date} className={`flex flex-col items-center px-3 py-2 rounded-lg border text-xs font-medium ${colorMap[status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                              <div key={date} className={`flex flex-col px-3 py-2 rounded-lg border text-xs font-medium min-w-[90px] ${colorMap[status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                                 <span className="font-bold">{new Date(date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</span>
                                 <span className="mt-0.5 opacity-80">{labelMap[status] || status}</span>
+                                {timeIn && timeOut && (
+                                  <span className="mt-1 text-xs opacity-70">{timeIn} – {timeOut}</span>
+                                )}
+                                {breakM != null && breakM > 0 && (
+                                  <span className="text-xs opacity-60">{breakM}m break</span>
+                                )}
                               </div>
                             );
                           })}
@@ -453,23 +474,24 @@ export default function LaborCostTab({ project, laborCostData }) {
 
       {/* ── Pagination ── */}
       {showPagination && (
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-4">
-          <div className="text-sm text-gray-600">
-            Showing <span className="font-semibold">{laborCosts.length}</span> of <span className="font-semibold">{pagination?.total || 0}</span> entries
-          </div>
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-6 border-t border-gray-200 gap-3">
+          <p className="text-sm text-gray-600 order-2 sm:order-1">
+            Showing <span className="font-semibold text-gray-900">{laborCosts.length}</span> of{' '}
+            <span className="font-semibold text-gray-900">{pagination?.total || 0}</span> entries
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
             <button disabled={!prevLink?.url} onClick={() => handlePageClick(prevLink?.url)}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}>
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!prevLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}>
               Previous
             </button>
             {pageLinks.map((link, idx) => (
               <button key={idx} disabled={!link?.url} onClick={() => handlePageClick(link?.url)}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium min-w-[40px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400' : ''}`}>
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all min-w-[36px] ${link?.active ? 'bg-gradient-to-r from-zinc-700 to-zinc-800 text-white shadow-md' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'} ${!link?.url ? 'cursor-not-allowed text-gray-400' : ''}`}>
                 {link?.label}
               </button>
             ))}
             <button disabled={!nextLink?.url} onClick={() => handlePageClick(nextLink?.url)}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}>
+              className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${!nextLink?.url ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 shadow-sm'}`}>
               Next
             </button>
           </div>
@@ -477,6 +499,9 @@ export default function LaborCostTab({ project, laborCostData }) {
       )}
 
       {/* ── Modals ── */}
+      {showViewModal && viewLaborCost && (
+        <ViewLaborCost setShowViewModal={setShowViewModal} project={project} laborCost={viewLaborCost} />
+      )}
       {showAddModal && (
         <AddLaborCost setShowAddModal={setShowAddModal} project={project} teamMembers={laborCostData?.teamMembers || []} />
       )}

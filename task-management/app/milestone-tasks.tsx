@@ -13,12 +13,46 @@ import {
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Trash2, Pencil, Calendar, User, ChevronDown, X } from 'lucide-react-native';
 import { D, getStatusColor, getStatusBg } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { formatDate, isOverdue } from '@/utils/dateUtils';
+
+// ─── Reusable date picker field ───────────────────────────────────────────────
+function DatePickerField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [show, setShow] = useState(false);
+  const toYMD = (v: string) => (v ? v.split('T')[0] : '');
+  const ymd = toYMD(value);
+  const dateObj = ymd ? new Date(ymd + 'T00:00:00') : new Date();
+  const fmt = (d: string) => {
+    const clean = toYMD(d);
+    if (!clean) return 'Select date';
+    try { return new Date(clean + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch { return clean; }
+  };
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TouchableOpacity style={styles.dateBtn} onPress={() => setShow(true)} activeOpacity={0.75}>
+        <Text style={[styles.dateBtnText, !ymd && { color: D.inkLight }]}>{fmt(value)}</Text>
+      </TouchableOpacity>
+      {show && (
+        <DateTimePicker
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          value={dateObj}
+          onChange={(_e, selected) => {
+            setShow(Platform.OS === 'ios');
+            if (selected) onChange(selected.toISOString().split('T')[0]);
+          }}
+        />
+      )}
+    </View>
+  );
+}
 
 type Task = {
   id: number;
@@ -268,14 +302,7 @@ export default function MilestoneTasksScreen() {
               onChangeText={setDesc}
               multiline
             />
-            <Text style={styles.fieldLabel}>Due Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Due Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
-              value={dueDate}
-              onChangeText={setDueDate}
-            />
+            <DatePickerField label="Due Date" value={dueDate} onChange={setDueDate} />
             <Text style={styles.fieldLabel}>Assign To</Text>
             <TouchableOpacity
               style={styles.userPickerButton}
@@ -415,6 +442,15 @@ const styles = StyleSheet.create({
   modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline, alignItems: 'center' },
   modalBtnPrimary: { backgroundColor: D.ink, borderColor: D.ink },
   modalBtnText: { fontSize: 13, fontWeight: '900', color: D.ink },
+  dateBtn: {
+    borderWidth: 1,
+    borderColor: D.hairline,
+    backgroundColor: D.chalk,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dateBtnText: { fontSize: 14, color: D.ink },
   userPickerButton: {
     flexDirection: 'row',
     alignItems: 'center',

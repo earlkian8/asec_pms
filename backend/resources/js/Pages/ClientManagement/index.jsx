@@ -12,10 +12,11 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
-import { Trash2, SquarePen, Eye, Filter, X, Search, Calendar, TrendingUp, Users, Building2, ArrowUpDown, KeyRound, AlertCircle } from 'lucide-react';
+import { Trash2, SquarePen, Eye, Filter, X, Search, Calendar, TrendingUp, Users, Building2, ArrowUpDown, KeyRound, AlertCircle, FolderOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { Switch } from "@/Components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/Components/ui/tooltip";
 import { usePermission } from '@/utils/permissions';
 import { toast } from 'sonner';
 
@@ -29,20 +30,20 @@ export default function ClientsIndex() {
   
   const breadcrumbs = [
     { title: "Home", href: route('dashboard') },
-    { title: "Client Management", href: route('client-management.index') },
-    { title: "Clients" },
+    { title: "Client Management" },
   ];
 
   const columns = [
-    { header: 'Code', width: '10%' },
-    { header: 'Name', width: '15%' },
-    { header: 'Type', width: '10%' },
-    { header: 'Contact Person', width: '15%' },
-    { header: 'Email', width: '15%' },
-    { header: 'Phone/Mobile', width: '10%' },
-    { header: 'City / Province', width: '15%' },
-    { header: 'Status', width: '10%' },
-    { header: 'Actions', width: '10%' },
+    { header: 'Code',           width: '9%'  },
+    { header: 'Name',           width: '14%' },
+    { header: 'Type',           width: '9%'  },
+    { header: 'Contact Person', width: '12%' },
+    { header: 'Email',          width: '13%' },
+    { header: 'Phone/Mobile',   width: '9%'  },
+    // { header: 'City / Province',width: '12%' },
+    { header: 'Projects',       width: '7%'  },
+    { header: 'Status',         width: '8%'  },
+    { header: 'Actions',        width: '7%'  },
   ];
 
   // Data from backend
@@ -225,6 +226,10 @@ export default function ClientsIndex() {
 
   // Handle Status Toggle
   const handleStatusChange = (client, newStatus) => {
+    if (!newStatus && client.active_projects_count > 0) {
+      toast.error(`Cannot deactivate '${client.client_name}'. They have ${client.active_projects_count} active or on-hold project(s). Complete, cancel, or archive all projects first.`);
+      return;
+    }
     router.put(route('client-management.update-status', client.id), {
       is_active: newStatus,
     }, {
@@ -232,7 +237,7 @@ export default function ClientsIndex() {
       preserveState: true,
       only: ['clients', 'stats'],
       onSuccess: () => toast.success('Client status updated successfully!'),
-      onError: () => toast.error('Failed to update status.'),
+      onError: (errors) => toast.error(errors?.is_active || errors?.message || 'Failed to update status.'),
     });
   };
 
@@ -643,7 +648,7 @@ export default function ClientsIndex() {
                         <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
                           {client.phone_number || <span className="text-gray-400 italic text-xs">No phone</span>}
                         </TableCell>
-                        <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
+                        {/* <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
                           {client.city || client.province ? (
                             <span>
                               {client.city ? capitalizeText(client.city) : '---'}
@@ -653,20 +658,54 @@ export default function ClientsIndex() {
                           ) : (
                             <span className="text-gray-400 italic text-xs">No location</span>
                           )}
+                        </TableCell> */}
+                        <TableCell className="px-3 sm:px-4 py-3 text-sm">
+                          {/* Projects count */}
+                          <div className="flex items-center gap-1.5">
+                            <FolderOpen size={13} className="text-gray-400 flex-shrink-0" />
+                            <span className={`text-xs font-semibold ${
+                              client.active_projects_count > 0 ? 'text-blue-700' : 'text-gray-500'
+                            }`}>
+                              {client.projects_count ?? 0}
+                            </span>
+                            {client.active_projects_count > 0 && (
+                              <span className="text-[10px] text-blue-500">({client.active_projects_count} active)</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="px-3 sm:px-4 py-3 text-sm">
                           <div className="flex items-center gap-2">
                             {has('clients.update-status') ? (
-                              <>
-                                <Switch
-                                  checked={client.is_active}
-                                  onCheckedChange={(checked) => handleStatusChange(client, checked)}
-                                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
-                                />
-                                <span className={`text-xs font-medium ${client.is_active ? 'text-green-600' : 'text-red-600'}`}>
-                                  {client.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                              </>
+                              client.is_active && client.active_projects_count > 0 ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex items-center gap-2 cursor-not-allowed">
+                                        <Switch
+                                          checked={client.is_active}
+                                          disabled
+                                          className="data-[state=checked]:bg-green-600 opacity-60"
+                                        />
+                                        <span className="text-xs font-medium text-green-600">Active</span>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-[220px] text-xs">
+                                      Cannot deactivate — {client.active_projects_count} active/on-hold project(s). Complete or archive them first.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <>
+                                  <Switch
+                                    checked={client.is_active}
+                                    onCheckedChange={(checked) => handleStatusChange(client, checked)}
+                                    className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+                                  />
+                                  <span className={`text-xs font-medium ${client.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                                    {client.is_active ? 'Active' : 'Inactive'}
+                                  </span>
+                                </>
+                              )
                             ) : (
                               <span className={`text-xs font-medium px-2 py-1 rounded ${client.is_active ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                                 {client.is_active ? 'Active' : 'Inactive'}

@@ -12,9 +12,10 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info } from 'lucide-react-native';
+import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info, Package } from 'lucide-react-native';
 import { D } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,7 +69,80 @@ type Assignable = {
   roleSuggestion?: string | null;
 };
 
-type TabKey = 'milestones' | 'team';
+type ReceivingReport = {
+  id: number;
+  quantityReceived: number;
+  condition?: string | null;
+  notes?: string | null;
+  receivedAt?: string | null;
+  receivedBy?: string | null;
+};
+
+type MaterialAllocation = {
+  id: number;
+  itemName?: string | null;
+  itemCode?: string | null;
+  unit?: string | null;
+  quantityAllocated: number;
+  quantityReceived: number;
+  quantityRemaining: number;
+  status: string;
+  notes?: string | null;
+  receivingReports: ReceivingReport[];
+};
+
+type TabKey = 'milestones' | 'team' | 'materials';
+
+// ─── Reusable date picker field ───────────────────────────────────────────────
+function DatePickerField({
+  label,
+  value,
+  onChange,
+  minimumDate,
+  maximumDate,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  minimumDate?: Date;
+  maximumDate?: Date;
+}) {
+  const [show, setShow] = useState(false);
+
+  // Normalize any ISO string to plain YYYY-MM-DD so appending T00:00:00 is safe
+  const toYMD = (v: string) => (v ? v.split('T')[0] : '');
+  const ymd = toYMD(value);
+  const dateObj = ymd ? new Date(ymd + 'T00:00:00') : new Date();
+
+  const fmt = (d: string) => {
+    const clean = toYMD(d);
+    if (!clean) return 'Select date';
+    try { return new Date(clean + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch { return clean; }
+  };
+
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TouchableOpacity style={styles.dateBtn} onPress={() => setShow(true)} activeOpacity={0.75}>
+        <Text style={[styles.dateBtnText, !ymd && { color: D.inkLight }]}>{fmt(value)}</Text>
+      </TouchableOpacity>
+      {show && (
+        <DateTimePicker
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          value={dateObj}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+          onChange={(_e, selected) => {
+            setShow(Platform.OS === 'ios');
+            if (selected) onChange(selected.toISOString().split('T')[0]);
+          }}
+        />
+      )}
+    </View>
+  );
+}
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -84,13 +158,26 @@ export default function ProjectDetailScreen() {
   const canReleaseTeam = hasPermission('tm.team.release');
   const canReactivateTeam = hasPermission('tm.team.reactivate');
   const canForceRemoveTeam = hasPermission('tm.team.force-remove');
+  const canReceivingReport = hasPermission('material-allocations.receiving-report');
 
   const [tab, setTab] = useState<TabKey>('milestones');
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [materials, setMaterials] = useState<MaterialAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Receiving report modal
+  const [rrModalOpen, setRrModalOpen] = useState(false);
+  const [rrAllocation, setRrAllocation] = useState<MaterialAllocation | null>(null);
+  const [rrQty, setRrQty] = useState('');
+  const [rrCondition, setRrCondition] = useState<string>('');
+  const [rrConditionOpen, setRrConditionOpen] = useState(false);
+  const [rrNotes, setRrNotes] = useState('');
+  const [rrSubmitting, setRrSubmitting] = useState(false);
+
+  const RR_CONDITIONS = ['Good', 'Slightly Damaged', 'Damaged', 'Defective', 'Incomplete'] as const;
 
   // Milestone modal
   const [milestoneModalOpen, setMilestoneModalOpen] = useState(false);
@@ -128,18 +215,48 @@ export default function ProjectDetailScreen() {
   const loadAll = async () => {
     try {
       setLoading(true);
-      const [pRes, mRes, tRes] = await Promise.all([
+      const [pRes, mRes, tRes, matRes] = await Promise.all([
         apiService.get<Project>(`/task-management/projects/${projectId}`),
         apiService.get<Milestone[]>(`/task-management/projects/${projectId}/milestones`),
         canViewTeam ? apiService.get<TeamMember[]>(`/task-management/projects/${projectId}/team`) : Promise.resolve({ success: true, data: [] } as any),
+        apiService.get<MaterialAllocation[]>(`/task-management/projects/${projectId}/material-allocations`),
       ]);
 
       if (pRes.success && pRes.data) setProject(pRes.data);
       if (mRes.success && mRes.data) setMilestones(Array.isArray(mRes.data) ? mRes.data : []);
       if (tRes.success && tRes.data) setTeam(Array.isArray(tRes.data) ? tRes.data : []);
+      if (matRes.success && matRes.data) setMaterials(Array.isArray(matRes.data) ? matRes.data : []);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const openReceivingReport = (alloc: MaterialAllocation) => {
+    setRrAllocation(alloc);
+    setRrQty(String(alloc.quantityRemaining));
+    setRrCondition('');
+    setRrConditionOpen(false);
+    setRrNotes('');
+    setRrModalOpen(true);
+  };
+
+  const submitReceivingReport = async () => {
+    if (!rrAllocation) return;
+    // Default to full remaining if left empty
+    const qty = rrQty.trim() ? parseFloat(rrQty) : rrAllocation.quantityRemaining;
+    if (isNaN(qty) || qty <= 0) return;
+    try {
+      setRrSubmitting(true);
+      await apiService.post(`/task-management/projects/${projectId}/material-allocations/${rrAllocation.id}/receiving-report`, {
+        quantity_received: qty,
+        condition: rrCondition || null,
+        notes: rrNotes.trim() || null,
+      });
+      setRrModalOpen(false);
+      loadAll();
+    } finally {
+      setRrSubmitting(false);
     }
   };
 
@@ -529,6 +646,13 @@ export default function ProjectDetailScreen() {
             Team
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'materials' && styles.tabActive]}
+          onPress={() => setTab('materials')}
+        >
+          <Package size={14} color={tab === 'materials' ? '#fff' : D.ink} strokeWidth={2.5} />
+          <Text style={[styles.tabText, tab === 'materials' && styles.tabTextActive]}>Materials</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -675,20 +799,178 @@ export default function ProjectDetailScreen() {
               })}
           </>
         )}
+
+        {tab === 'materials' && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Material Allocations</Text>
+            </View>
+
+            {materials.length === 0 && (
+              <View style={[styles.card, { alignItems: 'center', paddingVertical: 28 }]}>
+                <Package size={28} color={D.inkLight} strokeWidth={1.5} />
+                <Text style={[styles.cardTitle, { marginTop: 10, color: D.inkMid }]}>No allocations</Text>
+                <Text style={[styles.cardSub, { textAlign: 'center', marginTop: 4 }]}>No materials have been allocated to this project yet.</Text>
+              </View>
+            )}
+
+            {materials.map((alloc) => {
+              const statusMap: Record<string, { c: string; bg: string }> = {
+                pending:  { c: D.amber, bg: D.amberBg },
+                partial:  { c: D.blue,  bg: D.blueBg  },
+                received: { c: D.green, bg: D.greenBg },
+              };
+              const sc = statusMap[alloc.status] || { c: D.inkMid, bg: '#F0EFED' };
+              const pct = alloc.quantityAllocated > 0
+                ? Math.min(100, Math.round((alloc.quantityReceived / alloc.quantityAllocated) * 100))
+                : 0;
+
+              return (
+                <View key={alloc.id} style={styles.card}>
+                  <View style={styles.cardTopRow}>
+                    <View style={[styles.cardIconWrap, { backgroundColor: sc.bg }]}>
+                      <Package size={16} color={sc.c} strokeWidth={2} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{alloc.itemName || 'Unknown Item'}</Text>
+                      {alloc.itemCode ? <Text style={styles.cardSub}>{alloc.itemCode}</Text> : null}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                        <View style={[styles.infoPill, { backgroundColor: sc.bg }]}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sc.c }} />
+                          <Text style={[styles.infoPillText, { color: sc.c }]}>{alloc.status.toUpperCase()}</Text>
+                        </View>
+                      </View>
+                      <View style={{ marginTop: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={{ fontSize: 10, color: D.inkLight, fontWeight: '700' }}>
+                            {alloc.quantityReceived} / {alloc.quantityAllocated} {alloc.unit}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: sc.c, fontWeight: '800' }}>{pct}%</Text>
+                        </View>
+                        <View style={{ height: 6, backgroundColor: D.chalk, borderRadius: 3, overflow: 'hidden' }}>
+                          <View style={{ height: '100%', width: `${pct}%`, backgroundColor: sc.c, borderRadius: 3 }} />
+                        </View>
+                        <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 4 }}>
+                          Remaining: {alloc.quantityRemaining} {alloc.unit}
+                        </Text>
+                      </View>
+                    </View>
+                    {canReceivingReport && alloc.quantityRemaining > 0 && (
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => openReceivingReport(alloc)} activeOpacity={0.7}>
+                        <Plus size={16} color={D.green} strokeWidth={2.5} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {alloc.receivingReports.length > 0 && (
+                    <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: D.hairline, paddingTop: 10, gap: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: D.inkMid, marginBottom: 2 }}>RECEIVING HISTORY</Text>
+                      {alloc.receivingReports.map((rr) => (
+                        <View key={rr.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 11, color: D.inkMid, flex: 1 }}>
+                            {rr.quantityReceived} {alloc.unit}{rr.condition ? ` · ${rr.condition}` : ''}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: D.inkLight }}>
+                            {rr.receivedAt ? new Date(rr.receivedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </>
+        )}
       </ScrollView>
 
-      {/* Milestone modal */}
+      {/* Receiving report modal */}
+      <Modal visible={rrModalOpen} transparent animationType="slide" onRequestClose={() => setRrModalOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+            <Text style={styles.modalTitle}>Submit Receiving Report</Text>
+            <Text style={styles.modalHint} numberOfLines={2}>
+              {rrAllocation?.itemName} · Remaining: {rrAllocation?.quantityRemaining} {rrAllocation?.unit}
+            </Text>
+            <Text style={styles.fieldLabel}>Quantity Received <Text style={{ color: D.inkLight }}>(leave blank to receive all remaining)</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder={`${rrAllocation?.quantityRemaining ?? ''} ${rrAllocation?.unit ?? ''} (full remaining)`}
+              placeholderTextColor={D.inkLight}
+              value={rrQty}
+              onChangeText={setRrQty}
+              keyboardType="decimal-pad"
+            />
+            <Text style={styles.fieldLabel}>Condition</Text>
+            <TouchableOpacity
+              style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+              onPress={() => setRrConditionOpen((v) => !v)}
+              activeOpacity={0.75}
+            >
+              <Text style={[{ fontSize: 14 }, !rrCondition && { color: D.inkLight }]}>
+                {rrCondition || 'Select condition (optional)'}
+              </Text>
+              <Text style={{ fontSize: 12, color: D.inkLight }}>{rrConditionOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {rrConditionOpen && (
+              <View style={styles.conditionDropdown}>
+                <TouchableOpacity
+                  style={[styles.conditionOption, !rrCondition && styles.conditionOptionActive]}
+                  onPress={() => { setRrCondition(''); setRrConditionOpen(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.conditionOptionText, !rrCondition && { color: D.ink, fontWeight: '700' }]}>— None —</Text>
+                </TouchableOpacity>
+                {RR_CONDITIONS.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.conditionOption, rrCondition === c && styles.conditionOptionActive]}
+                    onPress={() => { setRrCondition(c); setRrConditionOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.conditionOptionText, rrCondition === c && { color: D.ink, fontWeight: '700' }]}>{c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <Text style={styles.fieldLabel}>Notes</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Additional notes (optional)"
+              placeholderTextColor={D.inkLight}
+              value={rrNotes}
+              onChangeText={setRrNotes}
+              multiline
+            />
+            <View style={[styles.modalActions, { marginTop: 6 }]}>
+              <TouchableOpacity style={styles.modalBtn} onPress={() => setRrModalOpen(false)} disabled={rrSubmitting}>
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnPrimary, rrSubmitting && { opacity: 0.6 }]}
+                onPress={submitReceivingReport}
+                disabled={rrSubmitting}
+              >
+                {rrSubmitting
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={[styles.modalBtnText, { color: '#fff' }]}>Submit</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
       <Modal visible={milestoneModalOpen} transparent animationType="slide" onRequestClose={() => setMilestoneModalOpen(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalCard}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>{editingMilestone ? 'Edit Milestone' : 'Add Milestone'}</Text>
-            <Text style={styles.fieldLabel}>Name</Text>
+            <Text style={styles.fieldLabel}>Name <Text style={{ color: D.red }}>*</Text></Text>
             <TextInput
               style={styles.input}
-              placeholder="Name"
+              placeholder="Milestone name"
               placeholderTextColor={D.inkLight}
               value={mName}
               onChangeText={setMName}
@@ -702,32 +984,30 @@ export default function ProjectDetailScreen() {
               onChangeText={setMDesc}
               multiline
             />
-            <Text style={styles.fieldLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Start Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="Start Date"
               value={mStartDate}
-              onChangeText={setMStartDate}
+              onChange={setMStartDate}
+              minimumDate={project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
-            <Text style={styles.fieldLabel}>Due Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Due Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="Due Date"
               value={mDueDate}
-              onChangeText={setMDueDate}
+              onChange={setMDueDate}
+              minimumDate={mStartDate ? new Date(mStartDate + 'T00:00:00') : (project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined)}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
-            <Text style={styles.fieldLabel}>Billing Percentage</Text>
+            <Text style={styles.fieldLabel}>Billing Percentage (%)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Billing % (optional)"
+              placeholder="e.g. 25 (optional)"
               placeholderTextColor={D.inkLight}
               value={mBillingPercentage}
               onChangeText={setMBillingPercentage}
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { marginTop: 6 }]}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setMilestoneModalOpen(false)}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -735,7 +1015,7 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -808,7 +1088,7 @@ export default function ProjectDetailScreen() {
                   return (
                     <View key={cid} style={styles.assignFormCard}>
                       <Text style={styles.assignFormTitle} numberOfLines={1}>{a.name}</Text>
-                      <Text style={styles.fieldLabel}>Role</Text>
+                      <Text style={styles.fieldLabel}>Role <Text style={{ color: D.red }}>*</Text></Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Role"
@@ -816,30 +1096,28 @@ export default function ProjectDetailScreen() {
                         value={assignFormData[cid]?.role ?? ''}
                         onChangeText={(v) => setAssignField(cid, 'role', v)}
                       />
-                      <Text style={styles.fieldLabel}>Hourly Rate</Text>
+                      <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
                       <TextInput
                         style={styles.input}
-                        placeholder="Hourly Rate"
+                        placeholder="e.g. 150.00"
                         placeholderTextColor={D.inkLight}
                         value={assignFormData[cid]?.hourly_rate ?? ''}
                         onChangeText={(v) => setAssignField(cid, 'hourly_rate', v)}
-                        keyboardType="numeric"
+                        keyboardType="decimal-pad"
                       />
-                      <Text style={styles.fieldLabel}>Start Date</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Start Date (YYYY-MM-DD)"
-                        placeholderTextColor={D.inkLight}
+                      <DatePickerField
+                        label="Start Date *"
                         value={assignFormData[cid]?.start_date ?? ''}
-                        onChangeText={(v) => setAssignField(cid, 'start_date', v)}
+                        onChange={(v) => setAssignField(cid, 'start_date', v)}
+                        minimumDate={project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined}
+                        maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
                       />
-                      <Text style={styles.fieldLabel}>End Date</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="End Date (YYYY-MM-DD)"
-                        placeholderTextColor={D.inkLight}
+                      <DatePickerField
+                        label="End Date *"
                         value={assignFormData[cid]?.end_date ?? ''}
-                        onChangeText={(v) => setAssignField(cid, 'end_date', v)}
+                        onChange={(v) => setAssignField(cid, 'end_date', v)}
+                        minimumDate={assignFormData[cid]?.start_date ? new Date(assignFormData[cid].start_date + 'T00:00:00') : (project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined)}
+                        maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
                       />
                     </View>
                   );
@@ -861,13 +1139,13 @@ export default function ProjectDetailScreen() {
       {/* Edit team member modal */}
       <Modal visible={teamEditOpen} transparent animationType="slide" onRequestClose={() => setTeamEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Edit Team Member</Text>
             <Text style={styles.modalHint} numberOfLines={2}>
               Update assignment details for {editingTeamMember?.name ?? 'team member'}.
             </Text>
 
-            <Text style={styles.fieldLabel}>Role</Text>
+            <Text style={styles.fieldLabel}>Role <Text style={{ color: D.red }}>*</Text></Text>
             <TextInput
               style={styles.input}
               placeholder="Role"
@@ -875,33 +1153,31 @@ export default function ProjectDetailScreen() {
               value={teRole}
               onChangeText={setTeRole}
             />
-            <Text style={styles.fieldLabel}>Hourly Rate</Text>
+            <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
             <TextInput
               style={styles.input}
-              placeholder="Hourly Rate"
+              placeholder="e.g. 150.00"
               placeholderTextColor={D.inkLight}
               value={teHourlyRate}
               onChangeText={setTeHourlyRate}
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
-            <Text style={styles.fieldLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Start Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="Start Date *"
               value={teStartDate}
-              onChangeText={setTeStartDate}
+              onChange={setTeStartDate}
+              minimumDate={project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
-            <Text style={styles.fieldLabel}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="End Date (YYYY-MM-DD)"
-              placeholderTextColor={D.inkLight}
+            <DatePickerField
+              label="End Date *"
               value={teEndDate}
-              onChangeText={setTeEndDate}
+              onChange={setTeEndDate}
+              minimumDate={teStartDate ? new Date(teStartDate + 'T00:00:00') : (project?.startDate ? new Date(project.startDate + 'T00:00:00') : undefined)}
+              maximumDate={project?.plannedEndDate ? new Date(project.plannedEndDate + 'T00:00:00') : undefined}
             />
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { marginTop: 6 }]}>
               <TouchableOpacity
                 style={styles.modalBtn}
                 onPress={() => {
@@ -915,7 +1191,7 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1145,9 +1421,38 @@ const styles = StyleSheet.create({
   },
   assignFormTitle: { fontSize: 12, fontWeight: '900', color: D.ink, marginBottom: 8 },
 
+  dateBtn: {
+    borderWidth: 1,
+    borderColor: D.hairline,
+    backgroundColor: D.chalk,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  dateBtnText: { fontSize: 14, color: D.ink },
+
   confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 18 },
   confirmCard: { width: '100%', backgroundColor: D.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: D.hairline },
   confirmTitle: { fontSize: 15, fontWeight: '900', color: D.ink, marginBottom: 8 },
   confirmBody: { fontSize: 12, color: D.inkMid, marginBottom: 14, lineHeight: 18 },
+
+  conditionDropdown: {
+    borderWidth: 1,
+    borderColor: D.hairline,
+    borderRadius: 12,
+    backgroundColor: D.surface,
+    marginTop: -6,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  conditionOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: D.hairline,
+  },
+  conditionOptionActive: { backgroundColor: '#F0EFED' },
+  conditionOptionText: { fontSize: 13, color: D.inkMid },
 });
 

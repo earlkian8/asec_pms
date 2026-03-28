@@ -40,15 +40,15 @@ class EmployeesController extends Controller
     private function storeImage(Request $request, string $field, string $folder): ?string
     {
         return ($request->hasFile($field) && $request->file($field)->isValid())
-            ? $request->file($field)->store($folder, 'public')
+            ? $request->file($field)->store($folder, config('filesystems.default'))
             : null;
     }
 
     private function replaceImage(Request $request, string $field, string $folder, ?string $existing): ?string
     {
         if ($request->hasFile($field) && $request->file($field)->isValid()) {
-            if ($existing) Storage::disk('public')->delete($existing);
-            return $request->file($field)->store($folder, 'public');
+            if ($existing) Storage::disk(config('filesystems.default'))->delete($existing);
+            return $request->file($field)->store($folder, config('filesystems.default'));
         }
         return $existing;
     }

@@ -72,30 +72,52 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
     notes: "",
   });
 
+  const [localErrors, setLocalErrors] = useState({});
+
   const selectedType = STOCK_OUT_TYPES.find(t => t.value === data.stock_out_type) || null;
   const requiresProject = selectedType?.requiresProject ?? false;
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
-    (error
+    ((error)
       ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
       : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
 
   const handleStockOutTypeChange = (value) => {
+    setLocalErrors(prev => ({ ...prev, stock_out_type: '' }));
     setData(prev => ({
       ...prev,
       stock_out_type: value,
-      project_id: "", // reset project whenever type changes
+      project_id: "",
     }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    if (!data.quantity || parseFloat(data.quantity) <= 0) {
+      errs.quantity = 'Quantity is required and must be greater than 0.';
+    } else if (parseFloat(data.quantity) > parseFloat(item.current_stock)) {
+      errs.quantity = `Cannot exceed available stock (${item.current_stock} ${item.unit_of_measure}).`;
+    }
+    if (!data.stock_out_type) {
+      errs.stock_out_type = 'Stock out type is required.';
+    }
+    if (requiresProject && !data.project_id) {
+      errs.project_id = 'Please select a project for project use.';
+    }
+    return errs;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (requiresProject && !data.project_id) {
-      toast.error("Please select a project for project use.");
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setLocalErrors(validationErrors);
+      toast.error('Please fill in all required fields.');
       return;
     }
+    setLocalErrors({});
 
     post(route("inventory-management.stock-out", item.id), {
       preserveScroll: true,
@@ -156,11 +178,11 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               min="0.01"
               max={item.current_stock}
               value={data.quantity}
-              onChange={(e) => setData("quantity", e.target.value)}
+              onChange={(e) => { setData("quantity", e.target.value); setLocalErrors(p => ({ ...p, quantity: '' })); }}
               placeholder="0.00"
-              className={inputClass(errors.quantity)}
+              className={inputClass(errors.quantity || localErrors.quantity)}
             />
-            <InputError message={errors.quantity} />
+            <InputError message={errors.quantity || localErrors.quantity} />
             <p className="text-xs text-gray-500 mt-1">
               Unit: {item.unit_of_measure} &nbsp;·&nbsp; Max:{" "}
               {parseFloat(item.current_stock || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -176,7 +198,7 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               value={data.stock_out_type}
               onValueChange={handleStockOutTypeChange}
             >
-              <SelectTrigger className={inputClass(errors.stock_out_type)}>
+              <SelectTrigger className={inputClass(errors.stock_out_type || localErrors.stock_out_type)}>
                 <SelectValue placeholder="Select reason for stock removal" />
               </SelectTrigger>
               <SelectContent>
@@ -189,7 +211,7 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
                 ))}
               </SelectContent>
             </Select>
-            <InputError message={errors.stock_out_type} />
+            <InputError message={errors.stock_out_type || localErrors.stock_out_type} />
             {selectedType && (
               <p className="text-xs text-gray-500 mt-1">{selectedType.description}</p>
             )}
@@ -203,9 +225,9 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
               </Label>
               <Select
                 value={data.project_id ? data.project_id.toString() : ""}
-                onValueChange={(value) => setData("project_id", value)}
+                onValueChange={(value) => { setData("project_id", value); setLocalErrors(p => ({ ...p, project_id: '' })); }}
               >
-                <SelectTrigger className={inputClass(errors.project_id)}>
+                <SelectTrigger className={inputClass(errors.project_id || localErrors.project_id)}>
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -222,7 +244,7 @@ const StockOut = ({ setShowStockOutModal, item, projects = [] }) => {
                   )}
                 </SelectContent>
               </Select>
-              <InputError message={errors.project_id} />
+              <InputError message={errors.project_id || localErrors.project_id} />
               <p className="text-xs text-gray-500 mt-1">Select the project this stock is allocated to</p>
             </div>
           )}

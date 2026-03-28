@@ -32,9 +32,9 @@ class ClientAuthController extends Controller
         if (!$client->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is inactive. Please contact support.',
+                'message' => 'Your account has been turned off. Please contact support.',
                 'errors' => [
-                    'email' => ['Your account is inactive. Please contact support.'],
+                    'email' => ['Your account has been turned off. Please contact support.'],
                 ],
             ], 403);
         }

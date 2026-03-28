@@ -170,6 +170,9 @@ class RoleSeeder extends Seeder
             'tm.team.release',
             'tm.team.reactivate',
             'tm.team.force-remove',
+
+            // Material receiving reports
+            'material-allocations.receiving-report',
         ]);
 
         $this->command->info('Roles seeded successfully!');

@@ -16,6 +16,8 @@ use App\Http\Controllers\API\TaskManagement\ProjectsController as TaskManagement
 use App\Http\Controllers\API\TaskManagement\MilestonesController as TaskManagementMilestonesController;
 use App\Http\Controllers\API\TaskManagement\TasksController as TaskManagementTasksController;
 use App\Http\Controllers\API\TaskManagement\TeamController as TaskManagementTeamController;
+use App\Http\Controllers\API\TaskManagement\PermissionDelegationController as TaskManagementPermissionDelegationController;
+use App\Http\Controllers\API\TaskManagement\MaterialAllocationsController as TaskManagementMaterialAllocationsController;
 
 // PayMongo webhook (public - verify signature in production)
 Route::post('/webhooks/paymongo', [WebhookController::class, 'handlePayMongo']);
@@ -167,6 +169,16 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::put('/projects/{project}/team/{projectTeam}/status', [TaskManagementTeamController::class, 'updateStatus'])->middleware('permission:tm.team.reactivate');
     Route::delete('/projects/{project}/team/{projectTeam}', [TaskManagementTeamController::class, 'release'])->middleware('permission:tm.team.release');
     Route::delete('/projects/{project}/team/{projectTeam}/force-remove', [TaskManagementTeamController::class, 'forceRemove'])->middleware('permission:tm.team.force-remove');
+
+    // Permission delegation (Engineer TM can grant/revoke TM access to other users)
+    Route::get('/permissions/granted-users', [TaskManagementPermissionDelegationController::class, 'grantedUsers']);
+    Route::get('/permissions/eligible-users', [TaskManagementPermissionDelegationController::class, 'eligibleUsers']);
+    Route::post('/permissions/grant', [TaskManagementPermissionDelegationController::class, 'grant']);
+    Route::post('/permissions/revoke', [TaskManagementPermissionDelegationController::class, 'revoke']);
+
+    // Material allocations (project-scoped)
+    Route::get('/projects/{project}/material-allocations', [TaskManagementMaterialAllocationsController::class, 'index'])->middleware('permission:tm.projects.view-assigned');
+    Route::post('/projects/{project}/material-allocations/{allocation}/receiving-report', [TaskManagementMaterialAllocationsController::class, 'storeReceivingReport'])->middleware('permission:material-allocations.receiving-report');
     });
 });
 

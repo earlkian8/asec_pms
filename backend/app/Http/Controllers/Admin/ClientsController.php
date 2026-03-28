@@ -40,7 +40,9 @@ class ClientsController extends Controller
 
         $clients = Client::with('clientType')
             ->withCount([
-                // Count active + on_hold projects so the frontend can block deletion
+                // Total projects (all statuses, non-deleted)
+                'projects as projects_count',
+                // Active/on-hold projects — blocks status toggle and deletion
                 'projects as active_projects_count' => fn ($q) => $q->whereIn('status', ['active', 'on_hold']),
             ])
             ->when($search, function ($query, $search) {
@@ -252,6 +254,19 @@ class ClientsController extends Controller
         $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);
+
+        // Guard: cannot deactivate a client that has active or on-hold projects
+        if (!$request->boolean('is_active')) {
+            $activeCount = $client->projects()
+                ->whereIn('status', ['active', 'on_hold'])
+                ->count();
+
+            if ($activeCount > 0) {
+                return back()->withErrors([
+                    'is_active' => "Cannot deactivate '{$client->client_name}'. They have {$activeCount} active or on-hold project(s). Complete, cancel, or archive all projects first.",
+                ])->with('error', "Cannot deactivate '{$client->client_name}'. They have {$activeCount} active or on-hold project(s).");
+            }
+        }
 
         $client->update([
             'is_active' => $request->input('is_active'),

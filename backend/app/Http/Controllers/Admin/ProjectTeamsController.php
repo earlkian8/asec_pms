@@ -238,6 +238,46 @@ class ProjectTeamsController extends Controller
         return redirect()->back()->with('success', 'Team member updated successfully.');
     }
 
+    // ─── Bulk Status Update (release / reactivate) ───────────────────────────
+
+    public function bulkStatus(Request $request, Project $project)
+    {
+        $request->validate([
+            'ids'               => 'required|array|min:1',
+            'ids.*'             => 'integer|exists:project_teams,id',
+            'assignment_status' => ['required', 'string', 'in:' . implode(',', AssignmentStatus::values())],
+        ]);
+
+        $newStatus = AssignmentStatus::from($request->assignment_status);
+
+        $teams = ProjectTeam::where('project_id', $project->id)
+            ->whereIn('id', $request->ids)
+            ->get();
+
+        foreach ($teams as $team) {
+            $updateData = ['assignment_status' => $newStatus->value];
+            if ($newStatus === AssignmentStatus::Released) {
+                $updateData['released_at'] = now();
+                if ($team->user_id) {
+                    ProjectTask::where('assigned_to', $team->user_id)
+                        ->whereHas('milestone', fn ($q) => $q->where('project_id', $project->id))
+                        ->update(['assigned_to' => null]);
+                }
+            } elseif ($newStatus === AssignmentStatus::Active) {
+                $updateData['reactivated_at'] = now();
+            }
+            $team->update($updateData);
+        }
+
+        $this->adminActivityLogs('Project Team', 'Bulk Status',
+            "Bulk updated {$teams->count()} member(s) to {$newStatus->label()} in Project {$project->project_name}"
+        );
+
+        return redirect()->back()->with('success',
+            "{$teams->count()} member(s) updated to {$newStatus->label()} successfully."
+        );
+    }
+
     // ─── Handle Status (toggle active ↔ released) ────────────────────────────
 
     public function handleStatus(Request $request, Project $project, ProjectTeam $projectTeam)
@@ -335,9 +375,39 @@ class ProjectTeamsController extends Controller
 
     // ─── Force Remove (permanent delete) ─────────────────────────────────────
 
-    public function forceRemove(Request $request, Project $project, ProjectTeam $projectTeam)
+    public function forceRemove(Request $request, Project $project, ProjectTeam $projectTeam = null)
     {
-        if ($projectTeam->project_id !== $project->id) {
+        // Bulk force-remove
+        if ($request->has('ids') && is_array($request->ids)) {
+            $validated = $request->validate([
+                'ids'   => 'required|array|min:1',
+                'ids.*' => 'integer|exists:project_teams,id',
+            ]);
+
+            $teams = ProjectTeam::where('project_id', $project->id)
+                ->whereIn('id', $validated['ids'])
+                ->get();
+
+            foreach ($teams as $team) {
+                if ($team->user_id) {
+                    ProjectTask::where('assigned_to', $team->user_id)
+                        ->whereHas('milestone', fn ($q) => $q->where('project_id', $project->id))
+                        ->update(['assigned_to' => null]);
+                }
+                $team->forceDelete();
+            }
+
+            $this->adminActivityLogs('Project Team', 'Remove',
+                "Permanently removed {$teams->count()} member(s) from Project {$project->project_name}"
+            );
+
+            return redirect()->back()->with('success',
+                "{$teams->count()} team member(s) permanently removed from the project."
+            );
+        }
+
+        // Single force-remove
+        if (!$projectTeam || $projectTeam->project_id !== $project->id) {
             abort(404);
         }
 

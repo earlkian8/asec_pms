@@ -15,9 +15,8 @@ use Illuminate\Http\Request;
 class TeamController extends Controller
 {
     /**
-     * Admin-like assignables list for team assignment UI.
-     * - Users: can be assigned to multiple projects
-     * - Employees: exclude occupied employees (rotation rule)
+     * Assignables list for team assignment UI.
+     * Excludes users/employees already actively assigned to this project.
      */
     public function assignables(Request $request, Project $project)
     {
@@ -33,6 +32,7 @@ class TeamController extends Controller
 
         $existingUserIds = ProjectTeam::query()
             ->where('project_id', $project->id)
+            ->where('assignment_status', AssignmentStatus::Active->value)
             ->whereNotNull('user_id')
             ->pluck('user_id')
             ->unique()
@@ -41,6 +41,7 @@ class TeamController extends Controller
 
         $existingEmployeeIds = ProjectTeam::query()
             ->where('project_id', $project->id)
+            ->where('assignment_status', AssignmentStatus::Active->value)
             ->whereNotNull('employee_id')
             ->pluck('employee_id')
             ->unique()
@@ -51,8 +52,9 @@ class TeamController extends Controller
             ->whereNull('deleted_at')
             ->when(count($existingUserIds) > 0, fn ($q) => $q->whereNotIn('id', $existingUserIds))
             ->with('roles')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email'])
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'email'])
             ->map(fn (User $u) => [
                 'id' => $u->id,
                 'type' => 'user',
@@ -61,18 +63,9 @@ class TeamController extends Controller
                 'roleSuggestion' => $u->roles->first()?->name,
             ]);
 
-        $occupiedEmployeeIds = ProjectTeam::occupied()
-            ->whereNotNull('employee_id')
-            ->pluck('employee_id')
-            ->unique()
-            ->filter()
-            ->toArray();
-
-        $excludeEmployeeIds = array_values(array_unique(array_filter(array_merge($occupiedEmployeeIds, $existingEmployeeIds))));
-
         $employees = Employee::query()
             ->where('is_active', true)
-            ->when(count($excludeEmployeeIds) > 0, fn ($q) => $q->whereNotIn('id', $excludeEmployeeIds))
+            ->when(count($existingEmployeeIds) > 0, fn ($q) => $q->whereNotIn('id', $existingEmployeeIds))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'email', 'position'])
@@ -134,7 +127,6 @@ class TeamController extends Controller
 
     /**
      * Assign team members to project (bulk).
-     * Mirrors admin validation and employee single-assignment constraint.
      */
     public function store(Request $request, Project $project)
     {
@@ -220,24 +212,9 @@ class TeamController extends Controller
         $created = [];
 
         foreach ($validated['assignables'] as $assignable) {
-            // Employee single-assignment constraint
-            if ($assignable['type'] === 'employee') {
-                $isOccupied = ProjectTeam::occupied()
-                    ->where('employee_id', (int) $assignable['id'])
-                    ->exists();
-
-                if ($isOccupied) {
-                    $name = $this->resolveAssignableName($assignable);
-                    return response()->json([
-                        'success' => false,
-                        'message' => "{$name} already has an active project assignment. Release or complete it first.",
-                    ], 422);
-                }
-            }
-
-            // Skip duplicates in same project+role+person
+            // Skip duplicates — only if already actively assigned to this project
             $exists = ProjectTeam::where('project_id', $project->id)
-                ->where('role', $assignable['role'])
+                ->where('assignment_status', AssignmentStatus::Active->value)
                 ->where(function ($query) use ($assignable) {
                     if ($assignable['type'] === 'user') {
                         $query->where('user_id', (int) $assignable['id'])->whereNull('employee_id');
@@ -369,7 +346,6 @@ class TeamController extends Controller
 
     /**
      * Update assignment status (release/reactivate/etc.)
-     * Mirrors admin conflict checks when reactivating an employee.
      */
     public function updateStatus(Request $request, Project $project, ProjectTeam $projectTeam)
     {
@@ -396,20 +372,6 @@ class TeamController extends Controller
         ]);
 
         $newStatus = AssignmentStatus::from($request->assignment_status);
-
-        if ($newStatus === AssignmentStatus::Active && $projectTeam->assignable_type === 'employee') {
-            $conflict = ProjectTeam::occupied()
-                ->where('id', '!=', $projectTeam->id)
-                ->where('employee_id', $projectTeam->employee_id)
-                ->exists();
-
-            if ($conflict) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "{$projectTeam->assignable_name} already has an active assignment on another project. Release them there first.",
-                ], 422);
-            }
-        }
 
         // Record timestamps
         $updateData = ['assignment_status' => $newStatus->value];

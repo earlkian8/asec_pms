@@ -13,8 +13,10 @@ import InputError from "@/Components/InputError";
 import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, AlertTriangle } from "lucide-react";
 import { formatNumberWithCommas, parseFormattedNumber } from "@/utils/numberFormat";
+
+const fmt = (n) => parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const EditBilling = ({ setShowEditModal, billing }) => {
   const { data, setData, put, errors, processing } = useForm({
@@ -24,16 +26,49 @@ const EditBilling = ({ setShowEditModal, billing }) => {
     description: billing.description || "",
   });
 
-  const [billingAmountDisplay, setBillingAmountDisplay] = useState('');
+  const [billingAmountDisplay, setBillingAmountDisplay] = useState(
+    billing.billing_amount ? formatNumberWithCommas(billing.billing_amount) : ''
+  );
 
-  // Initialize display value when data.billing_amount changes
-  useEffect(() => {
-    if (data.billing_amount) {
-      setBillingAmountDisplay(formatNumberWithCommas(data.billing_amount));
-    } else {
-      setBillingAmountDisplay('');
-    }
-  }, [data.billing_amount]);
+  const contractAmount = billing.project?.contract_amount ? parseFloat(billing.project.contract_amount) : 0;
+  const totalPaid      = parseFloat(billing.total_paid || 0);
+  const enteredAmount  = parseFloat(data.billing_amount) || 0;
+
+  // Total billed for the project excluding this billing, to compute variance correctly
+  // We don't have that from the billing prop, so we compute: if enteredAmount > contractAmount it's over
+  const wouldExceed = contractAmount > 0 && enteredAmount > contractAmount;
+
+  const setAmount = (raw) => {
+    setBillingAmountDisplay(formatNumberWithCommas(raw));
+    setData('billing_amount', parseFormattedNumber(raw));
+  };
+
+  const handleAmountChange = (e) => {
+    let v = e.target.value;
+    if (v === '') { setBillingAmountDisplay(''); setData('billing_amount', ''); return; }
+    v = v.replace(/[^\d.]/g, '');
+    const parts = v.split('.');
+    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+    if (parts.length === 2 && parts[1].length > 2) v = parts[0] + '.' + parts[1].substring(0, 2);
+    setAmount(v);
+  };
+
+  // Presets based on contract amount
+  const presets = [];
+  if (contractAmount > 0) {
+    presets.push({ label: 'Full', value: contractAmount.toFixed(2) });
+    [75, 50, 25].forEach(pct => {
+      presets.push({ label: `${pct}%`, value: ((contractAmount * pct) / 100).toFixed(2) });
+    });
+  }
+
+  // Milestone preset
+  const milestonePresetAmount =
+    billing.billing_type === 'milestone' &&
+    billing.milestone?.billing_percentage &&
+    contractAmount > 0
+      ? ((contractAmount * parseFloat(billing.milestone.billing_percentage)) / 100).toFixed(2)
+      : null;
 
   const inputClass = (error, readOnly = false) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -45,25 +80,16 @@ const EditBilling = ({ setShowEditModal, billing }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     put(route("billing-management.update", billing.id), {
       preserveScroll: true,
       onSuccess: (page) => {
         setShowEditModal(false);
         const flash = page.props.flash;
-        if (flash && flash.error) {
-          toast.error(flash.error);
-        } else {
-          toast.success("Billing updated successfully!");
-        }
+        if (flash?.error) { toast.error(flash.error); return; }
+        if (flash?.warning) toast.warning(flash.warning);
+        toast.success("Billing updated successfully!");
       },
-      onError: (errors) => {
-        if (errors.error) {
-          toast.error(errors.error);
-        } else {
-          toast.error("Please check the form for errors");
-        }
-      },
+      onError: () => toast.error("Please check the form for errors"),
     });
   };
 
@@ -75,17 +101,13 @@ const EditBilling = ({ setShowEditModal, billing }) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Billing Code (read-only) */}
+          {/* Billing Code */}
           <div className="col-span-2">
             <Label className="text-zinc-800">Billing Code</Label>
-            <Input
-              value={billing.billing_code}
-              readOnly
-              className={inputClass(false, true)}
-            />
+            <Input value={billing.billing_code} readOnly className={inputClass(false, true)} />
           </div>
 
-          {/* Project (read-only) */}
+          {/* Project */}
           <div className="col-span-2">
             <Label className="text-zinc-800">Project</Label>
             <Input
@@ -95,7 +117,7 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             />
           </div>
 
-          {/* Billing Type (read-only) */}
+          {/* Billing Type */}
           <div className="col-span-2">
             <Label className="text-zinc-800">Billing Type</Label>
             <Input
@@ -105,7 +127,7 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             />
           </div>
 
-          {/* Milestone (if milestone-based) */}
+          {/* Milestone (read-only info) */}
           {billing.billing_type === 'milestone' && billing.milestone && (
             <div className="col-span-2">
               <Label className="text-zinc-800">Milestone</Label>
@@ -117,78 +139,69 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             </div>
           )}
 
+          {/* Contract amount info */}
+          {contractAmount > 0 && (
+            <div className="col-span-2">
+              <Label className="text-zinc-800">Contract Amount</Label>
+              <Input
+                value={`₱${fmt(contractAmount)}`}
+                readOnly
+                className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
+              />
+              {totalPaid > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Total paid so far: <span className="font-medium">₱{fmt(totalPaid)}</span>
+                  {' '}— billing amount cannot be set below this.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Billing Amount */}
           <div className="col-span-2">
             <Label className="text-zinc-800">Billing Amount <span className="text-red-500">*</span></Label>
             <Input
               type="text"
               value={billingAmountDisplay}
-              onChange={(e) => {
-                // Only allow changes for fixed_price type (milestone is read-only)
-                if (billing.billing_type === 'fixed_price') {
-                  let inputValue = e.target.value;
-                  
-                  // Allow empty string
-                  if (inputValue === '') {
-                    setBillingAmountDisplay('');
-                    setData("billing_amount", '');
-                    return;
-                  }
-                  
-                  // Remove all non-numeric characters except decimal point
-                  inputValue = inputValue.replace(/[^\d.]/g, '');
-                  
-                  // Prevent multiple decimal points
-                  const parts = inputValue.split('.');
-                  if (parts.length > 2) {
-                    inputValue = parts[0] + '.' + parts.slice(1).join('');
-                  }
-                  
-                  // Limit decimal places to 2
-                  if (parts.length === 2 && parts[1].length > 2) {
-                    inputValue = parts[0] + '.' + parts[1].substring(0, 2);
-                  }
-                  
-                  // Format with commas for display
-                  const formattedValue = formatNumberWithCommas(inputValue);
-                  setBillingAmountDisplay(formattedValue);
-                  
-                  // Store numeric value (without commas)
-                  const numericValue = parseFormattedNumber(inputValue);
-                  setData("billing_amount", numericValue);
-                }
-              }}
-              readOnly={billing.billing_type === 'fixed_price' || billing.billing_type === 'milestone'}
+              onChange={handleAmountChange}
               placeholder="0.00"
-              className={billing.billing_type === 'fixed_price' || billing.billing_type === 'milestone'
-                ? "bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed" 
-                : inputClass(errors.billing_amount)}
+              className={inputClass(errors.billing_amount)}
             />
             <InputError message={errors.billing_amount} />
-            {billing.billing_type === 'fixed_price' && (
-              <p className="text-xs text-gray-500 mt-1">
-                Fixed amount cannot be changed.
-              </p>
+
+            {/* Presets */}
+            {(presets.length > 0 || milestonePresetAmount) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {milestonePresetAmount && (
+                  <button
+                    type="button"
+                    onClick={() => setAmount(milestonePresetAmount)}
+                    className="px-2.5 py-1 text-xs rounded-md border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium"
+                  >
+                    Milestone ({billing.milestone?.billing_percentage}%) = ₱{fmt(milestonePresetAmount)}
+                  </button>
+                )}
+                {presets.map(({ label, value }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setAmount(value)}
+                    className="px-2.5 py-1 text-xs rounded-md border border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition-colors font-medium"
+                  >
+                    {label} ₱{fmt(value)}
+                  </button>
+                ))}
+              </div>
             )}
-            {billing.billing_type === 'milestone' && billing.milestone && billing.project && (() => {
-              if (billing.milestone.billing_percentage && billing.project.contract_amount) {
-                const calculatedAmount = (parseFloat(billing.project.contract_amount) * parseFloat(billing.milestone.billing_percentage)) / 100;
-                return (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Calculated from milestone percentage: ₱{parseFloat(billing.project.contract_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {billing.milestone.billing_percentage}% = ₱{calculatedAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                );
-              }
-              return (
-                <p className="text-xs text-gray-500 mt-1">
-                  Amount is calculated from milestone percentage and cannot be changed.
-                </p>
-              );
-            })()}
-            {billing.total_paid > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                Total paid: ₱{parseFloat(billing.total_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
+
+            {/* Over-contract warning */}
+            {wouldExceed && (
+              <div className="mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2 border bg-amber-50 border-amber-200 text-amber-700">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                <span>
+                  This amount (<strong>₱{fmt(enteredAmount)}</strong>) exceeds the contract amount of <strong>₱{fmt(contractAmount)}</strong> by <strong>₱{fmt(enteredAmount - contractAmount)}</strong>. You can still proceed.
+                </span>
+              </div>
             )}
           </div>
 
@@ -230,7 +243,6 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             <InputError message={errors.description} />
           </div>
 
-          {/* Footer Buttons */}
           <DialogFooter className="col-span-2 flex justify-end gap-2 mt-4">
             <Button
               type="button"
@@ -247,15 +259,9 @@ const EditBilling = ({ setShowEditModal, billing }) => {
               disabled={processing}
             >
               {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" />Saving...</>
               ) : (
-                <>
-                  <Save size={16} />
-                  Save Changes
-                </>
+                <><Save size={16} />Save Changes</>
               )}
             </Button>
           </DialogFooter>

@@ -171,11 +171,15 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::delete('/projects/{project}/team/{projectTeam}', [TaskManagementTeamController::class, 'release'])->middleware('permission:tm.team.release');
     Route::delete('/projects/{project}/team/{projectTeam}/force-remove', [TaskManagementTeamController::class, 'forceRemove'])->middleware('permission:tm.team.force-remove');
 
-    // Permission delegation (Engineer TM can grant/revoke TM access to other users)
-    Route::get('/permissions/granted-users', [TaskManagementPermissionDelegationController::class, 'grantedUsers']);
-    Route::get('/permissions/eligible-users', [TaskManagementPermissionDelegationController::class, 'eligibleUsers']);
-    Route::post('/permissions/grant', [TaskManagementPermissionDelegationController::class, 'grant']);
-    Route::post('/permissions/revoke', [TaskManagementPermissionDelegationController::class, 'revoke']);
+    // Permission delegation — only non-delegated users (original authority) may delegate
+    // Fix #1 + #7: route-level guard using tm.permissions.delegate
+    Route::middleware('permission:tm.permissions.delegate')->group(function () {
+        Route::get('/permissions/granted-users', [TaskManagementPermissionDelegationController::class, 'grantedUsers']);
+        Route::get('/permissions/eligible-users', [TaskManagementPermissionDelegationController::class, 'eligibleUsers']);
+        Route::post('/permissions/grant', [TaskManagementPermissionDelegationController::class, 'grant']);
+        Route::post('/permissions/update-modules', [TaskManagementPermissionDelegationController::class, 'updateModules']);
+        Route::post('/permissions/revoke', [TaskManagementPermissionDelegationController::class, 'revoke']);
+    });
 
     // Notifications
     Route::get('/notifications', [TaskManagementNotificationController::class, 'index']);

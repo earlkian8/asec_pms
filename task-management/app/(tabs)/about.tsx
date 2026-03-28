@@ -51,16 +51,69 @@ function InfoRow({
   );
 }
 
+// ── Grant user row with module toggles ─────────────────────────────────────────
+function GrantUserRow({
+  user, granting, onGrant,
+}: {
+  user: { id: number; name: string; email: string };
+  granting: number | null;
+  onGrant: (userId: number, taskAccess: boolean, projectAccess: boolean) => void;
+}) {
+  const [taskAccess, setTaskAccess] = useState(true);
+  const [projectAccess, setProjectAccess] = useState(false);
+  const isGranting = granting === user.id;
+
+  return (
+    <View style={modalStyles.userRow}>
+      <View style={modalStyles.userAvatar}>
+        <Text style={modalStyles.userAvatarText}>{(user.name || '?')[0].toUpperCase()}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={modalStyles.userName} numberOfLines={1}>{user.name}</Text>
+        <Text style={modalStyles.userEmail} numberOfLines={1}>{user.email}</Text>
+        <View style={modalStyles.grantToggles}>
+          <TouchableOpacity
+            style={[modalStyles.grantToggle, taskAccess && modalStyles.grantToggleActive]}
+            onPress={() => setTaskAccess(!taskAccess)}
+            disabled={isGranting}
+            activeOpacity={0.7}
+          >
+            <Text style={[modalStyles.grantToggleText, taskAccess && modalStyles.grantToggleTextActive]}>Tasks</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[modalStyles.grantToggle, projectAccess && modalStyles.grantToggleActive]}
+            onPress={() => setProjectAccess(!projectAccess)}
+            disabled={isGranting}
+            activeOpacity={0.7}
+          >
+            <Text style={[modalStyles.grantToggleText, projectAccess && modalStyles.grantToggleTextActive]}>Projects</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <TouchableOpacity
+        style={[modalStyles.grantBtn, isGranting && { opacity: 0.6 }]}
+        onPress={() => onGrant(user.id, taskAccess, projectAccess)}
+        disabled={isGranting}
+        activeOpacity={0.7}
+      >
+        {isGranting
+          ? <ActivityIndicator size="small" color={D.green} />
+          : <UserPlus size={16} color={D.green} strokeWidth={2} />}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function AboutScreen() {
   const { user, logout, checkAuth, hasPermission } = useAuth();
   const dialog  = useDialog();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const canDelegate = hasPermission('tm.projects.view-assigned');
+  const canDelegate = hasPermission('tm.permissions.delegate');
 
   // Permission delegation state
-  const [grantedUsers, setGrantedUsers] = useState<{ id: number; name: string; email: string }[]>([]);
+  const [grantedUsers, setGrantedUsers] = useState<{ id: number; name: string; email: string; taskAccess: boolean; projectAccess: boolean }[]>([]);
   const [grantedLoading, setGrantedLoading] = useState(false);
   const [showGrantModal, setShowGrantModal] = useState(false);
   const [eligibleUsers, setEligibleUsers] = useState<{ id: number; name: string; email: string }[]>([]);
@@ -68,11 +121,12 @@ export default function AboutScreen() {
   const [grantSearch, setGrantSearch] = useState('');
   const [granting, setGranting] = useState<number | null>(null);
   const [revoking, setRevoking] = useState<number | null>(null);
+  const [updating, setUpdating] = useState<number | null>(null);
 
   const loadGrantedUsers = async () => {
     try {
       setGrantedLoading(true);
-      const res = await apiService.get<{ id: number; name: string; email: string }[]>('/task-management/permissions/granted-users');
+      const res = await apiService.get<{ id: number; name: string; email: string; taskAccess: boolean; projectAccess: boolean }[]>('/task-management/permissions/granted-users');
       if (res.success && res.data) setGrantedUsers(Array.isArray(res.data) ? res.data : []);
     } finally {
       setGrantedLoading(false);
@@ -91,10 +145,14 @@ export default function AboutScreen() {
     }
   };
 
-  const grantAccess = async (userId: number) => {
+  const grantAccess = async (userId: number, taskAccess: boolean, projectAccess: boolean) => {
+    if (!taskAccess && !projectAccess) {
+      dialog.showError('At least one module must be enabled');
+      return;
+    }
     try {
       setGranting(userId);
-      const res = await apiService.post('/task-management/permissions/grant', { user_id: userId });
+      const res = await apiService.post('/task-management/permissions/grant', { user_id: userId, task_access: taskAccess, project_access: projectAccess });
       if (res.success) {
         setShowGrantModal(false);
         loadGrantedUsers();
@@ -104,6 +162,21 @@ export default function AboutScreen() {
       }
     } finally {
       setGranting(null);
+    }
+  };
+
+  const updateModules = async (userId: number, taskAccess: boolean, projectAccess: boolean) => {
+    try {
+      setUpdating(userId);
+      const res = await apiService.post('/task-management/permissions/update-modules', { user_id: userId, task_access: taskAccess, project_access: projectAccess });
+      if (res.success) {
+        loadGrantedUsers();
+        dialog.showSuccess(res.message || 'Modules updated successfully');
+      } else {
+        dialog.showError(res.message || 'Failed to update modules');
+      }
+    } finally {
+      setUpdating(null);
     }
   };
 
@@ -228,6 +301,24 @@ export default function AboutScreen() {
                         <View style={styles.permInfo}>
                           <Text style={styles.permName} numberOfLines={1}>{u.name}</Text>
                           <Text style={styles.permEmail} numberOfLines={1}>{u.email}</Text>
+                          <View style={styles.moduleToggles}>
+                            <TouchableOpacity
+                              style={[styles.moduleToggle, u.taskAccess && styles.moduleToggleActive, updating === u.id && { opacity: 0.5 }]}
+                              onPress={() => updateModules(u.id, !u.taskAccess, u.projectAccess)}
+                              disabled={updating === u.id}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.moduleToggleText, u.taskAccess && styles.moduleToggleTextActive]}>Tasks</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.moduleToggle, u.projectAccess && styles.moduleToggleActive, updating === u.id && { opacity: 0.5 }]}
+                              onPress={() => updateModules(u.id, u.taskAccess, !u.projectAccess)}
+                              disabled={updating === u.id}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.moduleToggleText, u.projectAccess && styles.moduleToggleTextActive]}>Projects</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         <TouchableOpacity
                           style={[styles.revokeBtn, revoking === u.id && { opacity: 0.5 }]}
@@ -322,7 +413,7 @@ export default function AboutScreen() {
               </TouchableOpacity>
             </View>
             <Text style={modalStyles.sheetHint}>
-              Select a user to grant full Task Management access. They will be able to view projects, manage milestones, tasks, and team.
+              Select a user and choose which modules to enable. Tasks module: view tasks, progress, issues. Projects module: manage projects, milestones, team.
             </Text>
             <View style={modalStyles.searchBar}>
               <Search size={14} color={D.inkLight} strokeWidth={2} />
@@ -351,24 +442,7 @@ export default function AboutScreen() {
                     return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
                   })
                   .map((u) => (
-                    <TouchableOpacity
-                      key={u.id}
-                      style={[modalStyles.userRow, granting === u.id && { opacity: 0.6 }]}
-                      onPress={() => grantAccess(u.id)}
-                      disabled={granting === u.id}
-                      activeOpacity={0.75}
-                    >
-                      <View style={modalStyles.userAvatar}>
-                        <Text style={modalStyles.userAvatarText}>{(u.name || '?')[0].toUpperCase()}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={modalStyles.userName} numberOfLines={1}>{u.name}</Text>
-                        <Text style={modalStyles.userEmail} numberOfLines={1}>{u.email}</Text>
-                      </View>
-                      {granting === u.id
-                        ? <ActivityIndicator size="small" color={D.ink} />
-                        : <UserPlus size={16} color={D.green} strokeWidth={2} />}
-                    </TouchableOpacity>
+                    <GrantUserRow key={u.id} user={u} granting={granting} onGrant={grantAccess} />
                   ))}
                 {eligibleUsers.filter((u) => {
                   const q = grantSearch.trim().toLowerCase();
@@ -460,6 +534,14 @@ const styles = StyleSheet.create({
   permInfo: { flex: 1 },
   permName: { fontSize: 13, fontWeight: '700', color: D.ink },
   permEmail: { fontSize: 11, color: D.inkLight, marginTop: 1 },
+  moduleToggles: { flexDirection: 'row', gap: 6, marginTop: 6 },
+  moduleToggle: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+    backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline,
+  },
+  moduleToggleActive: { backgroundColor: D.blueBg, borderColor: D.blue },
+  moduleToggleText: { fontSize: 10, fontWeight: '600', color: D.inkLight },
+  moduleToggleTextActive: { color: D.blue },
   revokeBtn: {
     width: 32, height: 32, borderRadius: 8,
     backgroundColor: D.redBg, justifyContent: 'center', alignItems: 'center',
@@ -501,4 +583,17 @@ const modalStyles = StyleSheet.create({
   userAvatarText: { fontSize: 15, fontWeight: '700', color: D.green },
   userName: { fontSize: 13, fontWeight: '700', color: D.ink },
   userEmail: { fontSize: 11, color: D.inkLight, marginTop: 1 },
+  grantToggles: { flexDirection: 'row', gap: 6, marginTop: 6 },
+  grantToggle: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+    backgroundColor: D.chalk, borderWidth: 1, borderColor: D.hairline,
+  },
+  grantToggleActive: { backgroundColor: D.blueBg, borderColor: D.blue },
+  grantToggleText: { fontSize: 10, fontWeight: '600', color: D.inkLight },
+  grantToggleTextActive: { color: D.blue },
+  grantBtn: {
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: D.greenBg, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: D.green + '30',
+  },
 });

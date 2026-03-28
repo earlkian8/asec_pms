@@ -29,11 +29,13 @@ class TaskManagementAuthController extends Controller
             ]);
         }
 
-        $authz = app(TaskManagementAuthorization::class);
-        $permissions = $user->getAllPermissions()->pluck('name')->values();
+        if (!$user->can('tm.access')) {
+            throw ValidationException::withMessages([
+                'email' => ['You do not have access to the Task Management app.'],
+            ]);
+        }
 
-        // Revoke all existing tokens (optional - for single device login)
-        // $user->tokens()->delete();
+        $permissions = $user->getAllPermissions()->pluck('name')->values();
 
         $token = $user->createToken('task-management-api-token')->plainTextToken;
 

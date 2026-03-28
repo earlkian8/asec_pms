@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ProjectIssuesController;
 use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
 use App\Http\Controllers\Admin\ProjectLaborCostsController;
 use App\Http\Controllers\Admin\ProjectMiscellaneousExpensesController;
+use App\Http\Controllers\Admin\DirectSuppliesController;
 use App\Http\Controllers\Admin\InventoryItemsController;
 use App\Http\Controllers\Admin\BillingsController;
 use App\Http\Controllers\Admin\ReportsController;
@@ -239,6 +240,16 @@ Route::middleware('auth')->group(function () {
             Route::post('/restore', [TrashBinController::class, 'restore'])->middleware('permission:trash-bin.restore')->name('restore');
             Route::delete('/force-delete', [TrashBinController::class, 'forceDelete'])->middleware('permission:trash-bin.force-delete')->name('force-delete');
         });
+    });
+
+    // Direct Supply Management
+    Route::prefix('direct-supply-management')->name('direct-supply-management.')->group(function(){
+        Route::get('/', [DirectSuppliesController::class, 'index'])->middleware('permission:direct-supply.view')->name('index');
+        Route::post('/store', [DirectSuppliesController::class, 'store'])->middleware('permission:direct-supply.create')->name('store');
+        Route::put('/update/{directSupply}', [DirectSuppliesController::class, 'update'])->middleware('permission:direct-supply.update')->name('update');
+        Route::delete('/destroy/{directSupply}', [DirectSuppliesController::class, 'destroy'])->middleware('permission:direct-supply.delete')->name('destroy');
+        Route::put('/update-status/{directSupply}', [DirectSuppliesController::class, 'updateStatus'])->middleware('permission:direct-supply.update')->name('update-status');
+        Route::post('/allocate/{directSupply}', [DirectSuppliesController::class, 'allocate'])->middleware('permission:direct-supply.allocate')->name('allocate');
     });
 
     // Inventory Management

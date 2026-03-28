@@ -12,6 +12,8 @@ class ProjectMaterialAllocation extends Model
     protected $fillable = [
         'project_id',
         'inventory_item_id',
+        'direct_supply_id',
+        'unit_price',
         'quantity_allocated',
         'quantity_received',
         'quantity_remaining',
@@ -23,8 +25,9 @@ class ProjectMaterialAllocation extends Model
 
     protected $casts = [
         'quantity_allocated' => 'decimal:2',
-        'quantity_received' => 'decimal:2',
-        'allocated_at' => 'datetime',
+        'quantity_received'  => 'decimal:2',
+        'unit_price'         => 'decimal:2',
+        'allocated_at'       => 'datetime',
     ];
 
     public function project()
@@ -35,6 +38,16 @@ class ProjectMaterialAllocation extends Model
     public function inventoryItem()
     {
         return $this->belongsTo(InventoryItem::class);
+    }
+
+    public function directSupply()
+    {
+        return $this->belongsTo(DirectSupply::class);
+    }
+
+    public function isDirectSupply(): bool
+    {
+        return $this->direct_supply_id !== null;
     }
 
     public function allocatedBy()

@@ -16,6 +16,7 @@ use App\Models\ProjectLaborCost;
 use App\Models\User;
 use App\Models\Employee;
 use App\Models\InventoryItem;
+use App\Models\DirectSupply;
 use App\Models\ClientUpdateRequest;
 use App\Traits\ActivityLogsTrait;
 use Illuminate\Http\Request;
@@ -192,17 +193,19 @@ class ProjectsController extends Controller
 
         // AFTER
         $inventoryItems = InventoryItem::where('is_active', true)->orderBy('item_name')->get(['id', 'item_code', 'item_name', 'current_stock', 'unit_of_measure']);
+        $directSupplyItems = DirectSupply::where('is_active', true)->orderBy('supply_name')->get(['id', 'supply_code', 'supply_name', 'unit_of_measure', 'unit_price', 'supplier_name']);
         $statuses       = Project::whereNull('archived_at')->distinct()->whereNotNull('status')->pluck('status')->sort()->values();
         $priorities     = Project::whereNull('archived_at')->distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
 
         return Inertia::render('ProjectManagement/index', [
-            'projects'       => $projects,
-            'search'         => $search,
-            'clients'        => $clients,
-            'users'          => $allAssignables,
-            'inventoryItems' => $inventoryItems,
-            'projectTypes'   => $projectTypes,
-            'clientTypes'    => $clientTypes,
+            'projects'          => $projects,
+            'search'            => $search,
+            'clients'           => $clients,
+            'users'             => $allAssignables,
+            'inventoryItems'    => $inventoryItems,
+            'directSupplyItems' => $directSupplyItems,
+            'projectTypes'      => $projectTypes,
+            'clientTypes'       => $clientTypes,
             'stats'          => $stats,
             'filters'        => [
                 'client_id'       => $clientId,
@@ -342,7 +345,9 @@ class ProjectsController extends Controller
             'milestones.*.billing_percentage'          => ['nullable', 'numeric', 'min:0', 'max:100'],
             'milestones.*.status'                      => ['nullable', 'in:pending,in_progress,completed'],
             'material_allocations'                     => ['nullable', 'array'],
-            'material_allocations.*.inventory_item_id' => ['required', 'exists:inventory_items,id'],
+            'material_allocations.*.inventory_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'material_allocations.*.direct_supply_id'  => ['nullable', 'exists:direct_supplies,id'],
+            'material_allocations.*.unit_price'        => ['nullable', 'numeric', 'min:0'],
             'material_allocations.*.quantity_allocated' => ['required', 'numeric', 'min:0.01'],
             'material_allocations.*.notes'             => ['nullable', 'string'],
             'labor_costs'                              => ['nullable', 'array'],
@@ -431,7 +436,9 @@ class ProjectsController extends Controller
                 foreach ($validated['material_allocations'] as $allocation) {
                     ProjectMaterialAllocation::create([
                         'project_id'         => $project->id,
-                        'inventory_item_id'  => $allocation['inventory_item_id'],
+                        'inventory_item_id'  => $allocation['inventory_item_id'] ?? null,
+                        'direct_supply_id'   => $allocation['direct_supply_id'] ?? null,
+                        'unit_price'         => $allocation['unit_price'] ?? null,
                         'quantity_allocated' => $allocation['quantity_allocated'],
                         'quantity_received'  => 0,
                         'status'             => 'pending',

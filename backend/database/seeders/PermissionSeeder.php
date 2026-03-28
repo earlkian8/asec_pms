@@ -108,6 +108,13 @@ class PermissionSeeder extends Seeder
             'miscellaneous-expenses.update',
             'miscellaneous-expenses.delete',
 
+            // Direct Supply
+            'direct-supply.view',
+            'direct-supply.create',
+            'direct-supply.update',
+            'direct-supply.delete',
+            'direct-supply.allocate',
+
             // Clients
             'clients.view',
             'clients.create',

@@ -51,20 +51,28 @@ class ProjectMaterialAllocationsController extends Controller
 
         $receivingReport = $allocation->receivingReports()->create($data);
 
-        $inventoryItem = $allocation->inventoryItem;
-        InventoryTransaction::create([
-            'inventory_item_id'               => $inventoryItem->id,
-            'transaction_type'                => 'stock_out',
-            'stock_out_type'                  => 'project_use',
-            'quantity'                        => $data['quantity_received'],
-            'project_id'                      => $project->id,
-            'project_material_allocation_id'  => $allocation->id,
-            'notes'                           => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
-            'created_by'                      => auth()->id(),
-            'transaction_date'                => $data['received_at'],
-        ]);
-
-        $this->inventoryService->updateItemStock($inventoryItem);
+        // Only deduct inventory stock for inventory-based allocations
+        if ($allocation->inventory_item_id) {
+            $inventoryItem = $allocation->inventoryItem;
+            InventoryTransaction::create([
+                'inventory_item_id'               => $inventoryItem->id,
+                'transaction_type'                => 'stock_out',
+                'stock_out_type'                  => 'project_use',
+                'quantity'                        => $data['quantity_received'],
+                'project_id'                      => $project->id,
+                'project_material_allocation_id'  => $allocation->id,
+                'notes'                           => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
+                'created_by'                      => auth()->id(),
+                'transaction_date'                => $data['received_at'],
+            ]);
+            $this->inventoryService->updateItemStock($inventoryItem);
+            $itemName = $inventoryItem->item_name;
+            $itemUnit = $inventoryItem->unit_of_measure;
+        } else {
+            $directSupply = $allocation->directSupply;
+            $itemName = $directSupply->supply_name ?? 'Direct Supply';
+            $itemUnit = $directSupply->unit_of_measure ?? 'units';
+        }
 
         $allocation->quantity_received += $data['quantity_received'];
         $allocation->updateStatus();
@@ -72,13 +80,13 @@ class ProjectMaterialAllocationsController extends Controller
         $this->adminActivityLogs(
             'Material Receiving Report',
             'Created',
-            'Created receiving report for "' . $inventoryItem->item_name . '" - ' . $data['quantity_received'] . ' ' . $inventoryItem->unit_of_measure . ' received for project "' . $project->project_name . '"'
+            'Created receiving report for "' . $itemName . '" - ' . $data['quantity_received'] . ' ' . $itemUnit . ' received for project "' . $project->project_name . '"'
         );
 
         $this->createSystemNotification(
             'general',
             'Material Received',
-            "Material '{$inventoryItem->item_name}' ({$data['quantity_received']} {$inventoryItem->unit_of_measure}) has been received for project '{$project->project_name}'.",
+            "Material '{$itemName}' ({$data['quantity_received']} {$itemUnit}) has been received for project '{$project->project_name}'.",
             $project,
             route('project-management.view', $project->id)
         );
@@ -107,48 +115,58 @@ class ProjectMaterialAllocationsController extends Controller
             'received_at' => ['nullable', 'date'],
         ]);
 
-        $inventoryItem       = $allocation->inventoryItem;
-        $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
-            ->where('transaction_type', 'stock_out')
-            ->where('stock_out_type', 'project_use')
-            ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $receivingReport->id . ']%')
-            ->first();
-
         $oldQuantity = $receivingReport->quantity_received;
         $allocation->quantity_received -= $oldQuantity;
 
         $receivingReport->update($data);
 
-        if ($stockOutTransaction) {
-            $stockOutTransaction->update([
-                'quantity'         => $data['quantity_received'],
-                'transaction_date' => $data['received_at'],
-                'notes'            => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
-            ]);
+        if ($allocation->inventory_item_id) {
+            $inventoryItem       = $allocation->inventoryItem;
+            $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
+                ->where('transaction_type', 'stock_out')
+                ->where('stock_out_type', 'project_use')
+                ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $receivingReport->id . ']%')
+                ->first();
+
+            if ($stockOutTransaction) {
+                $stockOutTransaction->update([
+                    'quantity'         => $data['quantity_received'],
+                    'transaction_date' => $data['received_at'],
+                    'notes'            => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
+                ]);
+            } else {
+                InventoryTransaction::create([
+                    'inventory_item_id'              => $inventoryItem->id,
+                    'transaction_type'               => 'stock_out',
+                    'stock_out_type'                 => 'project_use',
+                    'quantity'                       => $data['quantity_received'],
+                    'project_id'                     => $project->id,
+                    'project_material_allocation_id' => $allocation->id,
+                    'notes'                          => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
+                    'created_by'                     => auth()->id(),
+                    'transaction_date'               => $data['received_at'],
+                ]);
+            }
+
+            $allocation->quantity_received += $data['quantity_received'];
+            $allocation->updateStatus();
+            $this->inventoryService->updateItemStock($inventoryItem);
+
+            $this->adminActivityLogs(
+                'Material Receiving Report',
+                'Updated',
+                'Updated receiving report for "' . $inventoryItem->item_name . '" for project "' . $project->project_name . '"'
+            );
         } else {
-            InventoryTransaction::create([
-                'inventory_item_id'              => $inventoryItem->id,
-                'transaction_type'               => 'stock_out',
-                'stock_out_type'                 => 'project_use',
-                'quantity'                       => $data['quantity_received'],
-                'project_id'                     => $project->id,
-                'project_material_allocation_id' => $allocation->id,
-                'notes'                          => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Stock removed via receiving report' . ($data['notes'] ? ' - ' . $data['notes'] : ''),
-                'created_by'                     => auth()->id(),
-                'transaction_date'               => $data['received_at'],
-            ]);
+            $allocation->quantity_received += $data['quantity_received'];
+            $allocation->updateStatus();
+            $supplyName = $allocation->directSupply->supply_name ?? 'Direct Supply';
+            $this->adminActivityLogs(
+                'Material Receiving Report',
+                'Updated',
+                'Updated receiving report for "' . $supplyName . '" for project "' . $project->project_name . '"'
+            );
         }
-
-        $allocation->quantity_received += $data['quantity_received'];
-        $allocation->updateStatus();
-
-        $this->inventoryService->updateItemStock($inventoryItem);
-
-        $this->adminActivityLogs(
-            'Material Receiving Report',
-            'Updated',
-            'Updated receiving report for "' . $inventoryItem->item_name . '" for project "' . $project->project_name . '"'
-        );
 
         return back()->with('success', 'Receiving report updated successfully.');
     }
@@ -156,29 +174,39 @@ class ProjectMaterialAllocationsController extends Controller
     // Delete receiving report
     public function destroyReceivingReport(Project $project, ProjectMaterialAllocation $allocation, MaterialReceivingReport $receivingReport)
     {
-        $inventoryItem       = $allocation->inventoryItem;
-        $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
-            ->where('transaction_type', 'stock_out')
-            ->where('stock_out_type', 'project_use')
-            ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $receivingReport->id . ']%')
-            ->first();
+        if ($allocation->inventory_item_id) {
+            $inventoryItem       = $allocation->inventoryItem;
+            $stockOutTransaction = InventoryTransaction::where('project_material_allocation_id', $allocation->id)
+                ->where('transaction_type', 'stock_out')
+                ->where('stock_out_type', 'project_use')
+                ->where('notes', 'like', '%[RECEIVING_REPORT_ID:' . $receivingReport->id . ']%')
+                ->first();
 
-        if ($stockOutTransaction) {
-            $stockOutTransaction->delete();
+            if ($stockOutTransaction) {
+                $stockOutTransaction->delete();
+            }
+
+            $allocation->quantity_received -= $receivingReport->quantity_received;
+            $allocation->updateStatus();
+            $receivingReport->delete();
+            $this->inventoryService->updateItemStock($inventoryItem);
+
+            $this->adminActivityLogs(
+                'Material Receiving Report',
+                'Deleted',
+                'Deleted receiving report for "' . $inventoryItem->item_name . '" for project "' . $project->project_name . '"'
+            );
+        } else {
+            $allocation->quantity_received -= $receivingReport->quantity_received;
+            $allocation->updateStatus();
+            $receivingReport->delete();
+            $supplyName = $allocation->directSupply->supply_name ?? 'Direct Supply';
+            $this->adminActivityLogs(
+                'Material Receiving Report',
+                'Deleted',
+                'Deleted receiving report for "' . $supplyName . '" for project "' . $project->project_name . '"'
+            );
         }
-
-        $allocation->quantity_received -= $receivingReport->quantity_received;
-        $allocation->updateStatus();
-
-        $receivingReport->delete();
-
-        $this->inventoryService->updateItemStock($inventoryItem);
-
-        $this->adminActivityLogs(
-            'Material Receiving Report',
-            'Deleted',
-            'Deleted receiving report for "' . $inventoryItem->item_name . '" for project "' . $project->project_name . '"'
-        );
 
         return back()->with('success', 'Receiving report deleted successfully.');
     }

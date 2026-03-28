@@ -40,6 +40,7 @@ import DeleteReceivingReport from './delete';
 import DeleteMaterialAllocation from './delete-allocation';
 import ViewMaterialAllocation from './view';
 import BulkReceivingReport from './bulk-receive';
+import { Truck } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -74,6 +75,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
     total_received_cost: 0,
     budget_remaining: 0,
   };
+  const directSupplyItems = materialAllocationData?.directSupplyItems || [];
 
   // Only allocations that still have remaining qty can be bulk-received
   const receivableAllocations = allocations.filter(a => {
@@ -473,6 +475,11 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
             {allocations.length > 0 ? (
               allocations.map((allocation, index) => {
                 const item      = allocation.inventory_item || allocation.inventoryItem || {};
+                const ds        = allocation.direct_supply || allocation.directSupply || null;
+                const isDs      = !!allocation.direct_supply_id;
+                const displayName = isDs ? (ds?.supply_name || 'Direct Supply') : (item.item_name || 'Unknown');
+                const displayCode = isDs ? (ds?.supply_code || '---') : (item.item_code || '---');
+                const displayUnit = isDs ? (ds?.unit_of_measure || 'units') : (item.unit_of_measure || 'units');
                 const remaining = (allocation.quantity_allocated || 0) - (allocation.quantity_received || 0);
                 const progress  = calculateProgress(allocation);
                 const isSelected = selectedIds.includes(allocation.id);
@@ -497,20 +504,28 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                     </TableCell>
 
                     <TableCell className="px-4 py-4 text-sm font-medium text-gray-900">
-                      {item.item_name || 'Unknown'}
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${
+                          isDs ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {isDs ? <Truck size={10} /> : <Package size={10} />}
+                          {isDs ? 'Direct' : 'Inv'}
+                        </span>
+                        {displayName}
+                      </div>
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm text-gray-700">
-                      {item.item_code || '---'}
+                      {displayCode}
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm font-bold text-gray-900">
-                      {allocation.quantity_allocated} <span className="font-normal text-gray-500 text-xs">{item.unit_of_measure || 'units'}</span>
+                      {allocation.quantity_allocated} <span className="font-normal text-gray-500 text-xs">{displayUnit}</span>
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm text-gray-700">
-                      {allocation.quantity_received || 0} <span className="text-gray-500 text-xs">{item.unit_of_measure || 'units'}</span>
+                      {allocation.quantity_received || 0} <span className="text-gray-500 text-xs">{displayUnit}</span>
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm text-gray-700">
                       <span className={remaining === 0 ? 'text-green-600 font-medium' : ''}>
-                        {remaining} <span className="text-gray-500 text-xs">{item.unit_of_measure || 'units'}</span>
+                        {remaining} <span className="text-gray-500 text-xs">{displayUnit}</span>
                       </span>
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm">

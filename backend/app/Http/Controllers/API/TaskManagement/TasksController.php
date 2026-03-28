@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\TaskManagement;
 
 use App\Http\Controllers\Controller;
+use App\Models\Notification;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Services\TaskManagementAuthorization;
@@ -118,6 +119,18 @@ class TasksController extends Controller
         $task->load('assignedUser');
         $this->syncMilestoneStatus($milestone);
 
+        // Notify the assigned user (new task)
+        if ($task->assigned_to && $milestone->project) {
+            Notification::create([
+                'user_id'    => $task->assigned_to,
+                'project_id' => $milestone->project->id,
+                'type'       => 'task',
+                'title'      => 'New Task Assigned',
+                'message'    => "You have been assigned to task '{$task->title}' in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
+                'read'       => false,
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Task created successfully',
@@ -162,6 +175,8 @@ class TasksController extends Controller
             $request->merge(['assigned_to' => null]);
         }
 
+        $oldAssignedTo = $task->assigned_to;
+
         $data = $request->validate([
             'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -192,6 +207,18 @@ class TasksController extends Controller
 
         $task->load('assignedUser');
         $this->syncMilestoneStatus($milestone);
+
+        // Notify newly assigned user (assignment change)
+        if (isset($data['assigned_to']) && $data['assigned_to'] && $data['assigned_to'] !== $oldAssignedTo && $milestone->project) {
+            Notification::create([
+                'user_id'    => $data['assigned_to'],
+                'project_id' => $milestone->project->id,
+                'type'       => 'task',
+                'title'      => 'Task Assigned to You',
+                'message'    => "You have been assigned to task '{$task->title}' in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",
+                'read'       => false,
+            ]);
+        }
 
         return response()->json([
             'success' => true,

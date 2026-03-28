@@ -17,6 +17,7 @@ use App\Http\Controllers\API\TaskManagement\MilestonesController as TaskManageme
 use App\Http\Controllers\API\TaskManagement\TasksController as TaskManagementTasksController;
 use App\Http\Controllers\API\TaskManagement\TeamController as TaskManagementTeamController;
 use App\Http\Controllers\API\TaskManagement\PermissionDelegationController as TaskManagementPermissionDelegationController;
+use App\Http\Controllers\API\TaskManagement\NotificationController as TaskManagementNotificationController;
 use App\Http\Controllers\API\TaskManagement\MaterialAllocationsController as TaskManagementMaterialAllocationsController;
 
 // PayMongo webhook (public - verify signature in production)
@@ -170,11 +171,21 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::delete('/projects/{project}/team/{projectTeam}', [TaskManagementTeamController::class, 'release'])->middleware('permission:tm.team.release');
     Route::delete('/projects/{project}/team/{projectTeam}/force-remove', [TaskManagementTeamController::class, 'forceRemove'])->middleware('permission:tm.team.force-remove');
 
-    // Permission delegation (Engineer TM can grant/revoke TM access to other users)
-    Route::get('/permissions/granted-users', [TaskManagementPermissionDelegationController::class, 'grantedUsers']);
-    Route::get('/permissions/eligible-users', [TaskManagementPermissionDelegationController::class, 'eligibleUsers']);
-    Route::post('/permissions/grant', [TaskManagementPermissionDelegationController::class, 'grant']);
-    Route::post('/permissions/revoke', [TaskManagementPermissionDelegationController::class, 'revoke']);
+    // Permission delegation — only non-delegated users (original authority) may delegate
+    // Fix #1 + #7: route-level guard using tm.permissions.delegate
+    Route::middleware('permission:tm.permissions.delegate')->group(function () {
+        Route::get('/permissions/granted-users', [TaskManagementPermissionDelegationController::class, 'grantedUsers']);
+        Route::get('/permissions/eligible-users', [TaskManagementPermissionDelegationController::class, 'eligibleUsers']);
+        Route::post('/permissions/grant', [TaskManagementPermissionDelegationController::class, 'grant']);
+        Route::post('/permissions/update-modules', [TaskManagementPermissionDelegationController::class, 'updateModules']);
+        Route::post('/permissions/revoke', [TaskManagementPermissionDelegationController::class, 'revoke']);
+    });
+
+    // Notifications
+    Route::get('/notifications', [TaskManagementNotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [TaskManagementNotificationController::class, 'unreadCount']);
+    Route::put('/notifications/{id}/read', [TaskManagementNotificationController::class, 'markAsRead']);
+    Route::put('/notifications/read-all', [TaskManagementNotificationController::class, 'markAllAsRead']);
 
     // Material allocations (project-scoped)
     Route::get('/projects/{project}/material-allocations', [TaskManagementMaterialAllocationsController::class, 'index'])->middleware('permission:tm.projects.view-assigned');

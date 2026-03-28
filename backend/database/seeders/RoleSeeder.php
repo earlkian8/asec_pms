@@ -173,6 +173,9 @@ class RoleSeeder extends Seeder
 
             // Material receiving reports
             'material-allocations.receiving-report',
+
+            // Permission delegation — only original Engineer (TM) users may delegate
+            'tm.permissions.delegate',
         ]);
 
         $this->command->info('Roles seeded successfully!');

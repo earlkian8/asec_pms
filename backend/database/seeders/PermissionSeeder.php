@@ -28,6 +28,7 @@ class PermissionSeeder extends Seeder
             'tm.issues.update-own',
             'tm.issues.delete-own',
             'tm.files.download',
+            'tm.permissions.delegate',
 
             // Engineer / higher-level project management (project-scoped in API)
             'tm.projects.view-assigned',

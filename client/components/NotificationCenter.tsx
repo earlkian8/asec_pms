@@ -29,7 +29,6 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
   // Refresh notifications when modal opens
   useEffect(() => {
     if (visible) {
-      console.log('NotificationCenter opened, refreshing notifications...');
       refreshNotifications();
       // Slide in from right (going to the left)
       Animated.timing(slideAnim, {
@@ -46,10 +45,6 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
       }).start();
     }
   }, [visible, refreshNotifications, slideAnim]);
-
-  useEffect(() => {
-    console.log('Notifications updated:', notifications.length);
-  }, [notifications]);
 
   const backgroundColor = '#FFFFFF';
   const textColor = '#111827';

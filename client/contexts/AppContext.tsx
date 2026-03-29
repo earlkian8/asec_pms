@@ -43,13 +43,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingNotifications(true);
       const response = await apiService.get<Notification[]>('/client/notifications');
 
-      console.log('Notifications API Response:', response);
-
       if (response.success && response.data) {
-        console.log('Setting notifications:', response.data.length);
         setNotifications(response.data);
       } else {
-        console.log('No notifications data or unsuccessful response');
         setNotifications([]);
       }
     } catch (error) {

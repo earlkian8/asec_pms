@@ -66,6 +66,7 @@ class PermissionSeeder extends Seeder
 
             // Project Milestones
             'project-milestones.view',
+            'project-milestones.view-detail',
             'project-milestones.create',
             'project-milestones.update',
             'project-milestones.delete',

@@ -28,8 +28,9 @@ class MilestoneMaterialUsagesController extends Controller
         // Guard: cannot use more than available (received - already used across all milestones)
         $totalUsed = $allocation->milestoneUsages()->sum('quantity_used');
         $available = (float) $allocation->quantity_received - (float) $totalUsed;
+        $unit = $allocation->inventoryItem?->unit_of_measure ?? $allocation->directSupply?->unit_of_measure ?? 'units';
         if ((float) $data['quantity_used'] > $available) {
-            return back()->withErrors(['quantity_used' => "Cannot use more than available stock ({$available} {$allocation->inventoryItem?->unit_of_measure ?? $allocation->directSupply?->unit_of_measure ?? 'units'})."]);
+            return back()->withErrors(['quantity_used' => "Cannot use more than available stock ({$available} {$unit})."]);
         }
 
         $data['project_milestone_id'] = $milestone->id;
@@ -59,14 +60,13 @@ class MilestoneMaterialUsagesController extends Controller
             'notes'                          => ['nullable', 'string'],
         ]);
 
-        $milestone->project->materialAllocations()->findOrFail($data['project_material_allocation_id']);
-
         // Guard: exclude this usage's own qty when checking available
         $allocation  = $milestone->project->materialAllocations()->findOrFail($data['project_material_allocation_id']);
         $totalUsed   = $allocation->milestoneUsages()->where('id', '!=', $usage->id)->sum('quantity_used');
         $available   = (float) $allocation->quantity_received - (float) $totalUsed;
+        $unit        = $allocation->inventoryItem?->unit_of_measure ?? $allocation->directSupply?->unit_of_measure ?? 'units';
         if ((float) $data['quantity_used'] > $available) {
-            return back()->withErrors(['quantity_used' => "Cannot use more than available stock ({$available} {$allocation->inventoryItem?->unit_of_measure ?? $allocation->directSupply?->unit_of_measure ?? 'units'})."]);
+            return back()->withErrors(['quantity_used' => "Cannot use more than available stock ({$available} {$unit})."]);
         }
 
         $usage->update($data);

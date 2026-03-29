@@ -103,20 +103,22 @@ class TeamController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(fn (ProjectTeam $t) => [
-                'id' => $t->id,
-                'projectId' => $t->project_id,
-                'assignableType' => $t->assignable_type,
-                'userId' => $t->user_id,
-                'employeeId' => $t->employee_id,
-                'name' => $t->assignable_name,
-                'role' => $t->role,
-                'hourlyRate' => $t->hourly_rate,
-                'startDate' => $t->start_date,
-                'endDate' => $t->end_date,
-                'isActive' => (bool) $t->is_active,
+                'id'               => $t->id,
+                'projectId'        => $t->project_id,
+                'assignableType'   => $t->assignable_type,
+                'userId'           => $t->user_id,
+                'employeeId'       => $t->employee_id,
+                'name'             => $t->assignable_name,
+                'role'             => $t->role,
+                'payType'          => $t->pay_type ?? 'hourly',
+                'hourlyRate'       => $t->hourly_rate,
+                'monthlySalary'    => $t->monthly_salary,
+                'startDate'        => $t->start_date,
+                'endDate'          => $t->end_date,
+                'isActive'         => (bool) $t->is_active,
                 'assignmentStatus' => $t->assignment_status?->value ?? $t->assignment_status,
-                'createdAt' => $t->created_at?->toISOString(),
-                'updatedAt' => $t->updated_at?->toISOString(),
+                'createdAt'        => $t->created_at?->toISOString(),
+                'updatedAt'        => $t->updated_at?->toISOString(),
             ])
             ->values();
 
@@ -142,13 +144,15 @@ class TeamController extends Controller
         }
 
         $validated = $request->validate([
-            'assignables'               => ['required', 'array', 'min:1'],
-            'assignables.*.id'          => ['required'],
-            'assignables.*.type'        => ['required', 'in:user,employee'],
-            'assignables.*.role'        => ['required', 'string', 'max:50'],
-            'assignables.*.hourly_rate' => ['required', 'numeric', 'min:0'],
-            'assignables.*.start_date'  => ['required', 'date'],
-            'assignables.*.end_date'    => ['required', 'date', 'after_or_equal:assignables.*.start_date'],
+            'assignables'                  => ['required', 'array', 'min:1'],
+            'assignables.*.id'             => ['required'],
+            'assignables.*.type'           => ['required', 'in:user,employee'],
+            'assignables.*.role'           => ['required', 'string', 'max:50'],
+            'assignables.*.pay_type'       => ['required', 'in:hourly,salary,fixed'],
+            'assignables.*.hourly_rate'    => ['nullable', 'numeric', 'min:0'],
+            'assignables.*.monthly_salary' => ['nullable', 'numeric', 'min:0'],
+            'assignables.*.start_date'     => ['required', 'date'],
+            'assignables.*.end_date'       => ['required', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
 
         // Validate IDs
@@ -230,17 +234,19 @@ class TeamController extends Controller
             }
 
             $teamMember = ProjectTeam::create([
-                'project_id' => $project->id,
-                'user_id' => $assignable['type'] === 'user' ? (int) $assignable['id'] : null,
-                'employee_id' => $assignable['type'] === 'employee' ? (int) $assignable['id'] : null,
+                'project_id'      => $project->id,
+                'user_id'         => $assignable['type'] === 'user' ? (int) $assignable['id'] : null,
+                'employee_id'     => $assignable['type'] === 'employee' ? (int) $assignable['id'] : null,
                 'assignable_type' => $assignable['type'],
-                'role' => $assignable['role'],
-                'hourly_rate' => $assignable['hourly_rate'],
-                'start_date' => $assignable['start_date'],
-                'end_date' => $assignable['end_date'] ?? null,
-                'is_active' => true,
+                'role'            => $assignable['role'],
+                'pay_type'        => $assignable['pay_type']       ?? 'hourly',
+                'hourly_rate'     => $assignable['hourly_rate']    ?? null,
+                'monthly_salary'  => $assignable['monthly_salary'] ?? null,
+                'start_date'      => $assignable['start_date'],
+                'end_date'        => $assignable['end_date'] ?? null,
+                'is_active'       => true,
                 'assignment_status' => AssignmentStatus::Active->value,
-                'created_by' => $user->id,
+                'created_by'      => $user->id,
             ]);
 
             $created[] = $teamMember->id;
@@ -284,10 +290,12 @@ class TeamController extends Controller
         }
 
         $validated = $request->validate([
-            'role' => ['required', 'string', 'max:50'],
-            'hourly_rate' => ['required', 'numeric', 'min:0'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'role'           => ['required', 'string', 'max:50'],
+            'pay_type'       => ['required', 'in:hourly,salary,fixed'],
+            'hourly_rate'    => ['nullable', 'numeric', 'min:0'],
+            'monthly_salary' => ['nullable', 'numeric', 'min:0'],
+            'start_date'     => ['required', 'date'],
+            'end_date'       => ['required', 'date', 'after_or_equal:start_date'],
         ]);
 
         // Validate assignment dates against project dates
@@ -336,10 +344,12 @@ class TeamController extends Controller
         }
 
         $projectTeam->update([
-            'role' => $validated['role'],
-            'hourly_rate' => $validated['hourly_rate'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
+            'role'           => $validated['role'],
+            'pay_type'       => $validated['pay_type'],
+            'hourly_rate'    => $validated['hourly_rate']    ?? null,
+            'monthly_salary' => $validated['monthly_salary'] ?? null,
+            'start_date'     => $validated['start_date'],
+            'end_date'       => $validated['end_date'],
         ]);
 
         $projectTeam->refresh();
@@ -348,11 +358,13 @@ class TeamController extends Controller
             'success' => true,
             'message' => 'Team member updated successfully',
             'data' => [
-                'id' => $projectTeam->id,
-                'role' => $projectTeam->role,
-                'hourlyRate' => $projectTeam->hourly_rate,
-                'startDate' => $projectTeam->start_date,
-                'endDate' => $projectTeam->end_date,
+                'id'            => $projectTeam->id,
+                'role'          => $projectTeam->role,
+                'payType'       => $projectTeam->pay_type,
+                'hourlyRate'    => $projectTeam->hourly_rate,
+                'monthlySalary' => $projectTeam->monthly_salary,
+                'startDate'     => $projectTeam->start_date,
+                'endDate'       => $projectTeam->end_date,
             ],
         ]);
     }

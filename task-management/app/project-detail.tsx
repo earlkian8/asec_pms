@@ -55,7 +55,9 @@ type TeamMember = {
   role: string;
   assignableType?: 'user' | 'employee' | string;
   assignmentStatus?: string;
+  payType?: 'hourly' | 'salary' | 'fixed' | string;
   hourlyRate?: number | string | null;
+  monthlySalary?: number | string | null;
   startDate?: string | null;
   endDate?: string | null;
 };
@@ -194,13 +196,15 @@ export default function ProjectDetailScreen() {
   const [assignablesLoading, setAssignablesLoading] = useState(false);
   const [assignablesSearch, setAssignablesSearch] = useState('');
   const [selectedAssignables, setSelectedAssignables] = useState<string[]>([]);
-  const [assignFormData, setAssignFormData] = useState<Record<string, { role: string; hourly_rate: string; start_date: string; end_date: string }>>({});
+  const [assignFormData, setAssignFormData] = useState<Record<string, { role: string; pay_type: string; hourly_rate: string; monthly_salary: string; start_date: string; end_date: string }>>({});
 
   // Team edit modal
   const [teamEditOpen, setTeamEditOpen] = useState(false);
   const [editingTeamMember, setEditingTeamMember] = useState<TeamMember | null>(null);
   const [teRole, setTeRole] = useState('');
+  const [tePayType, setTePayType] = useState<'hourly' | 'salary' | 'fixed'>('hourly');
   const [teHourlyRate, setTeHourlyRate] = useState('');
+  const [teMonthlySalary, setTeMonthlySalary] = useState('');
   const [teStartDate, setTeStartDate] = useState('');
   const [teEndDate, setTeEndDate] = useState('');
 
@@ -429,7 +433,9 @@ export default function ProjectDetailScreen() {
   const openEditTeamMember = (m: TeamMember) => {
     setEditingTeamMember(m);
     setTeRole(m.role || '');
+    setTePayType((m.payType as any) || 'hourly');
     setTeHourlyRate(m.hourlyRate !== null && m.hourlyRate !== undefined ? String(m.hourlyRate) : '');
+    setTeMonthlySalary(m.monthlySalary !== null && m.monthlySalary !== undefined ? String(m.monthlySalary) : '');
     setTeStartDate(m.startDate || '');
     setTeEndDate(m.endDate || '');
     setTeamEditOpen(true);
@@ -437,11 +443,15 @@ export default function ProjectDetailScreen() {
 
   const submitTeamEdit = async () => {
     if (!editingTeamMember) return;
-    if (!teRole.trim() || !teHourlyRate.trim() || !teStartDate.trim() || !teEndDate.trim()) return;
+    if (!teRole.trim() || !teStartDate.trim() || !teEndDate.trim()) return;
+    if (tePayType === 'hourly' && !teHourlyRate.trim()) return;
+    if (tePayType === 'salary' && !teMonthlySalary.trim()) return;
 
     await apiService.put(`/task-management/projects/${projectId}/team/${editingTeamMember.id}`, {
       role: teRole.trim(),
-      hourly_rate: Number(teHourlyRate.trim()),
+      pay_type: tePayType,
+      hourly_rate: tePayType === 'hourly' ? Number(teHourlyRate.trim()) : null,
+      monthly_salary: tePayType === 'salary' ? Number(teMonthlySalary.trim()) : null,
       start_date: teStartDate.trim(),
       end_date: teEndDate.trim(),
     });
@@ -479,12 +489,14 @@ export default function ProjectDetailScreen() {
     setSelectedAssignables((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const setAssignField = (id: string, field: 'role' | 'hourly_rate' | 'start_date' | 'end_date', value: string) => {
+  const setAssignField = (id: string, field: 'role' | 'pay_type' | 'hourly_rate' | 'monthly_salary' | 'start_date' | 'end_date', value: string) => {
     setAssignFormData((prev) => ({
       ...prev,
       [id]: {
         role: prev[id]?.role ?? '',
+        pay_type: prev[id]?.pay_type ?? 'hourly',
         hourly_rate: prev[id]?.hourly_rate ?? '',
+        monthly_salary: prev[id]?.monthly_salary ?? '',
         start_date: prev[id]?.start_date ?? '',
         end_date: prev[id]?.end_date ?? '',
         [field]: value,
@@ -518,12 +530,17 @@ export default function ProjectDetailScreen() {
         const [type, rawId] = cid.split('-');
         const id = Number(rawId);
         const def = assignFormData[cid];
-        if (!id || !def?.start_date || !def?.end_date || !def?.hourly_rate) return null;
+        const payType = def?.pay_type || 'hourly';
+        if (!id || !def?.start_date || !def?.end_date) return null;
+        if (payType === 'hourly' && !def?.hourly_rate) return null;
+        if (payType === 'salary' && !def?.monthly_salary) return null;
         return {
           id,
           type,
           role: def.role?.trim() || '',
-          hourly_rate: Number(def.hourly_rate),
+          pay_type: payType,
+          hourly_rate: payType === 'hourly' ? Number(def.hourly_rate) : null,
+          monthly_salary: payType === 'salary' ? Number(def.monthly_salary) : null,
           start_date: def.start_date,
           end_date: def.end_date,
         };
@@ -718,9 +735,13 @@ export default function ProjectDetailScreen() {
                             <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: as.c}} />
                             <Text style={[styles.infoPillText, {color: as.c}]}>{as.label}</Text>
                           </View>
-                          {m.hourlyRate && (
+                          {m.payType === 'salary' && m.monthlySalary ? (
+                            <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>₱{m.monthlySalary}/mo</Text>
+                          ) : m.payType === 'fixed' ? (
+                            <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>Fixed</Text>
+                          ) : m.hourlyRate ? (
                             <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>₱{m.hourlyRate}/hr</Text>
-                          )}
+                          ) : null}
                         </View>
                       </View>
 
@@ -1096,15 +1117,52 @@ export default function ProjectDetailScreen() {
                         value={assignFormData[cid]?.role ?? ''}
                         onChangeText={(v) => setAssignField(cid, 'role', v)}
                       />
-                      <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="e.g. 150.00"
-                        placeholderTextColor={D.inkLight}
-                        value={assignFormData[cid]?.hourly_rate ?? ''}
-                        onChangeText={(v) => setAssignField(cid, 'hourly_rate', v)}
-                        keyboardType="decimal-pad"
-                      />
+                      <Text style={styles.fieldLabel}>Pay Type <Text style={{ color: D.red }}>*</Text></Text>
+                      <View style={[styles.segmentRow, { marginBottom: 10 }]}>
+                        {(['hourly', 'salary', 'fixed'] as const).map((pt) => (
+                          <TouchableOpacity
+                            key={pt}
+                            style={[styles.segmentBtn, (assignFormData[cid]?.pay_type || 'hourly') === pt && styles.segmentBtnActive]}
+                            onPress={() => setAssignField(cid, 'pay_type', pt)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.segmentBtnText, (assignFormData[cid]?.pay_type || 'hourly') === pt && styles.segmentBtnTextActive]}>
+                              {pt.charAt(0).toUpperCase() + pt.slice(1)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      {(assignFormData[cid]?.pay_type || 'hourly') === 'hourly' && (
+                        <>
+                          <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="e.g. 150.00"
+                            placeholderTextColor={D.inkLight}
+                            value={assignFormData[cid]?.hourly_rate ?? ''}
+                            onChangeText={(v) => setAssignField(cid, 'hourly_rate', v)}
+                            keyboardType="decimal-pad"
+                          />
+                        </>
+                      )}
+                      {assignFormData[cid]?.pay_type === 'salary' && (
+                        <>
+                          <Text style={styles.fieldLabel}>Monthly Salary (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="e.g. 20000.00"
+                            placeholderTextColor={D.inkLight}
+                            value={assignFormData[cid]?.monthly_salary ?? ''}
+                            onChangeText={(v) => setAssignField(cid, 'monthly_salary', v)}
+                            keyboardType="decimal-pad"
+                          />
+                        </>
+                      )}
+                      {assignFormData[cid]?.pay_type === 'fixed' && (
+                        <Text style={[styles.fieldLabel, { color: D.inkLight, fontStyle: 'italic', marginBottom: 10 }]}>
+                          Fixed pay — gross amount entered per payroll period.
+                        </Text>
+                      )}
                       <DatePickerField
                         label="Start Date *"
                         value={assignFormData[cid]?.start_date ?? ''}
@@ -1153,15 +1211,52 @@ export default function ProjectDetailScreen() {
               value={teRole}
               onChangeText={setTeRole}
             />
-            <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 150.00"
-              placeholderTextColor={D.inkLight}
-              value={teHourlyRate}
-              onChangeText={setTeHourlyRate}
-              keyboardType="decimal-pad"
-            />
+            <Text style={styles.fieldLabel}>Pay Type <Text style={{ color: D.red }}>*</Text></Text>
+            <View style={[styles.segmentRow, { marginBottom: 10 }]}>
+              {(['hourly', 'salary', 'fixed'] as const).map((pt) => (
+                <TouchableOpacity
+                  key={pt}
+                  style={[styles.segmentBtn, tePayType === pt && styles.segmentBtnActive]}
+                  onPress={() => setTePayType(pt)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.segmentBtnText, tePayType === pt && styles.segmentBtnTextActive]}>
+                    {pt.charAt(0).toUpperCase() + pt.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {tePayType === 'hourly' && (
+              <>
+                <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 150.00"
+                  placeholderTextColor={D.inkLight}
+                  value={teHourlyRate}
+                  onChangeText={setTeHourlyRate}
+                  keyboardType="decimal-pad"
+                />
+              </>
+            )}
+            {tePayType === 'salary' && (
+              <>
+                <Text style={styles.fieldLabel}>Monthly Salary (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 20000.00"
+                  placeholderTextColor={D.inkLight}
+                  value={teMonthlySalary}
+                  onChangeText={setTeMonthlySalary}
+                  keyboardType="decimal-pad"
+                />
+              </>
+            )}
+            {tePayType === 'fixed' && (
+              <Text style={[styles.fieldLabel, { color: D.inkLight, fontStyle: 'italic', marginBottom: 10 }]}>
+                Fixed pay — gross amount entered per payroll period.
+              </Text>
+            )}
             <DatePickerField
               label="Start Date *"
               value={teStartDate}
@@ -1420,6 +1515,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   assignFormTitle: { fontSize: 12, fontWeight: '900', color: D.ink, marginBottom: 8 },
+
+  segmentRow: { flexDirection: 'row', borderWidth: 1, borderColor: D.hairline, borderRadius: 10, overflow: 'hidden' },
+  segmentBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: D.chalk },
+  segmentBtnActive: { backgroundColor: D.ink },
+  segmentBtnText: { fontSize: 11, fontWeight: '800', color: D.inkMid },
+  segmentBtnTextActive: { color: '#fff' },
 
   dateBtn: {
     borderWidth: 1,

@@ -36,12 +36,19 @@ class MaterialAllocationService
                 'allocatedBy',
                 'receivingReports' => function ($query) {
                     $query->with('receivedBy')->orderBy('received_at', 'desc');
-                }
+                },
+                'milestoneUsages',
             ])
             ->withCount('receivingReports')
             ->orderBy('allocated_at', 'desc')
             ->paginate(10)
             ->withQueryString();
+
+        // Append total_used from milestone usages
+        $allocations->getCollection()->transform(function ($a) {
+            $a->total_used = (float) $a->milestoneUsages->sum('quantity_used');
+            return $a;
+        });
 
         // Budget summary — computed from ALL allocations (not just current page)
         $allAllocations = ProjectMaterialAllocation::where('project_id', $project->id)

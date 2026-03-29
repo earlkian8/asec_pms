@@ -454,14 +454,16 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
               </TableHead>
 
               {[
-                { label: 'Item',      w: '20%' },
-                { label: 'Code',      w: '10%' },
-                { label: 'Allocated', w: '12%' },
-                { label: 'Received',  w: '12%' },
-                { label: 'Remaining', w: '11%' },
-                { label: 'Status',    w: '10%' },
-                { label: 'Progress',  w: '10%' },
-                { label: 'Actions',   w: '11%' },
+                { label: 'Item',      w: '18%' },
+                { label: 'Code',      w: '9%' },
+                { label: 'Allocated', w: '10%' },
+                { label: 'Received',  w: '10%' },
+                { label: 'Remaining', w: '9%' },
+                { label: 'Used',      w: '9%' },
+                { label: 'Available', w: '9%' },
+                { label: 'Status',    w: '9%' },
+                { label: 'Progress',  w: '9%' },
+                { label: 'Actions',   w: '8%' },
               ].map((col) => (
                 <TableHead key={col.label}
                   className="text-left font-bold px-4 py-4 text-xs sm:text-sm text-gray-700 uppercase tracking-wider"
@@ -528,6 +530,27 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                         {remaining} <span className="text-gray-500 text-xs">{displayUnit}</span>
                       </span>
                     </TableCell>
+                    <TableCell className="px-4 py-4 text-sm text-gray-700">
+                      {(() => {
+                        const used = allocation.total_used ?? 0;
+                        return <span>{used} <span className="text-gray-500 text-xs">{displayUnit}</span></span>;
+                      })()}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-sm">
+                      {(() => {
+                        const used = allocation.total_used ?? 0;
+                        const available = Math.max(0, (allocation.quantity_received || 0) - used);
+                        const pct = allocation.quantity_received > 0 ? available / allocation.quantity_received : 1;
+                        return (
+                          <span className={`font-medium ${
+                            available === 0 ? 'text-red-500' :
+                            pct <= 0.2     ? 'text-amber-600' : 'text-green-600'
+                          }`}>
+                            {available} <span className="text-gray-500 text-xs font-normal">{displayUnit}</span>
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell className="px-4 py-4 text-sm">
                       {getStatusBadge(allocation.status)}
                     </TableCell>
@@ -581,7 +604,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12">
+                <TableCell colSpan={11} className="text-center py-12">
                   <div className="flex flex-col items-center justify-center">
                     <div className="bg-gray-100 rounded-full p-4 mb-3">
                       <Search className="h-8 w-8 text-gray-400" />

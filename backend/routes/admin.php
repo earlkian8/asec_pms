@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\ClientTypesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
+use App\Http\Controllers\Admin\MilestoneMaterialUsagesController;
 use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
@@ -96,6 +97,10 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'update'])->middleware('permission:project-milestones.update')->name('update');
             Route::delete('/destroy/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'destroy'])->middleware('permission:project-milestones.delete')->name('destroy');
             Route::get('/export-pdf/{project}', [ProjectMilestonesController::class, 'exportPdf'])->middleware('permission:project-milestones.view')->name('export-pdf');
+            // Milestone Material Usages
+            Route::post('/material-usage/{project}/milestone/{milestone}', [MilestoneMaterialUsagesController::class, 'store'])->middleware('permission:milestone-material-usage.create')->name('material-usage.store');
+            Route::put('/material-usage/{project}/milestone/{milestone}/usage/{usage}', [MilestoneMaterialUsagesController::class, 'update'])->middleware('permission:milestone-material-usage.update')->name('material-usage.update');
+            Route::delete('/material-usage/{project}/milestone/{milestone}/usage/{usage}', [MilestoneMaterialUsagesController::class, 'destroy'])->middleware('permission:milestone-material-usage.delete')->name('material-usage.destroy');
         });
 
         // Project Tasks

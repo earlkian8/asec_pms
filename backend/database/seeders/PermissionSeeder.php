@@ -70,6 +70,12 @@ class PermissionSeeder extends Seeder
             'project-milestones.update',
             'project-milestones.delete',
 
+            // Milestone Material Usage
+            'milestone-material-usage.view',
+            'milestone-material-usage.create',
+            'milestone-material-usage.update',
+            'milestone-material-usage.delete',
+
             // Project Tasks
             'project-tasks.view',
             'project-tasks.create',

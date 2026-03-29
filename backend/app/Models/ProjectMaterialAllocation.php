@@ -65,6 +65,11 @@ class ProjectMaterialAllocation extends Model
         return $this->hasMany(InventoryTransaction::class);
     }
 
+    public function milestoneUsages()
+    {
+        return $this->hasMany(MilestoneMaterialUsage::class, 'project_material_allocation_id');
+    }
+
     // Auto-calculate quantity_remaining before saving
     protected static function boot()
     {

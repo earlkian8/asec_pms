@@ -40,11 +40,13 @@ import {
   AlertTriangle,
   Bell,
   Activity,
+  Boxes,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddMilestone from './add';
 import EditMilestone from './edit';
 import DeleteMilestone from './delete';
+import MilestoneMaterialUsage from './MilestoneMaterialUsage';
 import AddTask from '../Tasks/add';
 import EditTask from '../Tasks/edit';
 import DeleteTask from '../Tasks/delete';
@@ -189,6 +191,9 @@ export default function MilestonesTab({ project, milestoneData }) {
   
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState(null);
+
+  const [showMaterialUsageModal, setShowMaterialUsageModal] = useState(false);
+  const [materialUsageMilestone, setMaterialUsageMilestone] = useState(null);
   
   const [isExporting, setIsExporting] = useState(false);
   
@@ -207,6 +212,7 @@ export default function MilestonesTab({ project, milestoneData }) {
   const issues = milestoneData.issues || [];
   const filters = milestoneData?.filters || {};
   const filterOptions = milestoneData?.filterOptions || {};
+  const projectAllocations = milestoneData?.projectAllocations || [];
 
   const initializeFilters = (fp) => ({
     status:     fp?.status     || 'all',
@@ -710,6 +716,9 @@ const areAllTasksCompleted = (milestone) => {
                           {has('project-tasks.create') && (
                             <button onClick={() => { setSelectedMilestoneForTask(milestone); setShowAddTaskModal(true); }} className="p-1.5 rounded hover:bg-blue-100 text-blue-600 transition" title="Add Task"><Plus size={18} /></button>
                           )}
+                          {has('milestone-material-usage.view') && (
+                            <button onClick={() => { setMaterialUsageMilestone(milestone); setShowMaterialUsageModal(true); }} className="p-1.5 rounded hover:bg-emerald-100 text-emerald-600 transition" title="Material Usage"><Boxes size={18} /></button>
+                          )}
                           {has('project-milestones.update') && (
                             <button onClick={() => { setEditMilestone(milestone); setShowEditModal(true); }} className="p-1.5 rounded hover:bg-blue-100 text-blue-600 transition" title="Edit Milestone"><SquarePen size={18} /></button>
                           )}
@@ -943,6 +952,14 @@ const areAllTasksCompleted = (milestone) => {
               }
             });
           }}
+        />
+      )}
+      {showMaterialUsageModal && materialUsageMilestone && (
+        <MilestoneMaterialUsage
+          milestone={materialUsageMilestone}
+          project={project}
+          projectAllocations={projectAllocations}
+          onClose={() => { setShowMaterialUsageModal(false); setMaterialUsageMilestone(null); }}
         />
       )}
     </div>

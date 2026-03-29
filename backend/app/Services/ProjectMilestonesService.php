@@ -8,6 +8,7 @@ use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
 use App\Models\ClientUpdateRequest;
+use App\Models\ProjectMaterialAllocation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
@@ -64,6 +65,13 @@ class ProjectMilestonesService
                 },
                 'issues' => function ($q) {
                     $q->with(['reportedBy', 'assignedTo', 'task'])->orderBy('created_at', 'desc');
+                },
+                'materialUsages' => function ($q) {
+                    $q->with([
+                        'allocation.inventoryItem',
+                        'allocation.directSupply',
+                        'recordedBy',
+                    ])->orderBy('created_at', 'desc');
                 },
             ])
             ->orderBy($sortBy, $sortOrder)
@@ -149,11 +157,26 @@ class ProjectMilestonesService
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $projectAllocations = ProjectMaterialAllocation::where('project_id', $project->id)
+            ->with(['inventoryItem', 'directSupply', 'milestoneUsages'])
+            ->get()
+            ->map(fn ($a) => [
+                'id'            => $a->id,
+                'name'          => $a->inventoryItem?->item_name ?? $a->directSupply?->supply_name ?? 'Unknown',
+                'code'          => $a->inventoryItem?->item_code ?? $a->directSupply?->supply_code ?? '---',
+                'unit'          => $a->inventoryItem?->unit_of_measure ?? $a->directSupply?->unit_of_measure ?? 'units',
+                'is_direct'     => (bool) $a->direct_supply_id,
+                'qty_allocated' => (float) $a->quantity_allocated,
+                'qty_received'  => (float) $a->quantity_received,
+                'qty_used'      => (float) $a->milestoneUsages->sum('quantity_used'),
+            ]);
+
         return [
             'project'    => $project->load('client'),
             'milestones' => $milestones,
             'users'      => $users,
             'issues'     => $issues,
+            'projectAllocations' => $projectAllocations,
             'search'      => $search,
             'sort_by'     => $sortBy,
             'sort_order'  => $sortOrder,

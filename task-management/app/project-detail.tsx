@@ -15,7 +15,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info, Package } from 'lucide-react-native';
+import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info, Package, Boxes } from 'lucide-react-native';
 import { D } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,6 +47,32 @@ type Milestone = {
   totalTasks?: number;
   completedTasks?: number;
   progress?: number;
+  materialUsages?: MaterialUsage[];
+};
+
+type MaterialUsage = {
+  id: number;
+  projectMilestoneId: number;
+  projectMaterialAllocationId: number;
+  quantityUsed: number;
+  notes?: string | null;
+  recordedBy?: string | null;
+  itemName?: string | null;
+  itemCode?: string | null;
+  unit?: string | null;
+  isDirect?: boolean;
+  createdAt?: string | null;
+};
+
+type ProjectAllocation = {
+  id: number;
+  name: string;
+  code: string;
+  unit: string;
+  isDirect: boolean;
+  qtyAllocated: number;
+  qtyReceived: number;
+  qtyUsed: number;
 };
 
 type TeamMember = {
@@ -82,12 +108,15 @@ type ReceivingReport = {
 
 type MaterialAllocation = {
   id: number;
+  isDirect?: boolean;
   itemName?: string | null;
   itemCode?: string | null;
   unit?: string | null;
   quantityAllocated: number;
   quantityReceived: number;
   quantityRemaining: number;
+  totalUsed?: number;
+  available?: number;
   status: string;
   notes?: string | null;
   receivingReports: ReceivingReport[];
@@ -161,14 +190,29 @@ export default function ProjectDetailScreen() {
   const canReactivateTeam = hasPermission('tm.team.reactivate');
   const canForceRemoveTeam = hasPermission('tm.team.force-remove');
   const canReceivingReport = hasPermission('material-allocations.receiving-report');
+  const canUsageMaterialView = hasPermission('milestone-material-usage.view');
+  const canUsageMaterialCreate = hasPermission('milestone-material-usage.create');
+  const canUsageMaterialUpdate = hasPermission('milestone-material-usage.update');
+  const canUsageMaterialDelete = hasPermission('milestone-material-usage.delete');
 
   const [tab, setTab] = useState<TabKey>('milestones');
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [materials, setMaterials] = useState<MaterialAllocation[]>([]);
+  const [projectAllocations, setProjectAllocations] = useState<ProjectAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Material usage modal
+  const [usageModalOpen, setUsageModalOpen] = useState(false);
+  const [usageMilestone, setUsageMilestone] = useState<Milestone | null>(null);
+  const [editingUsage, setEditingUsage] = useState<MaterialUsage | null>(null);
+  const [usageAllocId, setUsageAllocId] = useState('');
+  const [usageQty, setUsageQty] = useState('');
+  const [usageNotes, setUsageNotes] = useState('');
+  const [usageAllocPickerOpen, setUsageAllocPickerOpen] = useState(false);
+  const [usageSubmitting, setUsageSubmitting] = useState(false);
 
   // Receiving report modal
   const [rrModalOpen, setRrModalOpen] = useState(false);
@@ -227,7 +271,14 @@ export default function ProjectDetailScreen() {
       ]);
 
       if (pRes.success && pRes.data) setProject(pRes.data);
-      if (mRes.success && mRes.data) setMilestones(Array.isArray(mRes.data) ? mRes.data : []);
+      if (mRes.success) {
+        const mData = (mRes as any);
+        const freshMilestones = Array.isArray(mData.data) ? mData.data : [];
+        setMilestones(freshMilestones);
+        setProjectAllocations(Array.isArray(mData.projectAllocations) ? mData.projectAllocations : []);
+        // Keep usage modal in sync if open
+        setUsageMilestone(prev => prev ? (freshMilestones.find((m: Milestone) => m.id === prev.id) ?? prev) : null);
+      }
       if (tRes.success && tRes.data) setTeam(Array.isArray(tRes.data) ? tRes.data : []);
       if (matRes.success && matRes.data) setMaterials(Array.isArray(matRes.data) ? matRes.data : []);
     } finally {
@@ -323,6 +374,57 @@ export default function ProjectDetailScreen() {
 
   const canShowTaskActions = canManageTasks;
 
+  const openUsageModal = (m: Milestone) => {
+    setUsageMilestone(m);
+    setEditingUsage(null);
+    setUsageAllocId('');
+    setUsageQty('');
+    setUsageNotes('');
+    setUsageAllocPickerOpen(false);
+    setUsageModalOpen(true);
+  };
+
+  const openEditUsage = (u: MaterialUsage) => {
+    setEditingUsage(u);
+    setUsageAllocId(String(u.projectMaterialAllocationId));
+    setUsageQty(String(u.quantityUsed));
+    setUsageNotes(u.notes ?? '');
+    setUsageAllocPickerOpen(false);
+  };
+
+  const resetUsageForm = () => {
+    setEditingUsage(null);
+    setUsageAllocId('');
+    setUsageQty('');
+    setUsageNotes('');
+    setUsageAllocPickerOpen(false);
+  };
+
+  const submitUsage = async () => {
+    if (!usageMilestone || !usageAllocId || !usageQty) return;
+    const qty = parseFloat(usageQty);
+    if (isNaN(qty) || qty <= 0) return;
+    setUsageSubmitting(true);
+    try {
+      const payload = { project_material_allocation_id: Number(usageAllocId), quantity_used: qty, notes: usageNotes.trim() || null };
+      if (editingUsage) {
+        await apiService.put(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${editingUsage.id}`, payload);
+      } else {
+        await apiService.post(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage`, payload);
+      }
+      resetUsageForm();
+      loadAll();
+    } finally {
+      setUsageSubmitting(false);
+    }
+  };
+
+  const deleteUsage = async (u: MaterialUsage) => {
+    if (!usageMilestone) return;
+    await apiService.delete(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${u.id}`);
+    loadAll();
+  };
+
   const milestoneCards = useMemo(() => {
     return milestones.map((m) => {
       const progress = m.progress ?? 0;
@@ -386,21 +488,24 @@ export default function ProjectDetailScreen() {
 
             {canManageMilestones && (
               <View style={styles.rowActions}>
+                {canUsageMaterialView && (
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); openUsageModal(m); }}
+                    style={styles.iconBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Boxes size={16} color={D.green} strokeWidth={2.5} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    openEditMilestone(m);
-                  }}
+                  onPress={(e) => { e.stopPropagation(); openEditMilestone(m); }}
                   style={styles.iconBtn}
                   activeOpacity={0.7}
                 >
                   <Pencil size={16} color={D.ink} strokeWidth={2.5} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    deleteMilestone(m);
-                  }}
+                  onPress={(e) => { e.stopPropagation(); deleteMilestone(m); }}
                   style={styles.iconBtn}
                   activeOpacity={0.7}
                 >
@@ -845,6 +950,8 @@ export default function ProjectDetailScreen() {
               const pct = alloc.quantityAllocated > 0
                 ? Math.min(100, Math.round((alloc.quantityReceived / alloc.quantityAllocated) * 100))
                 : 0;
+              const available = alloc.available ?? Math.max(0, alloc.quantityReceived - (alloc.totalUsed ?? 0));
+              const availPct = alloc.quantityReceived > 0 ? available / alloc.quantityReceived : 1;
 
               return (
                 <View key={alloc.id} style={styles.card}>
@@ -853,7 +960,14 @@ export default function ProjectDetailScreen() {
                       <Package size={16} color={sc.c} strokeWidth={2} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>{alloc.itemName || 'Unknown Item'}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{alloc.itemName || 'Unknown Item'}</Text>
+                        {alloc.isDirect && (
+                          <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#3B82F6' }}>DIRECT</Text>
+                          </View>
+                        )}
+                      </View>
                       {alloc.itemCode ? <Text style={styles.cardSub}>{alloc.itemCode}</Text> : null}
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
                         <View style={[styles.infoPill, { backgroundColor: sc.bg }]}>
@@ -861,18 +975,25 @@ export default function ProjectDetailScreen() {
                           <Text style={[styles.infoPillText, { color: sc.c }]}>{alloc.status.toUpperCase()}</Text>
                         </View>
                       </View>
+                      {/* Received progress */}
                       <View style={{ marginTop: 8 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                           <Text style={{ fontSize: 10, color: D.inkLight, fontWeight: '700' }}>
-                            {alloc.quantityReceived} / {alloc.quantityAllocated} {alloc.unit}
+                            Received: {alloc.quantityReceived} / {alloc.quantityAllocated} {alloc.unit}
                           </Text>
                           <Text style={{ fontSize: 10, color: sc.c, fontWeight: '800' }}>{pct}%</Text>
                         </View>
                         <View style={{ height: 6, backgroundColor: D.chalk, borderRadius: 3, overflow: 'hidden' }}>
                           <View style={{ height: '100%', width: `${pct}%`, backgroundColor: sc.c, borderRadius: 3 }} />
                         </View>
-                        <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 4 }}>
-                          Remaining: {alloc.quantityRemaining} {alloc.unit}
+                      </View>
+                      {/* Used + Available */}
+                      <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
+                        <Text style={{ fontSize: 10, color: D.inkLight }}>
+                          Used: <Text style={{ fontWeight: '800', color: D.inkMid }}>{alloc.totalUsed ?? 0} {alloc.unit}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 10, color: D.inkLight }}>
+                          Available: <Text style={{ fontWeight: '800', color: available === 0 ? D.red : availPct <= 0.2 ? D.amber : D.green }}>{available} {alloc.unit}</Text>
                         </Text>
                       </View>
                     </View>
@@ -1286,6 +1407,162 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Material Usage Modal */}
+      <Modal visible={usageModalOpen} transparent animationType="slide" onRequestClose={() => { setUsageModalOpen(false); resetUsageForm(); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+            <Text style={styles.modalTitle}>Material Usage</Text>
+            <Text style={styles.modalHint} numberOfLines={1}>{usageMilestone?.name}</Text>
+
+            {/* Add / Edit form */}
+            {(canUsageMaterialCreate || canUsageMaterialUpdate) && (
+              <View style={{ borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 12, marginBottom: 14, backgroundColor: D.chalk }}>
+                <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>{editingUsage ? 'Edit Usage' : 'Record Usage'}</Text>
+
+                {/* Allocation picker */}
+                <Text style={styles.fieldLabel}>Material <Text style={{ color: D.red }}>*</Text></Text>
+                <TouchableOpacity
+                  style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                  onPress={() => setUsageAllocPickerOpen(v => !v)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[{ fontSize: 13 }, !usageAllocId && { color: D.inkLight }]} numberOfLines={1}>
+                    {usageAllocId
+                      ? (() => {
+                          const a = projectAllocations.find(x => String(x.id) === usageAllocId);
+                          if (!a) return 'Unknown';
+                          const avail = Math.max(0, a.qtyReceived - a.qtyUsed);
+                          return `${a.name} — ${avail} ${a.unit} avail.`;
+                        })()
+                      : 'Select material...'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: D.inkLight }}>{usageAllocPickerOpen ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                {usageAllocPickerOpen && (
+                  <View style={styles.conditionDropdown}>
+                    {projectAllocations.map(a => {
+                      const avail = Math.max(0, a.qtyReceived - a.qtyUsed);
+                      const editingOwnQty = editingUsage && String(editingUsage.projectMaterialAllocationId) === String(a.id) ? editingUsage.quantityUsed : 0;
+                      const effectiveAvail = avail + editingOwnQty;
+                      const disabled = effectiveAvail <= 0;
+                      return (
+                        <TouchableOpacity
+                          key={a.id}
+                          style={[styles.conditionOption, usageAllocId === String(a.id) && styles.conditionOptionActive, disabled && { opacity: 0.4 }]}
+                          onPress={() => { if (!disabled) { setUsageAllocId(String(a.id)); setUsageAllocPickerOpen(false); } }}
+                          activeOpacity={disabled ? 1 : 0.7}
+                        >
+                          <Text style={{ fontSize: 12, color: disabled ? D.inkLight : D.ink, fontWeight: '700' }} numberOfLines={1}>
+                            {a.name} ({a.code})
+                          </Text>
+                          <Text style={{ fontSize: 10, color: disabled ? D.red : D.green, fontWeight: '700', marginTop: 1 }}>
+                            {effectiveAvail} {a.unit} available
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <Text style={styles.fieldLabel}>Quantity Used <Text style={{ color: D.red }}>*</Text></Text>
+                {usageAllocId && (() => {
+                  const a = projectAllocations.find(x => String(x.id) === usageAllocId);
+                  const editingOwnQty = editingUsage && String(editingUsage.projectMaterialAllocationId) === usageAllocId ? editingUsage.quantityUsed : 0;
+                  const maxQty = a ? Math.max(0, a.qtyReceived - a.qtyUsed) + editingOwnQty : undefined;
+                  return maxQty !== undefined ? (
+                    <Text style={{ fontSize: 10, color: D.inkLight, marginBottom: 4 }}>Max: {maxQty} {a?.unit}</Text>
+                  ) : null;
+                })()}
+                <TextInput
+                  style={styles.input}
+                  placeholder="0.00"
+                  placeholderTextColor={D.inkLight}
+                  value={usageQty}
+                  onChangeText={setUsageQty}
+                  keyboardType="decimal-pad"
+                />
+
+                <Text style={styles.fieldLabel}>Notes</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Optional notes..."
+                  placeholderTextColor={D.inkLight}
+                  value={usageNotes}
+                  onChangeText={setUsageNotes}
+                />
+
+                <View style={styles.modalActions}>
+                  {editingUsage && (
+                    <TouchableOpacity style={styles.modalBtn} onPress={resetUsageForm}>
+                      <Text style={styles.modalBtnText}>Cancel Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalBtnPrimary, { flex: 2 }, usageSubmitting && { opacity: 0.6 }]}
+                    onPress={submitUsage}
+                    disabled={usageSubmitting}
+                  >
+                    {usageSubmitting
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={[styles.modalBtnText, { color: '#fff' }]}>{editingUsage ? 'Update' : 'Save'}</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Usage list */}
+            <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
+              Recorded Usages ({(usageMilestone?.materialUsages ?? []).length})
+            </Text>
+            {(usageMilestone?.materialUsages ?? []).length === 0 ? (
+              <Text style={{ fontSize: 12, color: D.inkLight, textAlign: 'center', paddingVertical: 16 }}>No usages recorded yet.</Text>
+            ) : (
+              (usageMilestone?.materialUsages ?? []).map(u => {
+                const allocMeta = projectAllocations.find(a => String(a.id) === String(u.projectMaterialAllocationId));
+                const available = allocMeta ? Math.max(0, allocMeta.qtyReceived - allocMeta.qtyUsed) : null;
+                const availPct = allocMeta && allocMeta.qtyReceived > 0 ? available! / allocMeta.qtyReceived : 1;
+                return (
+                  <View key={u.id} style={{ borderWidth: 1, borderColor: D.hairline, borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#fff' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: D.ink }} numberOfLines={1}>{u.itemName ?? 'Unknown'}</Text>
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 3 }}>
+                          <Text style={{ fontSize: 11, color: D.inkMid }}>Used: <Text style={{ fontWeight: '800' }}>{u.quantityUsed} {u.unit}</Text></Text>
+                          {available !== null && (
+                            <Text style={{ fontSize: 11, color: D.inkMid }}>
+                              Remaining: <Text style={{ fontWeight: '800', color: available === 0 ? D.red : availPct <= 0.2 ? D.amber : D.green }}>{available} {u.unit}</Text>
+                            </Text>
+                          )}
+                        </View>
+                        {u.notes ? <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 2 }}>{u.notes}</Text> : null}
+                        {u.recordedBy ? <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 1 }}>By {u.recordedBy}</Text> : null}
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {canUsageMaterialUpdate && (
+                          <TouchableOpacity style={styles.iconBtn} onPress={() => openEditUsage(u)} activeOpacity={0.7}>
+                            <Pencil size={14} color={D.ink} strokeWidth={2.5} />
+                          </TouchableOpacity>
+                        )}
+                        {canUsageMaterialDelete && (
+                          <TouchableOpacity style={styles.iconBtn} onPress={() => deleteUsage(u)} activeOpacity={0.7}>
+                            <Trash2 size={14} color={D.red} strokeWidth={2.5} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+
+            <TouchableOpacity style={[styles.modalBtn, { marginTop: 4 }]} onPress={() => { setUsageModalOpen(false); resetUsageForm(); }}>
+              <Text style={styles.modalBtnText}>Close</Text>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>

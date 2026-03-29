@@ -155,6 +155,10 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::post('/projects/{project}/milestones', [TaskManagementMilestonesController::class, 'store'])->middleware('permission:tm.milestones.manage');
     Route::put('/projects/{project}/milestones/{milestone}', [TaskManagementMilestonesController::class, 'update'])->middleware('permission:tm.milestones.manage');
     Route::delete('/projects/{project}/milestones/{milestone}', [TaskManagementMilestonesController::class, 'destroy'])->middleware('permission:tm.milestones.manage');
+    // Milestone material usages
+    Route::post('/projects/{project}/milestones/{milestone}/material-usage', [TaskManagementMilestonesController::class, 'storeMaterialUsage'])->middleware('permission:milestone-material-usage.create');
+    Route::put('/projects/{project}/milestones/{milestone}/material-usage/{usage}', [TaskManagementMilestonesController::class, 'updateMaterialUsage'])->middleware('permission:milestone-material-usage.update');
+    Route::delete('/projects/{project}/milestones/{milestone}/material-usage/{usage}', [TaskManagementMilestonesController::class, 'destroyMaterialUsage'])->middleware('permission:milestone-material-usage.delete');
 
     // Tasks (milestone-scoped, but project access enforced via milestone->project)
     Route::get('/milestones/{milestone}/tasks', [TaskManagementTasksController::class, 'index'])->middleware('permission:tm.tasks.manage');

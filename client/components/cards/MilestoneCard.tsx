@@ -74,7 +74,7 @@ export default function MilestoneCard({ milestone, index, onPress }: MilestoneCa
               Progress
             </Text>
             <Text style={[styles.progressPercent, { color: AppColors.text }]}>
-              {milestone.progress}%
+              {parseFloat(Number(milestone.progress).toFixed(2))}%
             </Text>
           </View>
           <ProgressBar progress={milestone.progress} height={10} colors={progressColors} />

@@ -72,7 +72,7 @@ export default function BillingDetailScreen() {
   const router    = useRouter();
   const insets    = useSafeAreaInsets();
   const dialog    = useDialog();
-  const { displayBillingModule } = useAuth();
+  const { displayBillingModule, checkAuth } = useAuth();
 
   const [billing,               setBilling]               = useState<Billing | null>(null);
   const [loading,               setLoading]               = useState(true);
@@ -86,14 +86,10 @@ export default function BillingDetailScreen() {
   const [amountTouched,         setAmountTouched]         = useState(false);
 
   useEffect(() => {
-    if (!displayBillingModule) router.replace('/(tabs)');
-  }, [displayBillingModule, router]);
-
-  useEffect(() => {
     fetchBilling();
   }, [id]);
 
-  useFocusEffect(useCallback(() => { fetchBilling(); }, [id]));
+  useFocusEffect(useCallback(() => { fetchBilling(); checkAuth(true); }, [id]));
 
   useEffect(() => {
     if (!showPaymentModal) {
@@ -345,8 +341,8 @@ export default function BillingDetailScreen() {
           </View>
         )}
 
-        {/* ── Pay button ───────────────────────────────────────────────────── */}
-        {billing.remaining_amount > 0 && (
+        {/* ── Pay button — only when billing module is enabled ─────────────── */}
+        {displayBillingModule && billing.remaining_amount > 0 && (
           <TouchableOpacity
             style={[styles.payBtn, processing && { opacity: 0.6 }]}
             onPress={() => setShowPaymentModal(true)}
@@ -362,7 +358,7 @@ export default function BillingDetailScreen() {
       </ScrollView>
 
       {/* ══════════════════════════ PAY MODAL ════════════════════════════════ */}
-      <Modal visible={showPaymentModal} animationType="slide" transparent onRequestClose={() => setShowPaymentModal(false)}>
+      <Modal visible={displayBillingModule && showPaymentModal} animationType="slide" transparent onRequestClose={() => setShowPaymentModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />

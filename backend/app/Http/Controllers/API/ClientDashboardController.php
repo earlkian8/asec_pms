@@ -73,12 +73,12 @@ class ClientDashboardController extends Controller
         $totalBudget = $projects->sum('contract_amount');
         
         // Calculate total spent (material costs + labor costs + miscellaneous expenses) - optimized
-        // Material costs: join with inventory items - only count received materials
+        // Material costs: left join to include direct supply allocations; prefer allocation-level unit_price snapshot
         $materialCosts = DB::table('project_material_allocations')
-            ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->whereIn('project_material_allocations.project_id', $projectIds)
             ->where('project_material_allocations.quantity_received', '>', 0)
-            ->sum(DB::raw('project_material_allocations.quantity_received * inventory_items.unit_price'));
+            ->sum(DB::raw('project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)'));
         
         // Labor costs
         // NOTE: Labor is now period-based with computed gross_pay.
@@ -180,15 +180,15 @@ class ClientDashboardController extends Controller
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
         
-        // Pre-calculate all material costs - only count received materials
+        // Pre-calculate all material costs - left join to include direct supply allocations
         $materialCostsByProject = DB::table('project_material_allocations')
-            ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->whereIn('project_material_allocations.project_id', $projectIds)
             ->where('project_material_allocations.quantity_received', '>', 0)
-            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * inventory_items.unit_price) as total'))
+            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)) as total'))
             ->groupBy('project_material_allocations.project_id')
             ->pluck('total', 'project_id');
-        
+
         // Pre-calculate all labor costs
         $laborCostsByProject = ProjectLaborCost::whereIn('project_id', $projectIds)
             ->select('project_id', DB::raw('SUM(gross_pay) as total'))
@@ -216,7 +216,7 @@ class ClientDashboardController extends Controller
                     // Fallback: use milestone status
                     return $milestone->status === 'completed' ? 100 : ($milestone->status === 'in_progress' ? 50 : 0);
                 });
-                $progress = round($totalProgress / $milestones->count());
+                $progress = round($totalProgress / $milestones->count(), 2);
             }
             
             // Get spent from pre-calculated values
@@ -291,12 +291,12 @@ class ClientDashboardController extends Controller
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
         
-        // Pre-calculate costs - only count received materials
+        // Pre-calculate costs - left join to include direct supply allocations
         $materialCostsByProject = DB::table('project_material_allocations')
-            ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->whereIn('project_material_allocations.project_id', $projectIds)
             ->where('project_material_allocations.quantity_received', '>', 0)
-            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * inventory_items.unit_price) as total'))
+            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)) as total'))
             ->groupBy('project_material_allocations.project_id')
             ->pluck('total', 'project_id');
         
@@ -323,7 +323,7 @@ class ClientDashboardController extends Controller
                     }
                     return $milestone->status === 'completed' ? 100 : ($milestone->status === 'in_progress' ? 50 : 0);
                 });
-                $progress = round($totalProgress / $milestones->count());
+                $progress = round($totalProgress / $milestones->count(), 2);
             }
             
             $materialCost = (float) ($materialCostsByProject[$project->id] ?? 0);
@@ -494,6 +494,7 @@ class ClientDashboardController extends Controller
                 'milestones.tasks.assignedUser',
                 'milestones.tasks.progressUpdates.createdBy',
                 'materialAllocations.inventoryItem',
+                'materialAllocations.directSupply',
                 'materialAllocations.allocatedBy',
                 'laborCosts.user',
                 'laborCosts.employee',
@@ -527,13 +528,13 @@ class ClientDashboardController extends Controller
             $progress = round($totalProgress / $milestones->count());
         }
 
-        // Calculate spent - only count received materials
+        // Calculate spent - left join to include direct supply allocations; prefer allocation-level unit_price
         $projectId = $project->id;
         $materialCosts = DB::table('project_material_allocations')
-            ->join('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
             ->where('project_material_allocations.project_id', $projectId)
             ->where('project_material_allocations.quantity_received', '>', 0)
-            ->sum(DB::raw('project_material_allocations.quantity_received * inventory_items.unit_price'));
+            ->sum(DB::raw('project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)'));
         
         $laborCosts = ProjectLaborCost::where('project_id', $projectId)
             ->sum('gross_pay');
@@ -600,8 +601,8 @@ class ClientDashboardController extends Controller
                 'name' => $milestone->name,
                 'description' => $milestone->description ?? '',
                 'status' => $milestone->status === 'completed' ? 'completed' : ($milestone->status === 'in_progress' ? 'in-progress' : 'pending'),
-                'progress' => $tasks->count() > 0 
-                    ? round(($tasks->where('status', 'completed')->count() / $tasks->count()) * 100)
+                'progress' => $tasks->count() > 0
+                    ? round(($tasks->where('status', 'completed')->count() / $tasks->count()) * 100, 2)
                     : ($milestone->status === 'completed' ? 100 : ($milestone->status === 'in_progress' ? 50 : 0)),
                 'dueDate' => $milestone->due_date,
                 'completedDate' => $milestone->status === 'completed' ? $milestone->updated_at->toDateString() : null,
@@ -714,19 +715,21 @@ class ClientDashboardController extends Controller
         // Format material allocations
         $formattedMaterialAllocations = $project->materialAllocations->map(function ($allocation) {
             $item = $allocation->inventoryItem;
+            $supply = $allocation->directSupply;
             $allocatedByName = 'Unknown';
             if ($allocation->allocatedBy) {
                 $allocatedByName = $allocation->allocatedBy->name;
             }
-            
-            $unitPrice = $item ? (float) $item->unit_price : 0;
+
+            // Prefer allocation-level unit_price snapshot (supports direct supplies), fallback to inventory item
+            $unitPrice = (float) ($allocation->unit_price ?? ($item ? $item->unit_price : ($supply ? $supply->unit_price : 0)));
             $totalCost = (float) ($allocation->quantity_received * $unitPrice);
-            
+
             return [
                 'id' => (string) $allocation->id,
-                'itemName' => $item ? $item->item_name : 'Unknown Item',
-                'itemCode' => $item ? $item->item_code : 'N/A',
-                'unit' => $item ? $item->unit : 'N/A',
+                'itemName' => $item ? $item->item_name : ($supply ? $supply->supply_name : 'Unknown Item'),
+                'itemCode' => $item ? $item->item_code : ($supply ? $supply->supply_code : 'N/A'),
+                'unit' => $item ? $item->unit : ($supply ? $supply->unit_of_measure : 'N/A'),
                 'quantityAllocated' => (float) $allocation->quantity_allocated,
                 'quantityReceived' => (float) $allocation->quantity_received,
                 'quantityRemaining' => (float) $allocation->quantity_remaining,
@@ -739,21 +742,22 @@ class ClientDashboardController extends Controller
             ];
         })->sortByDesc('allocatedAt')->values();
 
-        // Format labor costs
+        // Format labor costs (period-based payroll schema)
         $formattedLaborCosts = $project->laborCosts->map(function ($laborCost) {
-            $assignableName = $laborCost->assignable_name;
-            
             return [
                 'id' => (string) $laborCost->id,
-                'assignableName' => $assignableName,
-                'workDate' => $laborCost->work_date ? $laborCost->work_date->toDateString() : null,
-                'hoursWorked' => (float) $laborCost->hours_worked,
-                'hourlyRate' => (float) $laborCost->hourly_rate,
-                'totalCost' => (float) ($laborCost->hours_worked * $laborCost->hourly_rate),
+                'assignableName' => $laborCost->assignable_name,
+                'periodStart' => $laborCost->period_start ? $laborCost->period_start->toDateString() : null,
+                'periodEnd' => $laborCost->period_end ? $laborCost->period_end->toDateString() : null,
+                'payType' => $laborCost->pay_type,
+                'daysPresent' => (float) $laborCost->days_present,
+                'dailyRate' => (float) $laborCost->daily_rate,
+                'monthlySalary' => (float) $laborCost->monthly_salary,
+                'grossPay' => (float) $laborCost->gross_pay,
                 'description' => $laborCost->description ?? '',
                 'notes' => $laborCost->notes ?? '',
             ];
-        })->sortByDesc('workDate')->values();
+        })->sortByDesc('periodStart')->values();
 
         // Format miscellaneous expenses
         $formattedMiscellaneousExpenses = $project->miscellaneousExpenses->map(function ($expense) {

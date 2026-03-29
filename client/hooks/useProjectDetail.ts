@@ -88,10 +88,13 @@ export interface MaterialAllocation {
 export interface LaborCost {
   id: string;
   assignableName: string;
-  workDate: string | null;
-  hoursWorked: number;
-  hourlyRate: number;
-  totalCost: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+  payType: string;
+  daysPresent: number;
+  dailyRate: number;
+  monthlySalary: number;
+  grossPay: number;
   description: string;
   notes: string;
 }

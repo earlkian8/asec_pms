@@ -86,7 +86,7 @@ export default function ProjectCard({
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${project.progress}%` }]} />
         </View>
-        <Text style={styles.progressPct}>{project.progress}%</Text>
+        <Text style={styles.progressPct}>{parseFloat(Number(project.progress).toFixed(2))}%</Text>
       </View>
 
       {/* ── Meta: due date + payment alert ────────────────────────────────── */}

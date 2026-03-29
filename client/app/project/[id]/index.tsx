@@ -162,7 +162,7 @@ export default function ProjectDetailScreen() {
         <View style={styles.headerProgressBlock}>
           <View style={styles.headerProgressLabelRow}>
             <Text style={styles.headerProgressLabel}>Overall Progress</Text>
-            <Text style={styles.headerProgressPct}>{project.progress}%</Text>
+            <Text style={styles.headerProgressPct}>{parseFloat(Number(project.progress).toFixed(2))}%</Text>
           </View>
           <View style={styles.headerProgressTrack}>
             <View style={[styles.headerProgressFill, { width: `${project.progress}%` }]} />

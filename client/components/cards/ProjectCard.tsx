@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Calendar, AlertCircle, CreditCard } from 'lucide-react-native';
 import AnimatedCard from '@/components/AnimatedCard';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency, formatCurrencyCompact } from '@/utils/formatCurrency';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const D = {
@@ -115,13 +115,9 @@ export default function ProjectCard({
       {/* ── Contract value ────────────────────────────────────────────────── */}
       <View style={styles.contractRow}>
         <Text style={styles.contractLabel}>Contract Value</Text>
-        <Text style={styles.contractValue}>{formatCurrency(project.budget)}</Text>
+        <Text style={styles.contractValue}>{formatCurrencyCompact(project.budget)}</Text>
       </View>
 
-      {/* ── Actions ──────────────────────────────────────────────────────── */}
-      <View style={styles.actions}>
-        <View style={styles.actionSpacer} />
-      </View>
     </AnimatedCard>
   );
 }
@@ -157,14 +153,8 @@ const styles = StyleSheet.create({
   contractRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderTopWidth: 1, borderTopColor: D.hairline,
-    paddingTop: 12, marginBottom: 14,
+    paddingTop: 12,
   },
   contractLabel: { fontSize: 11, color: D.inkLight, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.3 },
   contractValue: { fontSize: 14, fontWeight: '700', color: D.ink },
-
-  actions: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderTopWidth: 1, borderTopColor: D.hairline, paddingTop: 12,
-  },
-  actionSpacer: { height: 1 },
 });

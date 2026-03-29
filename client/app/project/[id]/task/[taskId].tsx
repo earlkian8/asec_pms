@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertCircle, Activity, MessageSquare, Bug, FileText } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
@@ -31,6 +32,7 @@ type Tab = typeof TABS[number];
 
 export default function TaskDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
 
   const { data, loading, error, refresh } = useTaskDetail(taskId as string);
@@ -106,7 +108,7 @@ export default function TaskDetailScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft size={20} color={D.ink} strokeWidth={2} />
         </TouchableOpacity>
@@ -286,7 +288,6 @@ const styles = StyleSheet.create({
     backgroundColor: D.surface,
     borderBottomWidth: 1,
     borderBottomColor: D.hairline,
-    paddingTop: 56,
     paddingHorizontal: 16,
     paddingBottom: 12,
     flexDirection: 'row',

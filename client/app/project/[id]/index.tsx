@@ -4,6 +4,7 @@ import {
   TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
   AlertCircle, MapPin, FileText,
@@ -15,7 +16,7 @@ import AnimatedCard from '@/components/AnimatedCard';
 import MilestoneCard from '@/components/cards/MilestoneCard';
 import LoadingState from '@/components/ui/LoadingState';
 import EmptyState from '@/components/ui/EmptyState';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatCurrency, formatCurrencyCompact } from '@/utils/formatCurrency';
 import { getRoleIcon, getProjectStatusColors } from '@/utils/statusHelpers';
 import { useDialog } from '@/contexts/DialogContext';
 
@@ -73,6 +74,7 @@ function StatCell({ label, value }: { label: string; value: string | number }) {
 export default function ProjectDetailScreen() {
   const { id }  = useLocalSearchParams<{ id: string }>();
   const router  = useRouter();
+  const insets  = useSafeAreaInsets();
   useDialog(); // kept for parity with other screens (no email/contact actions)
 
   const [refreshing,        setRefreshing]        = useState(false);
@@ -135,7 +137,7 @@ export default function ProjectDetailScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <ArrowLeft size={20} color={D.ink} strokeWidth={2} />
@@ -194,16 +196,9 @@ export default function ProjectDetailScreen() {
         {selectedTab === 'overview' && (
           <AnimatedView delay={0}>
             <View style={styles.statsStrip}>
-              <StatCell label="Contract Value" value={formatCurrency(project.budget)} />
+              <StatCell label="Contract Value" value={formatCurrencyCompact(project.budget)} />
               <View style={styles.statsDivider} />
-              <StatCell
-                label="Payment"
-                value={
-                  payment?.status
-                    ? `${paymentLabel}${payment.remainingAmount > 0 ? ` · ${formatCurrency(payment.remainingAmount)} due` : ''}`
-                    : 'N/A'
-                }
-              />
+              <StatCell label="Payment" value={paymentLabel} />
               <View style={styles.statsDivider} />
               <StatCell label="Started" value={formatMaybeDate(project.startDate)} />
               <View style={styles.statsDivider} />
@@ -365,7 +360,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: D.surface,
     borderBottomWidth: 1, borderBottomColor: D.hairline,
-    paddingTop: 56, paddingHorizontal: 20, paddingBottom: 0,
+    paddingHorizontal: 20, paddingBottom: 0,
   },
   headerTopRow: {
     flexDirection: 'row', justifyContent: 'space-between',

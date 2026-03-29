@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertCircle, CheckCircle2, Clock3, Circle, Activity, Bug, MessageSquare } from 'lucide-react-native';
 import { useProjectDetail, ProjectDetailMilestone, ProjectDetailTask } from '@/hooks/useProjectDetail';
 import LoadingState from '@/components/ui/LoadingState';
@@ -21,6 +22,7 @@ type Filter = 'all' | 'pending' | 'in-progress' | 'completed';
 
 export default function MilestoneScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id, milestoneId } = useLocalSearchParams<{ id: string; milestoneId: string }>();
 
   const { project, loading, error, refresh } = useProjectDetail(id as string);
@@ -74,7 +76,7 @@ export default function MilestoneScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ArrowLeft size={20} color={D.ink} strokeWidth={2} />
         </TouchableOpacity>
@@ -154,7 +156,6 @@ const styles = StyleSheet.create({
     backgroundColor: D.surface,
     borderBottomWidth: 1,
     borderBottomColor: D.hairline,
-    paddingTop: 56,
     paddingHorizontal: 16,
     paddingBottom: 12,
     flexDirection: 'row',

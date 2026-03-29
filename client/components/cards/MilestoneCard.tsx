@@ -13,6 +13,12 @@ interface MilestoneCardProps {
   onPress?: (milestone: ProjectDetailMilestone) => void;
 }
 
+const taskStatusMeta: Record<string, { color: string; icon: string }> = {
+  completed:   { color: '#10B981', icon: 'checkmark-circle' },
+  'in-progress': { color: '#3B82F6', icon: 'time' },
+  pending:     { color: '#6B7280', icon: 'ellipse-outline' },
+};
+
 export default function MilestoneCard({ milestone, index, onPress }: MilestoneCardProps) {
   const formatMaybeDate = (value?: string | null) => {
     if (!value) return null;
@@ -28,11 +34,15 @@ export default function MilestoneCard({ milestone, index, onPress }: MilestoneCa
       ? ['#10B981', '#059669']
       : ['#3B82F6', '#2563EB'];
 
-  const taskStatusColors: Record<string, { color: string; icon: string }> = {
-    completed: { color: '#10B981', icon: 'checkmark-circle' },
-    'in-progress': { color: '#3B82F6', icon: 'time' },
-    pending: { color: '#6B7280', icon: 'ellipse-outline' },
-  };
+  // Compact task counts for the summary row
+  const taskCounts = milestone.tasks
+    ? {
+        completed:    milestone.tasks.filter((t) => t.status === 'completed').length,
+        'in-progress': milestone.tasks.filter((t) => t.status === 'in-progress').length,
+        pending:      milestone.tasks.filter((t) => t.status === 'pending').length,
+      }
+    : null;
+  const totalTasks = milestone.tasks?.length ?? 0;
 
   return (
     <TouchableOpacity
@@ -43,6 +53,7 @@ export default function MilestoneCard({ milestone, index, onPress }: MilestoneCa
         index={index}
         delay={100}
         style={[styles.card, { backgroundColor: AppColors.card, borderColor: AppColors.border }]}>
+
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <StatusBadge status={milestone.status} type="milestone" showIcon />
@@ -51,33 +62,27 @@ export default function MilestoneCard({ milestone, index, onPress }: MilestoneCa
             ) : null}
           </View>
           <Text
-            style={[
-              styles.name,
-              { color: AppColors.text },
-              !milestone.name && styles.placeholderText,
-            ]}>
+            style={[styles.name, { color: AppColors.text }, !milestone.name && styles.placeholderText]}
+            numberOfLines={2}>
             {milestone.name || 'Unnamed Milestone'}
           </Text>
-          <Text
-            style={[
-              styles.description,
-              { color: AppColors.textSecondary },
-              !milestone.description && styles.placeholderText,
-            ]}>
-            {milestone.description || 'No description provided for this milestone.'}
-          </Text>
+          {milestone.description ? (
+            <Text
+              style={[styles.description, { color: AppColors.textSecondary }]}
+              numberOfLines={2}>
+              {milestone.description}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.progress}>
           <View style={styles.progressHeader}>
-            <Text style={[styles.progressLabel, { color: AppColors.textSecondary }]}>
-              Progress
-            </Text>
+            <Text style={[styles.progressLabel, { color: AppColors.textSecondary }]}>Progress</Text>
             <Text style={[styles.progressPercent, { color: AppColors.text }]}>
               {parseFloat(Number(milestone.progress).toFixed(2))}%
             </Text>
           </View>
-          <ProgressBar progress={milestone.progress} height={10} colors={progressColors} />
+          <ProgressBar progress={milestone.progress} height={6} colors={progressColors} />
         </View>
 
         <View style={styles.info}>
@@ -92,38 +97,31 @@ export default function MilestoneCard({ milestone, index, onPress }: MilestoneCa
               <Ionicons name="checkmark-circle-outline" size={13} color={AppColors.success} />
               <Text style={[styles.infoText, { color: AppColors.success }]}>
                 Completed: {new Date(milestone.completedDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
+                  month: 'short', day: 'numeric', year: 'numeric',
                 })}
               </Text>
             </View>
           )}
         </View>
 
-        {milestone.tasks && milestone.tasks.length > 0 && (
-          <View style={styles.tasksContainer}>
-            <Text style={[styles.tasksTitle, { color: AppColors.text }]}>Tasks</Text>
-            {milestone.tasks.map((task) => {
-              const taskStatus = taskStatusColors[task.status] || taskStatusColors.pending;
-
-              return (
-                <View key={task.id} style={styles.taskItem}>
-                  <Ionicons name={taskStatus.icon as any} size={14} color={taskStatus.color} />
-                  <Text style={[styles.taskName, { color: AppColors.text }]}>
-                    {task.name || 'Unnamed Task'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.taskAssignee,
-                      { color: AppColors.textSecondary },
-                      !task.assignedTo && styles.placeholderText,
-                    ]}>
-                    {task.assignedTo || 'Unassigned'}
-                  </Text>
-                </View>
-              );
-            })}
+        {/* ── Compact task summary ─────────────────────────────────────────── */}
+        {taskCounts && totalTasks > 0 && (
+          <View style={styles.taskSummary}>
+            <Text style={[styles.taskSummaryLabel, { color: AppColors.textSecondary }]}>
+              {totalTasks} task{totalTasks !== 1 ? 's' : ''}
+            </Text>
+            <View style={styles.taskPills}>
+              {(Object.entries(taskCounts) as [string, number][]).map(([status, count]) => {
+                if (count === 0) return null;
+                const meta = taskStatusMeta[status] || taskStatusMeta.pending;
+                return (
+                  <View key={status} style={[styles.taskPill, { backgroundColor: meta.color + '1A' }]}>
+                    <Ionicons name={meta.icon as any} size={11} color={meta.color} />
+                    <Text style={[styles.taskPillCount, { color: meta.color }]}>{count}</Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
       </AnimatedCard>
@@ -133,83 +131,85 @@ export default function MilestoneCard({ milestone, index, onPress }: MilestoneCa
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   header: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  name: {
-    fontSize: 17,
-    fontWeight: '700',
     marginBottom: 6,
   },
+  name: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   description: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
   },
   progress: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   progressPercent: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
   info: {
-    gap: 6,
-    marginBottom: 12,
+    gap: 5,
+    marginBottom: 10,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   infoText: {
     fontSize: 12,
     fontWeight: '500',
   },
-  tasksContainer: {
-    marginTop: 12,
-    paddingTop: 12,
+  taskSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: AppColors.border,
   },
-  tasksTitle: {
-    fontSize: 13,
+  taskSummaryLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 10,
   },
-  taskItem: {
+  taskPills: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  taskPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    gap: 10,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  taskName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  taskAssignee: {
+  taskPillCount: {
     fontSize: 11,
-    fontWeight: '400',
+    fontWeight: '700',
   },
   placeholderText: {
     fontStyle: 'italic',

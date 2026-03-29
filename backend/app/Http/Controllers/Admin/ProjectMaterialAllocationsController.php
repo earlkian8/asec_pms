@@ -11,13 +11,14 @@ use App\Models\InventoryItem;
 use App\Models\User;
 use App\Services\InventoryService;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProjectMaterialAllocationsController extends Controller
 {
-    use ActivityLogsTrait, NotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     protected $inventoryService;
 
@@ -76,6 +77,8 @@ class ProjectMaterialAllocationsController extends Controller
 
         $allocation->quantity_received += $data['quantity_received'];
         $allocation->updateStatus();
+
+        $this->notifyMaterialStatusChange($project, $itemName, $allocation->status);
 
         $this->adminActivityLogs(
             'Material Receiving Report',
@@ -306,6 +309,8 @@ class ProjectMaterialAllocationsController extends Controller
 
             $allocation->quantity_received += $item['quantity_received'];
             $allocation->updateStatus();
+
+            $this->notifyMaterialStatusChange($project, $inventoryItem->item_name, $allocation->status);
 
             $this->adminActivityLogs(
                 'Material Receiving Report',

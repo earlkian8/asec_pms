@@ -120,6 +120,16 @@ class ClientAuthController extends Controller
     }
 
     /**
+     * Register or update Expo push token
+     */
+    public function updatePushToken(Request $request)
+    {
+        $request->validate(['push_token' => 'nullable|string']);
+        $request->user()->update(['push_token' => $request->push_token]);
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Change password
      */
     public function changePassword(Request $request)

@@ -66,6 +66,8 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
         return 'alert-circle';
       case 'status_change':
         return 'sync';
+      case 'billing':
+        return 'receipt-outline';
       default:
         return 'notifications';
     }
@@ -81,6 +83,8 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
         return '#EF4444';
       case 'status_change':
         return '#8B5CF6';
+      case 'billing':
+        return '#1D4ED8';
       default:
         return '#8B5CF6';
     }

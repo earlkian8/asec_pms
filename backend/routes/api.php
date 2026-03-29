@@ -44,6 +44,7 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [ClientAuthController::class, 'logout']);
     Route::post('/logout-all', [ClientAuthController::class, 'logoutAll']);
     Route::post('/change-password', [ClientAuthController::class, 'changePassword']);
+    Route::post('/push-token', [ClientAuthController::class, 'updatePushToken']);
     
     // Dashboard routes
     Route::get('/dashboard/statistics', [ClientDashboardController::class, 'statistics']);

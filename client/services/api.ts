@@ -192,6 +192,10 @@ class ApiService {
     const result = await this.get(`/client/billings/transactions${queryString ? `?${queryString}` : ''}`, { responseType: 'json' });
     return result as ApiResponse<any>;
   }
+
+  async registerPushToken(token: string | null): Promise<ApiResponse<any>> {
+    return this.post('/client/push-token', { push_token: token });
+  }
 }
 
 export const apiService = new ApiService();

@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 
 interface Notification {
   id: string;
-  type: 'update' | 'milestone' | 'issue' | 'general' | 'status_change';
+  type: 'update' | 'milestone' | 'issue' | 'general' | 'status_change' | 'billing';
   title: string;
   message: string;
   date: string;

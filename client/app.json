@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +23,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.earlkian8.client"
+      "package": "com.earlkian8.client",
+      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
     },
     "web": {
       "output": "static",
@@ -28,6 +32,16 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/client-portal-logo.png",
+          "color": "#1D4ED8",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "ASEC PMS"
+        }
+      ],
       [
         "expo-splash-screen",
         {

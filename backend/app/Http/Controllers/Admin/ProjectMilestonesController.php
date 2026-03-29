@@ -114,6 +114,8 @@ class ProjectMilestonesController extends Controller
             'Updated milestone "' . $milestone->name . '" for project "' . $project->project_name . '"'
         );
 
+        $this->notifyMilestoneStatusChange($project, $milestone->name, $milestone->status);
+
         $this->createSystemNotification(
             'milestone', 'Milestone Updated',
             "Milestone '{$milestone->name}' has been updated for project '{$project->project_name}'.",

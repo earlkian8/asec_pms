@@ -32,6 +32,7 @@ class Client extends Authenticatable
         'payment_terms',
         'is_active',
         'notes',
+        'push_token',
     ];
 
     protected $hidden = [

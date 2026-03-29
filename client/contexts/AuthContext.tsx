@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiService } from '@/services/api';
 import { initializePusher, disconnectPusher } from '@/services/pusher';
+import { registerForPushNotificationsAsync } from '@/hooks/useNotifications';
 
 interface User {
   id: number;
@@ -64,6 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const token = apiService.getToken();
         if (token) {
           initializePusher(token);
+          registerForPushNotificationsAsync().then((pushToken) => {
+            if (pushToken) apiService.registerPushToken(pushToken).catch(() => {});
+          });
         }
       } else {
         setUser(null);
@@ -135,6 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (response.data.token) {
           initializePusher(response.data.token);
+          registerForPushNotificationsAsync().then((pushToken) => {
+            if (pushToken) apiService.registerPushToken(pushToken).catch(() => {});
+          });
         }
 
         // Done — do NOT call checkAuth() here, it causes isLoading flicker & remount

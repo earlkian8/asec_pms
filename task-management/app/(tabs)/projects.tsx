@@ -13,6 +13,8 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Search, ArrowRight, FolderKanban, MapPin, Filter, SlidersHorizontal, X, Check, Calendar, Flag } from 'lucide-react-native';
@@ -34,6 +36,24 @@ type Project = {
 };
 
 type SortOption = 'name_asc' | 'name_desc' | 'start_date_asc' | 'start_date_desc' | 'end_date_asc' | 'end_date_desc';
+
+function SkeletonCard() {
+  const opacity = useSharedValue(1);
+  useEffect(() => { opacity.value = withTiming(0.4, { duration: 700 }, () => { opacity.value = withTiming(1, { duration: 700 }); }); }, []);
+  const s = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View style={[{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E5DF', borderRadius: 12, padding: 14, marginBottom: 10 }, s]}>
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#E8E5DF' }} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <View style={{ height: 12, borderRadius: 6, backgroundColor: '#E8E5DF', width: '60%' }} />
+          <View style={{ height: 8, borderRadius: 6, backgroundColor: '#E8E5DF', width: '35%' }} />
+        </View>
+      </View>
+      <View style={{ height: 6, borderRadius: 6, backgroundColor: '#E8E5DF', width: '80%' }} />
+    </Animated.View>
+  );
+}
 
 export default function ProjectsScreen() {
   const insets = useSafeAreaInsets();
@@ -122,7 +142,7 @@ export default function ProjectsScreen() {
     loadProjects();
   };
 
-  const renderItem = ({ item }: { item: Project }) => {
+  const renderItem = ({ item, index }: { item: Project; index: number }) => {
     const statusMap: Record<string, { color: string; bg: string }> = {
       active:    { color: D.green, bg: D.greenBg },
       planning:  { color: D.amber, bg: D.amberBg },
@@ -147,11 +167,12 @@ export default function ProjectsScreen() {
     };
 
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/project-detail?id=${item.id}`)}
-        activeOpacity={0.7}
-      >
+      <Animated.View entering={FadeIn.duration(250).delay(index * 40)}>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/project-detail?id=${item.id}`); }}
+          activeOpacity={0.7}
+        >
         <View style={styles.cardHeader}>
           <View style={styles.iconWrap}>
             <FolderKanban size={16} color={sc.color} strokeWidth={2} />
@@ -201,14 +222,15 @@ export default function ProjectsScreen() {
         <Text style={styles.counts}>
           {`${item.milestonesCount ?? 0} milestones · ${item.teamCount ?? 0} team`}
         </Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
   if (loading && !refreshing) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color={D.ink} />
+      <View style={[styles.root, { padding: 16, paddingTop: 80 }]}>
+        <SkeletonCard /><SkeletonCard /><SkeletonCard />
       </View>
     );
   }

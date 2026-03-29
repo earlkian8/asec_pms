@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,19 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info, Package, Boxes } from 'lucide-react-native';
+import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Package, Boxes } from 'lucide-react-native';
 import { D } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -124,6 +133,105 @@ type MaterialAllocation = {
 
 type TabKey = 'milestones' | 'team' | 'materials';
 
+// ─── Toast ────────────────────────────────────────────────────────────────────
+type ToastType = 'success' | 'error' | 'info';
+type ToastState = { message: string; type: ToastType; id: number } | null;
+
+function useToast() {
+  const [toast, setToast] = useState<ToastState>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = useCallback((message: string, type: ToastType = 'success') => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setToast({ message, type, id: Date.now() });
+    timerRef.current = setTimeout(() => setToast(null), 2800);
+  }, []);
+
+  const hide = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setToast(null);
+  }, []);
+
+  return { toast, show, hide };
+}
+
+function Toast({ toast }: { toast: ToastState }) {
+  if (!toast) return null;
+  const bg = toast.type === 'success' ? D.green : toast.type === 'error' ? D.red : D.blue;
+  const icon = toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ';
+  return (
+    <Animated.View
+      key={toast.id}
+      entering={FadeInDown.springify().damping(14)}
+      exiting={FadeOutUp.duration(200)}
+      style={[toastStyles.wrap, { backgroundColor: bg }]}
+    >
+      <Text style={toastStyles.icon}>{icon}</Text>
+      <Text style={toastStyles.msg} numberOfLines={2}>{toast.message}</Text>
+    </Animated.View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    bottom: 32,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderRadius: 14,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  icon: { fontSize: 14, color: '#fff', fontWeight: '900' },
+  msg: { fontSize: 13, color: '#fff', fontWeight: '700', flex: 1 },
+});
+
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    opacity.value = withTiming(0.4, { duration: 700 }, () => {
+      opacity.value = withTiming(1, { duration: 700 });
+    });
+  }, []);
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View style={[skeletonStyles.card, animStyle]}>
+      <View style={skeletonStyles.iconBox} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={[skeletonStyles.line, { width: '60%' }]} />
+        <View style={[skeletonStyles.line, { width: '40%', height: 8 }]} />
+        <View style={[skeletonStyles.line, { width: '80%', height: 6, marginTop: 4 }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E8E5DF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#E8E5DF' },
+  line: { height: 12, borderRadius: 6, backgroundColor: '#E8E5DF' },
+});
+
 // ─── Reusable date picker field ───────────────────────────────────────────────
 function DatePickerField({
   label,
@@ -195,6 +303,9 @@ export default function ProjectDetailScreen() {
   const canUsageMaterialUpdate = hasPermission('milestone-material-usage.update');
   const canUsageMaterialDelete = hasPermission('milestone-material-usage.delete');
 
+  const { toast, show: showToast } = useToast();
+  const tabAnim = useSharedValue(0);
+
   const [tab, setTab] = useState<TabKey>('milestones');
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -260,9 +371,22 @@ export default function ProjectDetailScreen() {
   const [confirmTone, setConfirmTone] = useState<'neutral' | 'danger'>('neutral');
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
 
-  const loadAll = async () => {
+  const switchTab = (t: TabKey) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    tabAnim.value = withTiming(0, { duration: 0 }, () => {
+      tabAnim.value = withSpring(1, { damping: 16, stiffness: 180 });
+    });
+    setTab(t);
+  };
+
+  const tabContentStyle = useAnimatedStyle(() => ({
+    opacity: tabAnim.value,
+    transform: [{ translateX: withTiming(0) }],
+  }));
+
+  const loadAll = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [pRes, mRes, tRes, matRes] = await Promise.all([
         apiService.get<Project>(`/task-management/projects/${projectId}`),
         apiService.get<Milestone[]>(`/task-management/projects/${projectId}/milestones`),
@@ -276,11 +400,14 @@ export default function ProjectDetailScreen() {
         const freshMilestones = Array.isArray(mData.data) ? mData.data : [];
         setMilestones(freshMilestones);
         setProjectAllocations(Array.isArray(mData.projectAllocations) ? mData.projectAllocations : []);
-        // Keep usage modal in sync if open
         setUsageMilestone(prev => prev ? (freshMilestones.find((m: Milestone) => m.id === prev.id) ?? prev) : null);
       }
       if (tRes.success && tRes.data) setTeam(Array.isArray(tRes.data) ? tRes.data : []);
       if (matRes.success && matRes.data) setMaterials(Array.isArray(matRes.data) ? matRes.data : []);
+
+      if (!silent) {
+        tabAnim.value = withSpring(1, { damping: 16, stiffness: 180 });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -298,9 +425,15 @@ export default function ProjectDetailScreen() {
 
   const submitReceivingReport = async () => {
     if (!rrAllocation) return;
-    // Default to full remaining if left empty
     const qty = rrQty.trim() ? parseFloat(rrQty) : rrAllocation.quantityRemaining;
     if (isNaN(qty) || qty <= 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Optimistic update
+    setMaterials(prev => prev.map(a => a.id === rrAllocation.id
+      ? { ...a, quantityReceived: a.quantityReceived + qty, quantityRemaining: Math.max(0, a.quantityRemaining - qty) }
+      : a
+    ));
+    setRrModalOpen(false);
     try {
       setRrSubmitting(true);
       await apiService.post(`/task-management/projects/${projectId}/material-allocations/${rrAllocation.id}/receiving-report`, {
@@ -308,8 +441,13 @@ export default function ProjectDetailScreen() {
         condition: rrCondition || null,
         notes: rrNotes.trim() || null,
       });
-      setRrModalOpen(false);
-      loadAll();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Receiving report submitted', 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to submit report', 'error');
+      loadAll(true);
     } finally {
       setRrSubmitting(false);
     }
@@ -355,21 +493,48 @@ export default function ProjectDetailScreen() {
       billing_percentage: mBillingPercentage.trim() ? Number(mBillingPercentage.trim()) : null,
     };
     if (!payload.name) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (editingMilestone) {
-      await apiService.put(`/task-management/projects/${projectId}/milestones/${editingMilestone.id}`, payload);
+    const isEdit = !!editingMilestone;
+    // Optimistic update
+    if (isEdit && editingMilestone) {
+      setMilestones(prev => prev.map(m => m.id === editingMilestone.id ? { ...m, ...payload, name: payload.name } : m));
     } else {
-      await apiService.post(`/task-management/projects/${projectId}/milestones`, payload);
+      const tempId = -Date.now();
+      setMilestones(prev => [...prev, { id: tempId, projectId, name: payload.name, description: payload.description, startDate: payload.start_date, dueDate: payload.due_date, billingPercentage: payload.billing_percentage, status: 'pending', totalTasks: 0, completedTasks: 0, progress: 0 }]);
     }
-
     setMilestoneModalOpen(false);
     setEditingMilestone(null);
-    loadAll();
+
+    try {
+      if (isEdit && editingMilestone) {
+        await apiService.put(`/task-management/projects/${projectId}/milestones/${editingMilestone.id}`, payload);
+      } else {
+        await apiService.post(`/task-management/projects/${projectId}/milestones`, payload);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isEdit ? 'Milestone updated' : 'Milestone added', 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to save milestone', 'error');
+      loadAll(true);
+    }
   };
 
   const deleteMilestone = async (m: Milestone) => {
-    await apiService.delete(`/task-management/projects/${projectId}/milestones/${m.id}`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setMilestones(prev => prev.filter(x => x.id !== m.id));
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/milestones/${m.id}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Milestone deleted', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to delete milestone', 'error');
+      loadAll(true);
+    }
   };
 
   const canShowTaskActions = canManageTasks;
@@ -404,16 +569,53 @@ export default function ProjectDetailScreen() {
     if (!usageMilestone || !usageAllocId || !usageQty) return;
     const qty = parseFloat(usageQty);
     if (isNaN(qty) || qty <= 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isEdit = !!editingUsage;
+    const allocId = Number(usageAllocId);
+    const alloc = projectAllocations.find(a => a.id === allocId);
+    const allocName = alloc?.name ?? 'material';
+
+    // Optimistic: patch the milestone's materialUsages in state
+    if (isEdit && editingUsage) {
+      const patched: MaterialUsage = { ...editingUsage, quantityUsed: qty, notes: usageNotes.trim() || null };
+      setMilestones(prev => prev.map(m => m.id === usageMilestone.id
+        ? { ...m, materialUsages: (m.materialUsages ?? []).map(u => u.id === editingUsage.id ? patched : u) }
+        : m
+      ));
+      setUsageMilestone(prev => prev ? { ...prev, materialUsages: (prev.materialUsages ?? []).map(u => u.id === editingUsage.id ? patched : u) } : prev);
+    } else {
+      const tempUsage: MaterialUsage = {
+        id: -Date.now(),
+        projectMilestoneId: usageMilestone.id,
+        projectMaterialAllocationId: allocId,
+        quantityUsed: qty,
+        notes: usageNotes.trim() || null,
+        itemName: alloc?.name ?? null,
+        unit: alloc?.unit ?? null,
+      };
+      setMilestones(prev => prev.map(m => m.id === usageMilestone.id
+        ? { ...m, materialUsages: [...(m.materialUsages ?? []), tempUsage] }
+        : m
+      ));
+      setUsageMilestone(prev => prev ? { ...prev, materialUsages: [...(prev.materialUsages ?? []), tempUsage] } : prev);
+    }
+    resetUsageForm();
+
     setUsageSubmitting(true);
     try {
-      const payload = { project_material_allocation_id: Number(usageAllocId), quantity_used: qty, notes: usageNotes.trim() || null };
-      if (editingUsage) {
+      const payload = { project_material_allocation_id: allocId, quantity_used: qty, notes: usageNotes.trim() || null };
+      if (isEdit && editingUsage) {
         await apiService.put(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${editingUsage.id}`, payload);
       } else {
         await apiService.post(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage`, payload);
       }
-      resetUsageForm();
-      loadAll();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isEdit ? `Updated usage for ${allocName}` : `Recorded ${qty} ${alloc?.unit ?? ''} of ${allocName}`, 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to save usage', 'error');
+      loadAll(true);
     } finally {
       setUsageSubmitting(false);
     }
@@ -421,12 +623,27 @@ export default function ProjectDetailScreen() {
 
   const deleteUsage = async (u: MaterialUsage) => {
     if (!usageMilestone) return;
-    await apiService.delete(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${u.id}`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // Optimistic: remove from milestone's materialUsages
+    setMilestones(prev => prev.map(m => m.id === usageMilestone.id
+      ? { ...m, materialUsages: (m.materialUsages ?? []).filter(x => x.id !== u.id) }
+      : m
+    ));
+    setUsageMilestone(prev => prev ? { ...prev, materialUsages: (prev.materialUsages ?? []).filter(x => x.id !== u.id) } : prev);
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${u.id}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Usage record removed', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to delete usage', 'error');
+      loadAll(true);
+    }
   };
 
   const milestoneCards = useMemo(() => {
-    return milestones.map((m) => {
+    return milestones.map((m, index) => {
       const progress = m.progress ?? 0;
       const statusMap: Record<string, {c: string; bg: string}> = {
         pending: {c: D.amber, bg: D.amberBg},
@@ -441,16 +658,15 @@ export default function ProjectDetailScreen() {
       };
 
       return (
-        <TouchableOpacity
-          key={m.id}
-          style={styles.card}
-          activeOpacity={0.8}
-          onPress={() =>
-            router.push(
-              `/milestone-tasks?milestoneId=${m.id}&projectId=${projectId}&milestoneName=${encodeURIComponent(m.name)}`
-            )
-          }
-        >
+        <Animated.View key={m.id} entering={FadeInDown.delay(index * 40).duration(200)}>
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/milestone-tasks?milestoneId=${m.id}&projectId=${projectId}&milestoneName=${encodeURIComponent(m.name)}`);
+            }}
+          >
           <View style={styles.cardTopRow}>
             <View style={[styles.cardIconWrap, {backgroundColor: ms.bg}]}>
               <Flag size={16} color={ms.c} strokeWidth={2} />
@@ -490,7 +706,7 @@ export default function ProjectDetailScreen() {
               <View style={styles.rowActions}>
                 {canUsageMaterialView && (
                   <TouchableOpacity
-                    onPress={(e) => { e.stopPropagation(); openUsageModal(m); }}
+                    onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openUsageModal(m); }}
                     style={styles.iconBtn}
                     activeOpacity={0.7}
                   >
@@ -498,7 +714,7 @@ export default function ProjectDetailScreen() {
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); openEditMilestone(m); }}
+                  onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openEditMilestone(m); }}
                   style={styles.iconBtn}
                   activeOpacity={0.7}
                 >
@@ -515,24 +731,55 @@ export default function ProjectDetailScreen() {
             )}
           </View>
         </TouchableOpacity>
+        </Animated.View>
       );
     });
   }, [milestones, canManageMilestones, canShowTaskActions]);
 
 
   const updateTeamStatus = async (memberId: number, assignment_status: string) => {
-    await apiService.put(`/task-management/projects/${projectId}/team/${memberId}/status`, { assignment_status });
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTeam(prev => prev.map(m => m.id === memberId ? { ...m, assignmentStatus: assignment_status } : m));
+    try {
+      await apiService.put(`/task-management/projects/${projectId}/team/${memberId}/status`, { assignment_status });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Member set to ${assignment_status}`, 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to update status', 'error');
+      loadAll(true);
+    }
   };
 
   const releaseTeamMember = async (memberId: number) => {
-    await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTeam(prev => prev.map(m => m.id === memberId ? { ...m, assignmentStatus: 'released' } : m));
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Member released', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to release member', 'error');
+      loadAll(true);
+    }
   };
 
   const forceRemoveTeamMember = async (memberId: number) => {
-    await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}/force-remove`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTeam(prev => prev.filter(m => m.id !== memberId));
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}/force-remove`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Member removed', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to remove member', 'error');
+      loadAll(true);
+    }
   };
 
   const openEditTeamMember = (m: TeamMember) => {
@@ -551,19 +798,28 @@ export default function ProjectDetailScreen() {
     if (!teRole.trim() || !teStartDate.trim() || !teEndDate.trim()) return;
     if (tePayType === 'hourly' && !teHourlyRate.trim()) return;
     if (tePayType === 'salary' && !teMonthlySalary.trim()) return;
-
-    await apiService.put(`/task-management/projects/${projectId}/team/${editingTeamMember.id}`, {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const updated = {
       role: teRole.trim(),
       pay_type: tePayType,
       hourly_rate: tePayType === 'hourly' ? Number(teHourlyRate.trim()) : null,
       monthly_salary: tePayType === 'salary' ? Number(teMonthlySalary.trim()) : null,
       start_date: teStartDate.trim(),
       end_date: teEndDate.trim(),
-    });
-
+    };
+    setTeam(prev => prev.map(m => m.id === editingTeamMember.id ? { ...m, role: updated.role, payType: updated.pay_type, hourlyRate: updated.hourly_rate, monthlySalary: updated.monthly_salary, startDate: updated.start_date, endDate: updated.end_date } : m));
     setTeamEditOpen(false);
     setEditingTeamMember(null);
-    loadAll();
+    try {
+      await apiService.put(`/task-management/projects/${projectId}/team/${editingTeamMember.id}`, updated);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Team member updated', 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to update member', 'error');
+      loadAll(true);
+    }
   };
 
   const openConfirm = (opts: {
@@ -654,18 +910,28 @@ export default function ProjectDetailScreen() {
 
     if (payload.length === 0) return;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await apiService.post(`/task-management/projects/${projectId}/team`, {
       assignables: payload,
     });
-
     setTeamModalOpen(false);
-    loadAll();
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${payload.length} member(s) assigned`, 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to assign members', 'error');
+      loadAll(true);
+    }
   };
 
   if (loading && !project) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color={D.ink} />
+      <View style={[styles.root, { padding: 16, paddingTop: 80 }]}>
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </View>
     );
   }
@@ -753,31 +1019,30 @@ export default function ProjectDetailScreen() {
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tab, tab === 'milestones' && styles.tabActive]}
-          onPress={() => setTab('milestones')}
+          onPress={() => switchTab('milestones')}
         >
           <Layers size={14} color={tab === 'milestones' ? '#fff' : D.ink} strokeWidth={2.5} />
           <Text style={[styles.tabText, tab === 'milestones' && styles.tabTextActive]}>Milestones</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'team' && styles.tabActive]}
-          onPress={() => setTab('team')}
+          onPress={() => switchTab('team')}
           disabled={!canViewTeam}
         >
           <Users size={14} color={tab === 'team' ? '#fff' : D.ink} strokeWidth={2.5} />
-          <Text style={[styles.tabText, tab === 'team' && styles.tabTextActive]}>
-            Team
-          </Text>
+          <Text style={[styles.tabText, tab === 'team' && styles.tabTextActive]}>Team</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'materials' && styles.tabActive]}
-          onPress={() => setTab('materials')}
+          onPress={() => switchTab('materials')}
         >
           <Package size={14} color={tab === 'materials' ? '#fff' : D.ink} strokeWidth={2.5} />
           <Text style={[styles.tabText, tab === 'materials' && styles.tabTextActive]}>Materials</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
+        style={tabContentStyle}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />}
         showsVerticalScrollIndicator={false}
@@ -813,7 +1078,7 @@ export default function ProjectDetailScreen() {
             {!canViewTeam && <Text style={styles.hintText}>Grant `tm.team.view` to view team.</Text>}
 
             {canViewTeam &&
-              team.map((m) => {
+              team.map((m, index) => {
                 const assignSt = (m.assignmentStatus ?? '').toString().toLowerCase();
                 const aMap: Record<string, {c: string; bg: string; label: string}> = {
                   active: {c: D.green, bg: D.greenBg, label: 'Active'},
@@ -823,7 +1088,8 @@ export default function ProjectDetailScreen() {
                 const as = aMap[assignSt] || {c: D.inkMid, bg: '#F0EFED', label: assignSt || '—'};
 
                 return (
-                  <View key={m.id} style={styles.card}>
+                  <Animated.View key={m.id} entering={FadeInDown.delay(index * 40).duration(200)}>
+                  <View style={styles.card}>
                     <View style={styles.cardTopRow}>
                       <View style={[styles.cardIconWrap, { backgroundColor: as.bg }]}>
                         <Users size={16} color={as.c} strokeWidth={2} />
@@ -921,6 +1187,7 @@ export default function ProjectDetailScreen() {
                     </View>
                   </View>
                 </View>
+                  </Animated.View>
                 );
               })}
           </>
@@ -1024,7 +1291,9 @@ export default function ProjectDetailScreen() {
             })}
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <Toast toast={toast} />
 
       {/* Receiving report modal */}
       <Modal visible={rrModalOpen} transparent animationType="slide" onRequestClose={() => setRrModalOpen(false)}>

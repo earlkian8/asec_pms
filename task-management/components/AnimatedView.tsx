@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ViewStyle } from 'react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface AnimatedViewProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ export default function AnimatedView({
 
   return (
     <Animated.View
-      entering={FadeInUp.duration(400).delay(baseDelay).springify()}
+      entering={FadeIn.duration(250).delay(baseDelay)}
       style={style}>
       {children}
     </Animated.View>

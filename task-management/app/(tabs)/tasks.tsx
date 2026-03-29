@@ -14,7 +14,8 @@ import { Task } from '@/types';
 import { D, getStatusColor, getStatusBg } from '@/utils/colors';
 import { formatDate, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
 import { apiService } from '@/services/api';
-import AnimatedView from '@/components/AnimatedView';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
 type SortOption   = 'due_date_asc' | 'due_date_desc' | 'created_at_desc' | 'created_at_asc' | 'title_asc' | 'title_desc';
@@ -115,17 +116,18 @@ export default function TasksScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadTasks(); };
 
-  const renderTask = ({ item }: { item: Task }) => {
+  const renderTask = ({ item, index }: { item: Task; index: number }) => {
     const statusColor = getStatusColor(item.status);
     const statusBg    = getStatusBg(item.status);
     const overdue     = item.dueDate && isOverdue(item.dueDate);
     const daysUntil   = item.dueDate ? getDaysUntilDue(item.dueDate) : null;
 
     return (
-      <TouchableOpacity
-        style={styles.taskCard}
-        onPress={() => router.push(`/task-detail?id=${item.id}`)}
-        activeOpacity={0.7}>
+      <Animated.View entering={FadeIn.duration(250).delay(index * 40)}>
+        <TouchableOpacity
+          style={styles.taskCard}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/task-detail?id=${item.id}`); }}
+          activeOpacity={0.7}>
         <View style={[styles.taskAccentBar, { backgroundColor: statusColor }]} />
         <View style={styles.taskCardInner}>
           <View style={styles.taskCardTop}>
@@ -153,6 +155,7 @@ export default function TasksScreen() {
           </View>
         </View>
       </TouchableOpacity>
+      </Animated.View>
     );
   };
 

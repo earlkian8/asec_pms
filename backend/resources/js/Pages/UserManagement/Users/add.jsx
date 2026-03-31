@@ -16,7 +16,7 @@ import { Button } from '@/Components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Textarea } from '@/Components/ui/textarea';
 import {
-  Eye, EyeOff, Loader2, Save, ChevronRight, ChevronLeft,
+  Loader2, Save, ChevronRight, ChevronLeft,
   Lock, User, Phone, CreditCard, Camera, Upload, X, AlertTriangle,
 } from 'lucide-react';
 import PhilippineAddressSelector from './PhilippineAddressSelector';
@@ -29,7 +29,7 @@ const TABS = [
 ];
 
 const TAB_FIELDS = {
-  account:   ['first_name', 'middle_name', 'last_name', 'email', 'password', 'password_confirmation', 'role'],
+  account:   ['first_name', 'middle_name', 'last_name', 'email', 'role'],
   personal:  ['profile_image', 'phone', 'secondary_phone', 'gender', 'date_of_birth',
                'civil_status', 'nationality', 'region', 'province', 'city_municipality',
                'barangay', 'address', 'zip_code', 'notes'],
@@ -104,8 +104,6 @@ const GovIdRow = ({ label, numberKey, imageKey, data, setData, errors }) => {
 };
 
 const AddUser = ({ setShowAddModal, roles }) => {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [activeTab, setActiveTab] = useState('account');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const avatarRef = useRef(null);
@@ -116,8 +114,6 @@ const AddUser = ({ setShowAddModal, roles }) => {
     middle_name: '',
     last_name: '',
     email: '',
-    password: '',
-    password_confirmation: '',
     role: '',
 
     // Personal
@@ -290,44 +286,6 @@ const AddUser = ({ setShowAddModal, roles }) => {
                     className={inputClass(errors.email)}
                   />
                   <InputError message={errors.email} />
-                </div>
-
-                <div>
-                  <Label className="text-zinc-800">Password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      value={data.password}
-                      onChange={e => setData('password', e.target.value)}
-                      placeholder="Enter password"
-                      className={inputClass(errors.password) + " pr-12"}
-                    />
-                    <Button type="button" variant="ghost" size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}>
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <InputError message={errors.password} />
-                </div>
-
-                <div>
-                  <Label className="text-zinc-800">Confirm Password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPasswordConfirmation ? 'text' : 'password'}
-                      value={data.password_confirmation}
-                      onChange={e => setData('password_confirmation', e.target.value)}
-                      placeholder="Confirm password"
-                      className={inputClass(errors.password_confirmation) + " pr-12"}
-                    />
-                    <Button type="button" variant="ghost" size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}>
-                      {showPasswordConfirmation ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <InputError message={errors.password_confirmation} />
                 </div>
 
                 <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mt-2">Role & Identity</p>

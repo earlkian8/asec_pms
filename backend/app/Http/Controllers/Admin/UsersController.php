@@ -7,8 +7,10 @@ use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
+use App\Mail\UserCredentialsMail;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -79,7 +81,7 @@ class UsersController extends Controller
                     : Rule::unique('users', 'email')->ignore($user->id),
             ],
             'password' => [
-                $isCreate ? 'required' : 'nullable',
+                'nullable',
                 'string',
                 'confirmed',
                 Password::min(8)->max(254)->mixedCase()->numbers()->symbols(),
@@ -193,12 +195,26 @@ class UsersController extends Controller
     {
         $v = $request->validate($this->baseRules(true), $this->passwordMessages);
 
+        $upper    = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $lower    = 'abcdefghijklmnopqrstuvwxyz';
+        $digits   = '0123456789';
+        $symbols  = '!@#$%^&*';
+        $all      = $upper . $lower . $digits . $symbols;
+        $password = $upper[random_int(0, 25)]
+                  . $lower[random_int(0, 25)]
+                  . $digits[random_int(0, 9)]
+                  . $symbols[random_int(0, 7)];
+        for ($i = 0; $i < 8; $i++) {
+            $password .= $all[random_int(0, strlen($all) - 1)];
+        }
+        $plainPassword = str_shuffle($password);
+
         $user = User::create([
             'first_name'  => $v['first_name'],
             'middle_name' => $v['middle_name'] ?? null,
             'last_name'   => $v['last_name'],
             'email'       => $v['email'],
-            'password'    => Hash::make($v['password']),
+            'password'    => Hash::make($plainPassword),
             'email_verified_at' => now(),
 
             'employee_id'   => $v['employee_id'] ?? null,
@@ -236,12 +252,22 @@ class UsersController extends Controller
 
         $user->assignRole($v['role']);
 
+        if ($user->email) {
+            try {
+                Mail::to($user->email)->send(new UserCredentialsMail($user, $plainPassword));
+            } catch (\Exception $e) {
+                throw new \Exception('User created but failed to send credentials email: ' . $e->getMessage());
+            }
+        }
+
         $this->adminActivityLogs('User', 'Add', "Created User {$user->name} ({$user->email}) with role: {$v['role']}");
         $this->createSystemNotification(
             'general', 'New User Created',
             "A new user '{$user->name}' ({$user->email}) has been created with role '{$v['role']}'.",
             null, route('user-management.users.index')
         );
+
+        return redirect()->back()->with('success', 'User created successfully. Credentials have been sent to their email.');
     }
 
     // ── update ────────────────────────────────────────────────────────────────

@@ -155,9 +155,6 @@ class ClientBillingController extends Controller
      */
     public function index(Request $request)
     {
-        if (! ClientPortalSetting::displayBillingModule()) {
-            return $this->billingModuleDisabledResponse();
-        }
 
         $client = $request->user();
         
@@ -211,9 +208,6 @@ class ClientBillingController extends Controller
      */
     public function show(Request $request, $id)
     {
-        if (! ClientPortalSetting::displayBillingModule()) {
-            return $this->billingModuleDisabledResponse();
-        }
 
         $client = $request->user();
 
@@ -467,9 +461,6 @@ class ClientBillingController extends Controller
      */
     public function checkPaymentStatus(Request $request, $id)
     {
-        if (! ClientPortalSetting::displayBillingModule()) {
-            return $this->billingModuleDisabledResponse();
-        }
 
         // Validate ID is numeric to prevent route conflicts
         if (!is_numeric($id)) {
@@ -666,9 +657,6 @@ class ClientBillingController extends Controller
      */
     public function transactions(Request $request)
     {
-        if (! ClientPortalSetting::displayBillingModule()) {
-            return $this->billingModuleDisabledResponse();
-        }
 
         try {
             $client = $request->user();
@@ -715,9 +703,6 @@ class ClientBillingController extends Controller
 
             // Build the base query
             $query = BillingPayment::query();
-
-            // Only get payments made by clients
-            $query->where('paid_by_client', true);
 
             // Only get payments from client's projects
             if (!empty($projectIds)) {

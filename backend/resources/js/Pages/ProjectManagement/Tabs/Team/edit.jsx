@@ -42,7 +42,9 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
 
   const { data, setData, put, errors, processing, transform } = useForm({
     role: roleFromProfile,
+    pay_type: projectTeam?.pay_type || 'hourly',
     hourly_rate: projectTeam?.hourly_rate ? parseFloat(projectTeam.hourly_rate) : 0,
+    monthly_salary: projectTeam?.monthly_salary ? parseFloat(projectTeam.monthly_salary) : 0,
     start_date: formatDateForInput(projectTeam?.start_date),
     end_date: formatDateForInput(projectTeam?.end_date),
     is_active: projectTeam?.is_active ?? false,
@@ -50,11 +52,13 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
 
   // Transform data before submission
   transform((data) => ({
-    role: data.role.trim(),
-    hourly_rate: parseFloat(data.hourly_rate) || 0,
-    start_date: data.start_date || null,
-    end_date: data.end_date || null,
-    is_active: Boolean(data.is_active),
+    role:           data.role.trim(),
+    pay_type:       data.pay_type,
+    hourly_rate:    data.pay_type === 'hourly'  ? (parseFloat(data.hourly_rate) || 0)    : null,
+    monthly_salary: data.pay_type === 'salary'  ? (parseFloat(data.monthly_salary) || 0) : null,
+    start_date:     data.start_date || null,
+    end_date:       data.end_date || null,
+    is_active:      Boolean(data.is_active),
   }))
 
   const [validationErrors, setValidationErrors] = useState({});
@@ -65,8 +69,11 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
 
     // Client-side validation
     const errors = {};
-    if (!data.hourly_rate || parseFloat(data.hourly_rate) <= 0) {
+    if (data.pay_type === 'hourly' && (!data.hourly_rate || parseFloat(data.hourly_rate) <= 0)) {
       errors.hourly_rate = "Please enter a valid hourly rate";
+    }
+    if (data.pay_type === 'salary' && (!data.monthly_salary || parseFloat(data.monthly_salary) <= 0)) {
+      errors.monthly_salary = "Please enter a valid monthly salary";
     }
     if (!data.start_date) {
       errors.start_date = "Please enter a start date";
@@ -141,30 +148,61 @@ export default function EditProjectTeam({ setShowEditModal, projectTeam, project
             <p className="text-xs text-gray-500 mt-1">Role is automatically set from user/employee profile</p>
           </div>
 
-          {/* Hourly Rate */}
-          <div>
-            <Label className="text-zinc-800">Hourly Rate <span className="text-red-500">*</span></Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={data.hourly_rate}
-              onChange={(e) => {
-                setData("hourly_rate", parseFloat(e.target.value) || 0);
-                if (validationErrors.hourly_rate) {
-                  setValidationErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.hourly_rate;
-                    return newErrors;
-                  });
-                }
-              }}
-              placeholder="Enter hourly rate"
-              className={inputClass(getFieldError("hourly_rate"))}
-              required
-            />
-            <InputError message={getFieldError("hourly_rate")} />
+          {/* Pay Type */}
+          <div className="col-span-2">
+            <Label className="text-zinc-800">Pay Type</Label>
+            <div className="flex rounded-xl border border-gray-200 overflow-hidden text-sm mt-1">
+              {[
+                { id: 'hourly', label: 'Hourly' },
+                { id: 'salary', label: 'Monthly Salary' },
+                { id: 'fixed',  label: 'Fixed' },
+              ].map(pt => (
+                <button key={pt.id} type="button"
+                  onClick={() => setData('pay_type', pt.id)}
+                  className={`flex-1 py-2 font-medium transition-all ${
+                    data.pay_type === pt.id ? 'bg-zinc-700 text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}>
+                  {pt.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Rate field — conditional */}
+          {data.pay_type === 'hourly' && (
+            <div>
+              <Label className="text-zinc-800">Hourly Rate <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0"
+                value={data.hourly_rate}
+                onChange={(e) => setData('hourly_rate', parseFloat(e.target.value) || 0)}
+                placeholder="Enter hourly rate"
+                className={inputClass(getFieldError('hourly_rate'))}
+              />
+              <InputError message={getFieldError('hourly_rate')} />
+            </div>
+          )}
+          {data.pay_type === 'salary' && (
+            <div>
+              <Label className="text-zinc-800">Monthly Salary <span className="text-red-500">*</span></Label>
+              <Input type="number" step="0.01" min="0"
+                value={data.monthly_salary}
+                onChange={(e) => setData('monthly_salary', parseFloat(e.target.value) || 0)}
+                placeholder="Enter monthly salary"
+                className={inputClass(getFieldError('monthly_salary'))}
+              />
+              <p className="text-xs text-gray-400 mt-0.5">
+                Daily equivalent: ₱{data.monthly_salary ? (parseFloat(data.monthly_salary)/26).toFixed(2) : '0.00'}/day (÷26 working days)
+              </p>
+              <InputError message={getFieldError('monthly_salary')} />
+            </div>
+          )}
+          {data.pay_type === 'fixed' && (
+            <div className="col-span-2">
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                Fixed pay — gross amount will be entered per payroll period.
+              </p>
+            </div>
+          )}
 
           {/* Status */}
           <div>

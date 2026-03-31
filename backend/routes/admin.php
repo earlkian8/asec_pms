@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\ClientTypesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
+use App\Http\Controllers\Admin\MilestoneMaterialUsagesController;
 use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Admin\ProjectIssuesController;
 use App\Http\Controllers\Admin\ProjectMaterialAllocationsController;
 use App\Http\Controllers\Admin\ProjectLaborCostsController;
 use App\Http\Controllers\Admin\ProjectMiscellaneousExpensesController;
+use App\Http\Controllers\Admin\DirectSuppliesController;
 use App\Http\Controllers\Admin\InventoryItemsController;
 use App\Http\Controllers\Admin\BillingsController;
 use App\Http\Controllers\Admin\ReportsController;
@@ -95,6 +97,10 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'update'])->middleware('permission:project-milestones.update')->name('update');
             Route::delete('/destroy/{project}/milestone/{milestone}', [ProjectMilestonesController::class, 'destroy'])->middleware('permission:project-milestones.delete')->name('destroy');
             Route::get('/export-pdf/{project}', [ProjectMilestonesController::class, 'exportPdf'])->middleware('permission:project-milestones.view')->name('export-pdf');
+            // Milestone Material Usages
+            Route::post('/material-usage/{project}/milestone/{milestone}', [MilestoneMaterialUsagesController::class, 'store'])->middleware('permission:milestone-material-usage.create')->name('material-usage.store');
+            Route::put('/material-usage/{project}/milestone/{milestone}/usage/{usage}', [MilestoneMaterialUsagesController::class, 'update'])->middleware('permission:milestone-material-usage.update')->name('material-usage.update');
+            Route::delete('/material-usage/{project}/milestone/{milestone}/usage/{usage}', [MilestoneMaterialUsagesController::class, 'destroy'])->middleware('permission:milestone-material-usage.delete')->name('material-usage.destroy');
         });
 
         // Project Tasks
@@ -239,6 +245,18 @@ Route::middleware('auth')->group(function () {
             Route::post('/restore', [TrashBinController::class, 'restore'])->middleware('permission:trash-bin.restore')->name('restore');
             Route::delete('/force-delete', [TrashBinController::class, 'forceDelete'])->middleware('permission:trash-bin.force-delete')->name('force-delete');
         });
+    });
+
+    // Direct Supply Management
+    Route::prefix('direct-supply-management')->name('direct-supply-management.')->group(function(){
+        Route::get('/', [DirectSuppliesController::class, 'index'])->middleware('permission:direct-supply.view')->name('index');
+        Route::post('/store', [DirectSuppliesController::class, 'store'])->middleware('permission:direct-supply.create')->name('store');
+        Route::put('/update/{directSupply}', [DirectSuppliesController::class, 'update'])->middleware('permission:direct-supply.update')->name('update');
+        Route::delete('/destroy/{directSupply}', [DirectSuppliesController::class, 'destroy'])->middleware('permission:direct-supply.delete')->name('destroy');
+        Route::put('/update-status/{directSupply}', [DirectSuppliesController::class, 'updateStatus'])->middleware('permission:direct-supply.update')->name('update-status');
+        Route::post('/allocate/{directSupply}', [DirectSuppliesController::class, 'allocate'])->middleware('permission:direct-supply.allocate')->name('allocate');
+        Route::put('/archive/{directSupply}', [DirectSuppliesController::class, 'archive'])->middleware('permission:direct-supply.delete')->name('archive');
+        Route::put('/restore/{directSupply}', [DirectSuppliesController::class, 'restore'])->middleware('permission:direct-supply.update')->name('restore');
     });
 
     // Inventory Management

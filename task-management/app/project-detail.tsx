@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,19 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Info, Package } from 'lucide-react-native';
+import { ArrowLeft, Flag, Users, Plus, Trash2, Pencil, Layers, LogOut, UserCheck, MapPin, Calendar, Package, Boxes } from 'lucide-react-native';
 import { D } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,6 +56,32 @@ type Milestone = {
   totalTasks?: number;
   completedTasks?: number;
   progress?: number;
+  materialUsages?: MaterialUsage[];
+};
+
+type MaterialUsage = {
+  id: number;
+  projectMilestoneId: number;
+  projectMaterialAllocationId: number;
+  quantityUsed: number;
+  notes?: string | null;
+  recordedBy?: string | null;
+  itemName?: string | null;
+  itemCode?: string | null;
+  unit?: string | null;
+  isDirect?: boolean;
+  createdAt?: string | null;
+};
+
+type ProjectAllocation = {
+  id: number;
+  name: string;
+  code: string;
+  unit: string;
+  isDirect: boolean;
+  qtyAllocated: number;
+  qtyReceived: number;
+  qtyUsed: number;
 };
 
 type TeamMember = {
@@ -55,7 +90,9 @@ type TeamMember = {
   role: string;
   assignableType?: 'user' | 'employee' | string;
   assignmentStatus?: string;
+  payType?: 'hourly' | 'salary' | 'fixed' | string;
   hourlyRate?: number | string | null;
+  monthlySalary?: number | string | null;
   startDate?: string | null;
   endDate?: string | null;
 };
@@ -80,18 +117,120 @@ type ReceivingReport = {
 
 type MaterialAllocation = {
   id: number;
+  isDirect?: boolean;
   itemName?: string | null;
   itemCode?: string | null;
   unit?: string | null;
   quantityAllocated: number;
   quantityReceived: number;
   quantityRemaining: number;
+  totalUsed?: number;
+  available?: number;
   status: string;
   notes?: string | null;
   receivingReports: ReceivingReport[];
 };
 
 type TabKey = 'milestones' | 'team' | 'materials';
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+type ToastType = 'success' | 'error' | 'info';
+type ToastState = { message: string; type: ToastType; id: number } | null;
+
+function useToast() {
+  const [toast, setToast] = useState<ToastState>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = useCallback((message: string, type: ToastType = 'success') => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setToast({ message, type, id: Date.now() });
+    timerRef.current = setTimeout(() => setToast(null), 2800);
+  }, []);
+
+  const hide = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setToast(null);
+  }, []);
+
+  return { toast, show, hide };
+}
+
+function Toast({ toast }: { toast: ToastState }) {
+  if (!toast) return null;
+  const bg = toast.type === 'success' ? D.green : toast.type === 'error' ? D.red : D.blue;
+  const icon = toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ';
+  return (
+    <Animated.View
+      key={toast.id}
+      entering={FadeInDown.springify().damping(14)}
+      exiting={FadeOutUp.duration(200)}
+      style={[toastStyles.wrap, { backgroundColor: bg }]}
+    >
+      <Text style={toastStyles.icon}>{icon}</Text>
+      <Text style={toastStyles.msg} numberOfLines={2}>{toast.message}</Text>
+    </Animated.View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    bottom: 32,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderRadius: 14,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  icon: { fontSize: 14, color: '#fff', fontWeight: '900' },
+  msg: { fontSize: 13, color: '#fff', fontWeight: '700', flex: 1 },
+});
+
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    opacity.value = withTiming(0.4, { duration: 700 }, () => {
+      opacity.value = withTiming(1, { duration: 700 });
+    });
+  }, []);
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View style={[skeletonStyles.card, animStyle]}>
+      <View style={skeletonStyles.iconBox} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={[skeletonStyles.line, { width: '60%' }]} />
+        <View style={[skeletonStyles.line, { width: '40%', height: 8 }]} />
+        <View style={[skeletonStyles.line, { width: '80%', height: 6, marginTop: 4 }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E8E5DF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#E8E5DF' },
+  line: { height: 12, borderRadius: 6, backgroundColor: '#E8E5DF' },
+});
 
 // ─── Reusable date picker field ───────────────────────────────────────────────
 function DatePickerField({
@@ -159,14 +298,32 @@ export default function ProjectDetailScreen() {
   const canReactivateTeam = hasPermission('tm.team.reactivate');
   const canForceRemoveTeam = hasPermission('tm.team.force-remove');
   const canReceivingReport = hasPermission('material-allocations.receiving-report');
+  const canUsageMaterialView = hasPermission('milestone-material-usage.view');
+  const canUsageMaterialCreate = hasPermission('milestone-material-usage.create');
+  const canUsageMaterialUpdate = hasPermission('milestone-material-usage.update');
+  const canUsageMaterialDelete = hasPermission('milestone-material-usage.delete');
+
+  const { toast, show: showToast } = useToast();
+  const tabAnim = useSharedValue(0);
 
   const [tab, setTab] = useState<TabKey>('milestones');
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [materials, setMaterials] = useState<MaterialAllocation[]>([]);
+  const [projectAllocations, setProjectAllocations] = useState<ProjectAllocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Material usage modal
+  const [usageModalOpen, setUsageModalOpen] = useState(false);
+  const [usageMilestone, setUsageMilestone] = useState<Milestone | null>(null);
+  const [editingUsage, setEditingUsage] = useState<MaterialUsage | null>(null);
+  const [usageAllocId, setUsageAllocId] = useState('');
+  const [usageQty, setUsageQty] = useState('');
+  const [usageNotes, setUsageNotes] = useState('');
+  const [usageAllocPickerOpen, setUsageAllocPickerOpen] = useState(false);
+  const [usageSubmitting, setUsageSubmitting] = useState(false);
 
   // Receiving report modal
   const [rrModalOpen, setRrModalOpen] = useState(false);
@@ -194,13 +351,15 @@ export default function ProjectDetailScreen() {
   const [assignablesLoading, setAssignablesLoading] = useState(false);
   const [assignablesSearch, setAssignablesSearch] = useState('');
   const [selectedAssignables, setSelectedAssignables] = useState<string[]>([]);
-  const [assignFormData, setAssignFormData] = useState<Record<string, { role: string; hourly_rate: string; start_date: string; end_date: string }>>({});
+  const [assignFormData, setAssignFormData] = useState<Record<string, { role: string; pay_type: string; hourly_rate: string; monthly_salary: string; start_date: string; end_date: string }>>({});
 
   // Team edit modal
   const [teamEditOpen, setTeamEditOpen] = useState(false);
   const [editingTeamMember, setEditingTeamMember] = useState<TeamMember | null>(null);
   const [teRole, setTeRole] = useState('');
+  const [tePayType, setTePayType] = useState<'hourly' | 'salary' | 'fixed'>('hourly');
   const [teHourlyRate, setTeHourlyRate] = useState('');
+  const [teMonthlySalary, setTeMonthlySalary] = useState('');
   const [teStartDate, setTeStartDate] = useState('');
   const [teEndDate, setTeEndDate] = useState('');
 
@@ -212,9 +371,22 @@ export default function ProjectDetailScreen() {
   const [confirmTone, setConfirmTone] = useState<'neutral' | 'danger'>('neutral');
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
 
-  const loadAll = async () => {
+  const switchTab = (t: TabKey) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    tabAnim.value = withTiming(0, { duration: 0 }, () => {
+      tabAnim.value = withSpring(1, { damping: 16, stiffness: 180 });
+    });
+    setTab(t);
+  };
+
+  const tabContentStyle = useAnimatedStyle(() => ({
+    opacity: tabAnim.value,
+    transform: [{ translateX: withTiming(0) }],
+  }));
+
+  const loadAll = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [pRes, mRes, tRes, matRes] = await Promise.all([
         apiService.get<Project>(`/task-management/projects/${projectId}`),
         apiService.get<Milestone[]>(`/task-management/projects/${projectId}/milestones`),
@@ -223,9 +395,19 @@ export default function ProjectDetailScreen() {
       ]);
 
       if (pRes.success && pRes.data) setProject(pRes.data);
-      if (mRes.success && mRes.data) setMilestones(Array.isArray(mRes.data) ? mRes.data : []);
+      if (mRes.success) {
+        const mData = (mRes as any);
+        const freshMilestones = Array.isArray(mData.data) ? mData.data : [];
+        setMilestones(freshMilestones);
+        setProjectAllocations(Array.isArray(mData.projectAllocations) ? mData.projectAllocations : []);
+        setUsageMilestone(prev => prev ? (freshMilestones.find((m: Milestone) => m.id === prev.id) ?? prev) : null);
+      }
       if (tRes.success && tRes.data) setTeam(Array.isArray(tRes.data) ? tRes.data : []);
       if (matRes.success && matRes.data) setMaterials(Array.isArray(matRes.data) ? matRes.data : []);
+
+      if (!silent) {
+        tabAnim.value = withSpring(1, { damping: 16, stiffness: 180 });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -243,9 +425,15 @@ export default function ProjectDetailScreen() {
 
   const submitReceivingReport = async () => {
     if (!rrAllocation) return;
-    // Default to full remaining if left empty
     const qty = rrQty.trim() ? parseFloat(rrQty) : rrAllocation.quantityRemaining;
     if (isNaN(qty) || qty <= 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Optimistic update
+    setMaterials(prev => prev.map(a => a.id === rrAllocation.id
+      ? { ...a, quantityReceived: a.quantityReceived + qty, quantityRemaining: Math.max(0, a.quantityRemaining - qty) }
+      : a
+    ));
+    setRrModalOpen(false);
     try {
       setRrSubmitting(true);
       await apiService.post(`/task-management/projects/${projectId}/material-allocations/${rrAllocation.id}/receiving-report`, {
@@ -253,8 +441,13 @@ export default function ProjectDetailScreen() {
         condition: rrCondition || null,
         notes: rrNotes.trim() || null,
       });
-      setRrModalOpen(false);
-      loadAll();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Receiving report submitted', 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to submit report', 'error');
+      loadAll(true);
     } finally {
       setRrSubmitting(false);
     }
@@ -300,27 +493,157 @@ export default function ProjectDetailScreen() {
       billing_percentage: mBillingPercentage.trim() ? Number(mBillingPercentage.trim()) : null,
     };
     if (!payload.name) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (editingMilestone) {
-      await apiService.put(`/task-management/projects/${projectId}/milestones/${editingMilestone.id}`, payload);
+    const isEdit = !!editingMilestone;
+    // Optimistic update
+    if (isEdit && editingMilestone) {
+      setMilestones(prev => prev.map(m => m.id === editingMilestone.id ? { ...m, ...payload, name: payload.name } : m));
     } else {
-      await apiService.post(`/task-management/projects/${projectId}/milestones`, payload);
+      const tempId = -Date.now();
+      setMilestones(prev => [...prev, { id: tempId, projectId, name: payload.name, description: payload.description, startDate: payload.start_date, dueDate: payload.due_date, billingPercentage: payload.billing_percentage, status: 'pending', totalTasks: 0, completedTasks: 0, progress: 0 }]);
     }
-
     setMilestoneModalOpen(false);
     setEditingMilestone(null);
-    loadAll();
+
+    try {
+      if (isEdit && editingMilestone) {
+        await apiService.put(`/task-management/projects/${projectId}/milestones/${editingMilestone.id}`, payload);
+      } else {
+        await apiService.post(`/task-management/projects/${projectId}/milestones`, payload);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isEdit ? 'Milestone updated' : 'Milestone added', 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to save milestone', 'error');
+      loadAll(true);
+    }
   };
 
   const deleteMilestone = async (m: Milestone) => {
-    await apiService.delete(`/task-management/projects/${projectId}/milestones/${m.id}`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setMilestones(prev => prev.filter(x => x.id !== m.id));
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/milestones/${m.id}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Milestone deleted', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to delete milestone', 'error');
+      loadAll(true);
+    }
   };
 
   const canShowTaskActions = canManageTasks;
 
+  const openUsageModal = (m: Milestone) => {
+    setUsageMilestone(m);
+    setEditingUsage(null);
+    setUsageAllocId('');
+    setUsageQty('');
+    setUsageNotes('');
+    setUsageAllocPickerOpen(false);
+    setUsageModalOpen(true);
+  };
+
+  const openEditUsage = (u: MaterialUsage) => {
+    setEditingUsage(u);
+    setUsageAllocId(String(u.projectMaterialAllocationId));
+    setUsageQty(String(u.quantityUsed));
+    setUsageNotes(u.notes ?? '');
+    setUsageAllocPickerOpen(false);
+  };
+
+  const resetUsageForm = () => {
+    setEditingUsage(null);
+    setUsageAllocId('');
+    setUsageQty('');
+    setUsageNotes('');
+    setUsageAllocPickerOpen(false);
+  };
+
+  const submitUsage = async () => {
+    if (!usageMilestone || !usageAllocId || !usageQty) return;
+    const qty = parseFloat(usageQty);
+    if (isNaN(qty) || qty <= 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isEdit = !!editingUsage;
+    const allocId = Number(usageAllocId);
+    const alloc = projectAllocations.find(a => a.id === allocId);
+    const allocName = alloc?.name ?? 'material';
+
+    // Optimistic: patch the milestone's materialUsages in state
+    if (isEdit && editingUsage) {
+      const patched: MaterialUsage = { ...editingUsage, quantityUsed: qty, notes: usageNotes.trim() || null };
+      setMilestones(prev => prev.map(m => m.id === usageMilestone.id
+        ? { ...m, materialUsages: (m.materialUsages ?? []).map(u => u.id === editingUsage.id ? patched : u) }
+        : m
+      ));
+      setUsageMilestone(prev => prev ? { ...prev, materialUsages: (prev.materialUsages ?? []).map(u => u.id === editingUsage.id ? patched : u) } : prev);
+    } else {
+      const tempUsage: MaterialUsage = {
+        id: -Date.now(),
+        projectMilestoneId: usageMilestone.id,
+        projectMaterialAllocationId: allocId,
+        quantityUsed: qty,
+        notes: usageNotes.trim() || null,
+        itemName: alloc?.name ?? null,
+        unit: alloc?.unit ?? null,
+      };
+      setMilestones(prev => prev.map(m => m.id === usageMilestone.id
+        ? { ...m, materialUsages: [...(m.materialUsages ?? []), tempUsage] }
+        : m
+      ));
+      setUsageMilestone(prev => prev ? { ...prev, materialUsages: [...(prev.materialUsages ?? []), tempUsage] } : prev);
+    }
+    resetUsageForm();
+
+    setUsageSubmitting(true);
+    try {
+      const payload = { project_material_allocation_id: allocId, quantity_used: qty, notes: usageNotes.trim() || null };
+      if (isEdit && editingUsage) {
+        await apiService.put(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${editingUsage.id}`, payload);
+      } else {
+        await apiService.post(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage`, payload);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isEdit ? `Updated usage for ${allocName}` : `Recorded ${qty} ${alloc?.unit ?? ''} of ${allocName}`, 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to save usage', 'error');
+      loadAll(true);
+    } finally {
+      setUsageSubmitting(false);
+    }
+  };
+
+  const deleteUsage = async (u: MaterialUsage) => {
+    if (!usageMilestone) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    // Optimistic: remove from milestone's materialUsages
+    setMilestones(prev => prev.map(m => m.id === usageMilestone.id
+      ? { ...m, materialUsages: (m.materialUsages ?? []).filter(x => x.id !== u.id) }
+      : m
+    ));
+    setUsageMilestone(prev => prev ? { ...prev, materialUsages: (prev.materialUsages ?? []).filter(x => x.id !== u.id) } : prev);
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/milestones/${usageMilestone.id}/material-usage/${u.id}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Usage record removed', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to delete usage', 'error');
+      loadAll(true);
+    }
+  };
+
   const milestoneCards = useMemo(() => {
-    return milestones.map((m) => {
+    return milestones.map((m, index) => {
       const progress = m.progress ?? 0;
       const statusMap: Record<string, {c: string; bg: string}> = {
         pending: {c: D.amber, bg: D.amberBg},
@@ -335,16 +658,15 @@ export default function ProjectDetailScreen() {
       };
 
       return (
-        <TouchableOpacity
-          key={m.id}
-          style={styles.card}
-          activeOpacity={0.8}
-          onPress={() =>
-            router.push(
-              `/milestone-tasks?milestoneId=${m.id}&projectId=${projectId}&milestoneName=${encodeURIComponent(m.name)}`
-            )
-          }
-        >
+        <Animated.View key={m.id} entering={FadeInDown.delay(index * 40).duration(200)}>
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/milestone-tasks?milestoneId=${m.id}&projectId=${projectId}&milestoneName=${encodeURIComponent(m.name)}`);
+            }}
+          >
           <View style={styles.cardTopRow}>
             <View style={[styles.cardIconWrap, {backgroundColor: ms.bg}]}>
               <Flag size={16} color={ms.c} strokeWidth={2} />
@@ -382,21 +704,24 @@ export default function ProjectDetailScreen() {
 
             {canManageMilestones && (
               <View style={styles.rowActions}>
+                {canUsageMaterialView && (
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openUsageModal(m); }}
+                    style={styles.iconBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Boxes size={16} color={D.green} strokeWidth={2.5} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    openEditMilestone(m);
-                  }}
+                  onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openEditMilestone(m); }}
                   style={styles.iconBtn}
                   activeOpacity={0.7}
                 >
                   <Pencil size={16} color={D.ink} strokeWidth={2.5} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    deleteMilestone(m);
-                  }}
+                  onPress={(e) => { e.stopPropagation(); deleteMilestone(m); }}
                   style={styles.iconBtn}
                   activeOpacity={0.7}
                 >
@@ -406,30 +731,63 @@ export default function ProjectDetailScreen() {
             )}
           </View>
         </TouchableOpacity>
+        </Animated.View>
       );
     });
   }, [milestones, canManageMilestones, canShowTaskActions]);
 
 
   const updateTeamStatus = async (memberId: number, assignment_status: string) => {
-    await apiService.put(`/task-management/projects/${projectId}/team/${memberId}/status`, { assignment_status });
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTeam(prev => prev.map(m => m.id === memberId ? { ...m, assignmentStatus: assignment_status } : m));
+    try {
+      await apiService.put(`/task-management/projects/${projectId}/team/${memberId}/status`, { assignment_status });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Member set to ${assignment_status}`, 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to update status', 'error');
+      loadAll(true);
+    }
   };
 
   const releaseTeamMember = async (memberId: number) => {
-    await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTeam(prev => prev.map(m => m.id === memberId ? { ...m, assignmentStatus: 'released' } : m));
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Member released', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to release member', 'error');
+      loadAll(true);
+    }
   };
 
   const forceRemoveTeamMember = async (memberId: number) => {
-    await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}/force-remove`);
-    loadAll();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTeam(prev => prev.filter(m => m.id !== memberId));
+    try {
+      await apiService.delete(`/task-management/projects/${projectId}/team/${memberId}/force-remove`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Member removed', 'info');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to remove member', 'error');
+      loadAll(true);
+    }
   };
 
   const openEditTeamMember = (m: TeamMember) => {
     setEditingTeamMember(m);
     setTeRole(m.role || '');
+    setTePayType((m.payType as any) || 'hourly');
     setTeHourlyRate(m.hourlyRate !== null && m.hourlyRate !== undefined ? String(m.hourlyRate) : '');
+    setTeMonthlySalary(m.monthlySalary !== null && m.monthlySalary !== undefined ? String(m.monthlySalary) : '');
     setTeStartDate(m.startDate || '');
     setTeEndDate(m.endDate || '');
     setTeamEditOpen(true);
@@ -437,18 +795,31 @@ export default function ProjectDetailScreen() {
 
   const submitTeamEdit = async () => {
     if (!editingTeamMember) return;
-    if (!teRole.trim() || !teHourlyRate.trim() || !teStartDate.trim() || !teEndDate.trim()) return;
-
-    await apiService.put(`/task-management/projects/${projectId}/team/${editingTeamMember.id}`, {
+    if (!teRole.trim() || !teStartDate.trim() || !teEndDate.trim()) return;
+    if (tePayType === 'hourly' && !teHourlyRate.trim()) return;
+    if (tePayType === 'salary' && !teMonthlySalary.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const updated = {
       role: teRole.trim(),
-      hourly_rate: Number(teHourlyRate.trim()),
+      pay_type: tePayType,
+      hourly_rate: tePayType === 'hourly' ? Number(teHourlyRate.trim()) : null,
+      monthly_salary: tePayType === 'salary' ? Number(teMonthlySalary.trim()) : null,
       start_date: teStartDate.trim(),
       end_date: teEndDate.trim(),
-    });
-
+    };
+    setTeam(prev => prev.map(m => m.id === editingTeamMember.id ? { ...m, role: updated.role, payType: updated.pay_type, hourlyRate: updated.hourly_rate, monthlySalary: updated.monthly_salary, startDate: updated.start_date, endDate: updated.end_date } : m));
     setTeamEditOpen(false);
     setEditingTeamMember(null);
-    loadAll();
+    try {
+      await apiService.put(`/task-management/projects/${projectId}/team/${editingTeamMember.id}`, updated);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Team member updated', 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to update member', 'error');
+      loadAll(true);
+    }
   };
 
   const openConfirm = (opts: {
@@ -479,12 +850,14 @@ export default function ProjectDetailScreen() {
     setSelectedAssignables((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const setAssignField = (id: string, field: 'role' | 'hourly_rate' | 'start_date' | 'end_date', value: string) => {
+  const setAssignField = (id: string, field: 'role' | 'pay_type' | 'hourly_rate' | 'monthly_salary' | 'start_date' | 'end_date', value: string) => {
     setAssignFormData((prev) => ({
       ...prev,
       [id]: {
         role: prev[id]?.role ?? '',
+        pay_type: prev[id]?.pay_type ?? 'hourly',
         hourly_rate: prev[id]?.hourly_rate ?? '',
+        monthly_salary: prev[id]?.monthly_salary ?? '',
         start_date: prev[id]?.start_date ?? '',
         end_date: prev[id]?.end_date ?? '',
         [field]: value,
@@ -518,12 +891,17 @@ export default function ProjectDetailScreen() {
         const [type, rawId] = cid.split('-');
         const id = Number(rawId);
         const def = assignFormData[cid];
-        if (!id || !def?.start_date || !def?.end_date || !def?.hourly_rate) return null;
+        const payType = def?.pay_type || 'hourly';
+        if (!id || !def?.start_date || !def?.end_date) return null;
+        if (payType === 'hourly' && !def?.hourly_rate) return null;
+        if (payType === 'salary' && !def?.monthly_salary) return null;
         return {
           id,
           type,
           role: def.role?.trim() || '',
-          hourly_rate: Number(def.hourly_rate),
+          pay_type: payType,
+          hourly_rate: payType === 'hourly' ? Number(def.hourly_rate) : null,
+          monthly_salary: payType === 'salary' ? Number(def.monthly_salary) : null,
           start_date: def.start_date,
           end_date: def.end_date,
         };
@@ -532,18 +910,28 @@ export default function ProjectDetailScreen() {
 
     if (payload.length === 0) return;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await apiService.post(`/task-management/projects/${projectId}/team`, {
       assignables: payload,
     });
-
     setTeamModalOpen(false);
-    loadAll();
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${payload.length} member(s) assigned`, 'success');
+      loadAll(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to assign members', 'error');
+      loadAll(true);
+    }
   };
 
   if (loading && !project) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color={D.ink} />
+      <View style={[styles.root, { padding: 16, paddingTop: 80 }]}>
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </View>
     );
   }
@@ -631,31 +1019,30 @@ export default function ProjectDetailScreen() {
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tab, tab === 'milestones' && styles.tabActive]}
-          onPress={() => setTab('milestones')}
+          onPress={() => switchTab('milestones')}
         >
           <Layers size={14} color={tab === 'milestones' ? '#fff' : D.ink} strokeWidth={2.5} />
           <Text style={[styles.tabText, tab === 'milestones' && styles.tabTextActive]}>Milestones</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'team' && styles.tabActive]}
-          onPress={() => setTab('team')}
+          onPress={() => switchTab('team')}
           disabled={!canViewTeam}
         >
           <Users size={14} color={tab === 'team' ? '#fff' : D.ink} strokeWidth={2.5} />
-          <Text style={[styles.tabText, tab === 'team' && styles.tabTextActive]}>
-            Team
-          </Text>
+          <Text style={[styles.tabText, tab === 'team' && styles.tabTextActive]}>Team</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'materials' && styles.tabActive]}
-          onPress={() => setTab('materials')}
+          onPress={() => switchTab('materials')}
         >
           <Package size={14} color={tab === 'materials' ? '#fff' : D.ink} strokeWidth={2.5} />
           <Text style={[styles.tabText, tab === 'materials' && styles.tabTextActive]}>Materials</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
+        style={tabContentStyle}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />}
         showsVerticalScrollIndicator={false}
@@ -691,7 +1078,7 @@ export default function ProjectDetailScreen() {
             {!canViewTeam && <Text style={styles.hintText}>Grant `tm.team.view` to view team.</Text>}
 
             {canViewTeam &&
-              team.map((m) => {
+              team.map((m, index) => {
                 const assignSt = (m.assignmentStatus ?? '').toString().toLowerCase();
                 const aMap: Record<string, {c: string; bg: string; label: string}> = {
                   active: {c: D.green, bg: D.greenBg, label: 'Active'},
@@ -701,7 +1088,8 @@ export default function ProjectDetailScreen() {
                 const as = aMap[assignSt] || {c: D.inkMid, bg: '#F0EFED', label: assignSt || '—'};
 
                 return (
-                  <View key={m.id} style={styles.card}>
+                  <Animated.View key={m.id} entering={FadeInDown.delay(index * 40).duration(200)}>
+                  <View style={styles.card}>
                     <View style={styles.cardTopRow}>
                       <View style={[styles.cardIconWrap, { backgroundColor: as.bg }]}>
                         <Users size={16} color={as.c} strokeWidth={2} />
@@ -718,9 +1106,13 @@ export default function ProjectDetailScreen() {
                             <View style={{width: 6, height: 6, borderRadius: 3, backgroundColor: as.c}} />
                             <Text style={[styles.infoPillText, {color: as.c}]}>{as.label}</Text>
                           </View>
-                          {m.hourlyRate && (
+                          {m.payType === 'salary' && m.monthlySalary ? (
+                            <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>₱{m.monthlySalary}/mo</Text>
+                          ) : m.payType === 'fixed' ? (
+                            <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>Fixed</Text>
+                          ) : m.hourlyRate ? (
                             <Text style={{fontSize: 10, color: D.inkLight, fontWeight: '700'}}>₱{m.hourlyRate}/hr</Text>
-                          )}
+                          ) : null}
                         </View>
                       </View>
 
@@ -795,6 +1187,7 @@ export default function ProjectDetailScreen() {
                     </View>
                   </View>
                 </View>
+                  </Animated.View>
                 );
               })}
           </>
@@ -824,6 +1217,8 @@ export default function ProjectDetailScreen() {
               const pct = alloc.quantityAllocated > 0
                 ? Math.min(100, Math.round((alloc.quantityReceived / alloc.quantityAllocated) * 100))
                 : 0;
+              const available = alloc.available ?? Math.max(0, alloc.quantityReceived - (alloc.totalUsed ?? 0));
+              const availPct = alloc.quantityReceived > 0 ? available / alloc.quantityReceived : 1;
 
               return (
                 <View key={alloc.id} style={styles.card}>
@@ -832,7 +1227,14 @@ export default function ProjectDetailScreen() {
                       <Package size={16} color={sc.c} strokeWidth={2} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>{alloc.itemName || 'Unknown Item'}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{alloc.itemName || 'Unknown Item'}</Text>
+                        {alloc.isDirect && (
+                          <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#3B82F6' }}>DIRECT</Text>
+                          </View>
+                        )}
+                      </View>
                       {alloc.itemCode ? <Text style={styles.cardSub}>{alloc.itemCode}</Text> : null}
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
                         <View style={[styles.infoPill, { backgroundColor: sc.bg }]}>
@@ -840,18 +1242,25 @@ export default function ProjectDetailScreen() {
                           <Text style={[styles.infoPillText, { color: sc.c }]}>{alloc.status.toUpperCase()}</Text>
                         </View>
                       </View>
+                      {/* Received progress */}
                       <View style={{ marginTop: 8 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                           <Text style={{ fontSize: 10, color: D.inkLight, fontWeight: '700' }}>
-                            {alloc.quantityReceived} / {alloc.quantityAllocated} {alloc.unit}
+                            Received: {alloc.quantityReceived} / {alloc.quantityAllocated} {alloc.unit}
                           </Text>
                           <Text style={{ fontSize: 10, color: sc.c, fontWeight: '800' }}>{pct}%</Text>
                         </View>
                         <View style={{ height: 6, backgroundColor: D.chalk, borderRadius: 3, overflow: 'hidden' }}>
                           <View style={{ height: '100%', width: `${pct}%`, backgroundColor: sc.c, borderRadius: 3 }} />
                         </View>
-                        <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 4 }}>
-                          Remaining: {alloc.quantityRemaining} {alloc.unit}
+                      </View>
+                      {/* Used + Available */}
+                      <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
+                        <Text style={{ fontSize: 10, color: D.inkLight }}>
+                          Used: <Text style={{ fontWeight: '800', color: D.inkMid }}>{alloc.totalUsed ?? 0} {alloc.unit}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 10, color: D.inkLight }}>
+                          Available: <Text style={{ fontWeight: '800', color: available === 0 ? D.red : availPct <= 0.2 ? D.amber : D.green }}>{available} {alloc.unit}</Text>
                         </Text>
                       </View>
                     </View>
@@ -882,7 +1291,9 @@ export default function ProjectDetailScreen() {
             })}
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <Toast toast={toast} />
 
       {/* Receiving report modal */}
       <Modal visible={rrModalOpen} transparent animationType="slide" onRequestClose={() => setRrModalOpen(false)}>
@@ -1096,15 +1507,52 @@ export default function ProjectDetailScreen() {
                         value={assignFormData[cid]?.role ?? ''}
                         onChangeText={(v) => setAssignField(cid, 'role', v)}
                       />
-                      <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="e.g. 150.00"
-                        placeholderTextColor={D.inkLight}
-                        value={assignFormData[cid]?.hourly_rate ?? ''}
-                        onChangeText={(v) => setAssignField(cid, 'hourly_rate', v)}
-                        keyboardType="decimal-pad"
-                      />
+                      <Text style={styles.fieldLabel}>Pay Type <Text style={{ color: D.red }}>*</Text></Text>
+                      <View style={[styles.segmentRow, { marginBottom: 10 }]}>
+                        {(['hourly', 'salary', 'fixed'] as const).map((pt) => (
+                          <TouchableOpacity
+                            key={pt}
+                            style={[styles.segmentBtn, (assignFormData[cid]?.pay_type || 'hourly') === pt && styles.segmentBtnActive]}
+                            onPress={() => setAssignField(cid, 'pay_type', pt)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={[styles.segmentBtnText, (assignFormData[cid]?.pay_type || 'hourly') === pt && styles.segmentBtnTextActive]}>
+                              {pt.charAt(0).toUpperCase() + pt.slice(1)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      {(assignFormData[cid]?.pay_type || 'hourly') === 'hourly' && (
+                        <>
+                          <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="e.g. 150.00"
+                            placeholderTextColor={D.inkLight}
+                            value={assignFormData[cid]?.hourly_rate ?? ''}
+                            onChangeText={(v) => setAssignField(cid, 'hourly_rate', v)}
+                            keyboardType="decimal-pad"
+                          />
+                        </>
+                      )}
+                      {assignFormData[cid]?.pay_type === 'salary' && (
+                        <>
+                          <Text style={styles.fieldLabel}>Monthly Salary (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="e.g. 20000.00"
+                            placeholderTextColor={D.inkLight}
+                            value={assignFormData[cid]?.monthly_salary ?? ''}
+                            onChangeText={(v) => setAssignField(cid, 'monthly_salary', v)}
+                            keyboardType="decimal-pad"
+                          />
+                        </>
+                      )}
+                      {assignFormData[cid]?.pay_type === 'fixed' && (
+                        <Text style={[styles.fieldLabel, { color: D.inkLight, fontStyle: 'italic', marginBottom: 10 }]}>
+                          Fixed pay — gross amount entered per payroll period.
+                        </Text>
+                      )}
                       <DatePickerField
                         label="Start Date *"
                         value={assignFormData[cid]?.start_date ?? ''}
@@ -1153,15 +1601,52 @@ export default function ProjectDetailScreen() {
               value={teRole}
               onChangeText={setTeRole}
             />
-            <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 150.00"
-              placeholderTextColor={D.inkLight}
-              value={teHourlyRate}
-              onChangeText={setTeHourlyRate}
-              keyboardType="decimal-pad"
-            />
+            <Text style={styles.fieldLabel}>Pay Type <Text style={{ color: D.red }}>*</Text></Text>
+            <View style={[styles.segmentRow, { marginBottom: 10 }]}>
+              {(['hourly', 'salary', 'fixed'] as const).map((pt) => (
+                <TouchableOpacity
+                  key={pt}
+                  style={[styles.segmentBtn, tePayType === pt && styles.segmentBtnActive]}
+                  onPress={() => setTePayType(pt)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.segmentBtnText, tePayType === pt && styles.segmentBtnTextActive]}>
+                    {pt.charAt(0).toUpperCase() + pt.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {tePayType === 'hourly' && (
+              <>
+                <Text style={styles.fieldLabel}>Hourly Rate (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 150.00"
+                  placeholderTextColor={D.inkLight}
+                  value={teHourlyRate}
+                  onChangeText={setTeHourlyRate}
+                  keyboardType="decimal-pad"
+                />
+              </>
+            )}
+            {tePayType === 'salary' && (
+              <>
+                <Text style={styles.fieldLabel}>Monthly Salary (₱) <Text style={{ color: D.red }}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 20000.00"
+                  placeholderTextColor={D.inkLight}
+                  value={teMonthlySalary}
+                  onChangeText={setTeMonthlySalary}
+                  keyboardType="decimal-pad"
+                />
+              </>
+            )}
+            {tePayType === 'fixed' && (
+              <Text style={[styles.fieldLabel, { color: D.inkLight, fontStyle: 'italic', marginBottom: 10 }]}>
+                Fixed pay — gross amount entered per payroll period.
+              </Text>
+            )}
             <DatePickerField
               label="Start Date *"
               value={teStartDate}
@@ -1191,6 +1676,162 @@ export default function ProjectDetailScreen() {
                 <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
               </TouchableOpacity>
             </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Material Usage Modal */}
+      <Modal visible={usageModalOpen} transparent animationType="slide" onRequestClose={() => { setUsageModalOpen(false); resetUsageForm(); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <ScrollView style={styles.modalCard} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+            <Text style={styles.modalTitle}>Material Usage</Text>
+            <Text style={styles.modalHint} numberOfLines={1}>{usageMilestone?.name}</Text>
+
+            {/* Add / Edit form */}
+            {(canUsageMaterialCreate || canUsageMaterialUpdate) && (
+              <View style={{ borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 12, marginBottom: 14, backgroundColor: D.chalk }}>
+                <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>{editingUsage ? 'Edit Usage' : 'Record Usage'}</Text>
+
+                {/* Allocation picker */}
+                <Text style={styles.fieldLabel}>Material <Text style={{ color: D.red }}>*</Text></Text>
+                <TouchableOpacity
+                  style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                  onPress={() => setUsageAllocPickerOpen(v => !v)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[{ fontSize: 13 }, !usageAllocId && { color: D.inkLight }]} numberOfLines={1}>
+                    {usageAllocId
+                      ? (() => {
+                          const a = projectAllocations.find(x => String(x.id) === usageAllocId);
+                          if (!a) return 'Unknown';
+                          const avail = Math.max(0, a.qtyReceived - a.qtyUsed);
+                          return `${a.name} — ${avail} ${a.unit} avail.`;
+                        })()
+                      : 'Select material...'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: D.inkLight }}>{usageAllocPickerOpen ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                {usageAllocPickerOpen && (
+                  <View style={styles.conditionDropdown}>
+                    {projectAllocations.map(a => {
+                      const avail = Math.max(0, a.qtyReceived - a.qtyUsed);
+                      const editingOwnQty = editingUsage && String(editingUsage.projectMaterialAllocationId) === String(a.id) ? editingUsage.quantityUsed : 0;
+                      const effectiveAvail = avail + editingOwnQty;
+                      const disabled = effectiveAvail <= 0;
+                      return (
+                        <TouchableOpacity
+                          key={a.id}
+                          style={[styles.conditionOption, usageAllocId === String(a.id) && styles.conditionOptionActive, disabled && { opacity: 0.4 }]}
+                          onPress={() => { if (!disabled) { setUsageAllocId(String(a.id)); setUsageAllocPickerOpen(false); } }}
+                          activeOpacity={disabled ? 1 : 0.7}
+                        >
+                          <Text style={{ fontSize: 12, color: disabled ? D.inkLight : D.ink, fontWeight: '700' }} numberOfLines={1}>
+                            {a.name} ({a.code})
+                          </Text>
+                          <Text style={{ fontSize: 10, color: disabled ? D.red : D.green, fontWeight: '700', marginTop: 1 }}>
+                            {effectiveAvail} {a.unit} available
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <Text style={styles.fieldLabel}>Quantity Used <Text style={{ color: D.red }}>*</Text></Text>
+                {usageAllocId && (() => {
+                  const a = projectAllocations.find(x => String(x.id) === usageAllocId);
+                  const editingOwnQty = editingUsage && String(editingUsage.projectMaterialAllocationId) === usageAllocId ? editingUsage.quantityUsed : 0;
+                  const maxQty = a ? Math.max(0, a.qtyReceived - a.qtyUsed) + editingOwnQty : undefined;
+                  return maxQty !== undefined ? (
+                    <Text style={{ fontSize: 10, color: D.inkLight, marginBottom: 4 }}>Max: {maxQty} {a?.unit}</Text>
+                  ) : null;
+                })()}
+                <TextInput
+                  style={styles.input}
+                  placeholder="0.00"
+                  placeholderTextColor={D.inkLight}
+                  value={usageQty}
+                  onChangeText={setUsageQty}
+                  keyboardType="decimal-pad"
+                />
+
+                <Text style={styles.fieldLabel}>Notes</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Optional notes..."
+                  placeholderTextColor={D.inkLight}
+                  value={usageNotes}
+                  onChangeText={setUsageNotes}
+                />
+
+                <View style={styles.modalActions}>
+                  {editingUsage && (
+                    <TouchableOpacity style={styles.modalBtn} onPress={resetUsageForm}>
+                      <Text style={styles.modalBtnText}>Cancel Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalBtnPrimary, { flex: 2 }, usageSubmitting && { opacity: 0.6 }]}
+                    onPress={submitUsage}
+                    disabled={usageSubmitting}
+                  >
+                    {usageSubmitting
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={[styles.modalBtnText, { color: '#fff' }]}>{editingUsage ? 'Update' : 'Save'}</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Usage list */}
+            <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
+              Recorded Usages ({(usageMilestone?.materialUsages ?? []).length})
+            </Text>
+            {(usageMilestone?.materialUsages ?? []).length === 0 ? (
+              <Text style={{ fontSize: 12, color: D.inkLight, textAlign: 'center', paddingVertical: 16 }}>No usages recorded yet.</Text>
+            ) : (
+              (usageMilestone?.materialUsages ?? []).map(u => {
+                const allocMeta = projectAllocations.find(a => String(a.id) === String(u.projectMaterialAllocationId));
+                const available = allocMeta ? Math.max(0, allocMeta.qtyReceived - allocMeta.qtyUsed) : null;
+                const availPct = allocMeta && allocMeta.qtyReceived > 0 ? available! / allocMeta.qtyReceived : 1;
+                return (
+                  <View key={u.id} style={{ borderWidth: 1, borderColor: D.hairline, borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#fff' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: D.ink }} numberOfLines={1}>{u.itemName ?? 'Unknown'}</Text>
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 3 }}>
+                          <Text style={{ fontSize: 11, color: D.inkMid }}>Used: <Text style={{ fontWeight: '800' }}>{u.quantityUsed} {u.unit}</Text></Text>
+                          {available !== null && (
+                            <Text style={{ fontSize: 11, color: D.inkMid }}>
+                              Remaining: <Text style={{ fontWeight: '800', color: available === 0 ? D.red : availPct <= 0.2 ? D.amber : D.green }}>{available} {u.unit}</Text>
+                            </Text>
+                          )}
+                        </View>
+                        {u.notes ? <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 2 }}>{u.notes}</Text> : null}
+                        {u.recordedBy ? <Text style={{ fontSize: 10, color: D.inkLight, marginTop: 1 }}>By {u.recordedBy}</Text> : null}
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {canUsageMaterialUpdate && (
+                          <TouchableOpacity style={styles.iconBtn} onPress={() => openEditUsage(u)} activeOpacity={0.7}>
+                            <Pencil size={14} color={D.ink} strokeWidth={2.5} />
+                          </TouchableOpacity>
+                        )}
+                        {canUsageMaterialDelete && (
+                          <TouchableOpacity style={styles.iconBtn} onPress={() => deleteUsage(u)} activeOpacity={0.7}>
+                            <Trash2 size={14} color={D.red} strokeWidth={2.5} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+
+            <TouchableOpacity style={[styles.modalBtn, { marginTop: 4 }]} onPress={() => { setUsageModalOpen(false); resetUsageForm(); }}>
+              <Text style={styles.modalBtnText}>Close</Text>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -1420,6 +2061,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   assignFormTitle: { fontSize: 12, fontWeight: '900', color: D.ink, marginBottom: 8 },
+
+  segmentRow: { flexDirection: 'row', borderWidth: 1, borderColor: D.hairline, borderRadius: 10, overflow: 'hidden' },
+  segmentBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: D.chalk },
+  segmentBtnActive: { backgroundColor: D.ink },
+  segmentBtnText: { fontSize: 11, fontWeight: '800', color: D.inkMid },
+  segmentBtnTextActive: { color: '#fff' },
 
   dateBtn: {
     borderWidth: 1,

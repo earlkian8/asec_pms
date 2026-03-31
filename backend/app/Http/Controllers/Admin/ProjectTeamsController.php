@@ -27,7 +27,9 @@ class ProjectTeamsController extends Controller
             'assignables.*.id'          => ['required'],
             'assignables.*.type'        => ['required', 'in:user,employee'],
             'assignables.*.role'        => ['required', 'string', 'max:50'],
-            'assignables.*.hourly_rate' => ['required', 'numeric', 'min:0'],
+            'assignables.*.pay_type'       => ['required', 'in:hourly,salary,fixed'],
+            'assignables.*.hourly_rate'    => ['nullable', 'numeric', 'min:0'],
+            'assignables.*.monthly_salary' => ['nullable', 'numeric', 'min:0'],
             'assignables.*.start_date'  => ['required', 'date'],
             'assignables.*.end_date'    => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
@@ -114,7 +116,9 @@ class ProjectTeamsController extends Controller
                     'employee_id'       => $assignable['type'] === 'employee' ? (int) $assignable['id'] : null,
                     'assignable_type'   => $assignable['type'],
                     'role'              => $assignable['role'],
-                    'hourly_rate'       => $assignable['hourly_rate'],
+                    'pay_type'          => $assignable['pay_type']       ?? 'hourly',
+                    'hourly_rate'       => $assignable['hourly_rate']    ?? null,
+                    'monthly_salary'    => $assignable['monthly_salary'] ?? null,
                     'start_date'        => $assignable['start_date'],
                     'end_date'          => $assignable['end_date'] ?? null,
                     'is_active'         => true,
@@ -160,7 +164,9 @@ class ProjectTeamsController extends Controller
 
         $validated = $request->validate([
             'role'              => ['required', 'string', 'max:50'],
-            'hourly_rate'       => ['required', 'numeric', 'min:0'],
+            'pay_type'          => ['required', 'in:hourly,salary,fixed'],
+            'hourly_rate'       => ['nullable', 'numeric', 'min:0'],
+            'monthly_salary'    => ['nullable', 'numeric', 'min:0'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
             'is_active'         => ['required', 'boolean'],
@@ -476,7 +482,9 @@ class ProjectTeamsController extends Controller
                 'planned_end_date' => $team->project->planned_end_date,
             ] : null,
             'role'              => $team->role,
+            'pay_type'          => $team->pay_type ?? 'hourly',
             'hourly_rate'       => $team->hourly_rate,
+            'monthly_salary'    => $team->monthly_salary,
             'start_date'        => $team->start_date,
             'end_date'          => $team->end_date,
             'assignment_status' => $team->assignment_status instanceof \BackedEnum

@@ -36,7 +36,8 @@ class RoleSeeder extends Seeder
             'projects.view', 'projects.create', 'projects.update', 'projects.delete', 'projects.view-all',
             'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
             'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
-            'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+            'project-milestones.view', 'project-milestones.view-detail', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
             'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
             'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
             'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
@@ -60,7 +61,8 @@ class RoleSeeder extends Seeder
             'projects.view', 'projects.create', 'projects.update', 'projects.delete', 'projects.view-all',
             'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
             'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
-            'project-milestones.view', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+            'project-milestones.view', 'project-milestones.view-detail', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
             'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
             'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
             'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
@@ -96,7 +98,9 @@ class RoleSeeder extends Seeder
             'dashboard.view',
             'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate',
             'projects.view', // View only for context
+            'project-milestones.view', 'project-milestones.view-detail', // View milestone details for material context
             'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
+            'milestone-material-usage.view',
             'reports.view', 'reports.inventory',
         ]);
 
@@ -109,7 +113,8 @@ class RoleSeeder extends Seeder
             'dashboard.view',
             'projects.view', 'projects.view-all', // View assigned projects
             'project-teams.view', // View team members
-            'project-milestones.view', // View milestones
+            'project-milestones.view', 'project-milestones.view-detail', // View milestones
+            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
             'project-tasks.view', 'project-tasks.update', 'project-tasks.update-status', // Manage tasks
             'progress-updates.view', 'progress-updates.create', 'progress-updates.update', // Create and update progress
             'project-files.view', 'project-files.upload', 'project-files.download', // View and upload files

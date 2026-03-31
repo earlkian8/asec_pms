@@ -18,10 +18,15 @@ import { User, Calendar, Package, CheckCircle2, Clock, AlertCircle } from "lucid
 
 const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
   const inventoryItem = allocation.inventoryItem || allocation.inventory_item || {};
+  const directSupply = allocation.directSupply || allocation.direct_supply || {};
+  const isDs = !!allocation.direct_supply_id;
+  const itemName = isDs ? (directSupply.supply_name || 'Direct Supply') : (inventoryItem.item_name || '---');
+  const itemCode = isDs ? (directSupply.supply_code || '---') : (inventoryItem.item_code || '---');
+  const unitOfMeasure = isDs ? (directSupply.unit_of_measure || 'units') : (inventoryItem.unit_of_measure || 'units');
   const receivingReports = allocation.receiving_reports || allocation.receivingReports || [];
   const allocatedBy = allocation.allocated_by || allocation.allocatedBy;
   const remaining = (allocation.quantity_allocated || 0) - (allocation.quantity_received || 0);
-  const progress = allocation.quantity_allocated > 0 
+  const progress = allocation.quantity_allocated > 0
     ? Math.min(Math.round(((allocation.quantity_received || 0) / allocation.quantity_allocated) * 100), 100)
     : 0;
 
@@ -74,7 +79,7 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
         <DialogHeader>
           <DialogTitle className="text-zinc-800 text-xl">Material Allocation Details</DialogTitle>
           <DialogDescription className="text-zinc-600">
-            View details for {inventoryItem.item_name || 'this item'}
+            View details for {itemName}
           </DialogDescription>
         </DialogHeader>
 
@@ -88,28 +93,28 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <span className="text-sm font-medium text-gray-700">Item Name:</span>
-                <p className="text-sm text-gray-900 mt-1">{inventoryItem.item_name || '---'}</p>
+                <p className="text-sm text-gray-900 mt-1">{itemName}</p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-700">Item Code:</span>
-                <p className="text-sm text-gray-900 mt-1">{inventoryItem.item_code || '---'}</p>
+                <p className="text-sm text-gray-900 mt-1">{itemCode}</p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-700">Quantity Allocated:</span>
                 <p className="text-sm text-gray-900 mt-1">
-                  {allocation.quantity_allocated} {inventoryItem.unit_of_measure || 'units'}
+                  {allocation.quantity_allocated} {unitOfMeasure}
                 </p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-700">Quantity Received:</span>
                 <p className="text-sm text-gray-900 mt-1">
-                  {allocation.quantity_received || 0} {inventoryItem.unit_of_measure || 'units'}
+                  {allocation.quantity_received || 0} {unitOfMeasure}
                 </p>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-700">Quantity Remaining:</span>
                 <p className="text-sm text-gray-900 mt-1">
-                  {remaining} {inventoryItem.unit_of_measure || 'units'}
+                  {remaining} {unitOfMeasure}
                 </p>
               </div>
               <div>
@@ -182,7 +187,7 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
                       >
                         <TableCell>
                           <div className="font-medium text-gray-900">
-                            {report.quantity_received} {inventoryItem.unit_of_measure || 'units'}
+                            {report.quantity_received} {unitOfMeasure}
                           </div>
                         </TableCell>
                         <TableCell>

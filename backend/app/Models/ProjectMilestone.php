@@ -41,4 +41,9 @@ class ProjectMilestone extends Model
     {
         return $this->hasMany(ProjectIssue::class, 'project_milestone_id');
     }
+
+    public function materialUsages()
+    {
+        return $this->hasMany(MilestoneMaterialUsage::class, 'project_milestone_id');
+    }
 }

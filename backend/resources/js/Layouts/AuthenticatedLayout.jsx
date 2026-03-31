@@ -113,6 +113,13 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             type: 'single'
         },
         {
+            title: 'Direct Supply Management',
+            href: route('direct-supply-management.index'),
+            routeName: 'direct-supply-management.*',
+            icon: Boxes,
+            type: 'single'
+        },
+        {
             title: 'Billing Management',
             href: route('billing-management.index'),
             routeName: 'billing-management.*',
@@ -198,6 +205,11 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
             if (module.title === 'Inventory Management') {
                 return hasModuleAccess([
                     'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate'
+                ]) ? module : null;
+            }
+            if (module.title === 'Direct Supply Management') {
+                return hasModuleAccess([
+                    'direct-supply.view', 'direct-supply.create', 'direct-supply.update', 'direct-supply.delete'
                 ]) ? module : null;
             }
             if (module.title === 'Billing Management') {

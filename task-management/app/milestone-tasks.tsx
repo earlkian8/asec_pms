@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
+import Animated, { FadeInDown, FadeOutUp, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,6 +22,57 @@ import { ArrowLeft, Plus, Trash2, Pencil, Calendar, User, ChevronDown, X } from 
 import { D, getStatusColor, getStatusBg } from '@/utils/colors';
 import { apiService } from '@/services/api';
 import { formatDate, isOverdue } from '@/utils/dateUtils';
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+type ToastType = 'success' | 'error' | 'info';
+type ToastState = { message: string; type: ToastType; id: number } | null;
+function useToast() {
+  const [toast, setToast] = useState<ToastState>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const show = useCallback((message: string, type: ToastType = 'success') => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setToast({ message, type, id: Date.now() });
+    timerRef.current = setTimeout(() => setToast(null), 2800);
+  }, []);
+  return { toast, show };
+}
+function Toast({ toast }: { toast: ToastState }) {
+  if (!toast) return null;
+  const bg = toast.type === 'success' ? '#10B981' : toast.type === 'error' ? '#EF4444' : '#3B82F6';
+  const icon = toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ';
+  return (
+    <Animated.View key={toast.id} entering={FadeInDown.springify().damping(14)} exiting={FadeOutUp.duration(200)}
+      style={[toastSt.wrap, { backgroundColor: bg }]}>
+      <Text style={toastSt.icon}>{icon}</Text>
+      <Text style={toastSt.msg} numberOfLines={2}>{toast.message}</Text>
+    </Animated.View>
+  );
+}
+const toastSt = StyleSheet.create({
+  wrap: { position: 'absolute', bottom: 32, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 14, zIndex: 9999, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
+  icon: { fontSize: 14, color: '#fff', fontWeight: '900' },
+  msg:  { fontSize: 13, color: '#fff', fontWeight: '700', flex: 1 },
+});
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  const opacity = useSharedValue(1);
+  useEffect(() => { opacity.value = withTiming(0.4, { duration: 700 }, () => { opacity.value = withTiming(1, { duration: 700 }); }); }, []);
+  const s = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View style={[skelSt.card, s]}>
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={[skelSt.line, { width: '55%' }]} />
+        <View style={[skelSt.line, { width: '35%', height: 8 }]} />
+        <View style={[skelSt.line, { width: '70%', height: 6, marginTop: 6 }]} />
+      </View>
+    </Animated.View>
+  );
+}
+const skelSt = StyleSheet.create({
+  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E5DF', borderRadius: 12, padding: 14, marginBottom: 10 },
+  line: { height: 12, borderRadius: 6, backgroundColor: '#E8E5DF' },
+});
 
 // ─── Reusable date picker field ───────────────────────────────────────────────
 function DatePickerField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
@@ -109,9 +162,11 @@ export default function MilestoneTasksScreen() {
     loadTeamMembers();
   }, [pid]);
 
-  const loadTasks = async () => {
+  const { toast, show: showToast } = useToast();
+
+  const loadTasks = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await apiService.get<Task[]>(`/task-management/milestones/${mid}/tasks`);
       if (typeof res === 'object' && 'success' in res && res.success && res.data) setTasks(Array.isArray(res.data) ? res.data : []);
     } finally {
@@ -149,6 +204,8 @@ export default function MilestoneTasksScreen() {
 
   const submit = async () => {
     if (!title.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isEdit = !!editing;
     const payload = {
       title: title.trim(),
       description: desc.trim() ? desc.trim() : null,
@@ -156,20 +213,44 @@ export default function MilestoneTasksScreen() {
       due_date: dueDate.trim() ? dueDate.trim() : null,
       assigned_to: assignedTo || null,
     };
-
-    if (editing) {
-      await apiService.put(`/task-management/milestones/${mid}/tasks/${editing.id}`, payload);
+    // Optimistic
+    if (isEdit && editing) {
+      setTasks(prev => prev.map(t => t.id === editing.id ? { ...t, ...payload, title: payload.title } : t));
     } else {
-      await apiService.post(`/task-management/milestones/${mid}/tasks`, payload);
+      const tempId = -Date.now();
+      setTasks(prev => [...prev, { id: tempId, projectMilestoneId: mid, title: payload.title, description: payload.description, dueDate: payload.due_date, assignedTo: payload.assigned_to, assignedToName: null, status: 'pending' }]);
     }
     setModalOpen(false);
     setEditing(null);
-    loadTasks();
+    try {
+      if (isEdit && editing) {
+        await apiService.put(`/task-management/milestones/${mid}/tasks/${editing.id}`, payload);
+      } else {
+        await apiService.post(`/task-management/milestones/${mid}/tasks`, payload);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(isEdit ? 'Task updated' : 'Task added', 'success');
+      loadTasks(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to save task', 'error');
+      loadTasks(true);
+    }
   };
 
   const remove = async (t: Task) => {
-    await apiService.delete(`/task-management/milestones/${mid}/tasks/${t.id}`);
-    loadTasks();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setTasks(prev => prev.filter(x => x.id !== t.id));
+    try {
+      await apiService.delete(`/task-management/milestones/${mid}/tasks/${t.id}`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Task deleted', 'info');
+      loadTasks(true);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Failed to delete task', 'error');
+      loadTasks(true);
+    }
   };
 
   const headerSubtitle = useMemo(() => {
@@ -177,74 +258,57 @@ export default function MilestoneTasksScreen() {
     return 'Milestone';
   }, [milestoneName]);
 
-  const renderItem = ({ item }: { item: Task }) => {
+  const renderItem = ({ item, index }: { item: Task; index: number }) => {
     const c = getStatusColor(item.status);
     const bg = getStatusBg(item.status);
     return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.85}
-        onPress={() => router.push(`/task-detail?id=${item.id}`)}
-      >
-        <View style={styles.cardTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={styles.desc} numberOfLines={2}>
-              {item.description || 'No description'}
-            </Text>
+      <Animated.View entering={FadeInDown.delay(index * 50).springify().damping(14)}>
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.85}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/task-detail?id=${item.id}`); }}
+        >
+          <View style={styles.cardTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+              <Text style={styles.desc} numberOfLines={2}>{item.description || 'No description'}</Text>
+            </View>
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.iconBtn} onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openEdit(item); }} activeOpacity={0.7}>
+                <Pencil size={16} color={D.ink} strokeWidth={2.5} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={(e) => { e.stopPropagation(); remove(item); }} activeOpacity={0.7}>
+                <Trash2 size={16} color={D.red} strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                openEdit(item);
-              }}
-              activeOpacity={0.7}
-            >
-              <Pencil size={16} color={D.ink} strokeWidth={2.5} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                remove(item);
-              }}
-              activeOpacity={0.7}
-            >
-              <Trash2 size={16} color={D.red} strokeWidth={2.5} />
-            </TouchableOpacity>
+          <View style={styles.metaRow}>
+            <View style={[styles.badge, { backgroundColor: bg, borderColor: c + '40' }]}>
+              <Text style={[styles.badgeText, { color: c }]}>{item.status.replace('_', ' ').toUpperCase()}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Calendar size={12} color={D.inkLight} strokeWidth={2} />
+              <Text style={[styles.metaText, item.dueDate && isOverdue(item.dueDate) && { color: D.red, fontWeight: '700' }]}>
+                {item.dueDate ? formatDate(item.dueDate) : 'No due date'}
+                {item.dueDate && isOverdue(item.dueDate) ? ' · Overdue' : ''}
+              </Text>
+            </View>
+            <View style={styles.metaItem}>
+              <User size={12} color={D.inkLight} strokeWidth={2} />
+              <Text style={styles.metaText} numberOfLines={1}>{item.assignedToName || 'Unassigned'}</Text>
+            </View>
           </View>
-        </View>
-
-        <View style={styles.metaRow}>
-          <View style={[styles.badge, { backgroundColor: bg, borderColor: c + '40' }]}>
-            <Text style={[styles.badgeText, { color: c }]}>{item.status.replace('_', ' ').toUpperCase()}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Calendar size={12} color={D.inkLight} strokeWidth={2} />
-            <Text style={[styles.metaText, item.dueDate && isOverdue(item.dueDate) && { color: D.red, fontWeight: '700' }]}>
-              {item.dueDate ? formatDate(item.dueDate) : 'No due date'}
-              {item.dueDate && isOverdue(item.dueDate) ? ' · Overdue' : ''}
-            </Text>
-          </View>
-          <View style={styles.metaItem}>
-            <User size={12} color={D.inkLight} strokeWidth={2} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {item.assignedToName || 'Unassigned'}
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
   if (loading && !refreshing) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color={D.ink} />
+      <View style={[styles.root, { padding: 16, paddingTop: 80 }]}>
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </View>
     );
   }
@@ -261,7 +325,7 @@ export default function MilestoneTasksScreen() {
             {headerSubtitle}
           </Text>
         </View>
-        <TouchableOpacity onPress={openAdd} style={styles.addBtn} activeOpacity={0.75}>
+        <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); openAdd(); }} style={styles.addBtn} activeOpacity={0.75}>
           <Plus size={18} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
@@ -275,6 +339,7 @@ export default function MilestoneTasksScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={D.ink} />}
         ListEmptyComponent={
           <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>📋</Text>
             <Text style={styles.emptyTitle}>No tasks yet</Text>
             <Text style={styles.emptySub}>Create the first task for this milestone.</Text>
           </View>
@@ -363,6 +428,7 @@ export default function MilestoneTasksScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <Toast toast={toast} />
     </View>
   );
 }
@@ -407,9 +473,10 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', gap: 5, alignItems: 'center', maxWidth: '48%' },
   metaText: { fontSize: 11, color: D.inkLight, fontWeight: '600' },
 
-  empty: { backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 28, alignItems: 'center', marginTop: 18 },
-  emptyTitle: { fontSize: 15, fontWeight: '900', color: D.ink },
-  emptySub: { fontSize: 12, color: D.inkLight, marginTop: 6, textAlign: 'center' },
+  empty: { backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline, borderRadius: 16, padding: 40, alignItems: 'center', marginTop: 40 },
+  emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: '900', color: D.ink, marginBottom: 6 },
+  emptySub: { fontSize: 13, color: D.inkLight, textAlign: 'center', lineHeight: 20 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   modalCard: {

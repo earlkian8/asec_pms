@@ -115,6 +115,14 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
 
   const activePreset = formData?.date_preset || null;
   const isEmployee = member.type === "employee";
+  const payType = formData?.pay_type || "hourly";
+
+  const handleToggle = (id) => {
+    const willSelect = !isSelected;
+    onToggle(id);
+    // Auto-expand when selecting so the form is immediately visible
+    if (willSelect) setExpanded(true);
+  };
 
   const applyPreset = (preset) => {
     if (preset.id === "custom") {
@@ -124,11 +132,6 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
     onFormChange(compositeId, "date_preset", preset.id);
     onFormChange(compositeId, "start_date", preset.start);
     onFormChange(compositeId, "end_date", preset.end);
-  };
-
-  const applyTimeSlot = (slot) => {
-    onFormChange(compositeId, "time_slot", slot.id);
-    onFormChange(compositeId, "work_hours", slot.time);
   };
 
   const role = isEmployee ? (member.position || "No Position") : (member.role || "No Role");
@@ -144,7 +147,7 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
       {/* Card Header */}
       <div
         className="flex items-start gap-3 p-4 cursor-pointer"
-        onClick={() => onToggle(compositeId)}
+        onClick={() => handleToggle(compositeId)}
       >
         <div className="mt-0.5 flex-shrink-0">
           <div
@@ -201,9 +204,19 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
       {/* Inline summary when selected but collapsed */}
       {isSelected && !expanded && (
         <div className="px-4 pb-3 flex flex-wrap gap-2 border-t border-indigo-100">
-          {formData?.hourly_rate !== undefined && formData?.hourly_rate !== "" && (
+          {payType === "hourly" && formData?.hourly_rate !== undefined && formData?.hourly_rate !== "" && (
             <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2.5 py-1">
               ₱{parseFloat(formData.hourly_rate || 0).toFixed(2)}/hr
+            </span>
+          )}
+          {payType === "salary" && formData?.monthly_salary !== undefined && formData?.monthly_salary !== "" && (
+            <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2.5 py-1">
+              ₱{parseFloat(formData.monthly_salary || 0).toFixed(2)}/mo
+            </span>
+          )}
+          {payType === "fixed" && (
+            <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-1">
+              Fixed
             </span>
           )}
           {formData?.date_preset && formData.date_preset !== "custom" && (
@@ -238,26 +251,78 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
       {isSelected && expanded && (
         <div className="border-t border-indigo-100 bg-indigo-50/30 p-4 space-y-4">
 
-          {/* Hourly Rate */}
+          {/* Pay Type */}
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-              Hourly Rate (₱) <span className="text-red-500">*</span>
+              Pay Type <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={formData?.hourly_rate ?? ""}
-                onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className={`pl-7 text-sm ${errors?.hourly_rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
-              />
+            <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white">
+              {[
+                { id: "hourly",  label: "Hourly"         },
+                { id: "salary", label: "Monthly Salary" },
+                { id: "fixed",  label: "Fixed"          },
+              ].map((pt) => (
+                <button
+                  key={pt.id}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onFormChange(compositeId, "pay_type", pt.id); }}
+                  className={`flex-1 py-2 font-medium transition-all ${
+                    payType === pt.id
+                      ? "bg-indigo-600 text-white"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {pt.label}
+                </button>
+              ))}
             </div>
-            {errors?.hourly_rate && <InputError message={errors.hourly_rate} className="mt-1" />}
           </div>
+
+          {/* Rate field — conditional on pay_type */}
+          {payType === "hourly" && (
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                Hourly Rate (₱) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
+                <Input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  value={formData?.hourly_rate ?? ""}
+                  onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
+                />
+              </div>
+              {errors?.rate && <InputError message={errors.rate} className="mt-1" />}
+            </div>
+          )}
+          {payType === "salary" && (
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                Monthly Salary (₱) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
+                <Input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  value={formData?.monthly_salary ?? ""}
+                  onChange={(e) => onFormChange(compositeId, "monthly_salary", e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Daily equivalent: ₱{formData?.monthly_salary ? (parseFloat(formData.monthly_salary) / 26).toFixed(2) : "0.00"}/day (÷26 working days)
+              </p>
+              {errors?.rate && <InputError message={errors.rate} className="mt-1" />}
+            </div>
+          )}
+          {payType === "fixed" && (
+            <p className="text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+              Fixed pay — gross amount will be entered per payroll period.
+            </p>
+          )}
 
           {/* Date Presets */}
           <div>
@@ -491,9 +556,13 @@ export default function Step2TeamMembers({ users }) {
       if (!member) continue;
       const name = member.name || "Team Member";
       const fd = formData[compositeId] || {};
+      const payType = fd.pay_type || "hourly";
 
-      if (fd.hourly_rate === undefined || fd.hourly_rate === "" || parseFloat(fd.hourly_rate) < 0) {
-        validationErrors[`${compositeId}_hourly_rate`] = `Hourly rate required for ${name}`;
+      if (payType === "hourly" && (fd.hourly_rate === undefined || fd.hourly_rate === "" || parseFloat(fd.hourly_rate) < 0)) {
+        validationErrors[`${compositeId}_rate`] = `Hourly rate required for ${name}`;
+      }
+      if (payType === "salary" && (fd.monthly_salary === undefined || fd.monthly_salary === "" || parseFloat(fd.monthly_salary) < 0)) {
+        validationErrors[`${compositeId}_rate`] = `Monthly salary required for ${name}`;
       }
       if (!fd.start_date) {
         validationErrors[`${compositeId}_start_date`] = `Start date required for ${name}`;
@@ -528,16 +597,18 @@ export default function Step2TeamMembers({ users }) {
       if (!member) continue;
 
       addTeamMember({
-        id:          memberIdInt,
-        type:        memberType,
-        name:        member.name || "Unknown",
-        email:       member.email || "",
-        role:        getMemberRole(member),
-        hourly_rate: parseFloat(formData[compositeId]?.hourly_rate) || 0,
-        start_date:  formData[compositeId]?.start_date || "",
-        end_date:    formData[compositeId]?.end_date || "",
-        time_slot:   formData[compositeId]?.time_slot || null,
-        work_hours:  formData[compositeId]?.work_hours || null,
+        id:             memberIdInt,
+        type:           memberType,
+        name:           member.name || "Unknown",
+        email:          member.email || "",
+        role:           getMemberRole(member),
+        pay_type:       formData[compositeId]?.pay_type       || "hourly",
+        hourly_rate:    parseFloat(formData[compositeId]?.hourly_rate)    || 0,
+        monthly_salary: parseFloat(formData[compositeId]?.monthly_salary) || 0,
+        start_date:     formData[compositeId]?.start_date || "",
+        end_date:       formData[compositeId]?.end_date   || "",
+        time_slot:      formData[compositeId]?.time_slot  || null,
+        work_hours:     formData[compositeId]?.work_hours || null,
       });
       added++;
     }
@@ -649,9 +720,9 @@ export default function Step2TeamMembers({ users }) {
             const compositeId = getCompositeId(member);
             const isSelected  = selectedMemberIds.includes(compositeId);
             const memberErrors = {
-              hourly_rate: errors[`${compositeId}_hourly_rate`],
-              start_date:  errors[`${compositeId}_start_date`],
-              end_date:    errors[`${compositeId}_end_date`],
+              rate:       errors[`${compositeId}_rate`],
+              start_date: errors[`${compositeId}_start_date`],
+              end_date:   errors[`${compositeId}_end_date`],
             };
             return (
               <MemberCard
@@ -735,9 +806,19 @@ export default function Step2TeamMembers({ users }) {
                   </div>
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                     <span className="text-xs text-gray-500">{member.role}</span>
-                    <span className="text-xs font-semibold text-green-700">
-                      ₱{parseFloat(member.hourly_rate).toFixed(2)}/hr
-                    </span>
+                    {(!member.pay_type || member.pay_type === "hourly") && (
+                      <span className="text-xs font-semibold text-green-700">
+                        ₱{parseFloat(member.hourly_rate || 0).toFixed(2)}/hr
+                      </span>
+                    )}
+                    {member.pay_type === "salary" && (
+                      <span className="text-xs font-semibold text-purple-700">
+                        ₱{parseFloat(member.monthly_salary || 0).toFixed(2)}/mo
+                      </span>
+                    )}
+                    {member.pay_type === "fixed" && (
+                      <span className="text-xs font-semibold text-amber-700">Fixed</span>
+                    )}
                     <span className="text-xs text-gray-400">
                       {member.start_date} → {member.end_date || "—"}
                     </span>

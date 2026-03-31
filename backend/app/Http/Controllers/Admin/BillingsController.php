@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\BillingService;
 use App\Services\PayMongoService;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,7 @@ use Inertia\Inertia;
 
 class BillingsController extends Controller
 {
-    use ActivityLogsTrait, NotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     protected $billingService;
     protected $payMongoService;
@@ -172,6 +173,8 @@ class BillingsController extends Controller
 
         $this->adminActivityLogs('Billing', 'Created',
             'Created billing "' . $billing->billing_code . '" for project "' . $project->project_name . '"');
+
+        $this->notifyBillingCreated($project, $billing->billing_code, '₱' . number_format($billing->billing_amount, 2));
 
         $this->createSystemNotification('general', 'New Billing Created',
             "A new billing '{$billing->billing_code}' (₱" . number_format($billing->billing_amount, 2) . ") has been created for project '{$project->project_name}'.",
@@ -341,6 +344,8 @@ class BillingsController extends Controller
             'Recorded payment "' . $payment->payment_code . '" of ₱' . number_format((float) $payment->payment_amount, 2) . ' for billing "' . $billing->billing_code . '"');
 
         if ($project) {
+            $this->notifyPaymentReceived($project, $billing->billing_code, '₱' . number_format((float) $payment->payment_amount, 2));
+
             $status = $billing->status === 'paid' ? 'fully paid' : 'partially paid';
             $this->createSystemNotification('general', 'Payment Received',
                 "Payment of ₱" . number_format((float) $payment->payment_amount, 2) . " has been received for billing '{$billing->billing_code}'. Billing is now {$status}.",

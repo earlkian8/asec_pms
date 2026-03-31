@@ -44,6 +44,7 @@ Route::prefix('client')->middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [ClientAuthController::class, 'logout']);
     Route::post('/logout-all', [ClientAuthController::class, 'logoutAll']);
     Route::post('/change-password', [ClientAuthController::class, 'changePassword']);
+    Route::post('/push-token', [ClientAuthController::class, 'updatePushToken']);
     
     // Dashboard routes
     Route::get('/dashboard/statistics', [ClientDashboardController::class, 'statistics']);
@@ -133,7 +134,7 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     // Progress updates routes
     Route::get('/tasks/{id}/progress-updates', [TaskManagementTaskController::class, 'progressUpdates'])->middleware('permission:tm.progress-updates.view');
     Route::post('/tasks/{id}/progress-updates', [TaskManagementTaskController::class, 'storeProgressUpdate'])->middleware('permission:tm.progress-updates.create');
-    Route::put('/tasks/{id}/progress-updates/{updateId}', [TaskManagementTaskController::class, 'updateProgressUpdate'])->middleware('permission:tm.progress-updates.update-own');
+    Route::post('/tasks/{id}/progress-updates/{updateId}', [TaskManagementTaskController::class, 'updateProgressUpdate'])->middleware('permission:tm.progress-updates.update-own');
     Route::delete('/tasks/{id}/progress-updates/{updateId}', [TaskManagementTaskController::class, 'deleteProgressUpdate'])->middleware('permission:tm.progress-updates.delete-own');
     Route::get('/tasks/{id}/progress-updates/{updateId}/download', [TaskManagementTaskController::class, 'downloadProgressUpdateFile'])->middleware('permission:tm.files.download');
     
@@ -155,6 +156,10 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     Route::post('/projects/{project}/milestones', [TaskManagementMilestonesController::class, 'store'])->middleware('permission:tm.milestones.manage');
     Route::put('/projects/{project}/milestones/{milestone}', [TaskManagementMilestonesController::class, 'update'])->middleware('permission:tm.milestones.manage');
     Route::delete('/projects/{project}/milestones/{milestone}', [TaskManagementMilestonesController::class, 'destroy'])->middleware('permission:tm.milestones.manage');
+    // Milestone material usages
+    Route::post('/projects/{project}/milestones/{milestone}/material-usage', [TaskManagementMilestonesController::class, 'storeMaterialUsage'])->middleware('permission:milestone-material-usage.create');
+    Route::put('/projects/{project}/milestones/{milestone}/material-usage/{usage}', [TaskManagementMilestonesController::class, 'updateMaterialUsage'])->middleware('permission:milestone-material-usage.update');
+    Route::delete('/projects/{project}/milestones/{milestone}/material-usage/{usage}', [TaskManagementMilestonesController::class, 'destroyMaterialUsage'])->middleware('permission:milestone-material-usage.delete');
 
     // Tasks (milestone-scoped, but project access enforced via milestone->project)
     Route::get('/milestones/{milestone}/tasks', [TaskManagementTasksController::class, 'index'])->middleware('permission:tm.tasks.manage');

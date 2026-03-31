@@ -66,9 +66,16 @@ class PermissionSeeder extends Seeder
 
             // Project Milestones
             'project-milestones.view',
+            'project-milestones.view-detail',
             'project-milestones.create',
             'project-milestones.update',
             'project-milestones.delete',
+
+            // Milestone Material Usage
+            'milestone-material-usage.view',
+            'milestone-material-usage.create',
+            'milestone-material-usage.update',
+            'milestone-material-usage.delete',
 
             // Project Tasks
             'project-tasks.view',
@@ -107,6 +114,13 @@ class PermissionSeeder extends Seeder
             'miscellaneous-expenses.create',
             'miscellaneous-expenses.update',
             'miscellaneous-expenses.delete',
+
+            // Direct Supply
+            'direct-supply.view',
+            'direct-supply.create',
+            'direct-supply.update',
+            'direct-supply.delete',
+            'direct-supply.allocate',
 
             // Clients
             'clients.view',

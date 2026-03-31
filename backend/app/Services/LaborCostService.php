@@ -51,19 +51,25 @@ class LaborCostService
             ->map(function ($tm) {
                 if ($tm->assignable_type === 'employee' && $tm->employee) {
                     return [
-                        'id'         => $tm->employee->id,
-                        'name'       => trim($tm->employee->first_name . ' ' . $tm->employee->last_name),
-                        'email'      => $tm->employee->email,
-                        'daily_rate' => $tm->daily_rate ?? ($tm->hourly_rate ? $tm->hourly_rate * 8 : 0),
-                        'type'       => 'employee',
+                        'id'             => $tm->employee->id,
+                        'name'           => trim($tm->employee->first_name . ' ' . $tm->employee->last_name),
+                        'email'          => $tm->employee->email,
+                        'pay_type'       => $tm->pay_type ?? 'hourly',
+                        'hourly_rate'    => $tm->hourly_rate ?? 0,
+                        'monthly_salary' => $tm->monthly_salary ?? 0,
+                        'daily_rate'     => $this->resolveDailyRate($tm),
+                        'type'           => 'employee',
                     ];
                 } elseif ($tm->user) {
                     return [
-                        'id'         => $tm->user->id,
-                        'name'       => $tm->user->name,
-                        'email'      => $tm->user->email,
-                        'daily_rate' => $tm->daily_rate ?? ($tm->hourly_rate ? $tm->hourly_rate * 8 : 0),
-                        'type'       => 'user',
+                        'id'             => $tm->user->id,
+                        'name'           => $tm->user->name,
+                        'email'          => $tm->user->email,
+                        'pay_type'       => $tm->pay_type ?? 'hourly',
+                        'hourly_rate'    => $tm->hourly_rate ?? 0,
+                        'monthly_salary' => $tm->monthly_salary ?? 0,
+                        'daily_rate'     => $this->resolveDailyRate($tm),
+                        'type'           => 'user',
                     ];
                 }
                 return null;
@@ -99,5 +105,24 @@ class LaborCostService
             'sort_by'    => $sortBy,
             'sort_order' => $sortOrder,
         ];
+    }
+
+    /**
+     * Resolve the effective daily rate from a ProjectTeam record.
+     * - hourly: hourly_rate * 8
+     * - salary: monthly_salary / 26 (standard working days)
+     * - fixed:  0 (user enters gross directly)
+     */
+    private function resolveDailyRate(\App\Models\ProjectTeam $tm): float
+    {
+        $payType = $tm->pay_type ?? 'hourly';
+        if ($payType === 'salary') {
+            return $tm->monthly_salary ? round((float) $tm->monthly_salary / 26, 4) : 0;
+        }
+        if ($payType === 'fixed') {
+            return 0;
+        }
+        // hourly
+        return $tm->hourly_rate ? (float) $tm->hourly_rate * 8 : 0;
     }
 }

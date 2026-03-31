@@ -7,8 +7,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { AppProvider } from '@/contexts/AppContext';
+import { AppProvider, useApp } from '@/contexts/AppContext';
 import { DialogProvider } from '@/contexts/DialogContext';
+import { useNotificationListeners } from '@/hooks/useNotifications';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -16,6 +17,8 @@ export const unstable_settings = {
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { refreshNotifications } = useApp();
+  useNotificationListeners(refreshNotifications);
   const segments = useSegments();
   const router = useRouter();
 

@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderTopWidth: 1, borderTopColor: D.hairline, paddingTop: 10, marginBottom: 10,
   },
-  amountValue: { fontSize: 22, fontWeight: '700', color: D.ink, letterSpacing: -0.5 },
+  amountValue: { fontSize: 18, fontWeight: '700', color: D.ink, letterSpacing: -0.3 },
   milestonePill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#F5F4F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,

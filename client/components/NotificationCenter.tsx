@@ -29,7 +29,6 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
   // Refresh notifications when modal opens
   useEffect(() => {
     if (visible) {
-      console.log('NotificationCenter opened, refreshing notifications...');
       refreshNotifications();
       // Slide in from right (going to the left)
       Animated.timing(slideAnim, {
@@ -47,10 +46,6 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
     }
   }, [visible, refreshNotifications, slideAnim]);
 
-  useEffect(() => {
-    console.log('Notifications updated:', notifications.length);
-  }, [notifications]);
-
   const backgroundColor = '#FFFFFF';
   const textColor = '#111827';
   const textSecondary = '#4B5563';
@@ -66,6 +61,8 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
         return 'alert-circle';
       case 'status_change':
         return 'sync';
+      case 'billing':
+        return 'receipt-outline';
       default:
         return 'notifications';
     }
@@ -81,6 +78,8 @@ export default function NotificationCenter({ visible, onClose }: NotificationCen
         return '#EF4444';
       case 'status_change':
         return '#8B5CF6';
+      case 'billing':
+        return '#1D4ED8';
       default:
         return '#8B5CF6';
     }

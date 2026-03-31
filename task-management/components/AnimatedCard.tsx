@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import Animated, {
-  FadeInUp,
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -55,7 +55,7 @@ export default function AnimatedCard({
     onPress();
   };
 
-  const enteringAnimation = FadeInUp.duration(400).delay(delay + index * 50).springify();
+  const enteringAnimation = FadeIn.duration(250).delay(delay + index * 50);
 
   if (onPress) {
     return (

@@ -18,10 +18,15 @@ import { Textarea } from "@/Components/ui/textarea";
 
 const AddReceivingReport = ({ setShowAddModal, project, allocation, budgetSummary }) => {
   const remaining = (allocation.quantity_allocated || 0) - (allocation.quantity_received || 0);
+  const isDs = !!allocation.direct_supply_id;
   const inventoryItem = allocation.inventoryItem || allocation.inventory_item || {};
+  const directSupply = allocation.directSupply || allocation.direct_supply || {};
+  const itemName = isDs ? (directSupply.supply_name || 'Direct Supply') : (inventoryItem.item_name || 'Unknown');
+  const unitOfMeasure = isDs ? (directSupply.unit_of_measure || 'units') : (inventoryItem.unit_of_measure || 'units');
+  const unitPrice = isDs ? (allocation.unit_price ?? directSupply.unit_price ?? 0) : (inventoryItem.unit_price || 0);
 
   const fmt = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n ?? 0);
-  const thisItemCost = (allocation.quantity_allocated || 0) * (inventoryItem.unit_price || 0);
+  const thisItemCost = (allocation.quantity_allocated || 0) * unitPrice;
   const budgetRemaining = budgetSummary?.budget_remaining ?? (project?.contract_amount ?? 0);
   const isOverBudget = budgetRemaining < 0;
 
@@ -36,7 +41,7 @@ const AddReceivingReport = ({ setShowAddModal, project, allocation, budgetSummar
     e.preventDefault();
 
     if (parseFloat(data.quantity_received) > remaining) {
-      toast.error(`Quantity received cannot exceed remaining quantity (${remaining} ${inventoryItem.unit_of_measure || 'units'})`);
+      toast.error(`Quantity received cannot exceed remaining quantity (${remaining} ${unitOfMeasure})`);
       return;
     }
 
@@ -73,7 +78,7 @@ const AddReceivingReport = ({ setShowAddModal, project, allocation, budgetSummar
         <DialogHeader>
           <DialogTitle className="text-zinc-800">Add Receiving Report</DialogTitle>
           <DialogDescription className="text-zinc-600">
-            Record the materials received for {inventoryItem.item_name || 'this item'}.
+            Record the materials received for {itemName}.
           </DialogDescription>
         </DialogHeader>
 
@@ -105,10 +110,10 @@ const AddReceivingReport = ({ setShowAddModal, project, allocation, budgetSummar
           {/* Item Info */}
           <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
             <div className="text-sm text-gray-600 space-y-1">
-              <div><span className="font-medium">Item:</span> {inventoryItem.item_name || 'Unknown'}</div>
-              <div><span className="font-medium">Allocated:</span> {allocation.quantity_allocated} {inventoryItem.unit_of_measure || 'units'}</div>
-              <div><span className="font-medium">Already Received:</span> {allocation.quantity_received || 0} {inventoryItem.unit_of_measure || 'units'}</div>
-              <div><span className="font-medium">Remaining:</span> {remaining} {inventoryItem.unit_of_measure || 'units'}</div>
+              <div><span className="font-medium">Item:</span> {itemName}</div>
+              <div><span className="font-medium">Allocated:</span> {allocation.quantity_allocated} {unitOfMeasure}</div>
+              <div><span className="font-medium">Already Received:</span> {allocation.quantity_received || 0} {unitOfMeasure}</div>
+              <div><span className="font-medium">Remaining:</span> {remaining} {unitOfMeasure}</div>
             </div>
           </div>
 
@@ -122,12 +127,12 @@ const AddReceivingReport = ({ setShowAddModal, project, allocation, budgetSummar
               max={remaining}
               value={data.quantity_received}
               onChange={(e) => setData("quantity_received", e.target.value)}
-              placeholder={`Enter quantity (max: ${remaining} ${inventoryItem.unit_of_measure || 'units'})`}
+              placeholder={`Enter quantity (max: ${remaining} ${unitOfMeasure})`}
               className={inputClass(errors.quantity_received)}
             />
             <InputError message={errors.quantity_received} />
             <p className="text-xs text-gray-500 mt-1">
-              Maximum: {remaining} {inventoryItem.unit_of_measure || 'units'}
+              Maximum: {remaining} {unitOfMeasure}
             </p>
           </div>
 

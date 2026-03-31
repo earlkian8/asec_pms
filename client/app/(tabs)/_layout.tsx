@@ -4,7 +4,6 @@ import { Home, Briefcase, User, Receipt } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Platform } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
-import { useAuth } from '@/contexts/AuthContext';
 
 // ── Design tokens (shared across all tab screens) ─────────────────────────────
 export const DS = {
@@ -45,7 +44,6 @@ export const DS = {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { displayBillingModule } = useAuth();
 
   return (
     <Tabs
@@ -96,21 +94,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="billings"
-        options={
-          displayBillingModule
-            ? {
-                title: 'Billings',
-                href: '/(tabs)/billings',
-                tabBarIcon: ({ color, focused }) => (
-                  <Receipt size={22} color={color} strokeWidth={focused ? 2.5 : 1.8} />
-                ),
-              }
-            : {
-                title: 'Billings',
-                href: null,
-                tabBarItemStyle: { display: 'none', width: 0, minWidth: 0, overflow: 'hidden' },
-              }
-        }
+        options={{
+          title: 'Billings',
+          tabBarIcon: ({ color, focused }) => (
+            <Receipt size={22} color={color} strokeWidth={focused ? 2.5 : 1.8} />
+          ),
+        }}
       />
       <Tabs.Screen
         name="about"

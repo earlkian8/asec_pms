@@ -58,6 +58,7 @@ export default function ProjectsIndex() {
   const clients         = usePage().props.clients || [];
   const users           = usePage().props.users || [];
   const inventoryItems  = usePage().props.inventoryItems || [];
+  const directSupplyItems = usePage().props.directSupplyItems || [];
   const projectTypes    = usePage().props.projectTypes || [];
   const filters         = usePage().props.filters || {};
   const filterOptions   = usePage().props.filterOptions || {};
@@ -223,6 +224,7 @@ export default function ProjectsIndex() {
         clients={clients}
         users={users}
         inventoryItems={inventoryItems}
+        directSupplyItems={directSupplyItems}
         projectTypes={projectTypes}
         clientTypes={clientTypes}
       />

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.246.193.31:8000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
+// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.246.193.31:8000/api';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -191,6 +191,10 @@ class ApiService {
     const queryString = params ? new URLSearchParams(params).toString() : '';
     const result = await this.get(`/client/billings/transactions${queryString ? `?${queryString}` : ''}`, { responseType: 'json' });
     return result as ApiResponse<any>;
+  }
+
+  async registerPushToken(token: string | null): Promise<ApiResponse<any>> {
+    return this.post('/client/push-token', { push_token: token });
   }
 }
 

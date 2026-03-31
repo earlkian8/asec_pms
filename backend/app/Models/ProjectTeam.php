@@ -18,6 +18,8 @@ class ProjectTeam extends Model
         'assignable_type',
         'role',
         'hourly_rate',
+        'pay_type',
+        'monthly_salary',
         'start_date',
         'end_date',
         'is_active',
@@ -27,13 +29,14 @@ class ProjectTeam extends Model
     ];
 
     protected $casts = [
-        'hourly_rate'       => 'decimal:2',
-        'start_date'        => 'date',
-        'end_date'          => 'date',
-        'is_active'         => 'boolean',
+        'hourly_rate'    => 'decimal:2',
+        'monthly_salary' => 'decimal:2',
+        'start_date'     => 'date',
+        'end_date'       => 'date',
+        'is_active'      => 'boolean',
         'assignment_status' => AssignmentStatus::class,
-        'released_at'       => 'datetime',
-        'reactivated_at'    => 'datetime',
+        'released_at'    => 'datetime',
+        'reactivated_at' => 'datetime',
     ];
 
     protected $appends = [

@@ -7,13 +7,14 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProjectTasksController extends Controller
 {
-    use ActivityLogsTrait, NotificationTrait;
+    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
 
     /**
      * Sync milestone status based on its current tasks:
@@ -88,6 +89,8 @@ class ProjectTasksController extends Controller
         );
 
         if ($milestone->project) {
+            $this->notifyTaskCreated($milestone->project, $data['title'], $milestone->name);
+
             $this->createSystemNotification(
                 'task', 'New Task Created',
                 "A new task '{$data['title']}' has been created in milestone '{$milestone->name}' for project '{$milestone->project->project_name}'.",

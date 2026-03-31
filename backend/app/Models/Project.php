@@ -41,6 +41,11 @@ class Project extends Model
 
     protected $appends = ['has_billings'];
 
+    public function scopeNotArchived($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
     public function getHasBillingsAttribute(): bool
     {
         return $this->billings()->exists();

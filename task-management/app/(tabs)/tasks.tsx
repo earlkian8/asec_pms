@@ -55,16 +55,13 @@ export default function TasksScreen() {
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  useEffect(() => { loadTasks(); }, [statusFilter, debouncedSearch]);
+  useEffect(() => { loadTasks(); }, [debouncedSearch]);
 
   const loadTasks = async () => {
     try {
       setLoading(true);
       let endpoint = '/task-management/tasks';
-      const params: string[] = [];
-      if (statusFilter !== 'all') params.push(`status=${statusFilter}`);
-      if (debouncedSearch.trim()) params.push(`search=${encodeURIComponent(debouncedSearch.trim())}`);
-      if (params.length) endpoint += `?${params.join('&')}`;
+      if (debouncedSearch.trim()) endpoint += `?search=${encodeURIComponent(debouncedSearch.trim())}`;
 
       const response = await apiService.get<Task[]>(endpoint);
       if (response.success && response.data)
@@ -77,8 +74,13 @@ export default function TasksScreen() {
     }
   };
 
+  const filteredTasks = useMemo(() => {
+    if (statusFilter === 'all') return tasks;
+    return tasks.filter(t => t.status === statusFilter);
+  }, [tasks, statusFilter]);
+
   const sortedTasks = useMemo(() => {
-    const arr = [...tasks];
+    const arr = [...filteredTasks];
     switch (sortOption) {
       case 'due_date_asc':
         return arr.sort((a, b) => {

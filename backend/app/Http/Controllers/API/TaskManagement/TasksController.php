@@ -65,7 +65,7 @@ class TasksController extends Controller
                 'title' => $t->title,
                 'description' => $t->description,
                 'assignedTo' => $t->assigned_to,
-                'assignedToName' => $t->assignedUser->name ?? 'Unassigned',
+                'assignedToName' => $t->assignedUser?->name ?? 'Unassigned',
                 'dueDate' => $t->due_date,
                 'status' => $t->status,
                 'createdAt' => $t->created_at?->toISOString(),

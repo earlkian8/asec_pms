@@ -894,7 +894,7 @@ export default function TaskDetailScreen() {
 
             let response;
             if (editingProgressUpdate) {
-              response = await apiService.put(
+              response = await apiService.post(
                 `/task-management/tasks/${task.id}/progress-updates/${editingProgressUpdate.id}`,
                 formData,
                 true

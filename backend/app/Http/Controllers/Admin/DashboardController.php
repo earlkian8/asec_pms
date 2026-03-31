@@ -24,15 +24,17 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // Project Statistics
-        $totalProjects = Project::count();
-        $activeProjects = Project::where('status', 'active')->count();
-        $projectsByStatus = Project::select('status', DB::raw('count(*) as count'))
+        // Project Statistics — exclude archived projects
+        $totalProjects = Project::notArchived()->count();
+        $activeProjects = Project::notArchived()->where('status', 'active')->count();
+        $projectsByStatus = Project::notArchived()
+            ->select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
             ->get()
             ->pluck('count', 'status');
-        
-        $projectsByType = Project::with('projectType')
+
+        $projectsByType = Project::notArchived()
+            ->with('projectType')
             ->select('project_type_id', DB::raw('count(*) as count'))
             ->whereNotNull('project_type_id')
             ->groupBy('project_type_id')
@@ -42,22 +44,23 @@ class DashboardController extends Controller
                 return [$typeName => $item->count];
             });
 
-        $totalContractAmount = Project::sum('contract_amount');
-        
+        $totalContractAmount = Project::notArchived()->sum('contract_amount');
+
         // Calculate average completion based on milestones
-        $allProjects = Project::with('milestones')->get();
+        $allProjects = Project::notArchived()->with('milestones')->get();
         $completionPercentages = $allProjects->map(function ($project) {
             $milestones = $project->milestones;
             $totalMilestones = $milestones->count();
             $completedMilestones = $milestones->where('status', 'completed')->count();
-            return $totalMilestones > 0 
-                ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+            return $totalMilestones > 0
+                ? round(($completedMilestones / $totalMilestones) * 100, 2)
                 : 0;
         });
         $averageCompletion = $completionPercentages->avg() ?? 0;
 
-        // Recent Projects (last 5)
-        $recentProjects = Project::with(['client:id,client_name', 'projectType:id,name', 'milestones'])
+        // Recent Projects (last 5) — exclude archived
+        $recentProjects = Project::notArchived()
+            ->with(['client:id,client_name', 'projectType:id,name', 'milestones'])
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get()
@@ -65,8 +68,8 @@ class DashboardController extends Controller
                 $milestones = $project->milestones;
                 $totalMilestones = $milestones->count();
                 $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->milestones_completion_percentage = $totalMilestones > 0 
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2) 
+                $project->milestones_completion_percentage = $totalMilestones > 0
+                    ? round(($completedMilestones / $totalMilestones) * 100, 2)
                     : 0;
                 return $project->only(['id', 'project_code', 'project_name', 'status', 'milestones_completion_percentage', 'client_id', 'project_type_id', 'created_at']);
             });
@@ -75,26 +78,27 @@ class DashboardController extends Controller
         $totalClients = Client::count();
         $activeClients = Client::where('is_active', true)->count();
 
-        // Billing Statistics - Based on transactions (payments) to handle deleted billings
-        // Total billed: Sum of all billing amounts from existing billings
-        $totalBilled = Billing::sum('billing_amount');
-        
-        // Total paid: Sum of all payment transactions with status='paid' (even if billing is deleted)
-        // Only count confirmed paid payments - exclude pending, failed, or cancelled payments
-        $totalPaid = BillingPayment::where('payment_status', 'paid')->sum('payment_amount');
-        
-        // Total remaining: Calculate from existing billings minus payments
-        // This ensures accuracy even if some billings are deleted
+        // Billing Statistics — exclude archived billings
+        $totalBilled = Billing::active()->sum('billing_amount');
+
+        // Total paid: only from non-archived billings on non-archived projects
+        $totalPaid = BillingPayment::where('payment_status', 'paid')
+            ->whereHas('billing', fn($q) => $q->whereNull('archived_at')
+                ->whereHas('project', fn($q2) => $q2->whereNull('archived_at')))
+            ->sum('payment_amount');
+
         $totalRemaining = $totalBilled - $totalPaid;
-        
-        // Billing status counts - based on existing billings
-        $billingsByStatus = Billing::select('status', DB::raw('count(*) as count'))
+
+        // Billing status counts — exclude archived billings
+        $billingsByStatus = Billing::active()
+            ->select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
             ->get()
             ->pluck('count', 'status');
 
-        // Recent Billings (last 5)
-        $recentBillings = Billing::with(['project:id,project_code,project_name', 'milestone:id,name'])
+        // Recent Billings (last 5) — exclude archived
+        $recentBillings = Billing::active()
+            ->with(['project:id,project_code,project_name', 'milestone:id,name'])
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get(['id', 'billing_code', 'project_id', 'billing_amount', 'status', 'billing_date', 'milestone_id', 'created_at']);
@@ -109,28 +113,30 @@ class DashboardController extends Controller
             })
             ->count();
 
-        // Team Statistics
+        // Team Statistics — only from non-archived projects
         $totalTeamMembers = ProjectTeam::where('is_active', true)
             ->where(function ($query) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', now()->toDateString());
             })
+            ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
             ->count();
 
-        // Milestone Statistics
-        $totalMilestones = ProjectMilestone::count();
-        $completedMilestones = ProjectMilestone::where('status', 'completed')->count();
-        $inProgressMilestones = ProjectMilestone::where('status', 'in_progress')->count();
+        // Milestone Statistics — only from non-archived projects
+        $totalMilestones = ProjectMilestone::whereHas('project', fn($q) => $q->whereNull('archived_at'))->count();
+        $completedMilestones = ProjectMilestone::whereHas('project', fn($q) => $q->whereNull('archived_at'))->where('status', 'completed')->count();
+        $inProgressMilestones = ProjectMilestone::whereHas('project', fn($q) => $q->whereNull('archived_at'))->where('status', 'in_progress')->count();
 
-        // Task Statistics
-        $totalTasks = ProjectTask::count();
-        $completedTasks = ProjectTask::where('status', 'completed')->count();
-        $inProgressTasks = ProjectTask::where('status', 'in_progress')->count();
+        // Task Statistics — only from non-archived projects
+        $totalTasks = ProjectTask::whereHas('milestone.project', fn($q) => $q->whereNull('archived_at'))->count();
+        $completedTasks = ProjectTask::whereHas('milestone.project', fn($q) => $q->whereNull('archived_at'))->where('status', 'completed')->count();
+        $inProgressTasks = ProjectTask::whereHas('milestone.project', fn($q) => $q->whereNull('archived_at'))->where('status', 'in_progress')->count();
 
-        // Budget Statistics
-        $totalLaborCost = (float) ProjectLaborCost::sum('gross_pay');
+        // Budget Statistics — only from non-archived projects
+        $totalLaborCost = (float) ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('gross_pay');
 
-        $totalMaterialCost = ProjectMaterialAllocation::with('inventoryItem')
+        $totalMaterialCost = ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->with('inventoryItem')
             ->get()
             ->sum(function ($allocation) {
                 if ($allocation->inventoryItem) {
@@ -139,12 +145,14 @@ class DashboardController extends Controller
                 return 0;
             });
 
-        $totalMiscCost = (float) ProjectMiscellaneousExpense::sum('amount');
+        $totalMiscCost = (float) ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('amount');
 
         $totalBudgetUsed = $totalLaborCost + $totalMaterialCost + $totalMiscCost;
 
-        // Monthly Revenue (last 6 months) - Only count paid payments
+        // Monthly Revenue (last 6 months) — only from non-archived billings/projects
         $monthlyRevenue = BillingPayment::where('payment_status', 'paid')
+            ->whereHas('billing', fn($q) => $q->whereNull('archived_at')
+                ->whereHas('project', fn($q2) => $q2->whereNull('archived_at')))
             ->select(
                 DB::raw("DATE_TRUNC('month', payment_date) as month"),
                 DB::raw('SUM(payment_amount) as total')
@@ -157,11 +165,12 @@ class DashboardController extends Controller
                 return Carbon::parse($item->month)->format('Y-m');
             });
 
-        // Monthly Expenses (last 6 months) - Labor + Materials
-        $monthlyLaborCosts = ProjectLaborCost::select(
-            DB::raw("DATE_TRUNC('month', period_start) as month"),
-            DB::raw('SUM(gross_pay) as total')
-        )
+        // Monthly Expenses (last 6 months) — only from non-archived projects
+        $monthlyLaborCosts = ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->select(
+                DB::raw("DATE_TRUNC('month', period_start) as month"),
+                DB::raw('SUM(gross_pay) as total')
+            )
             ->where('period_start', '>=', now()->subMonths(6))
             ->groupBy('month')
             ->orderBy('month', 'asc')
@@ -170,7 +179,8 @@ class DashboardController extends Controller
                 return Carbon::parse($item->month)->format('Y-m');
             });
 
-        $monthlyMaterialCosts = ProjectMaterialAllocation::with('inventoryItem')
+        $monthlyMaterialCosts = ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->with('inventoryItem')
             ->where('allocated_at', '>=', now()->subMonths(6))
             ->get()
             ->groupBy(function ($allocation) {
@@ -185,7 +195,8 @@ class DashboardController extends Controller
                 });
             });
 
-        $monthlyMiscCosts = ProjectMiscellaneousExpense::select(
+        $monthlyMiscCosts = ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->select(
                 DB::raw("DATE_TRUNC('month', expense_date) as month"),
                 DB::raw('SUM(amount) as total')
             )
@@ -203,11 +214,11 @@ class DashboardController extends Controller
             $month = now()->subMonths($i);
             $monthKey = $month->format('Y-m');
             $monthLabel = $month->format('M Y');
-            
+
             $revenueData = $monthlyRevenue->get($monthKey);
             $laborData = $monthlyLaborCosts->get($monthKey);
             $miscData = $monthlyMiscCosts->get($monthKey);
-            
+
             $last6Months[] = [
                 'month' => $monthLabel,
                 'month_key' => $monthKey,
@@ -218,16 +229,18 @@ class DashboardController extends Controller
             ];
         }
 
-        // Overdue Projects
-        $overdueProjects = Project::where('status', '!=', 'completed')
+        // Overdue Projects — exclude archived
+        $overdueProjects = Project::notArchived()
+            ->where('status', '!=', 'completed')
             ->where('status', '!=', 'cancelled')
             ->whereNotNull('planned_end_date')
             ->where('planned_end_date', '<', now())
             ->with('client:id,client_name')
             ->get(['id', 'project_code', 'project_name', 'planned_end_date', 'client_id', 'status']);
 
-        // Upcoming Due Dates (next 7 days)
-        $upcomingDueDates = Project::where('status', '!=', 'completed')
+        // Upcoming Due Dates (next 7 days) — exclude archived
+        $upcomingDueDates = Project::notArchived()
+            ->where('status', '!=', 'completed')
             ->where('status', '!=', 'cancelled')
             ->whereNotNull('planned_end_date')
             ->whereBetween('planned_end_date', [now(), now()->addDays(7)])
@@ -235,8 +248,9 @@ class DashboardController extends Controller
             ->orderBy('planned_end_date', 'asc')
             ->get(['id', 'project_code', 'project_name', 'planned_end_date', 'client_id', 'status']);
 
-        // Overdue Billings
-        $overdueBillings = Billing::where('status', '!=', 'paid')
+        // Overdue Billings — exclude archived
+        $overdueBillings = Billing::active()
+            ->where('status', '!=', 'paid')
             ->whereNotNull('due_date')
             ->where('due_date', '<', now())
             ->with(['project:id,project_code,project_name'])
@@ -298,4 +312,3 @@ class DashboardController extends Controller
         ]);
     }
 }
-

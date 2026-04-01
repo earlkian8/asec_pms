@@ -39,24 +39,26 @@ trait NotificationTrait
     /**
      * Create system-wide notification for ALL users (system-based notification)
      */
-    protected function createSystemNotification(string $type, string $title, string $message, ?Project $project = null, ?string $link = null)
+    protected function createSystemNotification(string $type, string $title, string $message, ?Project $project = null, ?string $link = null): void
     {
-        $users = User::all();
-        $notifications = [];
-        $authId = auth()->id();
-        
-        // If no users exist, return empty array
-        if ($users->isEmpty()) {
-            return $notifications;
-        }
-        
-        foreach ($users as $user) {
+        $now = now();
+        $projectId = $project?->id;
 
-                $notifications[] = $this->createNotification($user, $type, $title, $message, $project, $link);
-            
-        }
-        
-        return $notifications;
+        User::query()->select('id')->chunkById(100, function ($users) use ($type, $title, $message, $projectId, $link, $now) {
+            $rows = $users->map(fn($u) => [
+                'user_id'    => $u->id,
+                'project_id' => $projectId,
+                'type'       => $type,
+                'title'      => $title,
+                'message'    => $message,
+                'read'       => false,
+                'link'       => $link,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all();
+
+            Notification::insert($rows);
+        });
     }
 
     /**

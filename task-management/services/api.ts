@@ -1,4 +1,4 @@
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-3dfex.ondigitalocean.app/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asec-pms-coc6d.ondigitalocean.app/api';
 interface ApiResponse<T> {
   success: boolean;
   message?: string;

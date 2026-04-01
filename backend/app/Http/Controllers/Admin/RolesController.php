@@ -84,6 +84,7 @@ class RolesController extends Controller
             route('user-management.roles-and-permissions.index')
         );
 
+        return redirect()->back()->with('success', 'Role created successfully.');
     }
 
     /**

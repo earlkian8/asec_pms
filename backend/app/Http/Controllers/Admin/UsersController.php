@@ -328,6 +328,8 @@ class UsersController extends Controller
             "User '{$user->name}' ({$user->email}) has been updated.",
             null, route('user-management.users.index')
         );
+
+        return redirect()->back()->with('success', 'User updated successfully.');
     }
 
     // ── resetPassword ─────────────────────────────────────────────────────────
@@ -346,6 +348,8 @@ class UsersController extends Controller
             "Password for user '{$user->name}' ({$user->email}) has been reset.",
             null, route('user-management.users.index')
         );
+
+        return back()->with('success', 'Password reset successfully.');
     }
 
     // ── destroy ───────────────────────────────────────────────────────────────

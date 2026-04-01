@@ -24,7 +24,11 @@ class ActivityLogsController extends Controller
                       ->orWhere('description', 'ilike', "%{$search}%")
                       ->orWhere('ip_address', 'ilike', "%{$search}%")
                       ->orWhereHas('user', function ($uq) use ($search) {
-                          $uq->where('name', 'ilike', "%{$search}%");
+                          $uq->where(function ($nameQuery) use ($search) {
+                                $nameQuery->where('first_name', 'ilike', "%{$search}%")
+                                            ->orWhere('middle_name', 'ilike', "%{$search}%")
+                                            ->orWhere('last_name', 'ilike', "%{$search}%");
+                            });
                       });
                 });
             })

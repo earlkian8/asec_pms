@@ -13,7 +13,9 @@
       "bundleIdentifier": "com.earlkian8.client",
       "buildNumber": "1",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -27,7 +29,11 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.earlkian8.client",
       "versionCode": 1,
-      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "web": {
       "output": "static",
@@ -65,9 +71,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f3cc106b-9e8b-464d-a7b5-d102522f2f46"
+        "projectId": "2fd8427f-6afa-4d3d-9cdb-becaf4955642"
       }
-    },
-    "owner": "earlkian8"
+    }
   }
 }

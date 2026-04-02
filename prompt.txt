@@ -1,0 +1,8 @@
+I want you to make the user manual for this entire codebases (backend, client, task management). It should be sequential as well in module usage
+
+Backend:
+Login -> teach first about roles & permission, user management, and activity logs -> project management actions and viewing inside consist of overview, team members, material allocation, labor cost, miscellaneous and milestone (where in that milestone is also where you could do actions for tasks, and make a progress update or issues and or view the client request) -> project type -> employee -> client -> client type  -> inventory -> direct supply -> billing -> reports.
+
+I think on reading part, you should prioritize reading the frontend part and then their backend processes because thru frontend, you can visualize how the flow actually happens (where a user will click, what are the actions and what it does in the backend stuff like that), apply the same thing to client portal app and task management app (same sequential tutorial from login to end)
+
+Make it easier for us especially our users to understand, i will also be providing images with red markers on where to click (like your tutorial is on how to create a project then i will be the one making the images and adding the red markers), so meaning just add a placeholder for those needed images

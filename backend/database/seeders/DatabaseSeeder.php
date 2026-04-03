@@ -28,7 +28,7 @@ class DatabaseSeeder extends Seeder
 
         // Create or update admin user with Super Admin role
         // Update this email to match your account email
-        $adminEmail = 'dev@unisync.com'; // Change this to your email
+        $adminEmail = 'developer@asec.com'; // Change this to your email
         
         $adminUser = User::firstOrCreate(
             ['email' => $adminEmail],
@@ -42,7 +42,7 @@ class DatabaseSeeder extends Seeder
         );
         
         // Ensure Super Admin role is assigned (remove other roles first)
-        $adminUser->syncRoles(['Super Admin']);
+        $adminUser->syncRoles(['Developer']);
         
         // $this->command->info("Super Admin role assigned to: {$adminEmail}");
 

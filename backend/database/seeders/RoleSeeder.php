@@ -24,7 +24,13 @@ class RoleSeeder extends Seeder
             ['name' => 'Super Admin', 'guard_name' => 'web'],
             ['name' => 'Super Admin', 'guard_name' => 'web']
         );
+
+        $developer = Role::firstOrCreate(
+            ['name' => 'Developer', 'guard_name' => 'web'],
+            ['name' => 'Developer', 'guard_name' => 'web']
+        );
         $superAdmin->syncPermissions($allPermissions);
+        $developer->syncPermissions($allPermissions);
 
         // 2. Admin - All permissions except user management (users, roles, activity-logs)
         $admin = Role::firstOrCreate(

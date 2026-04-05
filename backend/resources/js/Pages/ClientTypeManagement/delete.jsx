@@ -10,22 +10,20 @@ import {
   DialogFooter
 } from "@/Components/ui/dialog"
 import { Button } from '@/Components/ui/button';
-import { Loader2, AlertTriangle, Trash2, ShieldAlert, FolderOpen } from 'lucide-react';
+import { Loader2, AlertTriangle, Trash2, ShieldAlert, Users } from 'lucide-react';
 
-const DeleteClient = ({ setShowDeleteModal, client }) => {
+const DeleteClientType = ({ setShowDeleteModal, clientType }) => {
   const [processing, setProcessing] = useState(false);
 
-  // active_projects_count is passed from the backend via the client object
-  // (add `active_projects_count` to the clients query in ClientsController if not already present)
-  const activeProjectsCount = client.active_projects_count ?? 0;
-  const isBlocked = activeProjectsCount > 0;
+  const clientsCount = clientType.clients_count ?? 0;
+  const isBlocked = clientsCount > 0;
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
 
     router.delete(
-      route('client-management.destroy', client.id),
+      route('client-type-management.destroy', clientType.id),
       {
         preserveScroll: true,
         onSuccess: (page) => {
@@ -35,7 +33,7 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
             toast.error(flash.error);
           } else {
             setShowDeleteModal(false);
-            toast.success(`Client "${client.client_name}" deleted successfully`);
+            toast.success(`Client type "${clientType.name}" deleted successfully`);
           }
         },
         onError: (errors) => {
@@ -43,14 +41,14 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
           if (errors.message) {
             toast.error(errors.message);
           } else {
-            toast.error('Failed to delete client. Please try again.');
+            toast.error('Failed to delete client type. Please try again.');
           }
         }
       }
     );
   };
 
-  // ── Blocked: client has active projects ────────────────────────────────────
+  // ── Blocked: client type has linked clients ─────────────────────────────────
   if (isBlocked) {
     return (
       <Dialog open onOpenChange={setShowDeleteModal}>
@@ -60,16 +58,15 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
               <div className="bg-amber-100 rounded-full p-2">
                 <ShieldAlert className="h-6 w-6 text-amber-600" />
               </div>
-              <DialogTitle className="text-amber-900">Cannot Delete Client</DialogTitle>
+              <DialogTitle className="text-amber-900">Cannot Delete Client Type</DialogTitle>
             </div>
             <DialogDescription className="text-gray-600 pt-2">
               <div className="space-y-4">
                 <p className="text-sm">
-                  Client <span className="font-semibold text-gray-900">{client.client_name}</span> cannot
-                  be deleted because it currently has active projects.
+                  Client type <span className="font-semibold text-gray-900">{clientType.name}</span> cannot
+                  be deleted because it is currently assigned to clients.
                 </p>
 
-                {/* Blocked warning box */}
                 <div className="p-4 border border-amber-200 rounded-lg bg-gradient-to-r from-amber-50 to-amber-100">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-amber-100 rounded-lg">
@@ -78,26 +75,24 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
                     <div className="flex-1 min-w-0">
                       <h4 className="mb-1 font-medium text-amber-900">Deletion Blocked</h4>
                       <p className="text-sm text-amber-700">
-                        This client has{' '}
-                        <span className="font-semibold">{activeProjectsCount}</span>{' '}
-                        active or on-hold project{activeProjectsCount !== 1 ? 's' : ''} and cannot be removed.
+                        This client type has{' '}
+                        <span className="font-semibold">{clientsCount}</span>{' '}
+                        client{clientsCount !== 1 ? 's' : ''} assigned and cannot be removed.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* What to do instead box */}
                 <div className="p-4 border border-blue-200 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-blue-100 rounded-lg">
-                      <FolderOpen className="w-4 h-4 text-blue-600" />
+                      <Users className="w-4 h-4 text-blue-600" />
                     </div>
                     <div className="flex-1">
                       <h4 className="mb-2 font-medium text-blue-900">What You Can Do Instead</h4>
                       <ul className="text-sm text-blue-700 space-y-1">
-                        <li>• Complete or cancel all active projects first</li>
-                        <li>• Set this client to <span className="font-medium">Inactive</span> to stop new project assignments</li>
-                        <li>• Contact an administrator if you need further assistance</li>
+                        <li>• Reassign all clients to a different client type first</li>
+                        <li>• Set this type to <span className="font-medium">Inactive</span> to prevent new assignments</li>
                       </ul>
                     </div>
                   </div>
@@ -120,7 +115,7 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
     );
   }
 
-  // ── Normal: no active projects — confirm deletion ──────────────────────────
+  // ── Normal: no clients — confirm deletion ───────────────────────────────────
   return (
     <Dialog open onOpenChange={setShowDeleteModal}>
       <DialogContent className="max-w-md">
@@ -129,26 +124,18 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
             <div className="bg-red-100 rounded-full p-2">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <DialogTitle className="text-red-900">Delete Client</DialogTitle>
+            <DialogTitle className="text-red-900">Delete Client Type</DialogTitle>
           </div>
           <DialogDescription className="text-gray-600 pt-2 space-y-3">
             <p>
-              Are you sure you want to delete client{' '}
-              <span className="font-semibold text-gray-900">{client.client_name}</span>
-              {client.client_code && (
-                <span className="text-gray-500"> ({client.client_code})</span>
-              )}?
+              Are you sure you want to delete client type{' '}
+              <span className="font-semibold text-gray-900">{clientType.name}</span>?
             </p>
 
             <div>
               <p className="text-sm mb-1">
-                This action <span className="font-semibold text-red-600">cannot be undone</span>. The following will be permanently deleted:
+                This action <span className="font-semibold text-red-600">cannot be undone</span>.
               </p>
-              <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                <li>Client profile and information</li>
-                <li>Contact details and credentials</li>
-                <li>All associated project history</li>
-              </ul>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -178,7 +165,7 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
               ) : (
                 <>
                   <Trash2 size={16} />
-                  Delete Client
+                  Delete Client Type
                 </>
               )}
             </Button>
@@ -189,4 +176,4 @@ const DeleteClient = ({ setShowDeleteModal, client }) => {
   );
 };
 
-export default DeleteClient;
+export default DeleteClientType;

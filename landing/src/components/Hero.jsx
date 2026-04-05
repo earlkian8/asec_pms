@@ -1,4 +1,5 @@
 import clientPortalLogo from '../assets/client-portal-logo.png';
+import ApkDownloadButton from './ApkDownloadButton';
 
 export default function Hero() {
   return (
@@ -22,20 +23,23 @@ export default function Hero() {
           </p>
           <div className="flex flex-col items-center lg:items-start gap-3 animate-fade-up" style={{ animationDelay: '0.3s' }}>
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-              <a href="#" className="hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
-                <img
-                  src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
-                  alt="Get it on Google Play"
-                  className="h-14"
-                />
-              </a>
-              <div className="inline-flex items-center gap-2.5 bg-black/80 text-white/60 px-4 py-2.5 rounded-xl text-sm cursor-default select-none border border-white/10 h-14">
+              <ApkDownloadButton size="md" />
+              <div className="inline-flex items-center gap-2.5 bg-black/10 text-charcoal-500 px-4 py-2.5 rounded-xl text-sm cursor-default select-none border border-charcoal-300/50 h-14">
+                <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3.18 23.76c.3.17.64.22.98.14l13.2-7.62-2.83-2.83-11.35 10.31zm-1.7-20.1C1.2 4.05 1 4.5 1 5.06v13.88c0 .56.2 1.01.48 1.4l.08.07 7.77-7.77v-.2L1.56 3.59l-.08.07zM20.49 10.7l-2.83-1.63-3.17 3.17 3.17 3.17 2.86-1.65c.82-.47.82-1.56-.03-2.06zM4.16.25L17.36 7.9l-2.83 2.83L3.18.47c.3-.18.67-.22.98-.22z" />
+                </svg>
+                <div className="leading-tight text-left">
+                  <p className="text-[10px] text-charcoal-400 uppercase tracking-wide">Coming Soon</p>
+                  <p className="text-sm font-semibold text-charcoal-500">Google Play</p>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-2.5 bg-black/10 text-charcoal-500 px-4 py-2.5 rounded-xl text-sm cursor-default select-none border border-charcoal-300/50 h-14">
                 <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
                 </svg>
                 <div className="leading-tight text-left">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wide">Coming Soon</p>
-                  <p className="text-sm font-semibold text-white/70">App Store</p>
+                  <p className="text-[10px] text-charcoal-400 uppercase tracking-wide">Coming Soon</p>
+                  <p className="text-sm font-semibold text-charcoal-500">App Store</p>
                 </div>
               </div>
             </div>

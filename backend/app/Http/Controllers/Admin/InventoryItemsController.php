@@ -170,7 +170,7 @@ class InventoryItemsController extends Controller
             return $item;
         });
 
-        return Inertia::render('InventoryManagement/archived', [
+        return Inertia::render('InventoryManagement/archive', [
             'items'      => $items,
             'search'     => $search,
             'sort_by'    => $sortBy,
@@ -322,6 +322,7 @@ class InventoryItemsController extends Controller
         $inventoryItem->update([
             'is_archived' => true,
             'is_active' => false,       // deactivate alongside archiving
+            'archived_at' => now(),
         ]);
 
         $this->adminActivityLogs(
@@ -349,6 +350,7 @@ class InventoryItemsController extends Controller
         $inventoryItem->update([
             'is_archived' => false,
             'is_active' => true,
+            'archived_at' => null,
         ]);
 
         $this->adminActivityLogs(

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectTeam;
+use App\Models\ProjectTeamStatusLog;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Traits\ActivityLogsTrait;
@@ -273,6 +274,15 @@ class ProjectTeamsController extends Controller
                 $updateData['reactivated_at'] = now();
             }
             $team->update($updateData);
+
+            if (in_array($newStatus->value, ['released', 'reactivated'])) {
+                ProjectTeamStatusLog::create([
+                    'project_team_id' => $team->id,
+                    'project_id'      => $project->id,
+                    'action'          => $newStatus->value,
+                    'performed_by'    => auth()->id(),
+                ]);
+            }
         }
 
         $this->adminActivityLogs('Project Team', 'Bulk Status',
@@ -326,6 +336,16 @@ class ProjectTeamsController extends Controller
         }
 
         $projectTeam->update($updateData);
+
+        // Record status change log
+        if (in_array($newStatus->value, ['released', 'reactivated'])) {
+            ProjectTeamStatusLog::create([
+                'project_team_id' => $projectTeam->id,
+                'project_id'      => $project->id,
+                'action'          => $newStatus->value,
+                'performed_by'    => auth()->id(),
+            ]);
+        }
 
         $this->adminActivityLogs('Project Team', 'Update Status',
             "Updated {$projectTeam->assignable_name} assignment status from {$oldLabel} to {$newStatus->label()} "
@@ -498,6 +518,33 @@ class ProjectTeamsController extends Controller
         return response()->json(['assignments' => $assignments]);
     }
 
+    // ─── Status Logs ──────────────────────────────────────────────────────────
+
+    /**
+     * Return the release/reactivate log for a specific project team member.
+     *
+     * GET /project-management/project-teams/status-logs/{project}/team/{projectTeam}
+     */
+    public function statusLogs(Project $project, ProjectTeam $projectTeam)
+    {
+        if ($projectTeam->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $logs = ProjectTeamStatusLog::with('performer:id,name')
+            ->where('project_team_id', $projectTeam->id)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($log) => [
+                'id'           => $log->id,
+                'action'       => $log->action,
+                'performed_by' => $log->performer?->name ?? 'System',
+                'created_at'   => $log->created_at?->toISOString(),
+            ]);
+
+        return response()->json(['logs' => $logs]);
+    }
+
     // ─── Private Helpers ──────────────────────────────────────────────────────
 
     /**
@@ -518,6 +565,13 @@ class ProjectTeamsController extends Controller
         $team->update([
             'assignment_status' => AssignmentStatus::Released->value,
             'released_at'       => now(),
+        ]);
+
+        ProjectTeamStatusLog::create([
+            'project_team_id' => $team->id,
+            'project_id'      => $project->id,
+            'action'          => 'released',
+            'performed_by'    => auth()->id(),
         ]);
 
         $this->adminActivityLogs('Project Team', 'Release',

@@ -1,0 +1,291 @@
+Apr 08 13:55:10  [34m╭────────────[34m[30m[44m git repo clone [0m[0m[34m───────────╼[0m
+Apr 08 13:55:10  [34m│[0m [34m › fetching app source code[0m
+Apr 08 13:55:10  [34m│[0m => Selecting branch "master"
+Apr 08 13:55:10  [34m│[0m => Checking out commit "562b8bb1f66aec5475ea004b48eb773983706202"
+Apr 08 13:55:10  [34m│[0m 
+Apr 08 13:55:10  [34m│[0m [32m ✔ cloned repo to [35m/workspace[0m[0m
+Apr 08 13:55:10  [34m╰────────────────────────────────────────╼[0m
+Apr 08 13:55:10  
+Apr 08 13:55:10  [34m › applying source directory [35mbackend[0m[0m
+Apr 08 13:55:10  [32m ✔ using workspace root [35m/workspace/backend[0m[0m
+Apr 08 13:55:10  
+Apr 08 13:55:11  [34m › configuring build-time app environment variables:[0m
+Apr 08 13:55:11       PUSHER_APP_CLUSTER AWS_SECRET_ACCESS_KEY MAIL_FROM_ADDRESS FILESYSTEM_DISK CACHE_STORE REVERB_APP_SECRET SESSION_ENCRYPT REDIS_HOST BCRYPT_ROUNDS SUPABASE_STORAGE_BUCKET APP_LOCALE REVERB_PORT VITE_REVERB_PORT SUPABASE_STORAGE_ENDPOINT APP_DEBUG REDIS_PORT LOG_STACK SESSION_PATH MAIL_FROM_NAME VITE_REVERB_HOST REVERB_APP_ID VITE_REVERB_APP_KEY MAIL_PASSWORD APP_FALLBACK_LOCALE VITE_PUSHER_APP_CLUSTER BROADCAST_CONNECTION APP_MAINTENANCE_DRIVER LOG_LEVEL MAIL_HOST SESSION_LIFETIME REDIS_CLIENT AWS_USE_PATH_STYLE_ENDPOINT LOG_DEPRECATIONS_CHANNEL REVERB_SCHEME REVERB_APP_KEY APP_KEY SESSION_DRIVER AWS_ACCESS_KEY_ID DB_CONNECTION AWS_ENDPOINT PUSHER_APP_SECRET MAIL_USERNAME PUSHER_APP_ID LOG_CHANNEL VITE_PUSHER_APP_KEY PAYMONGO_SECRET_KEY PUSHER_APP_KEY APP_ENV REDIS_PASSWORD AWS_DEFAULT_REGION AWS_BUCKET VITE_APP_NAME SUPABASE_STORAGE_KEY QUEUE_CONNECTION PAYMONGO_API_URL MAIL_PORT SUPABASE_STORAGE_URL PAYMONGO_PUBLIC_KEY APP_NAME MEMCACHED_HOST SANCTUM_STATEFUL_DOMAINS VITE_REVERB_SCHEME MAIL_MAILER DB_URL APP_URL MAIL_ENCRYPTION PAYMONGO_RETURN_URL REVERB_HOST APP_FAKER_LOCALE
+Apr 08 13:55:11  
+Apr 08 13:55:11  [34m › configuring custom build command to be run at the end of the build:[0m
+Apr 08 13:55:11     [34m│[0m composer install --no-dev --optimize-autoloader
+Apr 08 13:55:11     [34m│[0m npm install
+Apr 08 13:55:11     [34m│[0m npm run build
+Apr 08 13:55:11     [34m│[0m php artisan config:cache
+Apr 08 13:55:11     [34m│[0m php artisan route:cache
+Apr 08 13:55:11     [34m│[0m php artisan view:cache
+Apr 08 13:55:11  
+Apr 08 13:55:11  [34m╭────────────[34m[30m[44m buildpack detection [0m[0m[34m───────────╼[0m
+Apr 08 13:55:11  [34m│[0m [34m › using Ubuntu 22.04 stack[0m
+Apr 08 13:55:12  [34m│[0m Detected the following buildpacks suitable to build your app:
+Apr 08 13:55:12  [34m│[0m 
+Apr 08 13:55:12  [34m│[0m    digitalocean/nodejs-appdetect  v0.1.2    
+Apr 08 13:55:12  [34m│[0m    heroku/nodejs                  v0.338.5  (Node.js)
+Apr 08 13:55:12  [34m│[0m    digitalocean/php-appdetect     v0.1.0    
+Apr 08 13:55:12  [34m│[0m    heroku/php                     v2.281.5  (PHP)
+Apr 08 13:55:12  [34m│[0m    digitalocean/procfile          v0.1.0    (Procfile)
+Apr 08 13:55:12  [34m│[0m    digitalocean/custom            v0.2.0    (Custom Build Command)
+Apr 08 13:55:12  [34m│[0m 
+Apr 08 13:55:12  [34m│[0m For documentation on the buildpacks used to build your app, please see:
+Apr 08 13:55:12  [34m│[0m 
+Apr 08 13:55:12  [34m│[0m    PHP  v2.281.5  https://do.co/apps-buildpack-php
+Apr 08 13:55:12  [34m╰─────────────────────────────────────────────╼[0m
+Apr 08 13:55:12  
+Apr 08 13:55:12  [34m╭────────────[34m[30m[44m build caching [0m[0m[34m───────────╼[0m
+Apr 08 13:55:12  [34m│[0m [34m › checking for cache from a previous build[0m
+Apr 08 13:55:12  [34m│[0m Timer: Analyzer started at 2026-04-08T13:55:12Z
+Apr 08 13:55:13  [34m│[0m Layer cache not found
+Apr 08 13:55:13  [34m│[0m Timer: Analyzer ran for 774.234256ms and ended at 2026-04-08T13:55:13Z
+Apr 08 13:55:13  [34m│[0m Timer: Restorer started at 2026-04-08T13:55:13Z
+Apr 08 13:55:13  [34m│[0m Layer cache not found
+Apr 08 13:55:13  [34m│[0m Timer: Restorer ran for 72.95299ms and ended at 2026-04-08T13:55:13Z
+Apr 08 13:55:13  [34m╰───────────────────────────────────────╼[0m
+Apr 08 13:55:13  
+Apr 08 13:55:13  [34m╭────────────[34m[30m[44m app build [0m[0m[34m───────────╼[0m
+Apr 08 13:55:13  [34m│[0m Timer: Builder started at 2026-04-08T13:55:13Z
+Apr 08 13:55:14  [34m│[0m        
+Apr 08 13:55:14  [34m│[0m -----> Creating runtime environment
+Apr 08 13:55:14  [34m│[0m        
+Apr 08 13:55:14  [34m│[0m        NPM_CONFIG_LOGLEVEL=error
+Apr 08 13:55:14  [34m│[0m        NODE_VERBOSE=false
+Apr 08 13:55:14  [34m│[0m        NODE_ENV=
+Apr 08 13:55:14  [34m│[0m        NODE_MODULES_CACHE=true
+Apr 08 13:55:14  [34m│[0m        
+Apr 08 13:55:14  [34m│[0m -----> Installing binaries
+Apr 08 13:55:14  [34m│[0m        engines.node (package.json):   unspecified
+Apr 08 13:55:14  [34m│[0m        engines.npm (package.json):    unspecified (use default)
+Apr 08 13:55:14  [34m│[0m        
+Apr 08 13:55:14  [34m│[0m        Resolving node version 22.x...
+Apr 08 13:55:14  [34m│[0m        Downloading and installing node 22.22.1...
+Apr 08 13:55:15  [34m│[0m        Validating checksum
+Apr 08 13:55:17  [34m│[0m        Using default npm version: 10.9.4
+Apr 08 13:55:18  [34m│[0m        
+Apr 08 13:55:18  [34m│[0m -----> Installing dependencies
+Apr 08 13:55:18  [34m│[0m        Installing node modules
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m        added 383 packages, and audited 384 packages in 8s
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m        63 packages are looking for funding
+Apr 08 13:55:26  [34m│[0m          run `npm fund` for details
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m        2 high severity vulnerabilities
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m        To address all issues, run:
+Apr 08 13:55:26  [34m│[0m          npm audit fix
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m        Run `npm audit` for details.
+Apr 08 13:55:26  [34m│[0m        npm notice
+Apr 08 13:55:26  [34m│[0m        npm notice New major version of npm available! 10.9.4 -> 11.12.1
+Apr 08 13:55:26  [34m│[0m        npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.12.1
+Apr 08 13:55:26  [34m│[0m        npm notice To update run: npm install -g npm@11.12.1
+Apr 08 13:55:26  [34m│[0m        npm notice
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m -----> Build
+Apr 08 13:55:26  [34m│[0m        
+Apr 08 13:55:26  [34m│[0m -----> Caching build
+Apr 08 13:55:26  [34m│[0m        - npm cache
+Apr 08 13:55:27  [34m│[0m        
+Apr 08 13:55:27  [34m│[0m -----> Pruning devDependencies
+Apr 08 13:55:27  [34m│[0m        Skipping because NODE_ENV is not 'production'
+Apr 08 13:55:27  [34m│[0m        
+Apr 08 13:55:27  [34m│[0m -----> Build succeeded!
+Apr 08 13:55:27  [34m│[0m  !     This app may not specify any way to start a node process
+Apr 08 13:55:27  [34m│[0m        https://devcenter.heroku.com/articles/nodejs-support#default-web-process-type
+Apr 08 13:55:27  [34m│[0m 
+Apr 08 13:55:27  [34m│[0m -----> Bootstrapping...[0m
+Apr 08 13:55:34  [34m│[0m -----> Preparing platform package installation...[0m
+Apr 08 13:55:34  [34m│[0m -----> Installing platform packages...[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     ERROR: [0m[1;31mFailed to install system packages![0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     Your platform requirements (for runtimes and extensions) could[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     not be resolved to an installable set of dependencies, or a[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     platform package repository was unreachable.[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     This usually means that you (or packages you are using) depend[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     on a combination of PHP versions and/or extensions that are[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     currently not available on Heroku.[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     The following is the full output from the installation attempt:[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > Loading repositories with available runtimes and extensions[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > Updating dependencies[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > Lock file operations: 113 installs, 0 updates, 0 removals[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking aws/aws-crt-php (v1.2.7)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking aws/aws-sdk-php (3.374.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking brick/math (0.14.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking carbonphp/carbon-doctrine-types (3.2.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking composer.json/composer.lock (dev-207b85d239079d4e593a4fcf87025440)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking composer/pcre (3.3.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking composer/semver (3.4.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking dflydev/dot-access-data (v3.0.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking doctrine/inflector (2.1.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking doctrine/lexer (3.0.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking dompdf/dompdf (v3.1.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking dompdf/php-font-lib (1.0.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking dompdf/php-svg-lib (1.0.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking dragonmantank/cron-expression (v3.6.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking egulias/email-validator (4.0.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking ezyang/htmlpurifier (v4.19.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking fruitcake/php-cors (v1.3.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking graham-campbell/result-type (v1.1.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking guzzlehttp/guzzle (7.10.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking guzzlehttp/promises (2.3.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking guzzlehttp/psr7 (2.8.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking guzzlehttp/uri-template (v1.0.5)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking apache (2.4.66)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking composer (2.9.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking ext-gd (8.4.17)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking nginx (1.28.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking php (8.4.17)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking heroku/installer-plugin (1.7.5)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking inertiajs/inertia-laravel (v2.0.10)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking laravel/framework (v12.37.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking laravel/prompts (v0.3.7)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking laravel/sanctum (v4.2.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking laravel/serializable-closure (v2.0.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking laravel/tinker (v2.10.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/commonmark (2.7.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/config (v1.2.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/flysystem (3.30.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/flysystem-aws-s3-v3 (3.0.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/flysystem-local (3.30.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/mime-type-detection (1.16.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/uri (7.5.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking league/uri-interfaces (7.5.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking maatwebsite/excel (3.1.67)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking maennchen/zipstream-php (3.1.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking markbaker/complex (3.0.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking markbaker/matrix (3.0.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking masterminds/html5 (2.10.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking monolog/monolog (3.9.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking mtdowling/jmespath.php (2.8.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking nesbot/carbon (3.10.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking nette/schema (v1.3.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking nette/utils (v4.0.8)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking nikic/php-parser (v5.6.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking nunomaduro/termwind (v2.3.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking paragonie/sodium_compat (v2.4.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking paymongo/paymongo-php (v0.0.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking phpoffice/phpspreadsheet (1.30.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking phpoption/phpoption (1.9.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/clock (1.0.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/container (2.0.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/event-dispatcher (1.0.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/http-client (1.0.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/http-factory (1.1.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/http-message (2.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/log (3.0.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psr/simple-cache (3.0.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking psy/psysh (v0.12.14)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking pusher/pusher-php-server (7.2.7)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking ralouphie/getallheaders (3.0.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking ramsey/collection (2.1.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking ramsey/uuid (4.9.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking resend/resend-php (v1.1.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking sabberworm/php-css-parser (v9.1.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking spatie/laravel-permission (6.23.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/brevo-mailer (v7.4.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/clock (v7.3.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/console (v7.3.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/css-selector (v7.3.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/deprecation-contracts (v3.6.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/error-handler (v7.3.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/event-dispatcher (v7.3.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/event-dispatcher-contracts (v3.6.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/filesystem (v7.4.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/finder (v7.3.5)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/http-client (v7.4.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/http-client-contracts (v3.6.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/http-foundation (v7.3.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/http-kernel (v7.3.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/mailer (v7.3.5)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/mime (v7.3.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-ctype (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-intl-grapheme (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-intl-idn (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-intl-normalizer (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-mbstring (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-php80 (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-php83 (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-php84 (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-php85 (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/polyfill-uuid (v1.33.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/process (v7.3.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/routing (v7.3.6)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/service-contracts (v3.6.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/string (v7.3.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/translation (v7.3.4)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/translation-contracts (v3.6.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/uid (v7.3.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking symfony/var-dumper (v7.3.5)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking thecodingmachine/safe (v3.3.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking tightenco/ziggy (v2.6.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking tijsverkoyen/css-to-inline-styles (v2.3.0)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking vlucas/phpdotenv (v5.6.2)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Locking voku/portable-ascii (2.0.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > Writing lock file[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > Package operations: 113 installs, 0 updates, 0 removals[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Installing heroku/installer-plugin (1.7.5): Mirroring from /tmp/tmp.y8x8BNaBlq/target/support/installer[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Downloading php (8.4.17)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Downloading apache (2.4.66)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Downloading composer (2.9.3)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   - Downloading nginx (1.28.1)[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >  0/4 [>---------------------------]   0%[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >  1/4 [=======>--------------------]  25%[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >  2/4 [==============>-------------]  50%[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >  3/4 [=====================>------]  75%[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >  4/4 [============================] 100%[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > In CurlDownloader.php line 398:[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >                                                                                [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   curl error 28 while downloading https://lang-php.s3.us-east-1.amazonaws.com  [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   /dist-heroku-22-stable/php-8.4.17.tar.gz: Operation timed out after 300000   [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >   milliseconds with 1827379 out of 15941580 bytes received                     [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     >                                                                                [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     > install [--prefer-source] [--prefer-dist] [--prefer-install PREFER-INSTALL] [--dry-run] [--download-only] [--dev] [--no-suggest] [--no-dev] [--no-security-blocking] [--no-autoloader] [--no-progress] [--no-install] [--audit] [--audit-format AUDIT-FORMAT] [-v|vv|vvv|--verbose] [-o|--optimize-autoloader] [-a|--classmap-authoritative] [--apcu-autoloader] [--apcu-autoloader-prefix APCU-AUTOLOADER-PREFIX] [--ignore-platform-req IGNORE-PLATFORM-REQ] [--ignore-platform-reqs] [--] [<packages>...][0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     For reference, the following runtimes are currently available:[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     PHP: 8.5.2, 8.5.1, 8.5.0, 8.4.17, 8.4.16, 8.4.15, 8.4.14, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.4.13, 8.4.12, 8.4.11, 8.4.10, 8.4.8, 8.4.7, 8.4.6, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.4.5, 8.4.4, 8.4.3, 8.4.2, 8.4.1, 8.3.30, 8.3.29, 8.3.28, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.3.27, 8.3.26, 8.3.25, 8.3.24, 8.3.23, 8.3.22, 8.3.21, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.3.20, 8.3.19, 8.3.17, 8.3.16, 8.3.15, 8.3.14, 8.3.13, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.3.12, 8.3.11, 8.3.10, 8.3.9, 8.3.8, 8.3.7, 8.3.6, 8.3.5, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.3.4, 8.3.3, 8.3.2, 8.3.1, 8.3.0, 8.2.30, 8.2.29, 8.2.28, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.2.27, 8.2.26, 8.2.25, 8.2.24, 8.2.23, 8.2.22, 8.2.21, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.2.20, 8.2.19, 8.2.18, 8.2.17, 8.2.16, 8.2.15, 8.2.14, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.2.13, 8.2.12, 8.2.11, 8.2.10, 8.2.9, 8.2.8, 8.2.7, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.2.6, 8.2.5, 8.2.4, 8.2.3, 8.2.2, 8.2.1, 8.1.34, 8.1.33, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.1.32, 8.1.31, 8.1.30, 8.1.29, 8.1.28, 8.1.27, 8.1.26, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.1.25, 8.1.24, 8.1.23, 8.1.22, 8.1.21, 8.1.20, 8.1.19, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.1.18, 8.1.17, 8.1.16, 8.1.15, 8.1.14, 8.1.13, 8.1.12, [0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !          8.1.11, 8.1.10, 8.1.9, 8.1.8, 8.1.7, 8.1.6[0m[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     Please verify that all requirements for runtime versions in[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     'composer.lock' are compatible with the list above, and ensure[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     all required extensions are available for the desired runtimes.[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     When choosing a PHP runtimes and extensions, please also ensure[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     they are available on your app's stack (heroku-22), and select[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     a different stack if needed after consulting the article below.[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     For a list of supported runtimes & extensions on Heroku, please[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     refer to: https://devcenter.heroku.com/articles/php-support[0m
+Apr 08 14:15:38  [34m│[0m [1;31m !     [0m
+Apr 08 14:15:38  [34m│[0m Timer: Builder ran for 20m24.541151167s and ended at 2026-04-08T14:15:38Z
+Apr 08 14:15:38  [34m│[0m [31;1mERROR: [0mfailed to build: exit status 1
+Apr 08 14:15:38  [34m│[0m 
+Apr 08 14:15:38  [34m│[0m 
+Apr 08 14:15:38  [34m│[0m For documentation on the buildpacks used to build your app, please see:
+Apr 08 14:15:38  [34m│[0m 
+Apr 08 14:15:38  [34m│[0m    PHP  v2.281.5  https://do.co/apps-buildpack-php
+Apr 08 14:15:38  [34m│[0m 
+Apr 08 14:15:38  [34m│[0m [31m ✘ build failed[0m

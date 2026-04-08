@@ -4,7 +4,7 @@ import {
 import { useEffect, useState } from "react"
 import {
   Clock, Calendar, Building2, Loader2,
-  AlertCircle, CalendarCheck, RotateCcw, User, Briefcase, Mail, DollarSign
+  AlertCircle, CalendarCheck, RotateCcw, User, Briefcase, Mail, DollarSign, LogOut
 } from "lucide-react"
 
 const STATUS_CONFIG = {
@@ -35,13 +35,17 @@ function formatCurrency(amount) {
 
 export default function ViewAssignmentHistory({ teamMember, onClose }) {
   const [assignments, setAssignments] = useState([])
+  const [statusLogs, setStatusLogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [logsLoading, setLogsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [logsError, setLogsError] = useState(null)
   const [activeTab, setActiveTab] = useState("details")
 
   const memberName = teamMember?.assignable_name || "Team Member"
   const isEmployee = teamMember?.assignable_type === "employee"
 
+  // Fetch assignment history
   useEffect(() => {
     if (!teamMember) return
     setLoading(true)
@@ -62,9 +66,28 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
       .catch(() => { setError("Could not load assignment history."); setLoading(false) })
   }, [teamMember])
 
+  // Fetch status logs for this specific team member
+  useEffect(() => {
+    if (!teamMember?.id || !teamMember?.project_id) return
+    setLogsLoading(true)
+    setLogsError(null)
+
+    fetch(
+      route("project-management.project-teams.status-logs", {
+        project: teamMember.project_id,
+        projectTeam: teamMember.id,
+      }),
+      { headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" } }
+    )
+      .then(res => { if (!res.ok) throw new Error(); return res.json() })
+      .then(data => { setStatusLogs(data.logs || []); setLogsLoading(false) })
+      .catch(() => { setLogsError("Could not load status logs."); setLogsLoading(false) })
+  }, [teamMember])
+
   const tabs = [
     { id: "details", label: "Details" },
-    ...(isEmployee ? [{ id: "logs", label: "Rotation Logs" }] : []),
+    { id: "logs", label: "Status Logs" },
+    ...(isEmployee ? [{ id: "rotation", label: "Rotation" }] : []),
   ]
 
   return (
@@ -102,6 +125,11 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
                 }`}
               >
                 {tab.label}
+                {tab.id === "logs" && statusLogs.length > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-gray-200 text-gray-600">
+                    {statusLogs.length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -113,17 +141,14 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
           {/* ─── Details Tab ─── */}
           {activeTab === "details" && (
             <div className="space-y-4">
-              {/* Current assignment info */}
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assignment Info</h4>
-
                 <div className="grid grid-cols-2 gap-3">
                   <InfoItem icon={<Briefcase size={13} />} label="Role" value={teamMember?.role || "—"} />
                   <InfoItem icon={<DollarSign size={13} />} label="Hourly Rate" value={formatCurrency(teamMember?.hourly_rate)} />
                   <InfoItem icon={<Calendar size={13} />} label="Start Date" value={formatDate(teamMember?.start_date)} />
                   <InfoItem icon={<Calendar size={13} />} label="End Date" value={formatDate(teamMember?.end_date)} />
                 </div>
-
                 <div className="mt-2">
                   {(() => {
                     const status = STATUS_CONFIG[teamMember?.assignment_status] || STATUS_CONFIG.active
@@ -137,7 +162,6 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
                 </div>
               </div>
 
-              {/* Contact info */}
               <div className="space-y-3 pt-3 border-t border-gray-100">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</h4>
                 <InfoItem
@@ -150,7 +174,6 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
                 )}
               </div>
 
-              {/* Project assignments overview */}
               {!loading && assignments.length > 0 && (
                 <div className="space-y-3 pt-3 border-t border-gray-100">
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -182,8 +205,42 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
             </div>
           )}
 
+          {/* ─── Status Logs Tab ─── */}
+          {activeTab === "logs" && (
+            <div>
+              {logsLoading && (
+                <div className="flex flex-col items-center py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400 mb-2" />
+                  <p className="text-xs text-gray-500">Loading logs...</p>
+                </div>
+              )}
+
+              {logsError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-xs text-red-600">
+                  <AlertCircle size={14} /> {logsError}
+                </div>
+              )}
+
+              {!logsLoading && !logsError && statusLogs.length === 0 && (
+                <div className="text-center py-10">
+                  <Clock className="h-6 w-6 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500">No status changes recorded yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Logs appear when a member is released or reactivated</p>
+                </div>
+              )}
+
+              {!logsLoading && !logsError && statusLogs.length > 0 && (
+                <div className="space-y-2">
+                  {statusLogs.map(log => (
+                    <StatusLogCard key={log.id} log={log} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ─── Rotation Logs Tab (employees only) ─── */}
-          {activeTab === "logs" && isEmployee && (
+          {activeTab === "rotation" && isEmployee && (
             <div>
               {loading && (
                 <div className="flex flex-col items-center py-10">
@@ -232,6 +289,37 @@ function InfoItem({ icon, label, value }) {
   )
 }
 
+function StatusLogCard({ log }) {
+  const isRelease = log.action === "released"
+
+  return (
+    <div className={`rounded-lg border p-3 flex items-start gap-3 ${
+      isRelease ? "border-amber-200 bg-amber-50/40" : "border-green-200 bg-green-50/40"
+    }`}>
+      <div className={`mt-0.5 flex-shrink-0 rounded-full p-1 ${
+        isRelease ? "bg-amber-100" : "bg-green-100"
+      }`}>
+        {isRelease
+          ? <LogOut size={12} className="text-amber-600" />
+          : <RotateCcw size={12} className="text-green-600" />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-semibold ${isRelease ? "text-amber-700" : "text-green-700"}`}>
+          {isRelease ? "Released" : "Reactivated"}
+        </p>
+        <p className="text-[11px] text-gray-500 mt-0.5">
+          By <span className="font-medium text-gray-700">{log.performed_by}</span>
+        </p>
+        <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+          <Clock size={10} />
+          {formatDateTime(log.created_at)}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function RotationLogCard({ assignment }) {
   const status = STATUS_CONFIG[assignment.assignment_status] || STATUS_CONFIG.released
 
@@ -252,7 +340,6 @@ function RotationLogCard({ assignment }) {
         </span>
       </div>
 
-      {/* Timeline entries */}
       <div className="space-y-1 border-t border-gray-100 pt-2 mt-1">
         {assignment.created_at && (
           <TimelineEntry

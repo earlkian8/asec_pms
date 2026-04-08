@@ -81,6 +81,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/history', [ProjectTeamsController::class, 'history'])
                 ->middleware('permission:project-teams.view')
                 ->name('history');
+
+            Route::get('/status-logs/{project}/team/{projectTeam}', [ProjectTeamsController::class, 'statusLogs'])
+                ->middleware('permission:project-teams.view')
+                ->name('status-logs');
         });
 
         // Project Files

@@ -587,14 +587,14 @@ export default function TeamTab({ project, teamData }) {
                   <TableCell className="px-4 py-4 text-sm">
                     <div className="flex gap-1.5 flex-wrap">
 
-                      {/* Eye — assignment history */}
-                      {/* <button
+                      {/* Eye — status logs */}
+                      <button
                         onClick={() => handleViewHistory(team)}
                         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-all border border-slate-200 hover:border-slate-300"
-                        title="View assignment history"
+                        title="View status logs"
                       >
                         <Eye size={15} />
-                      </button> */}
+                      </button>
 
                       {/* Edit */}
                       {has('project-teams.update') && (

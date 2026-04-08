@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { KeyRound, LogIn, Activity } from 'lucide-react';
 import { useStaggerReveal } from '../hooks/useScrollReveal';
 
@@ -23,14 +24,29 @@ const steps = [
 ];
 
 export default function HowItWorks() {
-  const setRef = useStaggerReveal(steps.length, { stagger: 150 });
+  const setRef = useStaggerReveal(steps.length, { stagger: 180, duration: 700 });
+  const [lineVisible, setLineVisible] = useState(false);
+  const sectionRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setLineVisible(true); },
+      { threshold: 0.4 }
+    );
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <section id="how-it-works" className="py-20 md:py-28 px-6 bg-charcoal-100">
+    <section id="how-it-works" className="py-20 md:py-28 px-6 bg-charcoal-100" ref={sectionRef}>
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-16">
-          <div className="w-12 h-1 bg-charcoal-800 rounded-full mx-auto mb-5" />
-          <h2 className="text-3xl md:text-4xl font-bold text-charcoal-800 tracking-tight mb-4">
+          <div className="inline-flex items-center gap-3 mb-5">
+            <span className="block w-8 h-px bg-charcoal-400" />
+            <span className="font-display text-[10px] uppercase tracking-[0.22em] text-charcoal-500 font-semibold">Process</span>
+            <span className="block w-8 h-px bg-charcoal-400" />
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal-900 tracking-tight mb-4">
             Getting Started is Simple
           </h2>
           <p className="text-charcoal-500 max-w-lg mx-auto">
@@ -39,21 +55,43 @@ export default function HowItWorks() {
         </div>
 
         <div className="relative grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
-          {/* Connector line */}
-          <div className="hidden md:block absolute top-12 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-charcoal-300 via-charcoal-300 to-charcoal-300" />
+          {/* Animated connector line */}
+          <div className="hidden md:block absolute top-[3.25rem] left-[20%] right-[20%] h-px bg-charcoal-200 overflow-hidden">
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-charcoal-400 via-charcoal-500 to-charcoal-400 transition-all duration-1200 ease-out"
+              style={{
+                transform: lineVisible ? 'scaleX(1)' : 'scaleX(0)',
+                transformOrigin: 'left',
+                transitionDuration: '1100ms',
+              }}
+            />
+          </div>
 
           {steps.map((step, i) => (
-            <div key={step.number} ref={setRef(i)} className="relative text-center">
-              <div className="relative inline-block mb-6">
-                <div className="w-24 h-24 rounded-full bg-charcoal-800 text-white flex items-center justify-center text-3xl font-bold ring-8 ring-charcoal-800/10 relative z-10">
-                  {step.number}
+            <div key={step.number} ref={setRef(i)} className="relative text-center group">
+              {/* Step number circle */}
+              <div className="relative inline-flex items-center justify-center mb-7">
+                <div className="w-[6.5rem] h-[6.5rem] rounded-full bg-charcoal-900 text-white flex items-center justify-center relative z-10 transition-all duration-400 group-hover:bg-charcoal-700 group-hover:scale-105">
+                  <span className="font-display text-2xl font-bold tracking-tight">{step.number}</span>
                 </div>
+                {/* Pulsing ring on hover */}
+                <div className="absolute inset-0 rounded-full border-2 border-charcoal-400/0 group-hover:border-charcoal-400/30 transition-all duration-400 scale-90 group-hover:scale-125" />
               </div>
-              <div className="w-10 h-10 rounded-lg bg-charcoal-200 flex items-center justify-center mx-auto mb-4">
-                <step.Icon className="w-5 h-5 text-charcoal-600" strokeWidth={1.8} />
+
+              {/* Icon badge */}
+              <div className="w-9 h-9 rounded-lg bg-white border border-charcoal-200 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:shadow-md group-hover:border-charcoal-300 transition-all duration-300">
+                <step.Icon className="w-4 h-4 text-charcoal-600" strokeWidth={1.8} />
               </div>
-              <h3 className="text-xl font-semibold text-charcoal-800 mb-3">{step.title}</h3>
+
+              <h3 className="font-display text-lg font-semibold text-charcoal-900 mb-3">{step.title}</h3>
               <p className="text-charcoal-500 text-sm leading-relaxed max-w-xs mx-auto">{step.description}</p>
+
+              {/* Small tech tick decoration */}
+              <div className="mt-5 flex items-center justify-center gap-1 opacity-30">
+                {[...Array(3)].map((_, j) => (
+                  <div key={j} className={`bg-charcoal-500 rounded-full ${j === 1 ? 'w-3 h-[2px]' : 'w-1 h-[2px]'}`} />
+                ))}
+              </div>
             </div>
           ))}
         </div>

@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Syne', system-ui, sans-serif;
+
   --color-charcoal-900: #1a1a1a;
   --color-charcoal-800: #2d2d2d;
   --color-charcoal-700: #3a3a3a;
@@ -12,14 +14,17 @@
   --color-charcoal-200: #eeeeee;
   --color-charcoal-100: #f7f7f7;
 
-  --animate-fade-up: fade-up 0.6s ease-out both;
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 0.5s ease-out both;
-  --animate-slide-in-right: slide-in-right 0.6s ease-out both;
-  --animate-pulse-slow: pulse-slow 4s ease-in-out infinite;
+  --animate-slide-in-right: slide-in-right 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pulse-slow: pulse-slow 5s ease-in-out infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-shimmer: shimmer 3s linear infinite;
+  --animate-spin-slow: spin-slow 20s linear infinite;
 }
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(24px); }
+  from { opacity: 0; transform: translateY(28px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -29,13 +34,29 @@
 }
 
 @keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(32px); }
+  from { opacity: 0; transform: translateX(36px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes pulse-slow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-10px) rotate(1deg); }
+  66% { transform: translateY(-5px) rotate(-1deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 html {

@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Download } from 'lucide-react';
 
 export default function Login({ status }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -190,6 +190,18 @@ export default function Login({ status }) {
                         <p className="text-xs text-neutral-500 font-light tracking-wide">
                             Need access? Contact your administrator.
                         </p>
+
+                        {/* APK Download */}
+                        <a
+                            href="https://github.com/earlkian8/asec_pms/releases/download/v.1.0/application-e55b85a6-17fd-4f05-b1fd-1c2ad961107a.1.apk"
+                            download
+                            className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 px-4 border border-neutral-400/50 rounded text-xs font-bold tracking-[0.18em] uppercase text-neutral-600
+                                bg-white/30 hover:bg-white/60 hover:border-neutral-500 hover:text-neutral-800
+                                active:bg-white/20 transition-all duration-150"
+                        >
+                            <Download className="w-3.5 h-3.5 shrink-0" />
+                            Download Task Management APK
+                        </a>
                     </div>
                 </div>
             </div>

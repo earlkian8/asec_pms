@@ -124,8 +124,9 @@ class ClientsController extends Controller
             'business_permit' => ['nullable', 'max:50'],
             'credit_limit'    => ['nullable', 'numeric'],
             'payment_terms'   => ['nullable', 'max:100'],
-            'is_active'       => ['required', 'boolean'],
-            'notes'           => ['nullable', 'string'],
+            'is_active'        => ['required', 'boolean'],
+            'notes'            => ['nullable', 'string'],
+            'send_credentials' => ['nullable', 'boolean'],
         ]);
 
         if (is_null($validated['credit_limit'] ?? null)) {
@@ -134,6 +135,7 @@ class ClientsController extends Controller
         if (is_null($validated['payment_terms'] ?? null)) {
             unset($validated['payment_terms']);
         }
+        unset($validated['send_credentials']);
 
         // Auto-generate a secure random password
         $plainPassword = bin2hex(random_bytes(6)); // 12-character random password
@@ -151,8 +153,9 @@ class ClientsController extends Controller
 
         $client = Client::create($validated);
 
-        // Send credentials email to client
-        if ($client->email && $plainPassword) {
+        // Send credentials email to client (optional)
+        $sendCredentials = $request->boolean('send_credentials', true);
+        if ($sendCredentials && $client->email && $plainPassword) {
             try {
                 $loginUrl = config('app.client_portal_url', url('/client/login'));
                 Mail::to($client->email)
@@ -172,7 +175,11 @@ class ClientsController extends Controller
             route('client-management.index')
         );
 
-        return redirect()->back()->with('success', 'Client added successfully.');
+        $successMsg = $sendCredentials
+            ? 'Client added successfully. Credentials emailed.'
+            : 'Client added successfully. Credentials were not emailed.';
+
+        return redirect()->back()->with('success', $successMsg);
     }
 
     public function update(Request $request, Client $client)
@@ -293,7 +300,7 @@ class ClientsController extends Controller
     public function resetPassword(Client $client)
     {
         $defaultPassword = 'clientpassword';
-        
+
         $client->update([
             'password' => Hash::make($defaultPassword),
             'password_changed_at' => null,
@@ -306,5 +313,26 @@ class ClientsController extends Controller
         );
 
         return redirect()->back()->with('success', 'Client password reset successfully. Client will be required to change password on next login.');
+    }
+
+    public function sendCredentials(Client $client)
+    {
+        $plain = bin2hex(random_bytes(6));
+
+        $client->update([
+            'password'            => Hash::make($plain),
+            'password_changed_at' => null,
+        ]);
+
+        $loginUrl = config('app.client_portal_url', url('/client/login'));
+        Mail::to($client->email)->send(new ClientCredentialsMail($client, $plain, $loginUrl));
+
+        $this->adminActivityLogs(
+            'Client',
+            'Send Credentials',
+            'Sent credentials to Client ' . $client->client_name . ' (' . $client->client_code . ')'
+        );
+
+        return redirect()->back()->with('success', 'Credentials sent to ' . $client->email . '.');
     }
 }

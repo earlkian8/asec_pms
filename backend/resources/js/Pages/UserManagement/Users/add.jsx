@@ -13,6 +13,7 @@ import { Input } from '@/Components/ui/input';
 import InputError from '@/Components/InputError';
 import { Label } from '@/Components/ui/label';
 import { Button } from '@/Components/ui/button';
+import { Switch } from '@/Components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Textarea } from '@/Components/ui/textarea';
 import {
@@ -150,6 +151,9 @@ const AddUser = ({ setShowAddModal, roles }) => {
 
     // Notes
     notes: '',
+
+    // Credential sending
+    send_credentials: true,
   });
 
   const tabHasError = (tabId) => (TAB_FIELDS[tabId] || []).some(k => errors[k]);
@@ -286,6 +290,21 @@ const AddUser = ({ setShowAddModal, roles }) => {
                     className={inputClass(errors.email)}
                   />
                   <InputError message={errors.email} />
+                </div>
+
+                {/* Send credentials toggle */}
+                <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <Switch
+                    id="send_credentials"
+                    checked={data.send_credentials}
+                    onCheckedChange={(checked) => setData('send_credentials', checked)}
+                    className="data-[state=checked]:bg-blue-600 flex-shrink-0"
+                  />
+                  <label htmlFor="send_credentials" className="text-sm text-blue-700 cursor-pointer select-none">
+                    {data.send_credentials
+                      ? 'Send credentials to user email upon creation'
+                      : 'Do not send credentials email'}
+                  </label>
                 </div>
 
                 <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mt-2">Role & Identity</p>

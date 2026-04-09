@@ -42,6 +42,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
     payment_terms: '',
     is_active: true,
     notes: '',
+    send_credentials: true,
   });
 
   const [validationErrors, setValidationErrors] = useState({});
@@ -115,7 +116,7 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Auto-password notice */}
+        {/* Auto-password notice + send toggle */}
         <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 -mt-1">
           <div className="flex-shrink-0 mt-0.5">
             <div className="flex items-center gap-1.5">
@@ -123,9 +124,24 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
               <Mail className="h-4 w-4 text-blue-600" />
             </div>
           </div>
-          <p className="text-sm text-blue-700 leading-relaxed">
-            A <span className="font-semibold">secure password will be auto-generated</span> for this client and sent to their email address along with their login credentials. The client will be required to change their password upon first login.
-          </p>
+          <div className="flex-1">
+            <p className="text-sm text-blue-700 leading-relaxed">
+              A <span className="font-semibold">secure password will be auto-generated</span> for this client upon creation.
+            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <Switch
+                id="send_credentials"
+                checked={data.send_credentials}
+                onCheckedChange={(checked) => setData('send_credentials', checked)}
+                className="data-[state=checked]:bg-blue-600"
+              />
+              <label htmlFor="send_credentials" className="text-sm text-blue-700 cursor-pointer select-none">
+                {data.send_credentials
+                  ? 'Send credentials to client email'
+                  : 'Do not send credentials email'}
+              </label>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">

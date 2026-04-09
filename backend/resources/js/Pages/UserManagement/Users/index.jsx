@@ -9,7 +9,7 @@ import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import {
   Trash2, SquarePen, UnlockIcon, X, Search, ArrowUpDown,
-  Users, UserPlus, Shield, TrendingUp, AlertCircle, Filter, User,
+  Users, UserPlus, Shield, TrendingUp, AlertCircle, Filter, User, SendHorizonal,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -18,6 +18,7 @@ import AddUser from './add';
 import EditUser from './edit';
 import ResetPassword from './reset';
 import DeleteUser from './delete';
+import SendCredentials from './send-credentials';
 
 export default function UsersIndex() {
   const { has } = usePermission();
@@ -54,9 +55,11 @@ export default function UsersIndex() {
   const [editUser, setEditUser]               = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteUser, setDeleteUser]           = useState(null);
-  const [showResetModal, setShowResetModal]   = useState(false);
-  const [resetUser, setResetUser]             = useState(null);
-  const [showFilterCard, setShowFilterCard]   = useState(false);
+  const [showResetModal, setShowResetModal]           = useState(false);
+  const [resetUser, setResetUser]                     = useState(null);
+  const [showSendCredModal, setShowSendCredModal]     = useState(false);
+  const [sendCredUser, setSendCredUser]               = useState(null);
+  const [showFilterCard, setShowFilterCard]           = useState(false);
   const [showSortCard, setShowSortCard]       = useState(false);
 
   const initializeFilters = (filterProps) => ({ role: filterProps?.role || '' });
@@ -185,7 +188,8 @@ export default function UsersIndex() {
       {showAddModal    && <AddUser setShowAddModal={setShowAddModal} roles={roles} />}
       {showEditModal   && <EditUser setShowEditModal={setShowEditModal} user={editUser} roles={roles} />}
       {showDeleteModal && <DeleteUser setShowDeleteModal={setShowDeleteModal} user={deleteUser} />}
-      {showResetModal  && <ResetPassword setShowResetModal={setShowResetModal} user={resetUser} />}
+      {showResetModal      && <ResetPassword setShowResetModal={setShowResetModal} user={resetUser} />}
+      {showSendCredModal   && <SendCredentials user={sendCredUser} onClose={() => setShowSendCredModal(false)} />}
 
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
         <Head title="Users" />
@@ -400,6 +404,12 @@ export default function UsersIndex() {
                               <button onClick={() => { setResetUser(user); setShowResetModal(true); }}
                                 className="p-1.5 rounded-lg hover:bg-yellow-100 text-yellow-600 transition-all border border-yellow-200 hover:border-yellow-300" title="Reset Password">
                                 <UnlockIcon size={14} />
+                              </button>
+                            )}
+                            {has('users.update') && (
+                              <button onClick={() => { setSendCredUser(user); setShowSendCredModal(true); }}
+                                className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-all border border-blue-200 hover:border-blue-300" title="Send Credentials">
+                                <SendHorizonal size={14} />
                               </button>
                             )}
                             {has('users.delete') && (

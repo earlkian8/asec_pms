@@ -206,6 +206,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/delete/{client}', [ClientsController::class, 'destroy'])->middleware('permission:clients.delete')->name('destroy');
         Route::put('/update-status/{client}', [ClientsController::class, 'handleStatus'])->middleware('permission:clients.update-status')->name('update-status');
         Route::patch('/reset-password/{client}', [ClientsController::class, 'resetPassword'])->middleware('permission:clients.update')->name('reset-password');
+        Route::post('/send-credentials/{client}', [ClientsController::class, 'sendCredentials'])->middleware('permission:clients.update')->name('send-credentials');
     });
     // Reports & Analytics
     Route::prefix('reports')->name('reports.')->group(function(){
@@ -236,6 +237,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/store', [UsersController::class, 'store'])->middleware('permission:users.create')->name('store');
             Route::put('/update/{user}', [UsersController::class, 'update'])->middleware('permission:users.update')->name('update');
             Route::patch('/reset-password/{user}', [UsersController::class, 'resetPassword'])->middleware('permission:users.reset-password')->name('reset-password');
+            Route::post('/send-credentials/{user}', [UsersController::class, 'sendCredentials'])->middleware('permission:users.update')->name('send-credentials');
             Route::delete('/destroy/{user}', [UsersController::class, 'destroy'])->middleware('permission:users.delete')->name('destroy');
         });
         // Activity Logs

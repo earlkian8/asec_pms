@@ -12,7 +12,7 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
-import { Trash2, SquarePen, Eye, Filter, X, Search, Calendar, TrendingUp, Users, Building2, ArrowUpDown, KeyRound, AlertCircle, FolderOpen } from 'lucide-react';
+import { Trash2, SquarePen, Eye, Filter, X, Search, Calendar, TrendingUp, Users, Building2, ArrowUpDown, KeyRound, AlertCircle, FolderOpen, SendHorizonal } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { Switch } from "@/Components/ui/switch";
@@ -24,6 +24,7 @@ import AddClient from './add';
 import EditClient from './edit';
 import DeleteClient from './delete';
 import ResetPassword from './reset';
+import SendCredentials from './send-credentials';
 
 export default function ClientsIndex() {
   const { has } = usePermission();
@@ -70,9 +71,11 @@ export default function ClientsIndex() {
   const [editClient, setEditClient] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteClient, setDeleteClient] = useState(null);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetClient, setResetClient] = useState(null);
-  const [showFilterCard, setShowFilterCard] = useState(false);
+  const [showResetModal, setShowResetModal]         = useState(false);
+  const [resetClient, setResetClient]               = useState(null);
+  const [showSendCredModal, setShowSendCredModal]   = useState(false);
+  const [sendCredClient, setSendCredClient]         = useState(null);
+  const [showFilterCard, setShowFilterCard]         = useState(false);
   const [showSortCard, setShowSortCard] = useState(false);
   
   // Initialize filters from props
@@ -268,7 +271,8 @@ export default function ClientsIndex() {
       {showAddModal && <AddClient setShowAddModal={setShowAddModal} clientTypes={filterOptions.clientTypes} />}
       {showEditModal && <EditClient setShowEditModal={setShowEditModal} client={editClient} clientTypes={filterOptions.clientTypes} />}
       {showDeleteModal && <DeleteClient setShowDeleteModal={setShowDeleteModal} client={deleteClient} />}
-      {showResetModal && <ResetPassword setShowResetModal={setShowResetModal} client={resetClient} />}
+      {showResetModal    && <ResetPassword setShowResetModal={setShowResetModal} client={resetClient} />}
+      {showSendCredModal && <SendCredentials client={sendCredClient} onClose={() => setShowSendCredModal(false)} />}
 
       <AuthenticatedLayout breadcrumbs={breadcrumbs}>
         <Head title="Clients" />
@@ -731,6 +735,15 @@ export default function ClientsIndex() {
                                 title="Reset Password"
                               >
                                 <KeyRound size={14} />
+                              </button>
+                            )}
+                            {has('clients.update') && (
+                              <button
+                                onClick={() => { setSendCredClient(client); setShowSendCredModal(true); }}
+                                className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all duration-200 border border-blue-200 hover:border-blue-300"
+                                title="Send Credentials"
+                              >
+                                <SendHorizonal size={14} />
                               </button>
                             )}
                             {has('clients.delete') && (

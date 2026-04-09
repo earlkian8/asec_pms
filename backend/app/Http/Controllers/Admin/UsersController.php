@@ -252,7 +252,8 @@ class UsersController extends Controller
 
         $user->assignRole($v['role']);
 
-        if ($user->email) {
+        $sendCredentials = $request->boolean('send_credentials', true);
+        if ($sendCredentials && $user->email) {
             try {
                 Mail::to($user->email)->send(new UserCredentialsMail($user, $plainPassword));
             } catch (\Exception $e) {
@@ -267,7 +268,11 @@ class UsersController extends Controller
             null, route('user-management.users.index')
         );
 
-        return redirect()->back()->with('success', 'User created successfully. Credentials have been sent to their email.');
+        $successMsg = $sendCredentials
+            ? 'User created successfully. Credentials have been sent to their email.'
+            : 'User created successfully. Credentials were not emailed.';
+
+        return redirect()->back()->with('success', $successMsg);
     }
 
     // ── update ────────────────────────────────────────────────────────────────
@@ -350,6 +355,33 @@ class UsersController extends Controller
         );
 
         return back()->with('success', 'Password reset successfully.');
+    }
+
+    // ── sendCredentials ───────────────────────────────────────────────────────
+
+    public function sendCredentials(User $user)
+    {
+        $upper   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $lower   = 'abcdefghijklmnopqrstuvwxyz';
+        $digits  = '0123456789';
+        $symbols = '!@#$%^&*';
+        $all     = $upper . $lower . $digits . $symbols;
+        $p       = $upper[random_int(0, 25)]
+                 . $lower[random_int(0, 25)]
+                 . $digits[random_int(0, 9)]
+                 . $symbols[random_int(0, 7)];
+        for ($i = 0; $i < 8; $i++) {
+            $p .= $all[random_int(0, strlen($all) - 1)];
+        }
+        $plain = str_shuffle($p);
+
+        $user->update(['password' => Hash::make($plain)]);
+
+        Mail::to($user->email)->send(new UserCredentialsMail($user, $plain));
+
+        $this->adminActivityLogs('User', 'Send Credentials', "Sent credentials to User {$user->name} ({$user->email})");
+
+        return redirect()->back()->with('success', 'Credentials sent to ' . $user->email . '.');
     }
 
     // ── destroy ───────────────────────────────────────────────────────────────

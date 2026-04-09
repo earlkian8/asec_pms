@@ -546,7 +546,7 @@ class ProjectTeamsController extends Controller
                 'id'           => $log->id,
                 'action'       => $log->action,
                 'performed_by' => $log->performer?->name ?? 'System',
-                'created_at'   => $log->created_at?->toISOString(),
+                'created_at'   => $log->created_at?->toIso8601String(),
             ]);
 
         return response()->json(['logs' => $logs]);

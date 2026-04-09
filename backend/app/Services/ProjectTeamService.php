@@ -38,7 +38,8 @@ class ProjectTeamService
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('user', fn ($uq) =>
-                        $uq->where('name', 'ilike', "%{$search}%")
+                        $uq->where('first_name', 'ilike', "%{$search}%")
+                           ->orWhere('last_name', 'ilike', "%{$search}%")
                            ->orWhere('email', 'ilike', "%{$search}%")
                     )
                     ->orWhereHas('employee', fn ($eq) =>

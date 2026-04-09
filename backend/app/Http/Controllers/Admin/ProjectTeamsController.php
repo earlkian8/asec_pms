@@ -538,14 +538,14 @@ class ProjectTeamsController extends Controller
             abort(404);
         }
 
-        $logs = ProjectTeamStatusLog::with('performer:id,name')
+        $logs = ProjectTeamStatusLog::with('performer:id,first_name,last_name')
             ->where('project_team_id', $projectTeam->id)
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(fn ($log) => [
                 'id'           => $log->id,
                 'action'       => $log->action,
-                'performed_by' => $log->performer?->name ?? 'System',
+                'performed_by' => $log->performer ? trim($log->performer->first_name . ' ' . $log->performer->last_name) : 'System',
                 'created_at'   => $log->created_at?->toIso8601String(),
             ]);
 

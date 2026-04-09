@@ -23,7 +23,7 @@ class LaborCostService
         $laborCosts = ProjectLaborCost::where('project_id', $project->id)
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($q2) use ($search) {
-                    $q2->whereHas('user', fn ($u) => $u->where('name', 'ilike', "%{$search}%"))
+                    $q2->whereHas('user', fn ($u) => $u->where('first_name', 'ilike', "%{$search}%")->orWhere('last_name', 'ilike', "%{$search}%"))
                        ->orWhereHas('employee', fn ($e) =>
                             $e->where('first_name', 'ilike', "%{$search}%")
                               ->orWhere('last_name',  'ilike', "%{$search}%")

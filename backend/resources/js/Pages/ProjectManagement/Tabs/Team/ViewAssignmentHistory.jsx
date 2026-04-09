@@ -3,8 +3,8 @@ import {
 } from "@/Components/ui/dialog"
 import { useEffect, useState } from "react"
 import {
-  Clock, Calendar, Building2, Loader2,
-  AlertCircle, CalendarCheck, RotateCcw, User, Briefcase, Mail, DollarSign, LogOut
+  Clock, Loader2, AlertCircle, RotateCcw,
+  Briefcase, Mail, DollarSign, Calendar, User, LogOut,
 } from "lucide-react"
 
 const STATUS_CONFIG = {
@@ -34,48 +34,25 @@ function formatCurrency(amount) {
 }
 
 export default function ViewAssignmentHistory({ teamMember, onClose }) {
-  const [assignments, setAssignments] = useState([])
-  const [statusLogs, setStatusLogs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [logsLoading, setLogsLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [logsError, setLogsError] = useState(null)
-  const [activeTab, setActiveTab] = useState("details")
+  const [statusLogs, setStatusLogs]     = useState([])
+  const [logsLoading, setLogsLoading]   = useState(true)
+  const [logsError, setLogsError]       = useState(null)
+  const [activeTab, setActiveTab]       = useState("details")
 
   const memberName = teamMember?.assignable_name || "Team Member"
   const isEmployee = teamMember?.assignable_type === "employee"
 
-  // Reset to "details" when switching between members of different types
+  // Reset tab when member changes
   useEffect(() => {
-    if (!isEmployee && (activeTab === "logs" || activeTab === "rotation")) {
-      setActiveTab("details")
+    setActiveTab("details")
+  }, [teamMember?.id])
+
+  // Fetch status logs — employees only
+  useEffect(() => {
+    if (!teamMember?.id || !teamMember?.project_id || !isEmployee) {
+      setLogsLoading(false)
+      return
     }
-  }, [isEmployee])
-
-  // Fetch assignment history
-  useEffect(() => {
-    if (!teamMember) return
-    setLoading(true)
-    setError(null)
-
-    const params = new URLSearchParams()
-    if (teamMember.assignable_type === "employee" && teamMember.employee_id) {
-      params.set("employee_id", teamMember.employee_id)
-    } else if (teamMember.user_id) {
-      params.set("user_id", teamMember.user_id)
-    }
-
-    fetch(route("project-management.project-teams.history") + "?" + params.toString(), {
-      headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" },
-    })
-      .then(res => { if (!res.ok) throw new Error(); return res.json() })
-      .then(data => { setAssignments(data.assignments || []); setLoading(false) })
-      .catch(() => { setError("Could not load assignment history."); setLoading(false) })
-  }, [teamMember])
-
-  // Fetch status logs for this specific team member (employees only)
-  useEffect(() => {
-    if (!teamMember?.id || !teamMember?.project_id || !isEmployee) return
     setLogsLoading(true)
     setLogsError(null)
 
@@ -86,17 +63,14 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
       }),
       { headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" } }
     )
-      .then(res => { if (!res.ok) throw new Error(); return res.json() })
+      .then(res => { if (!res.ok) throw new Error(res.status); return res.json() })
       .then(data => { setStatusLogs(data.logs || []); setLogsLoading(false) })
       .catch(() => { setLogsError("Could not load status logs."); setLogsLoading(false) })
-  }, [teamMember])
+  }, [teamMember?.id, teamMember?.project_id])
 
   const tabs = [
     { id: "details", label: "Details" },
-    ...(isEmployee ? [
-      { id: "logs", label: "Status Logs" },
-      { id: "rotation", label: "Rotation" },
-    ] : []),
+    ...(isEmployee ? [{ id: "logs", label: "Status Logs" }] : []),
   ]
 
   return (
@@ -182,40 +156,11 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
                   <InfoItem icon={<User size={13} />} label="Position" value={teamMember.employee.position} />
                 )}
               </div>
-
-              {!loading && assignments.length > 0 && (
-                <div className="space-y-3 pt-3 border-t border-gray-100">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Project Assignments ({assignments.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {assignments.map(a => (
-                      <div key={a.id} className={`flex items-center justify-between rounded-lg border p-2.5 text-xs ${
-                        a.assignment_status === "active" ? "border-green-200 bg-green-50/40" : "border-gray-200 bg-white"
-                      }`}>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-gray-900 truncate">{a.project?.project_name || "—"}</p>
-                          <p className="text-gray-500 mt-0.5">{formatDate(a.start_date)} → {a.end_date ? formatDate(a.end_date) : "ongoing"}</p>
-                        </div>
-                        {(() => {
-                          const s = STATUS_CONFIG[a.assignment_status] || STATUS_CONFIG.released
-                          return (
-                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border ${s.bg} ${s.text} ${s.border}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                              {s.label}
-                            </span>
-                          )
-                        })()}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {/* ─── Status Logs Tab ─── */}
-          {activeTab === "logs" && (
+          {/* ─── Status Logs Tab (employees only) ─── */}
+          {activeTab === "logs" && isEmployee && (
             <div>
               {logsLoading && (
                 <div className="flex flex-col items-center py-10">
@@ -242,39 +187,6 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
                 <div className="space-y-2">
                   {statusLogs.map(log => (
                     <StatusLogCard key={log.id} log={log} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─── Rotation Logs Tab (employees only) ─── */}
-          {activeTab === "rotation" && isEmployee && (
-            <div>
-              {loading && (
-                <div className="flex flex-col items-center py-10">
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-400 mb-2" />
-                  <p className="text-xs text-gray-500">Loading...</p>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-xs text-red-600">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-
-              {!loading && !error && assignments.length === 0 && (
-                <div className="text-center py-10">
-                  <Building2 className="h-6 w-6 text-gray-300 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">No rotation logs found</p>
-                </div>
-              )}
-
-              {!loading && !error && assignments.length > 0 && (
-                <div className="space-y-2">
-                  {assignments.map(a => (
-                    <RotationLogCard key={a.id} assignment={a} />
                   ))}
                 </div>
               )}
@@ -325,63 +237,6 @@ function StatusLogCard({ log }) {
           {formatDateTime(log.created_at)}
         </p>
       </div>
-    </div>
-  )
-}
-
-function RotationLogCard({ assignment }) {
-  const status = STATUS_CONFIG[assignment.assignment_status] || STATUS_CONFIG.released
-
-  return (
-    <div className={`rounded-lg border p-3 text-sm ${
-      assignment.assignment_status === "active" ? "border-green-200 bg-green-50/40" : "border-gray-200 bg-white"
-    }`}>
-      <div className="flex justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900 truncate">
-            {assignment.project?.project_name || "—"}
-          </p>
-          <p className="text-xs text-gray-500">{assignment.role || "No role"}</p>
-        </div>
-        <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border self-start ${status.bg} ${status.text} ${status.border}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-          {status.label}
-        </span>
-      </div>
-
-      <div className="space-y-1 border-t border-gray-100 pt-2 mt-1">
-        {assignment.created_at && (
-          <TimelineEntry
-            icon={<CalendarCheck size={11} className="text-green-500" />}
-            label="Assigned"
-            date={formatDateTime(assignment.created_at)}
-          />
-        )}
-        {assignment.released_at && (
-          <TimelineEntry
-            icon={<Clock size={11} className="text-amber-500" />}
-            label="Released"
-            date={formatDateTime(assignment.released_at)}
-          />
-        )}
-        {assignment.reactivated_at && (
-          <TimelineEntry
-            icon={<RotateCcw size={11} className="text-blue-500" />}
-            label="Reactivated"
-            date={formatDateTime(assignment.reactivated_at)}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function TimelineEntry({ icon, label, date }) {
-  return (
-    <div className="flex items-center gap-2 text-[11px]">
-      <span className="flex-shrink-0">{icon}</span>
-      <span className="text-gray-400 w-16">{label}</span>
-      <span className="font-medium text-gray-600">{date}</span>
     </div>
   )
 }

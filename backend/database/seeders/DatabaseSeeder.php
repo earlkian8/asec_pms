@@ -28,14 +28,13 @@ class DatabaseSeeder extends Seeder
 
         // Create or update admin user with Super Admin role
         // Update this email to match your account email
-        $adminEmail = 'developer@asec.com'; // Change this to your email
+        $adminEmail = 'dev@unisync.com'; // Change this to your email
         
         $adminUser = User::firstOrCreate(
             ['email' => $adminEmail],
             [
-                'first_name' => 'Earl Kian',
-                'middle_name' => 'Anastacio',
-                'last_name' => 'Bancayrin',
+                'first_name' => 'Developer',
+                'last_name' => 'Account',
                 'password' => Hash::make('Password-12345'),
                 'email_verified_at' => now(),
             ]

@@ -338,11 +338,18 @@ class ProjectTeamsController extends Controller
         $projectTeam->update($updateData);
 
         // Record status change log
-        if (in_array($newStatus->value, ['released', 'reactivated'])) {
+        if ($newStatus === AssignmentStatus::Released) {
             ProjectTeamStatusLog::create([
                 'project_team_id' => $projectTeam->id,
                 'project_id'      => $project->id,
-                'action'          => $newStatus->value,
+                'action'          => 'released',
+                'performed_by'    => auth()->id(),
+            ]);
+        } elseif ($newStatus === AssignmentStatus::Active) {
+            ProjectTeamStatusLog::create([
+                'project_team_id' => $projectTeam->id,
+                'project_id'      => $project->id,
+                'action'          => 'reactivated',
                 'performed_by'    => auth()->id(),
             ]);
         }

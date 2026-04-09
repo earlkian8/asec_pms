@@ -377,7 +377,7 @@ class ProjectsController extends Controller
                 if ($request->hasFile($fieldName)) {
                     $directory = 'projects/documents/' . $projectCode;
                     $validated[$fieldName] = basename(
-                        $request->file($fieldName)->store($directory, env('FILESYSTEM_DISK', 'public'))
+                        $request->file($fieldName)->store($directory, config('filesystems.default'))
                     );
                 }
             }
@@ -521,10 +521,10 @@ class ProjectsController extends Controller
         foreach (self::DOCUMENT_FIELDS as $fieldName) {
             if ($request->hasFile($fieldName)) {
                 if ($project->{$fieldName}) {
-                    Storage::disk(env('FILESYSTEM_DISK', 'public'))->delete($directory . '/' . $project->{$fieldName});
+                    Storage::disk(config('filesystems.default'))->delete($directory . '/' . $project->{$fieldName});
                 }
                 $validated[$fieldName] = basename(
-                    $request->file($fieldName)->store($directory, env('FILESYSTEM_DISK', 'public'))
+                    $request->file($fieldName)->store($directory, config('filesystems.default'))
                 );
             } else {
                 unset($validated[$fieldName]);
@@ -589,9 +589,9 @@ class ProjectsController extends Controller
             abort(404);
         }
         $path = 'projects/documents/' . $project->project_code . '/' . $project->{$field};
-        if (!Storage::disk(env('FILESYSTEM_DISK', 'public'))->exists($path)) {
+        if (!Storage::disk(config('filesystems.default'))->exists($path)) {
             abort(404);
         }
-        return Storage::disk(env('FILESYSTEM_DISK', 'public'))->response($path);
+        return Storage::disk(config('filesystems.default'))->response($path);
     }
 }

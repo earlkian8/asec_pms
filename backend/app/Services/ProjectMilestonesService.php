@@ -90,8 +90,8 @@ class ProjectMilestonesService
                     }]);
                 }
                 $task->progressUpdates->each(function ($update) {
-                    if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                        $update->file_url = Storage::disk('public')->url($update->file_path);
+                    if ($update->file_path && Storage::disk(config('filesystems.default'))->exists($update->file_path)) {
+                        $update->file_url = Storage::disk(config('filesystems.default'))->url($update->file_path);
                     }
                     if (!$update->relationLoaded('createdBy') && $update->created_by) {
                         $update->load('createdBy');

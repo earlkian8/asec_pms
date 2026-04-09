@@ -23,7 +23,7 @@ class ProjectFilesController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
-        $disk      = env('FILESYSTEM_DISK', 'public'); // use public by default
+        $disk      = config('filesystems.default'); // use public by default
         $directory = "project_files/{$project->id}";
         $uploaded  = $request->file('file');
 
@@ -98,7 +98,7 @@ class ProjectFilesController extends Controller
 
     public function destroy(Request $request, Project $project, ProjectFile $file = null)
     {
-        $disk = env('FILESYSTEM_DISK', 'public');
+        $disk = config('filesystems.default');
 
         // Bulk delete
         if ($request->has('ids') && is_array($request->ids)) {
@@ -170,7 +170,7 @@ class ProjectFilesController extends Controller
             abort(404);
         }
 
-        $disk = env('FILESYSTEM_DISK', 'public');
+        $disk = config('filesystems.default');
 
         if (!Storage::disk($disk)->exists($file->file_path)) {
             return redirect()->back()->with('error', 'File not found on server.');

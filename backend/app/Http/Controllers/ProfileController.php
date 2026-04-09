@@ -73,9 +73,9 @@ class ProfileController extends Controller
         foreach ($this->imageFields as $field => $folder) {
             if ($request->hasFile($field)) {
                 if ($user->{$field}) {
-                    Storage::disk('public')->delete($user->{$field});
+                    Storage::disk(config('filesystems.default'))->delete($user->{$field});
                 }
-                $data[$field] = $request->file($field)->store($folder, 'public');
+                $data[$field] = $request->file($field)->store($folder, config('filesystems.default'));
             }
         }
 

@@ -636,13 +636,8 @@ class ClientDashboardController extends Controller
                         // Generate storage URL using request host (works for mobile apps, not just localhost)
                         // This matches TaskDetailModal's approach of using window.location.origin
                         $fileUrl = null;
-                        if (Storage::disk('public')->exists($update->file_path)) {
-                            // Use request scheme and host instead of APP_URL to work from any client
-                            $scheme = $request->getScheme();
-                            $host = $request->getHost();
-                            $port = $request->getPort();
-                            $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
-                            $fileUrl = $baseUrl . '/storage/' . $update->file_path;
+                        if (Storage::disk(config('filesystems.default'))->exists($update->file_path)) {
+                            $fileUrl = Storage::disk(config('filesystems.default'))->url($update->file_path);
                         }
                         
                         $fileData = [
@@ -872,12 +867,8 @@ class ClientDashboardController extends Controller
                 $fileData = null;
                 if ($update->file_path) {
                     $fileUrl = null;
-                    if (Storage::disk('public')->exists($update->file_path)) {
-                        $scheme = $request->getScheme();
-                        $host = $request->getHost();
-                        $port = $request->getPort();
-                        $baseUrl = $scheme . '://' . $host . ($port && $port != 80 && $port != 443 ? ':' . $port : '');
-                        $fileUrl = $baseUrl . '/storage/' . $update->file_path;
+                    if (Storage::disk(config('filesystems.default'))->exists($update->file_path)) {
+                        $fileUrl = Storage::disk(config('filesystems.default'))->url($update->file_path);
                     }
 
                     $fileData = [
@@ -1014,7 +1005,7 @@ class ClientDashboardController extends Controller
             ], 404);
         }
 
-        $disk = env('FILESYSTEM_DISK', 'public');
+        $disk = config('filesystems.default');
 
         if (!Storage::disk($disk)->exists($progressUpdate->file_path)) {
             return response()->json([

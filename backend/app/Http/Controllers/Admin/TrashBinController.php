@@ -297,13 +297,11 @@ class TrashBinController extends Controller
 
         // Model-specific cleanup before permanent deletion
         if ($model instanceof ProjectFile && $model->file_path) {
-            $disk = env('FILESYSTEM_DISK', 'public');
-            Storage::disk($disk)->delete($model->file_path);
+            Storage::disk(config('filesystems.default'))->delete($model->file_path);
         }
 
         if ($model instanceof ProgressUpdate && $model->file_path) {
-            $disk = env('FILESYSTEM_DISK', 'public');
-            Storage::disk($disk)->delete($model->file_path);
+            Storage::disk(config('filesystems.default'))->delete($model->file_path);
         }
 
         $modelId = $model->id;

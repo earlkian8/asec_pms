@@ -264,8 +264,8 @@ class TaskManagementDashboardController extends Controller
 
         $formattedProgressUpdates = $progressUpdates->map(function ($update) use ($baseUrl) {
             $fileUrl = null;
-            if ($update->file_path && Storage::disk('public')->exists($update->file_path)) {
-                $fileUrl = $baseUrl . '/storage/' . $update->file_path;
+            if ($update->file_path && Storage::disk(config('filesystems.default'))->exists($update->file_path)) {
+                $fileUrl = Storage::disk(config('filesystems.default'))->url($update->file_path);
             }
 
             $task = $update->task;

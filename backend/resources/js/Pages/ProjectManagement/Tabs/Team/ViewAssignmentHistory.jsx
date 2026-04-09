@@ -45,6 +45,13 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
   const memberName = teamMember?.assignable_name || "Team Member"
   const isEmployee = teamMember?.assignable_type === "employee"
 
+  // Reset to "details" when switching between members of different types
+  useEffect(() => {
+    if (!isEmployee && (activeTab === "logs" || activeTab === "rotation")) {
+      setActiveTab("details")
+    }
+  }, [isEmployee])
+
   // Fetch assignment history
   useEffect(() => {
     if (!teamMember) return
@@ -66,9 +73,9 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
       .catch(() => { setError("Could not load assignment history."); setLoading(false) })
   }, [teamMember])
 
-  // Fetch status logs for this specific team member
+  // Fetch status logs for this specific team member (employees only)
   useEffect(() => {
-    if (!teamMember?.id || !teamMember?.project_id) return
+    if (!teamMember?.id || !teamMember?.project_id || !isEmployee) return
     setLogsLoading(true)
     setLogsError(null)
 
@@ -86,8 +93,10 @@ export default function ViewAssignmentHistory({ teamMember, onClose }) {
 
   const tabs = [
     { id: "details", label: "Details" },
-    { id: "logs", label: "Status Logs" },
-    ...(isEmployee ? [{ id: "rotation", label: "Rotation" }] : []),
+    ...(isEmployee ? [
+      { id: "logs", label: "Status Logs" },
+      { id: "rotation", label: "Rotation" },
+    ] : []),
   ]
 
   return (

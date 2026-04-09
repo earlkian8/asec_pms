@@ -67,8 +67,7 @@ class TaskManagementTaskController extends Controller
 
     /**
      * Helper to generate a file URL from a file path.
-     * Uses Storage::disk('public')->url() which respects APP_URL from .env,
-     * avoiding proxy/scheme issues on DigitalOcean.
+     * Uses the configured default filesystem disk (DO Spaces in production).
      */
     private function getFileUrl(?string $filePath): ?string
     {

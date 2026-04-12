@@ -12,8 +12,8 @@ export default defineConfig({
     ],
     server: {
         hmr: {
-            // host: 'https://asecpms-zkitw.ondigitalocean.app/',
-            host: 'localhost',
+            host: 'https://asecpms-zkitw.ondigitalocean.app/',
+            // host: 'localhost',
         },
     },
 });

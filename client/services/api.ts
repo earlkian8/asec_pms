@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asecpms-zkitw.ondigitalocean.app/api';
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.137.1:8000/api';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://asecpms-zkitw.ondigitalocean.app/api';
+// export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.137.1:8000/api';
 
 const TOKEN_KEY = 'auth_token';
 

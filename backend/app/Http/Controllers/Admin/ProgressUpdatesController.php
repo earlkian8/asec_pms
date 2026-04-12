@@ -38,7 +38,7 @@ class ProgressUpdatesController extends Controller
         $data = $request->validate([
             'project_task_id' => 'required|exists:project_tasks,id',
             'description'     => 'required|string',
-            'file'            => 'nullable|file|max:20480',
+            'file'            => 'nullable|file|max:102400',
         ]);
 
         $task      = ProjectTask::with('milestone.project')->findOrFail($data['project_task_id']);
@@ -106,7 +106,7 @@ class ProgressUpdatesController extends Controller
 
         $data = $request->validate([
             'description' => 'required|string',
-            'file'        => 'nullable|file|max:20480',
+            'file'        => 'nullable|file|max:102400',
         ]);
 
         if ($request->hasFile('file')) {

@@ -35,11 +35,11 @@ class UsersController extends Controller
     private function imageRules(): array
     {
         return [
-            'profile_image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'sss_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'philhealth_id_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'pagibig_id_image'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'tin_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'profile_image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'sss_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'philhealth_id_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'pagibig_id_image'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'tin_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
         ];
     }
 

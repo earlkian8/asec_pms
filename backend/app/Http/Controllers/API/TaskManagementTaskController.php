@@ -296,7 +296,7 @@ class TaskManagementTaskController extends Controller
 
         $request->validate([
             'description' => 'required|string',
-            'file' => 'nullable|file|max:20480', // 20MB max
+            'file' => 'nullable|file|max:102400', // 100MB max
         ]);
 
         $filePath = null;
@@ -405,7 +405,7 @@ class TaskManagementTaskController extends Controller
 
         $request->validate([
             'description' => 'required|string',
-            'file' => 'nullable|file|max:20480',
+            'file' => 'nullable|file|max:102400',
         ]);
 
         $progressUpdate->description = $request->description;

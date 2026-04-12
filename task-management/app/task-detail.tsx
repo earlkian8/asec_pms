@@ -40,6 +40,69 @@ import AnimatedView from '@/components/AnimatedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDialog } from '@/contexts/DialogContext';
 
+const normalizeMimeType = (name?: string, mimeType?: string): string => {
+  const normalized = (mimeType || '').toLowerCase().trim();
+
+  if (normalized === 'image/jpg' || normalized === 'application/jpg' || normalized === 'image/pjpeg') {
+    return 'image/jpeg';
+  }
+
+  if (normalized) {
+    return normalized;
+  }
+
+  const extension = (name || '').split('.').pop()?.toLowerCase();
+  const extensionMap: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    jfif: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+
+  return extension ? (extensionMap[extension] || 'application/octet-stream') : 'application/octet-stream';
+};
+
+const ensureUploadName = (name?: string, mimeType?: string): string => {
+  if (name && /\.[a-z0-9]+$/i.test(name)) {
+    return name;
+  }
+
+  const mimeToExtension: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  };
+
+  const extension = mimeToExtension[(mimeType || '').toLowerCase()] || 'bin';
+  return `file_${Date.now()}.${extension}`;
+};
+
+const extractApiErrorMessage = (response: any, fallback: string): string => {
+  const errors = response?.errors;
+
+  if (errors && typeof errors === 'object') {
+    const firstEntry = Object.values(errors).find((value) => Array.isArray(value) && value.length > 0) as string[] | undefined;
+    if (firstEntry && firstEntry[0]) {
+      return firstEntry[0];
+    }
+  }
+
+  if (response?.message && typeof response.message === 'string') {
+    return response.message;
+  }
+
+  return fallback;
+};
+
 export default function TaskDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -873,8 +936,8 @@ export default function TaskDetailScreen() {
               // Handle both web File objects and Expo file objects
               if (file.uri) {
                 // React Native/Expo file object - use uri directly
-                const fileName = file.name || `file_${Date.now()}`;
-                const fileType = file.mimeType || 'application/octet-stream';
+                const fileType = normalizeMimeType(file.name, file.mimeType);
+                const fileName = ensureUploadName(file.name, fileType);
                 formData.append('file', {
                   uri: file.uri,
                   type: fileType,
@@ -915,7 +978,7 @@ export default function TaskDetailScreen() {
                 loadProgressUpdates();
                 loadTask(); // Reload task to reflect auto-status change (pending → in_progress)
               } else {
-                const errorMessage = response.message || (response.errors ? Object.values(response.errors).flat().join(', ') : 'Failed to save progress update');
+                const errorMessage = extractApiErrorMessage(response, 'Failed to save progress update');
                 dialog.showError(errorMessage);
               }
             } else {

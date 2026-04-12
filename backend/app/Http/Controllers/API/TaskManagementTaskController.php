@@ -20,6 +20,27 @@ class TaskManagementTaskController extends Controller
 {
     use NotificationTrait;
 
+    private function hasInvalidUploadedFile(Request $request): bool
+    {
+        return $request->has('file') && !$request->hasFile('file');
+    }
+
+    private function uploadLimitErrorResponse()
+    {
+        $uploadMax = ini_get('upload_max_filesize') ?: 'unknown';
+        $postMax = ini_get('post_max_size') ?: 'unknown';
+
+        return response()->json([
+            'success' => false,
+            'message' => "File upload failed before validation. Server limits are upload_max_filesize={$uploadMax} and post_max_size={$postMax}.",
+            'errors' => [
+                'file' => [
+                    'The file failed to upload. The file may exceed server upload limits or be an invalid upload payload.',
+                ],
+            ],
+        ], 422);
+    }
+
     /**
      * Sync milestone status based on its current tasks.
      * Mirrors admin behavior from ProjectTasksController::syncMilestoneStatus().
@@ -294,6 +315,10 @@ class TaskManagementTaskController extends Controller
             ], 404);
         }
 
+        if ($this->hasInvalidUploadedFile($request)) {
+            return $this->uploadLimitErrorResponse();
+        }
+
         $request->validate([
             'description' => 'required|string',
             'file' => 'nullable|file|max:102400', // 100MB max
@@ -401,6 +426,10 @@ class TaskManagementTaskController extends Controller
                 'success' => false,
                 'message' => 'Progress update not found or you do not have permission to edit it',
             ], 404);
+        }
+
+        if ($this->hasInvalidUploadedFile($request)) {
+            return $this->uploadLimitErrorResponse();
         }
 
         $request->validate([

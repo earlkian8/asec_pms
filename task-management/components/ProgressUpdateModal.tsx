@@ -85,9 +85,9 @@ export default function ProgressUpdateModal({
         input.onchange = (e: any) => {
           const file = e.target.files?.[0];
           if (file) {
-            // Check file size (20MB max)
-            if (file.size > 20 * 1024 * 1024) {
-              dialog.showError('File size must be less than 20MB', 'File Too Large');
+            // Check file size (100MB max)
+            if (file.size > 100 * 1024 * 1024) {
+              dialog.showError('File size must be less than 100MB', 'File Too Large');
               return;
             }
             setSelectedFile(file);
@@ -105,9 +105,9 @@ export default function ProgressUpdateModal({
         if (!result.canceled && result.assets && result.assets.length > 0) {
           const file = result.assets[0];
           
-          // Check file size (20MB max)
-          if (file.size && file.size > 20 * 1024 * 1024) {
-            dialog.showError('File size must be less than 20MB', 'File Too Large');
+          // Check file size (100MB max)
+          if (file.size && file.size > 100 * 1024 * 1024) {
+            dialog.showError('File size must be less than 100MB', 'File Too Large');
             return;
           }
           
@@ -258,7 +258,7 @@ export default function ProgressUpdateModal({
                   </TouchableOpacity>
                 )}
                 <Text style={styles.helperText}>
-                  Supported: Images, PDFs, Documents (Max 20MB)
+                  Supported: Images, PDFs, Documents (Max 100MB)
                   {editingUpdate && !selectedFile && editingUpdate.file_path && ' - Click Replace to change file'}
                 </Text>
               </View>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, RefreshControl,
+  TouchableOpacity, RefreshControl, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -244,9 +244,16 @@ export default function ProjectDetailScreen() {
                         styles.teamRow,
                         i < project.teamMembers.length - 1 && styles.teamRowBorder,
                       ]}>
-                      <View style={[styles.teamAvatar, { backgroundColor: roleIcon.bgColor }]}>
-                        <Ionicons name={roleIcon.icon as any} size={15} color={roleIcon.color} />
-                      </View>
+                      {member.profileImage ? (
+                        <Image
+                          source={{ uri: member.profileImage }}
+                          style={styles.teamAvatarImage}
+                        />
+                      ) : (
+                        <View style={[styles.teamAvatar, { backgroundColor: roleIcon.bgColor }]}>
+                          <Ionicons name={roleIcon.icon as any} size={15} color={roleIcon.color} />
+                        </View>
+                      )}
                       <View style={styles.teamInfo}>
                         <Text style={styles.teamName}>{member.name || 'Unnamed'}</Text>
                         <Text style={styles.teamRole}>{member.role || 'No role'}</Text>
@@ -440,7 +447,8 @@ const styles = StyleSheet.create({
 
   teamRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
   teamRowBorder: { borderBottomWidth: 1, borderBottomColor: D.hairline },
-  teamAvatar:    { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  teamAvatar:      { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  teamAvatarImage: { width: 32, height: 32, borderRadius: 8 },
   teamInfo:      { flex: 1 },
   teamName:      { fontSize: 13, fontWeight: '600', color: D.ink, marginBottom: 1 },
   teamRole:      { fontSize: 11, color: D.inkLight },

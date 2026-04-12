@@ -50,6 +50,7 @@ export interface TeamMember {
   id: string;
   name: string;
   role: string;
+  profileImage: string | null;
 }
 
 export interface ProjectIssue {

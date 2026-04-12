@@ -497,12 +497,15 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
 
                     {/* Checkbox cell */}
                     <TableCell className="px-4 py-4">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleOne(allocation.id)}
-                        disabled={!canReceive}
-                        aria-label={`Select ${item.item_name || 'item'}`}
-                      />
+                      {canReceive ? (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleOne(allocation.id)}
+                          aria-label={`Select ${item.item_name || 'item'}`}
+                        />
+                      ) : (
+                        <div className="h-4 w-4" />
+                      )}
                     </TableCell>
 
                     <TableCell className="px-4 py-4 text-sm font-medium text-gray-900">

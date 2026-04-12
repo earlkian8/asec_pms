@@ -264,7 +264,7 @@ class ProjectMaterialAllocationsController extends Controller
         $errors  = [];
 
         foreach ($request->items as $index => $item) {
-            $allocation = ProjectMaterialAllocation::with('inventoryItem')
+            $allocation = ProjectMaterialAllocation::with('inventoryItem', 'directSupply')
                 ->where('id', $item['allocation_id'])
                 ->where('project_id', $project->id)
                 ->first();
@@ -276,9 +276,15 @@ class ProjectMaterialAllocationsController extends Controller
 
             $remaining = $allocation->quantity_allocated - $allocation->quantity_received;
 
+            if ($allocation->inventory_item_id) {
+                $unitOfMeasure = $allocation->inventoryItem->unit_of_measure;
+            } else {
+                $unitOfMeasure = $allocation->directSupply->unit_of_measure ?? 'units';
+            }
+
             if ($item['quantity_received'] > $remaining) {
                 $errors["items.{$index}.quantity_received"] =
-                    "Quantity cannot exceed remaining ({$remaining} {$allocation->inventoryItem->unit_of_measure}).";
+                    "Quantity cannot exceed remaining ({$remaining} {$unitOfMeasure}).";
                 continue;
             }
 
@@ -290,33 +296,38 @@ class ProjectMaterialAllocationsController extends Controller
                 'received_by'       => auth()->id(),
             ]);
 
-            $inventoryItem = $allocation->inventoryItem;
+            if ($allocation->inventory_item_id) {
+                $inventoryItem = $allocation->inventoryItem;
+                $itemName      = $inventoryItem->item_name;
 
-            InventoryTransaction::create([
-                'inventory_item_id'              => $inventoryItem->id,
-                'transaction_type'               => 'stock_out',
-                'stock_out_type'                 => 'project_use',
-                'quantity'                       => $item['quantity_received'],
-                'project_id'                     => $project->id,
-                'project_material_allocation_id' => $allocation->id,
-                'notes'                          => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Bulk receiving report'
-                                                . ($item['notes'] ? ' - ' . $item['notes'] : ''),
-                'created_by'                     => auth()->id(),
-                'transaction_date'               => $request->received_at,
-            ]);
+                InventoryTransaction::create([
+                    'inventory_item_id'              => $inventoryItem->id,
+                    'transaction_type'               => 'stock_out',
+                    'stock_out_type'                 => 'project_use',
+                    'quantity'                       => $item['quantity_received'],
+                    'project_id'                     => $project->id,
+                    'project_material_allocation_id' => $allocation->id,
+                    'notes'                          => '[RECEIVING_REPORT_ID:' . $receivingReport->id . '] Bulk receiving report'
+                                                    . ($item['notes'] ? ' - ' . $item['notes'] : ''),
+                    'created_by'                     => auth()->id(),
+                    'transaction_date'               => $request->received_at,
+                ]);
 
-            $this->inventoryService->updateItemStock($inventoryItem);
+                $this->inventoryService->updateItemStock($inventoryItem);
+            } else {
+                $itemName = $allocation->directSupply->supply_name ?? 'Direct Supply';
+            }
 
             $allocation->quantity_received += $item['quantity_received'];
             $allocation->updateStatus();
 
-            $this->notifyMaterialStatusChange($project, $inventoryItem->item_name, $allocation->status);
+            $this->notifyMaterialStatusChange($project, $itemName, $allocation->status);
 
             $this->adminActivityLogs(
                 'Material Receiving Report',
                 'Bulk Created',
-                'Bulk receiving report for "' . $inventoryItem->item_name . '" - '
-                . $item['quantity_received'] . ' ' . $inventoryItem->unit_of_measure
+                'Bulk receiving report for "' . $itemName . '" - '
+                . $item['quantity_received'] . ' ' . $unitOfMeasure
                 . ' received for project "' . $project->project_name . '"'
             );
 

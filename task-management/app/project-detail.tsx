@@ -11,6 +11,7 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -95,6 +96,7 @@ type TeamMember = {
   monthlySalary?: number | string | null;
   startDate?: string | null;
   endDate?: string | null;
+  profileImage?: string | null;
 };
 
 type Assignable = {
@@ -1091,9 +1093,13 @@ export default function ProjectDetailScreen() {
                   <Animated.View key={m.id} entering={FadeInDown.delay(index * 40).duration(200)}>
                   <View style={styles.card}>
                     <View style={styles.cardTopRow}>
-                      <View style={[styles.cardIconWrap, { backgroundColor: as.bg }]}>
-                        <Users size={16} color={as.c} strokeWidth={2} />
-                      </View>
+                      {m.profileImage ? (
+                        <Image source={{ uri: m.profileImage }} style={styles.cardAvatarImage} />
+                      ) : (
+                        <View style={[styles.cardIconWrap, { backgroundColor: as.bg }]}>
+                          <Users size={16} color={as.c} strokeWidth={2} />
+                        </View>
+                      )}
                       <View style={{ flex: 1 }}>
                         <Text style={styles.cardTitle} numberOfLines={1}>
                           {m.name}
@@ -1962,7 +1968,8 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: D.surface, borderWidth: 1, borderColor: D.hairline, borderRadius: 12, padding: 14, marginBottom: 10 },
   cardTopRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  cardIconWrap: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: D.greenBg },
+  cardIconWrap:    { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: D.greenBg },
+  cardAvatarImage: { width: 32, height: 32, borderRadius: 8 },
   cardTitle: { fontSize: 14, fontWeight: '900', color: D.ink },
   cardSub: { fontSize: 11, color: D.inkMid, marginTop: 2, lineHeight: 16 },
   cardMeta: { fontSize: 11, color: D.inkLight, marginTop: 8, fontWeight: '700' },

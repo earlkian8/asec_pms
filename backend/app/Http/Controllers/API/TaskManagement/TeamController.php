@@ -117,6 +117,7 @@ class TeamController extends Controller
                 'endDate'          => $t->end_date,
                 'isActive'         => (bool) $t->is_active,
                 'assignmentStatus' => $t->assignment_status?->value ?? $t->assignment_status,
+                'profileImage'     => $t->user?->profile_image_url ?? $t->employee?->profile_image_url,
                 'createdAt'        => $t->created_at?->toISOString(),
                 'updatedAt'        => $t->updated_at?->toISOString(),
             ])

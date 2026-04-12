@@ -5,6 +5,6 @@
 
 export const FIRM_CONTACT = {
   phone: '+639774925594',
-  email: 'support@example.com',
+  email: 'abduraufsawadjaan@gmail.com',
 } as const;
 

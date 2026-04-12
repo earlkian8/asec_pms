@@ -724,7 +724,7 @@ class ClientDashboardController extends Controller
                 'id' => (string) $allocation->id,
                 'itemName' => $item ? $item->item_name : ($supply ? $supply->supply_name : 'Unknown Item'),
                 'itemCode' => $item ? $item->item_code : ($supply ? $supply->supply_code : 'N/A'),
-                'unit' => $item ? $item->unit : ($supply ? $supply->unit_of_measure : 'N/A'),
+                'unit' => $item ? $item->unit_of_measure : ($supply ? $supply->unit_of_measure : 'N/A'),
                 'quantityAllocated' => (float) $allocation->quantity_allocated,
                 'quantityReceived' => (float) $allocation->quantity_received,
                 'quantityRemaining' => (float) $allocation->quantity_remaining,
@@ -778,18 +778,22 @@ class ClientDashboardController extends Controller
         $teamMembers = $project->team
             ->where('is_active', true)
             ->map(function ($teamMember) {
-                // Get name from user or employee (they can be mixed in team members)
+                // Get name and profile image from user or employee
                 $name = 'Unknown';
+                $profileImage = null;
                 if ($teamMember->user) {
                     $name = $teamMember->user->name;
+                    $profileImage = $teamMember->user->profile_image_url;
                 } elseif ($teamMember->employee) {
                     $name = $teamMember->employee->full_name;
+                    $profileImage = $teamMember->employee->profile_image_url;
                 }
-                
+
                 return [
-                    'id' => (string) $teamMember->id,
-                    'name' => $name,
-                    'role' => $teamMember->role,
+                    'id'           => (string) $teamMember->id,
+                    'name'         => $name,
+                    'role'         => $teamMember->role,
+                    'profileImage' => $profileImage,
                 ];
             });
 

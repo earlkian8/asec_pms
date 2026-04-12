@@ -193,7 +193,7 @@ export default function Login({ status }) {
 
                         {/* APK Download */}
                         <a
-                            href="https://github.com/earlkian8/asec_pms/releases/download/v.1.0/application-e55b85a6-17fd-4f05-b1fd-1c2ad961107a.1.apk"
+                            href="https://github.com/earlkian8/asec_pms/releases/download/v.1.0/ASEC.Task.apk"
                             download
                             className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 px-4 border border-neutral-400/50 rounded text-xs font-bold tracking-[0.18em] uppercase text-neutral-600
                                 bg-white/30 hover:bg-white/60 hover:border-neutral-500 hover:text-neutral-800

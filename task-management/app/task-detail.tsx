@@ -31,7 +31,7 @@ import {
 import { Task, ProgressUpdate, Issue, RequestUpdate } from '@/types';
 import { AppColors, getStatusColor, getPriorityColor, getIssueStatusColor } from '@/utils/colors';
 import { formatDate, formatDateTime, isOverdue, getDaysUntilDue } from '@/utils/dateUtils';
-import { apiService, API_BASE_URL } from '@/services/api';
+import { apiService, API_BASE_URL, ProgressUploadTicketResponse } from '@/services/api';
 import ProgressUpdateModal from '@/components/ProgressUpdateModal';
 import IssueReportModal from '@/components/IssueReportModal';
 import { ArrowLeft } from 'lucide-react-native';
@@ -101,6 +101,42 @@ const extractApiErrorMessage = (response: any, fallback: string): string => {
   }
 
   return fallback;
+};
+
+const fileToUploadPayload = async (file: any): Promise<{ blob: Blob; fileName: string; fileType: string; fileSize: number }> => {
+  if (file?.uri) {
+    const fileType = normalizeMimeType(file.name, file.mimeType);
+    const fileName = ensureUploadName(file.name, fileType);
+    const localResponse = await fetch(file.uri);
+    const blob = await localResponse.blob();
+
+    return {
+      blob,
+      fileName,
+      fileType,
+      fileSize: file.size || blob.size,
+    };
+  }
+
+  if (typeof File !== 'undefined' && file instanceof File) {
+    return {
+      blob: file,
+      fileName: file.name || `file_${Date.now()}`,
+      fileType: normalizeMimeType(file.name, file.type),
+      fileSize: file.size,
+    };
+  }
+
+  if (typeof Blob !== 'undefined' && file instanceof Blob) {
+    return {
+      blob: file,
+      fileName: `file_${Date.now()}`,
+      fileType: 'application/octet-stream',
+      fileSize: file.size,
+    };
+  }
+
+  throw new Error('Unsupported file format for upload');
 };
 
 export default function TaskDetailScreen() {
@@ -930,43 +966,78 @@ export default function TaskDetailScreen() {
           if (!task) return;
           
           try {
-            const formData = new FormData();
-            formData.append('description', description);
-            if (file) {
-              // Handle both web File objects and Expo file objects
-              if (file.uri) {
-                // React Native/Expo file object - use uri directly
-                const fileType = normalizeMimeType(file.name, file.mimeType);
-                const fileName = ensureUploadName(file.name, fileType);
-                formData.append('file', {
-                  uri: file.uri,
-                  type: fileType,
-                  name: fileName,
-                } as any);
-              } else if (file instanceof File) {
-                // Web File object
-                formData.append('file', file, file.name || `file_${Date.now()}`);
-              } else if (file instanceof Blob) {
-                // Web Blob object (no name property)
-                formData.append('file', file, `file_${Date.now()}`);
-              } else {
-                // Fallback - try to append as-is
-                formData.append('file', file);
-              }
-            }
-
             let response;
-            if (editingProgressUpdate) {
-              response = await apiService.post(
-                `/task-management/tasks/${task.id}/progress-updates/${editingProgressUpdate.id}`,
-                formData,
-                true
-              );
+            if (editingProgressUpdate || !file) {
+              // Keep existing direct endpoint for edit and no-file updates as fallback.
+              const formData = new FormData();
+              formData.append('description', description);
+
+              if (file) {
+                if (file.uri) {
+                  const fileType = normalizeMimeType(file.name, file.mimeType);
+                  const fileName = ensureUploadName(file.name, fileType);
+                  formData.append('file', {
+                    uri: file.uri,
+                    type: fileType,
+                    name: fileName,
+                  } as any);
+                } else if (typeof File !== 'undefined' && file instanceof File) {
+                  formData.append('file', file, file.name || `file_${Date.now()}`);
+                } else if (typeof Blob !== 'undefined' && file instanceof Blob) {
+                  formData.append('file', file, `file_${Date.now()}`);
+                } else {
+                  formData.append('file', file);
+                }
+              }
+
+              if (editingProgressUpdate) {
+                response = await apiService.post(
+                  `/task-management/tasks/${task.id}/progress-updates/${editingProgressUpdate.id}`,
+                  formData,
+                  true
+                );
+              } else {
+                response = await apiService.post(
+                  `/task-management/tasks/${task.id}/progress-updates`,
+                  formData,
+                  true
+                );
+              }
             } else {
+              const uploadPayload = await fileToUploadPayload(file);
+
+              const ticketResponse = await apiService.post<ProgressUploadTicketResponse>(
+                `/task-management/tasks/${task.id}/progress-updates/tickets`,
+                {
+                  description,
+                  file_name: uploadPayload.fileName,
+                  file_size: uploadPayload.fileSize,
+                  file_type: uploadPayload.fileType,
+                }
+              );
+
+              if (!(typeof ticketResponse === 'object' && 'success' in ticketResponse && ticketResponse.success && ticketResponse.data)) {
+                const ticketError = extractApiErrorMessage(ticketResponse, 'Failed to create upload ticket');
+                dialog.showError(ticketError);
+                return;
+              }
+
+              const uploadResult = await apiService.uploadToPresignedUrl(
+                ticketResponse.data.upload_url,
+                uploadPayload.blob,
+                ticketResponse.data.required_headers || {}
+              );
+
+              if (!uploadResult.success) {
+                dialog.showError(uploadResult.message || 'Failed to upload file to storage');
+                return;
+              }
+
               response = await apiService.post(
-                `/task-management/tasks/${task.id}/progress-updates`,
-                formData,
-                true
+                `/task-management/tasks/${task.id}/progress-updates/finalize`,
+                {
+                  ticket_id: ticketResponse.data.ticket_id,
+                }
               );
             }
 

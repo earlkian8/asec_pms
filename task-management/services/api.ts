@@ -6,6 +6,14 @@ interface ApiResponse<T> {
   errors?: Record<string, string[]>;
 }
 
+export interface ProgressUploadTicketResponse {
+  ticket_id: string;
+  upload_url: string;
+  required_headers: Record<string, string>;
+  expires_in: number;
+  object_path: string;
+}
+
 class ApiService {
   private baseURL: string;
   private token: string | null = null;
@@ -213,6 +221,34 @@ class ApiService {
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  async uploadToPresignedUrl(
+    uploadUrl: string,
+    payload: Blob,
+    headers: Record<string, string> = {}
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers,
+        body: payload,
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: `Upload failed with status ${response.status}`,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to upload file to storage',
+      };
+    }
   }
 }
 

@@ -8,7 +8,9 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProgressUpdate;
 use App\Models\ProjectIssue;
+use App\Models\UploadTicket;
 use App\Models\User;
+use App\Services\SpacesUploadService;
 use App\Services\TaskManagementAuthorization;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -320,6 +322,232 @@ class TaskManagementTaskController extends Controller
         return response()->json([
             'success' => true,
             'data' => $formattedUpdates,
+        ]);
+    }
+
+    /**
+     * Create a pre-signed upload ticket for direct-to-Spaces file uploads.
+     */
+    public function createProgressUpdateUploadTicket(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $data = $request->validate([
+            'description' => 'required|string',
+            'file_name' => 'required|string|max:255',
+            'file_size' => 'required|integer|min:1|max:104857600',
+            'file_type' => 'nullable|string|max:120',
+        ]);
+
+        $spacesService = app(SpacesUploadService::class);
+        $objectPath = $spacesService->generateObjectPath((int) $task->id, (string) $data['file_name']);
+        $uploadPayload = $spacesService->createUploadUrl($objectPath, $data['file_type'] ?? null, 900);
+
+        $ticket = UploadTicket::create([
+            'project_task_id' => $task->id,
+            'user_id' => $user->id,
+            'description' => $data['description'],
+            'original_name' => $data['file_name'],
+            'file_type' => $data['file_type'] ?? null,
+            'file_size' => $data['file_size'],
+            'file_path' => $objectPath,
+            'expires_at' => now()->addSeconds($uploadPayload['expires_in']),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Upload ticket created successfully',
+            'data' => [
+                'ticket_id' => $ticket->id,
+                'upload_url' => $uploadPayload['url'],
+                'required_headers' => $uploadPayload['headers'],
+                'expires_in' => $uploadPayload['expires_in'],
+                'object_path' => $objectPath,
+            ],
+        ]);
+    }
+
+    /**
+     * Finalize a direct-uploaded file and create the progress update record.
+     */
+    public function finalizeProgressUpdate(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $data = $request->validate([
+            'ticket_id' => 'required|uuid',
+        ]);
+
+        $ticket = UploadTicket::where('id', $data['ticket_id'])
+            ->where('project_task_id', $task->id)
+            ->where('user_id', $user->id)
+            ->whereNull('completed_at')
+            ->first();
+
+        if (!$ticket) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload ticket is invalid or already completed.',
+                'errors' => [
+                    'ticket_id' => ['Upload ticket is invalid or already completed.'],
+                ],
+            ], 422);
+        }
+
+        if ($ticket->expires_at && $ticket->expires_at->isPast()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload ticket has expired. Please request a new upload ticket.',
+                'errors' => [
+                    'ticket_id' => ['Upload ticket has expired. Please request a new upload ticket.'],
+                ],
+            ], 422);
+        }
+
+        $spacesService = app(SpacesUploadService::class);
+        if (!$spacesService->objectExists($ticket->file_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Uploaded file was not found in storage. Please re-upload and try again.',
+                'errors' => [
+                    'file' => ['Uploaded file was not found in storage. Please re-upload and try again.'],
+                ],
+            ], 422);
+        }
+
+        $progressUpdate = ProgressUpdate::create([
+            'project_task_id' => $task->id,
+            'description' => $ticket->description,
+            'file_path' => $ticket->file_path,
+            'original_name' => $ticket->original_name,
+            'file_type' => $ticket->file_type,
+            'file_size' => $ticket->file_size,
+            'created_by' => $user->id,
+        ]);
+
+        $ticket->update(['completed_at' => now()]);
+
+        $progressUpdate->load('createdBy');
+        $task->load(['milestone.project']);
+
+        if ($task->milestone) {
+            $this->autoProgressMilestone($task, $task->milestone);
+        }
+
+        if ($task->milestone && $task->milestone->project) {
+            $project = $task->milestone->project;
+            $this->createSystemNotification(
+                'update',
+                'New Progress Update',
+                "A new progress update has been added for task '{$task->title}' in milestone '{$task->milestone->name}' for project '{$project->project_name}'.",
+                $project,
+                null
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Progress update created successfully',
+            'data' => [
+                'id' => $progressUpdate->id,
+                'project_task_id' => $progressUpdate->project_task_id,
+                'description' => $progressUpdate->description,
+                'file_path' => $progressUpdate->file_path,
+                'file_url' => $this->getFileUrl($progressUpdate->file_path),
+                'original_name' => $progressUpdate->original_name,
+                'file_type' => $progressUpdate->file_type,
+                'file_size' => $progressUpdate->file_size,
+                'created_by' => $progressUpdate->created_by,
+                'created_by_name' => $progressUpdate->createdBy?->name ?? 'Unknown User',
+                'created_at' => $progressUpdate->created_at->toISOString(),
+                'updated_at' => $progressUpdate->updated_at->toISOString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get short-lived download URL for a progress update file.
+     */
+    public function progressUpdateDownloadUrl(Request $request, $id, $updateId)
+    {
+        $user = $request->user();
+
+        $task = ProjectTask::where('id', $id)->with(['milestone.project'])->first();
+
+        if (!$task) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $authz = app(TaskManagementAuthorization::class);
+        if (!$authz->canAccessTask($user, $task)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Task not found or you do not have access to it',
+            ], 404);
+        }
+
+        $progressUpdate = ProgressUpdate::where('id', $updateId)
+            ->where('project_task_id', $id)
+            ->first();
+
+        if (!$progressUpdate || !$progressUpdate->file_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File not found',
+            ], 404);
+        }
+
+        $spacesService = app(SpacesUploadService::class);
+        if (!$spacesService->objectExists($progressUpdate->file_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File does not exist',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'url' => $spacesService->createDownloadUrl($progressUpdate->file_path, 900),
+                'expires_in' => 900,
+            ],
         ]);
     }
 

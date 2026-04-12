@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class TaskManagementTaskController extends Controller
 {
@@ -25,17 +26,48 @@ class TaskManagementTaskController extends Controller
         return $request->has('file') && !$request->hasFile('file');
     }
 
-    private function uploadLimitErrorResponse()
+    private function getInvalidUploadedFile(Request $request): ?UploadedFile
+    {
+        if (!$request->hasFile('file')) {
+            return null;
+        }
+
+        $file = $request->file('file');
+
+        if ($file instanceof UploadedFile && !$file->isValid()) {
+            return $file;
+        }
+
+        return null;
+    }
+
+    private function uploadErrorCodeMessage(?int $errorCode): string
+    {
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the server upload_max_filesize limit.',
+            UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE limit from the form.',
+            UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded.',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary upload directory on the server.',
+            UPLOAD_ERR_CANT_WRITE => 'Server failed to write the uploaded file to disk.',
+            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload.',
+            default => 'The file failed to upload. The file may exceed server upload limits or be an invalid upload payload.',
+        };
+    }
+
+    private function uploadLimitErrorResponse(?int $errorCode = null)
     {
         $uploadMax = ini_get('upload_max_filesize') ?: 'unknown';
         $postMax = ini_get('post_max_size') ?: 'unknown';
+        $baseMessage = "File upload failed before validation. Server limits are upload_max_filesize={$uploadMax} and post_max_size={$postMax}.";
+        $errorMessage = $this->uploadErrorCodeMessage($errorCode);
 
         return response()->json([
             'success' => false,
-            'message' => "File upload failed before validation. Server limits are upload_max_filesize={$uploadMax} and post_max_size={$postMax}.",
+            'message' => $baseMessage,
             'errors' => [
                 'file' => [
-                    'The file failed to upload. The file may exceed server upload limits or be an invalid upload payload.',
+                    $errorMessage,
                 ],
             ],
         ], 422);
@@ -315,6 +347,11 @@ class TaskManagementTaskController extends Controller
             ], 404);
         }
 
+        $invalidUploadedFile = $this->getInvalidUploadedFile($request);
+        if ($invalidUploadedFile) {
+            return $this->uploadLimitErrorResponse($invalidUploadedFile->getError());
+        }
+
         if ($this->hasInvalidUploadedFile($request)) {
             return $this->uploadLimitErrorResponse();
         }
@@ -426,6 +463,11 @@ class TaskManagementTaskController extends Controller
                 'success' => false,
                 'message' => 'Progress update not found or you do not have permission to edit it',
             ], 404);
+        }
+
+        $invalidUploadedFile = $this->getInvalidUploadedFile($request);
+        if ($invalidUploadedFile) {
+            return $this->uploadLimitErrorResponse($invalidUploadedFile->getError());
         }
 
         if ($this->hasInvalidUploadedFile($request)) {

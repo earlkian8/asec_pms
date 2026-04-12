@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 
@@ -136,6 +137,12 @@ class RolesController extends Controller
         
         // Sync permissions to role
         $role->syncPermissions($permissions);
+
+        // Role permission changes affect all users assigned to this role.
+        $role->loadMissing('users:id');
+        foreach ($role->users as $user) {
+            Cache::forget("user_permissions_{$user->id}");
+        }
 
         $this->adminActivityLogs(
             'Role',

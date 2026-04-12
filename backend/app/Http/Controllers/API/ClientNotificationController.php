@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClientNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ClientNotificationController extends Controller
 {
@@ -80,6 +81,7 @@ class ClientNotificationController extends Controller
             ->findOrFail($id);
         
         $notification->update(['read' => true]);
+        Cache::forget("user_unread_notifications_{$client->id}");
         
         return response()->json([
             'success' => true,
@@ -97,6 +99,8 @@ class ClientNotificationController extends Controller
         ClientNotification::where('client_id', $client->id)
             ->where('read', false)
             ->update(['read' => true]);
+
+        Cache::forget("user_unread_notifications_{$client->id}");
         
         return response()->json([
             'success' => true,

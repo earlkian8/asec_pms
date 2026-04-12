@@ -18,7 +18,7 @@ class ProjectFilesController extends Controller
     {
         
         $validated = $request->validate([
-            'file'        => ['required', 'file', 'max:20480'], // 20MB
+            'file'        => ['required', 'file', 'max:102400'], // 100MB
             'category'    => ['nullable', 'in:contract,drafting,specification,report,photo,other'],
             'description' => ['nullable', 'string'],
         ]);

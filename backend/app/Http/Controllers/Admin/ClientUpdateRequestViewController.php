@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientUpdateRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ClientUpdateRequestViewController extends Controller
 {
@@ -34,10 +35,19 @@ class ClientUpdateRequestViewController extends Controller
 
         $userId = Auth::id();
 
-        ClientUpdateRequest::whereIn('id', $ids)
-            ->with('views')
-            ->get()
-            ->each(fn ($r) => $r->markViewedBy($userId));
+        $now = now();
+
+        DB::table('client_update_request_views')->upsert(
+            collect($ids)->map(fn ($id) => [
+                'client_update_request_id' => $id,
+                'user_id' => $userId,
+                'viewed_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all(),
+            ['client_update_request_id', 'user_id'],
+            ['viewed_at', 'updated_at']
+        );
 
         return response()->json(['success' => true, 'marked' => count($ids)]);
     }

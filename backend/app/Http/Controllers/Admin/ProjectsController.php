@@ -99,7 +99,8 @@ class ProjectsController extends Controller
         }
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
-        $projects = Project::with(['client', 'projectType:id,name', 'milestones.tasks'])
+        $projects = Project::with(['client', 'projectType:id,name', 'milestones', 'milestones.tasks'])
+            ->withExists('billings')
             ->whereNull('archived_at')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -144,7 +145,7 @@ class ProjectsController extends Controller
                 $project->progress_percentage = round($milestoneProgress->avg(), 2);
             }
 
-            $project->has_billings = $project->billings()->exists();
+            $project->has_billings = (bool) ($project->billings_exists ?? false);
             return $project;
         });
 
@@ -323,13 +324,13 @@ class ProjectsController extends Controller
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
             'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
-            'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'contractor_license'       => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'surety_bond'              => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'signed_contract'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
+            'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'contractor_license'       => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'surety_bond'              => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'signed_contract'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'team_members'                             => ['nullable', 'array'],
             'team_members.*.id'                        => ['required', 'integer'],
             'team_members.*.type'                      => ['required', 'in:user,employee'],
@@ -508,13 +509,13 @@ class ProjectsController extends Controller
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
             'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
-            'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'contractor_license'       => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'surety_bond'              => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'signed_contract'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
-            'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:10240'],
+            'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'contractor_license'       => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'surety_bond'              => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'signed_contract'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
+            'notice_to_proceed'        => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
         ]);
 
         $directory = 'projects/documents/' . $project->project_code;

@@ -22,6 +22,7 @@ use App\Models\Message;
 use App\Models\Notification;
 use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
@@ -69,6 +70,7 @@ class AlphaTestingSeeder extends Seeder
         $adminUser->password = Hash::make('password');
         $adminUser->save();
         $adminUser->syncRoles(['Admin']);
+        Cache::forget("user_permissions_{$adminUser->id}");
         $this->command->info('Admin user: admin@alphasync.com');
         return $adminUser;
     }
@@ -95,6 +97,7 @@ class AlphaTestingSeeder extends Seeder
                 ]
             );
             $user->syncRoles([$data['role']]);
+            Cache::forget("user_permissions_{$user->id}");
             $users->push($user);
         }
 

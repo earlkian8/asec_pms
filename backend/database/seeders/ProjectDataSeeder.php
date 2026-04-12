@@ -14,6 +14,7 @@ use App\Models\Billing;
 use App\Models\BillingPayment;
 use Spatie\Permission\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -106,6 +107,7 @@ class ProjectDataSeeder extends Seeder
             $role = Role::where('name', $roleName)->first();
             if ($role) {
                 $user->assignRole($role);
+                Cache::forget("user_permissions_{$user->id}");
             }
 
             $users->push($user);

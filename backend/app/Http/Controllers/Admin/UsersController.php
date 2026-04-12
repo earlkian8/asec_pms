@@ -9,6 +9,7 @@ use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use App\Mail\UserCredentialsMail;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -34,11 +35,11 @@ class UsersController extends Controller
     private function imageRules(): array
     {
         return [
-            'profile_image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'sss_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'philhealth_id_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'pagibig_id_image'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'tin_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+            'profile_image'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'sss_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'philhealth_id_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'pagibig_id_image'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
+            'tin_id_image'        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:102400',
         ];
     }
 
@@ -251,6 +252,7 @@ class UsersController extends Controller
         ]);
 
         $user->assignRole($v['role']);
+        Cache::forget("user_permissions_{$user->id}");
 
         $sendCredentials = $request->boolean('send_credentials', true);
         if ($sendCredentials && $user->email) {
@@ -326,6 +328,7 @@ class UsersController extends Controller
 
         $user->update($data);
         $user->syncRoles([$v['role']]);
+        Cache::forget("user_permissions_{$user->id}");
 
         $this->adminActivityLogs('User', 'Update', "Updated User {$user->name} ({$user->email}) with role: {$v['role']}");
         $this->createSystemNotification(

@@ -133,6 +133,9 @@ Route::prefix('task-management')->middleware('auth:sanctum')->group(function () 
     
     // Progress updates routes
     Route::get('/tasks/{id}/progress-updates', [TaskManagementTaskController::class, 'progressUpdates'])->middleware('permission:tm.progress-updates.view');
+    Route::post('/tasks/{id}/progress-updates/tickets', [TaskManagementTaskController::class, 'createProgressUpdateUploadTicket'])->middleware('permission:tm.progress-updates.create');
+    Route::post('/tasks/{id}/progress-updates/finalize', [TaskManagementTaskController::class, 'finalizeProgressUpdate'])->middleware('permission:tm.progress-updates.create');
+    Route::get('/tasks/{id}/progress-updates/{updateId}/download-url', [TaskManagementTaskController::class, 'progressUpdateDownloadUrl'])->middleware('permission:tm.files.download');
     Route::post('/tasks/{id}/progress-updates', [TaskManagementTaskController::class, 'storeProgressUpdate'])->middleware('permission:tm.progress-updates.create');
     Route::post('/tasks/{id}/progress-updates/{updateId}', [TaskManagementTaskController::class, 'updateProgressUpdate'])->middleware('permission:tm.progress-updates.update-own');
     Route::delete('/tasks/{id}/progress-updates/{updateId}', [TaskManagementTaskController::class, 'deleteProgressUpdate'])->middleware('permission:tm.progress-updates.delete-own');

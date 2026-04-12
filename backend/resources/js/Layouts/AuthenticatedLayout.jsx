@@ -478,7 +478,7 @@ export default function AuthenticatedLayout({ header, children, breadcrumbs = []
                     {/* Footer */}
                     <footer className="bg-white border-t border-gray-200 px-4 py-[14px] sm:px-6">
                         <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600">
-                            <p>&copy; 2025 Abdurauf Sawadjaan Engineering Consultancy. All rights reserved.</p>
+                            <p>&copy; 2026 Earl Kian Bancayrin. All rights reserved.</p>
                         </div>
                     </footer>
                 </main>

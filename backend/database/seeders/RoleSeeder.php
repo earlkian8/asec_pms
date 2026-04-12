@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -30,7 +31,9 @@ class RoleSeeder extends Seeder
             ['name' => 'Developer', 'guard_name' => 'web']
         );
         $superAdmin->syncPermissions($allPermissions);
+        $this->clearUserPermissionCacheForRole($superAdmin);
         $developer->syncPermissions($allPermissions);
+        $this->clearUserPermissionCacheForRole($developer);
 
         // 2. Admin - All permissions except user management (users, roles, activity-logs)
         $admin = Role::firstOrCreate(
@@ -56,6 +59,7 @@ class RoleSeeder extends Seeder
             'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments',
             'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget',
         ]);
+        $this->clearUserPermissionCacheForRole($admin);
 
         // 3. Project Manager
         $projectManager = Role::firstOrCreate(
@@ -81,6 +85,7 @@ class RoleSeeder extends Seeder
             'billing.view', 'billing.create', 'billing.update',
             'reports.view', 'reports.project-performance',
         ]);
+        $this->clearUserPermissionCacheForRole($projectManager);
 
         // 4. Finance Manager
         $financeManager = Role::firstOrCreate(
@@ -94,6 +99,7 @@ class RoleSeeder extends Seeder
             'clients.view', // View only
             'reports.view', 'reports.financial', 'reports.budget',
         ]);
+        $this->clearUserPermissionCacheForRole($financeManager);
 
         // 5. Inventory Manager
         $inventoryManager = Role::firstOrCreate(
@@ -109,6 +115,7 @@ class RoleSeeder extends Seeder
             'milestone-material-usage.view',
             'reports.view', 'reports.inventory',
         ]);
+        $this->clearUserPermissionCacheForRole($inventoryManager);
 
         // 6. Foreman - Field supervisor with project execution capabilities
         $foreman = Role::firstOrCreate(
@@ -131,6 +138,7 @@ class RoleSeeder extends Seeder
             'employees.view', // View employees for team context
             'reports.view', 'reports.project-performance', // View project reports
         ]);
+        $this->clearUserPermissionCacheForRole($foreman);
 
         // 7. Foreman (TM) - Task-management app execution only (permission-driven)
         $tmForeman = Role::firstOrCreate(
@@ -151,6 +159,7 @@ class RoleSeeder extends Seeder
             'tm.issues.delete-own',
             'tm.files.download',
         ]);
+        $this->clearUserPermissionCacheForRole($tmForeman);
 
         // 8. Engineer (TM) - Task-management app project-scoped management
         $tmEngineer = Role::firstOrCreate(
@@ -188,8 +197,18 @@ class RoleSeeder extends Seeder
             // Permission delegation — only original Engineer (TM) users may delegate
             'tm.permissions.delegate',
         ]);
+        $this->clearUserPermissionCacheForRole($tmEngineer);
 
         $this->command->info('Roles seeded successfully!');
+    }
+
+    private function clearUserPermissionCacheForRole(Role $role): void
+    {
+        $role->loadMissing('users:id');
+
+        foreach ($role->users as $user) {
+            Cache::forget("user_permissions_{$user->id}");
+        }
     }
 }
 

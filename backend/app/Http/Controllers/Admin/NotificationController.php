@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class NotificationController extends Controller
@@ -78,6 +79,7 @@ class NotificationController extends Controller
         }
 
         $notification->update(['read' => true]);
+        Cache::forget("user_unread_notifications_{$request->user()->id}");
 
         return response()->json([
             'success' => true,
@@ -95,6 +97,8 @@ class NotificationController extends Controller
         Notification::where('user_id', $user->id)
             ->where('read', false)
             ->update(['read' => true]);
+
+        Cache::forget("user_unread_notifications_{$user->id}");
 
         return response()->json([
             'success' => true,
@@ -121,6 +125,8 @@ class NotificationController extends Controller
             ->where('read', false)
             ->whereIn('type', $types)
             ->update(['read' => true]);
+
+        Cache::forget("user_unread_notifications_{$user->id}");
 
         return response()->json([
             'success' => true,

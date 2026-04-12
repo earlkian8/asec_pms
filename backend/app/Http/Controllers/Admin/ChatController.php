@@ -32,6 +32,11 @@ class ChatController extends Controller
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
         $chats = Chat::with(['client', 'user', 'latestMessage'])
+            ->withCount([
+                'messages as unread_count' => fn($query) => $query
+                    ->where('sender_type', 'client')
+                    ->where('read', false),
+            ])
             ->when($search, function ($query, $search) {
                 return $query->whereHas('client', function ($q) use ($search) {
                     $q->where('client_name', 'like', "%{$search}%")
@@ -48,12 +53,6 @@ class ChatController extends Controller
                 return $query->orderBy($sortBy, $sortOrder);
             })
             ->paginate(20);
-
-        // Add unread count to each chat
-        $chats->getCollection()->transform(function ($chat) {
-            $chat->unread_count = $chat->unreadMessagesCount();
-            return $chat;
-        });
 
         return Inertia::render('Chat/index', [
             'chats' => $chats,
@@ -87,12 +86,13 @@ class ChatController extends Controller
 
         // Get all chats for sidebar
         $allChats = Chat::with(['client', 'user', 'latestMessage'])
+            ->withCount([
+                'messages as unread_count' => fn($query) => $query
+                    ->where('sender_type', 'client')
+                    ->where('read', false),
+            ])
             ->orderBy('last_message_at', 'desc')
-            ->get()
-            ->map(function ($c) {
-                $c->unread_count = $c->unreadMessagesCount();
-                return $c;
-            });
+            ->get();
 
         return Inertia::render('Chat/show', [
             'chat' => $chat,

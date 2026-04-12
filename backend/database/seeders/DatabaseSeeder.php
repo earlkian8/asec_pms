@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -42,6 +43,7 @@ class DatabaseSeeder extends Seeder
         
         // Ensure Super Admin role is assigned (remove other roles first)
         $adminUser->syncRoles(['Developer']);
+        Cache::forget("user_permissions_{$adminUser->id}");
         
         // $this->command->info("Super Admin role assigned to: {$adminEmail}");
 

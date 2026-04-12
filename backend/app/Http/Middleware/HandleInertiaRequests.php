@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -35,8 +36,16 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $user,
-                'permissions' => $user ? $user->getAllPermissions()->pluck('name')->toArray() : [],
-                'unread_notifications_count' => $user ? $user->unreadNotifications()->count() : 0,
+                'permissions' => $user
+                    ? Cache::remember("user_permissions_{$user->id}", now()->addMinutes(5), function () use ($user) {
+                        return $user->getAllPermissions()->pluck('name')->toArray();
+                    })
+                    : [],
+                'unread_notifications_count' => $user
+                    ? Cache::remember("user_unread_notifications_{$user->id}", now()->addMinutes(2), function () use ($user) {
+                        return $user->unreadNotifications()->count();
+                    })
+                    : 0,
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),

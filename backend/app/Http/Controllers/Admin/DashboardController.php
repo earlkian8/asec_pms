@@ -46,31 +46,47 @@ class DashboardController extends Controller
 
         $totalContractAmount = Project::notArchived()->sum('contract_amount');
 
-        // Calculate average completion based on milestones
-        $allProjects = Project::notArchived()->with('milestones')->get();
-        $completionPercentages = $allProjects->map(function ($project) {
-            $milestones = $project->milestones;
-            $totalMilestones = $milestones->count();
-            $completedMilestones = $milestones->where('status', 'completed')->count();
-            return $totalMilestones > 0
-                ? round(($completedMilestones / $totalMilestones) * 100, 2)
-                : 0;
-        });
-        $averageCompletion = $completionPercentages->avg() ?? 0;
+        // Calculate average completion in SQL to avoid loading all projects into memory.
+        $averageCompletion = (float) DB::query()
+            ->fromSub(
+                ProjectMilestone::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+                    ->selectRaw(
+                        "project_id, (SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END)::decimal / NULLIF(COUNT(*), 0)) * 100 as completion_percentage"
+                    )
+                    ->groupBy('project_id'),
+                'project_completion'
+            )
+            ->selectRaw('COALESCE(AVG(completion_percentage), 0) as average_completion')
+            ->value('average_completion');
 
         // Recent Projects (last 5) — exclude archived
         $recentProjects = Project::notArchived()
-            ->with(['client:id,client_name', 'projectType:id,name', 'milestones'])
+            ->with([
+                'client:id,client_name',
+                'projectType:id,name',
+                'milestones' => fn($query) => $query->withCount([
+                    'tasks',
+                    'tasks as completed_tasks_count' => fn($taskQuery) => $taskQuery->where('status', 'completed'),
+                ]),
+            ])
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get()
             ->map(function ($project) {
                 $milestones = $project->milestones;
-                $totalMilestones = $milestones->count();
-                $completedMilestones = $milestones->where('status', 'completed')->count();
-                $project->milestones_completion_percentage = $totalMilestones > 0
-                    ? round(($completedMilestones / $totalMilestones) * 100, 2)
-                    : 0;
+
+                $milestoneProgress = $milestones->map(function ($milestone) {
+                    $totalTasks = (int) ($milestone->tasks_count ?? 0);
+                    $completedTasks = (int) ($milestone->completed_tasks_count ?? 0);
+
+                    if ($totalTasks === 0) {
+                        return 0;
+                    }
+
+                    return ($completedTasks / $totalTasks) * 100;
+                });
+
+                $project->milestones_completion_percentage = round($milestoneProgress->avg() ?? 0, 2);
                 return $project->only(['id', 'project_code', 'project_name', 'status', 'milestones_completion_percentage', 'client_id', 'project_type_id', 'created_at']);
             });
 
@@ -107,10 +123,8 @@ class DashboardController extends Controller
         $totalInventoryItems = InventoryItem::count();
         $activeInventoryItems = InventoryItem::where('is_active', true)->count();
         $lowStockItems = InventoryItem::where('is_active', true)
-            ->get()
-            ->filter(function ($item) {
-                return $item->isLowStock();
-            })
+            ->whereNotNull('min_stock_level')
+            ->whereColumn('current_stock', '<=', 'min_stock_level')
             ->count();
 
         // Team Statistics — only from non-archived projects
@@ -135,15 +149,10 @@ class DashboardController extends Controller
         // Budget Statistics — only from non-archived projects
         $totalLaborCost = (float) ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('gross_pay');
 
-        $totalMaterialCost = ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->with('inventoryItem')
-            ->get()
-            ->sum(function ($allocation) {
-                if ($allocation->inventoryItem) {
-                    return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-                }
-                return 0;
-            });
+        $totalMaterialCost = (float) ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->selectRaw('COALESCE(SUM(project_material_allocations.quantity_received * COALESCE(inventory_items.unit_price, 0)), 0) as total')
+            ->value('total');
 
         $totalMiscCost = (float) ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('amount');
 
@@ -180,19 +189,17 @@ class DashboardController extends Controller
             });
 
         $monthlyMaterialCosts = ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->with('inventoryItem')
+            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+            ->select(
+                DB::raw("DATE_TRUNC('month', project_material_allocations.allocated_at) as month"),
+                DB::raw('SUM(project_material_allocations.quantity_received * COALESCE(inventory_items.unit_price, 0)) as total')
+            )
             ->where('allocated_at', '>=', now()->subMonths(6))
+            ->groupBy('month')
+            ->orderBy('month', 'asc')
             ->get()
-            ->groupBy(function ($allocation) {
-                return Carbon::parse($allocation->allocated_at)->format('Y-m');
-            })
-            ->map(function ($allocations) {
-                return $allocations->sum(function ($allocation) {
-                    if ($allocation->inventoryItem) {
-                        return (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price;
-                    }
-                    return 0;
-                });
+            ->keyBy(function ($item) {
+                return Carbon::parse($item->month)->format('Y-m');
             });
 
         $monthlyMiscCosts = ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'))
@@ -224,7 +231,7 @@ class DashboardController extends Controller
                 'month_key' => $monthKey,
                 'revenue' => $revenueData ? (float) $revenueData->total : 0,
                 'labor_cost' => $laborData ? (float) $laborData->total : 0,
-                'material_cost' => (float) ($monthlyMaterialCosts->get($monthKey) ?? 0),
+                'material_cost' => (float) ($monthlyMaterialCosts->get($monthKey)?->total ?? 0),
                 'misc_cost' => $miscData ? (float) $miscData->total : 0,
             ];
         }
@@ -236,6 +243,7 @@ class DashboardController extends Controller
             ->whereNotNull('planned_end_date')
             ->where('planned_end_date', '<', now())
             ->with('client:id,client_name')
+            ->limit(10)
             ->get(['id', 'project_code', 'project_name', 'planned_end_date', 'client_id', 'status']);
 
         // Upcoming Due Dates (next 7 days) — exclude archived
@@ -246,6 +254,7 @@ class DashboardController extends Controller
             ->whereBetween('planned_end_date', [now(), now()->addDays(7)])
             ->with('client:id,client_name')
             ->orderBy('planned_end_date', 'asc')
+            ->limit(10)
             ->get(['id', 'project_code', 'project_name', 'planned_end_date', 'client_id', 'status']);
 
         // Overdue Billings — exclude archived
@@ -254,6 +263,7 @@ class DashboardController extends Controller
             ->whereNotNull('due_date')
             ->where('due_date', '<', now())
             ->with(['project:id,project_code,project_name'])
+            ->limit(10)
             ->get(['id', 'billing_code', 'project_id', 'billing_amount', 'due_date', 'status']);
 
         return Inertia::render('Dashboard', [

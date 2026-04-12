@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\TaskManagement;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 
@@ -282,6 +283,7 @@ class PermissionDelegationController extends Controller
         }
 
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        Cache::forget("user_permissions_{$target->id}");
     }
 
     private function revokeUser(User $granter, User $target): \Illuminate\Http\JsonResponse

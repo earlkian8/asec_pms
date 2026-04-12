@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 class AssignSuperAdmin extends Command
 {
@@ -37,6 +38,7 @@ class AssignSuperAdmin extends Command
         
         // Assign Super Admin role
         $user->syncRoles(['Super Admin']);
+        Cache::forget("user_permissions_{$user->id}");
         
         $this->info("Super Admin role has been assigned to: {$user->name} ({$user->email})");
         $this->info("Current roles: " . $user->roles->pluck('name')->implode(', '));

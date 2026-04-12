@@ -9,6 +9,7 @@ use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
 use App\Mail\UserCredentialsMail;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -251,6 +252,7 @@ class UsersController extends Controller
         ]);
 
         $user->assignRole($v['role']);
+        Cache::forget("user_permissions_{$user->id}");
 
         $sendCredentials = $request->boolean('send_credentials', true);
         if ($sendCredentials && $user->email) {
@@ -326,6 +328,7 @@ class UsersController extends Controller
 
         $user->update($data);
         $user->syncRoles([$v['role']]);
+        Cache::forget("user_permissions_{$user->id}");
 
         $this->adminActivityLogs('User', 'Update', "Updated User {$user->name} ({$user->email}) with role: {$v['role']}");
         $this->createSystemNotification(

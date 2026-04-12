@@ -99,7 +99,8 @@ class ProjectsController extends Controller
         }
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
-        $projects = Project::with(['client', 'projectType:id,name', 'milestones.tasks'])
+        $projects = Project::with(['client', 'projectType:id,name', 'milestones', 'milestones.tasks'])
+            ->withExists('billings')
             ->whereNull('archived_at')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -144,7 +145,7 @@ class ProjectsController extends Controller
                 $project->progress_percentage = round($milestoneProgress->avg(), 2);
             }
 
-            $project->has_billings = $project->billings()->exists();
+            $project->has_billings = (bool) ($project->billings_exists ?? false);
             return $project;
         });
 

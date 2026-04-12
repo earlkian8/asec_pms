@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\TaskManagement;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class NotificationController extends Controller
 {
@@ -39,18 +40,26 @@ class NotificationController extends Controller
 
     public function markAsRead(Request $request, $id)
     {
+        $userId = $request->user()->id;
+
         Notification::where('user_id', $request->user()->id)
             ->where('id', $id)
             ->update(['read' => true]);
+
+        Cache::forget("user_unread_notifications_{$userId}");
 
         return response()->json(['success' => true]);
     }
 
     public function markAllAsRead(Request $request)
     {
+        $userId = $request->user()->id;
+
         Notification::where('user_id', $request->user()->id)
             ->where('read', false)
             ->update(['read' => true]);
+
+        Cache::forget("user_unread_notifications_{$userId}");
 
         return response()->json(['success' => true]);
     }

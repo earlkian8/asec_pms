@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/items/{project}/section/{section}', [ProjectBoqController::class, 'storeItem'])->middleware('permission:project-boq.create')->name('items.store');
             Route::put('/items/{project}/item/{item}', [ProjectBoqController::class, 'updateItem'])->middleware('permission:project-boq.update')->name('items.update');
             Route::delete('/items/{project}/item/{item}', [ProjectBoqController::class, 'destroyItem'])->middleware('permission:project-boq.delete')->name('items.destroy');
+            Route::get('/export/{project}', [ProjectBoqController::class, 'export'])->middleware('permission:project-boq.view')->name('export');
         });
 
         // Project Milestones

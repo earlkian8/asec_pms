@@ -91,9 +91,25 @@ export default function OverviewTab({ project, overviewData, boqData }) {
 
   const { budget, billing, team, milestones, tasks, timeline } = overviewData;
   const boqPlannedTotal = boqData?.grand_total ?? 0;
-  const boqActualTotal = boqData?.actual_total ?? 0;
-  const boqContractVariance = boqData?.contract_variance ?? 0;
-  const boqIsOverContract = boqData?.is_over_contract ?? false;
+
+  // All actual expenses vs contract (not restricted to BOQ-linked actuals)
+  const allExpensesVariance = budget.contract_amount - budget.total_budget_used;
+  const allExpensesOverContract = allExpensesVariance < 0;
+
+  // Cumulative burn rows computed from monthly breakdown
+  const burnRows = (() => {
+    let cumulative = 0;
+    return (budget.monthly_breakdown || []).map((m) => {
+      const monthlyTotal = (m.labor_cost || 0) + (m.material_cost || 0) + (m.miscellaneous_expenses || 0);
+      cumulative += monthlyTotal;
+      return {
+        ...m,
+        monthly_total: monthlyTotal,
+        cumulative,
+        pct: budget.contract_amount > 0 ? (cumulative / budget.contract_amount) * 100 : 0,
+      };
+    });
+  })();
 
   const uploadedDocCount = DOCUMENT_FIELDS.filter(({ key }) => project[key]).length;
 
@@ -237,7 +253,7 @@ export default function OverviewTab({ project, overviewData, boqData }) {
         </div>
       </div>
 
-      {/* BOQ System Impact */}
+      {/* Cost Summary: Scoped vs Actual vs Contract */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl border border-cyan-200 p-4 shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-center justify-between mb-2">
@@ -255,26 +271,26 @@ export default function OverviewTab({ project, overviewData, boqData }) {
             <div className="p-2 bg-indigo-500 rounded-lg group-hover:scale-110 transition-transform">
               <Activity className="text-white" size={18} />
             </div>
-            <span className="text-xs font-semibold text-indigo-700 bg-indigo-200 px-2 py-0.5 rounded">BOQ Actual</span>
+            <span className="text-xs font-semibold text-indigo-700 bg-indigo-200 px-2 py-0.5 rounded">Actual Expenses</span>
           </div>
-          <p className="text-xl font-bold text-gray-900">{formatCurrency(boqActualTotal)}</p>
-          <p className="text-xs text-gray-600 mt-1 font-medium">Linked material + labor actuals</p>
+          <p className="text-xl font-bold text-gray-900">{formatCurrency(budget.total_budget_used)}</p>
+          <p className="text-xs text-gray-600 mt-1 font-medium">All recorded expenses (labor + material + misc)</p>
         </div>
 
-        <div className={`rounded-xl border p-4 shadow-sm hover:shadow-md transition-all group ${boqIsOverContract ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200'}`}>
+        <div className={`rounded-xl border p-4 shadow-sm hover:shadow-md transition-all group ${allExpensesOverContract ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200'}`}>
           <div className="flex items-center justify-between mb-2">
-            <div className={`p-2 rounded-lg group-hover:scale-110 transition-transform ${boqIsOverContract ? 'bg-red-500' : 'bg-emerald-500'}`}>
-              {boqIsOverContract ? <TrendingUp className="text-white" size={18} /> : <TrendingDown className="text-white" size={18} />}
+            <div className={`p-2 rounded-lg group-hover:scale-110 transition-transform ${allExpensesOverContract ? 'bg-red-500' : 'bg-emerald-500'}`}>
+              {allExpensesOverContract ? <TrendingUp className="text-white" size={18} /> : <TrendingDown className="text-white" size={18} />}
             </div>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${boqIsOverContract ? 'text-red-700 bg-red-200' : 'text-emerald-700 bg-emerald-200'}`}>
-              {boqIsOverContract ? 'Over Contract' : 'Within Contract'}
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${allExpensesOverContract ? 'text-red-700 bg-red-200' : 'text-emerald-700 bg-emerald-200'}`}>
+              {allExpensesOverContract ? 'Over Contract' : 'Within Contract'}
             </span>
           </div>
-          <p className={`text-xl font-bold ${boqIsOverContract ? 'text-red-700' : 'text-emerald-700'}`}>
-            {formatCurrency(Math.abs(boqContractVariance))}
+          <p className={`text-xl font-bold ${allExpensesOverContract ? 'text-red-700' : 'text-emerald-700'}`}>
+            {formatCurrency(Math.abs(allExpensesVariance))}
           </p>
           <p className="text-xs text-gray-600 mt-1 font-medium">
-            {boqIsOverContract ? 'Amount over contract' : 'Remaining contract room'}
+            {allExpensesOverContract ? 'Amount over contract' : 'Remaining contract room'}
           </p>
         </div>
       </div>
@@ -333,12 +349,30 @@ export default function OverviewTab({ project, overviewData, boqData }) {
                   style={{ width: budget.contract_amount > 0 ? `${Math.min(((budget.total_miscellaneous_expenses||0)/budget.contract_amount)*100,100)}%` : '0%' }} />
               </div>
             </div>
-            <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg p-3 border-2 border-green-300">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><DollarSign className="text-green-700" size={16} /><span className="text-sm font-bold text-gray-800">Budget Remaining</span></div>
-                <span className="text-base font-bold text-green-700">{formatCurrency(budget.budget_remaining)}</span>
-              </div>
-            </div>
+            {(() => {
+              const remaining = budget.budget_remaining;
+              const pctUsed = budget.budget_utilization_percentage || 0;
+              const isOver = remaining < 0;
+              const isNear = !isOver && pctUsed >= 90;
+              const colorClass = isOver
+                ? 'from-red-100 to-red-100 border-red-300'
+                : isNear
+                ? 'from-amber-100 to-amber-100 border-amber-300'
+                : 'from-green-100 to-emerald-100 border-green-300';
+              const textClass = isOver ? 'text-red-700' : isNear ? 'text-amber-700' : 'text-green-700';
+              return (
+                <div className={`bg-gradient-to-r ${colorClass} rounded-lg p-3 border-2`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className={textClass} size={16} />
+                      <span className="text-sm font-bold text-gray-800">Budget Remaining</span>
+                    </div>
+                    <span className={`text-base font-bold ${textClass}`}>{formatCurrency(remaining)}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Contract Amount − All Expenses</p>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -519,6 +553,62 @@ export default function OverviewTab({ project, overviewData, boqData }) {
           )}
         </div>
       </div>
+
+      {/* Monthly Expense Burn Table */}
+      {burnRows.some((r) => r.monthly_total > 0) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <h3 className="text-base font-bold text-gray-900 flex items-center gap-2 mb-3">
+            <div className="p-1.5 bg-orange-100 rounded-lg"><TrendingUp className="text-orange-600" size={18} /></div>
+            Monthly Expense Burn
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600">Month</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Labor</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Material</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Misc</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Monthly Total</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Cumulative</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-600">% of Contract</th>
+                </tr>
+              </thead>
+              <tbody>
+                {burnRows.map((row, i) => (
+                  <tr key={i} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    <td className="px-3 py-2 font-medium text-gray-800">{row.month}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.labor_cost)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.material_cost)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(row.miscellaneous_expenses || 0)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-gray-900">{formatCurrency(row.monthly_total)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-indigo-700">{formatCurrency(row.cumulative)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className={`font-semibold ${row.pct >= 100 ? 'text-red-600' : row.pct >= 80 ? 'text-amber-600' : 'text-emerald-700'}`}>
+                        {row.pct.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+                  <td colSpan={4} className="px-3 py-2 font-bold text-gray-800">Total (6-month window)</td>
+                  <td className="px-3 py-2 text-right font-bold text-gray-900">
+                    {formatCurrency(burnRows.reduce((s, r) => s + r.monthly_total, 0))}
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-indigo-700">
+                    {formatCurrency(burnRows[burnRows.length - 1]?.cumulative ?? 0)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-indigo-700">
+                    {(burnRows[burnRows.length - 1]?.pct ?? 0).toFixed(1)}%
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Progress & Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

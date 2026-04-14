@@ -23,15 +23,11 @@ class ProjectOverviewService
         $totalLaborDays  = (float) $laborCosts->sum('days_present');
 
         // ── Material Costs ────────────────────────────────────────────────────
-        $materialAllocations = ProjectMaterialAllocation::where('project_id', $project->id)
-            ->with('inventoryItem')
-            ->get();
+        $materialAllocations = ProjectMaterialAllocation::where('project_id', $project->id)->get();
 
-        $totalMaterialCost     = $materialAllocations->sum(function ($a) {
-            return $a->inventoryItem
-                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price
-                : 0;
-        });
+        $totalMaterialCost     = $materialAllocations->sum(
+            fn ($a) => (float) $a->quantity_received * (float) $a->unit_price
+        );
         $totalMaterialQuantity = (float) $materialAllocations->sum('quantity_received');
 
         // ── Miscellaneous Expenses ────────────────────────────────────────────
@@ -104,12 +100,10 @@ class ProjectOverviewService
         // Materials
         $monthlyMaterialCosts = ProjectMaterialAllocation::where('project_id', $project->id)
             ->where('allocated_at', '>=', now()->subMonths(6))
-            ->with('inventoryItem')
             ->get()
             ->groupBy(fn ($a) => $a->allocated_at->format('Y-m'))
-            ->map(fn ($allocations) => $allocations->sum(fn ($a) => $a->inventoryItem
-                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price
-                : 0
+            ->map(fn ($allocations) => $allocations->sum(
+                fn ($a) => (float) $a->quantity_received * (float) $a->unit_price
             ));
 
         // Misc

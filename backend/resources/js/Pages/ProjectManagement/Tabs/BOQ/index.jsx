@@ -15,6 +15,7 @@ import {
     Info,
     Package,
     Wrench,
+    Download,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 
@@ -47,27 +48,6 @@ const ReadOnlyInput = ({ value, className = '' }) => (
     />
 );
 
-const VarianceBadge = ({ planned, actual }) => {
-    const diff = Number(planned || 0) - Number(actual || 0);
-    if (Number(planned || 0) === 0 && Number(actual || 0) === 0) return null;
-    if (diff > 0)
-        return (
-            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                ₱{formatCurrency(diff)} under
-            </span>
-        );
-    if (diff < 0)
-        return (
-            <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                ₱{formatCurrency(Math.abs(diff))} over
-            </span>
-        );
-    return (
-        <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-            on budget
-        </span>
-    );
-};
 
 export default function BOQTab({ project, boqData }) {
     const { has } = usePermission();
@@ -84,7 +64,6 @@ export default function BOQTab({ project, boqData }) {
                     item_code: i.item_code || '',
                     description: i.description || '',
                     resources: (i.resources || []).map((r) => ({ ...r })),
-                    planned_vs_actual: i.planned_vs_actual || null,
                     remarks: i.remarks || '',
                     sort_order: i.sort_order ?? 0,
                 })),
@@ -105,7 +84,6 @@ export default function BOQTab({ project, boqData }) {
     const [saving, setSaving] = useState(false);
 
     const contractAmount = boqData?.contract_amount ?? project?.contract_amount ?? 0;
-    const actualTotal = boqData?.actual_total ?? 0;
 
     const projectDays = (() => {
         const start = project?.start_date;
@@ -137,14 +115,7 @@ export default function BOQTab({ project, boqData }) {
     const sectionSubtotal = (section) =>
         (section.items || []).reduce((sub, i) => sub + getItemTotal(i), 0);
 
-    const sectionActual = (section) =>
-        (section.items || []).reduce(
-            (sub, i) => sub + Number(i.planned_vs_actual?.total_actual || 0),
-            0
-        );
-
     const contractVariance = Number(contractAmount) - grandTotal;
-    const plannedVsActualVariance = grandTotal - Number(actualTotal || 0);
 
     const toggleSection = (sIndex) =>
         setCollapsedSections((prev) => ({ ...prev, [sIndex]: !prev[sIndex] }));
@@ -604,7 +575,6 @@ export default function BOQTab({ project, boqData }) {
                 sections.map((section, sIndex) => {
                     const sectionOpen = !collapsedSections[sIndex];
                     const subtotal = sectionSubtotal(section);
-                    const actTotal = sectionActual(section);
 
                     return (
                         <div key={sIndex} className="overflow-hidden rounded-lg border border-zinc-200 shadow-sm">
@@ -633,7 +603,6 @@ export default function BOQTab({ project, boqData }) {
                                         </span>
                                     )}
                                     <span>₱{formatCurrency(subtotal)}</span>
-                                    <VarianceBadge planned={subtotal} actual={actTotal} />
                                 </div>
                             </button>
 
@@ -647,8 +616,6 @@ export default function BOQTab({ project, boqData }) {
                                             const itemKey = `${sIndex}-${iIndex}`;
                                             const itemOpen = !collapsedItems[itemKey];
                                             const itemTotal = getItemTotal(item);
-                                            const pva = item.planned_vs_actual || {};
-                                            const itemActual = Number(pva.total_actual || 0);
 
                                             return (
                                                 <div key={iIndex}>
@@ -675,20 +642,10 @@ export default function BOQTab({ project, boqData }) {
                                                         </div>
                                                         <div className="flex items-center gap-3 text-sm">
                                                             <span className="text-zinc-500 text-xs">
-                                                                Planned:{' '}
                                                                 <span className="font-medium text-zinc-800">
                                                                     ₱{formatCurrency(itemTotal)}
                                                                 </span>
                                                             </span>
-                                                            {itemActual > 0 && (
-                                                                <span className="text-zinc-500 text-xs">
-                                                                    Actual:{' '}
-                                                                    <span className="font-medium text-zinc-800">
-                                                                        ₱{formatCurrency(itemActual)}
-                                                                    </span>
-                                                                </span>
-                                                            )}
-                                                            <VarianceBadge planned={itemTotal} actual={itemActual} />
                                                         </div>
                                                     </button>
 
@@ -986,12 +943,8 @@ export default function BOQTab({ project, boqData }) {
                         <div className="text-lg font-semibold text-zinc-800">₱{formatCurrency(contractAmount)}</div>
                     </div>
                     <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">BOQ Total (Planned)</div>
+                        <div className="text-xs uppercase tracking-wide text-zinc-500">BOQ Total</div>
                         <div className="text-lg font-semibold text-zinc-800">₱{formatCurrency(grandTotal)}</div>
-                    </div>
-                    <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">Actual (Used)</div>
-                        <div className="text-lg font-semibold text-zinc-800">₱{formatCurrency(actualTotal)}</div>
                     </div>
                     <div>
                         <div className="text-xs uppercase tracking-wide text-zinc-500">vs Contract</div>
@@ -1009,29 +962,19 @@ export default function BOQTab({ project, boqData }) {
                             {contractVariance > 0 && <span className="ml-1 text-xs">(under)</span>}
                         </div>
                     </div>
-                    <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">Planned vs Actual</div>
-                        <div
-                            className={`text-lg font-semibold ${
-                                plannedVsActualVariance < 0
-                                    ? 'text-red-600'
-                                    : plannedVsActualVariance > 0
-                                    ? 'text-emerald-600'
-                                    : 'text-zinc-800'
-                            }`}
-                        >
-                            ₱{formatCurrency(Math.abs(plannedVsActualVariance))}
-                            {plannedVsActualVariance < 0 && (
-                                <span className="ml-1 text-xs">(overrun)</span>
-                            )}
-                            {plannedVsActualVariance > 0 && (
-                                <span className="ml-1 text-xs">(remaining)</span>
-                            )}
-                        </div>
-                    </div>
                 </div>
 
                 <div className="flex gap-2">
+                    {!editing && sections.length > 0 && (
+                        <a
+                            href={route('project-management.project-boq.export', project.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 text-sm font-medium"
+                        >
+                            <Download size={14} /> Export PDF
+                        </a>
+                    )}
                     {!editing && canEdit && sections.length > 0 && (
                         <Button
                             type="button"

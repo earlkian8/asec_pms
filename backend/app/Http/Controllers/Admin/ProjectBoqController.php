@@ -273,6 +273,14 @@ class ProjectBoqController extends Controller
         return redirect()->back()->with('success', 'BOQ item removed.');
     }
 
+    public function export(Project $project)
+    {
+        $export   = new \App\Exports\ProjectBoqExport($project);
+        $fileName = 'BOQ_' . $project->project_code . '_' . now()->format('Ymd') . '.pdf';
+
+        return \Maatwebsite\Excel\Facades\Excel::download($export, $fileName, \Maatwebsite\Excel\Excel::DOMPDF);
+    }
+
     private function syncItemResources(ProjectBoqItem $item, array $resources): void
     {
         $item->resources()->delete();

@@ -248,7 +248,7 @@ export default function TeamTab({ project, teamData }) {
     { header: 'Member',      width: '22%' },
     { header: 'Email',       width: '18%' },
     { header: 'Role',        width: '12%' },
-    { header: 'Rate',        width: '10%' },
+    { header: 'Rate / Type', width: '10%' },
     { header: 'Start',       width: '10%' },
     { header: 'End',         width: '10%' },
     { header: 'Status',      width: '8%'  },
@@ -561,7 +561,12 @@ export default function TeamTab({ project, teamData }) {
                   </TableCell>
 
                   <TableCell className="px-4 py-4 text-sm font-bold text-gray-900">
-                    {formatCurrency(team.hourly_rate)}
+                    {team.pay_type === 'salary'
+                      ? <>{formatCurrency(team.monthly_salary)}<span className="text-xs font-normal text-gray-500 ml-0.5">/mo</span></>
+                      : team.pay_type === 'hourly'
+                      ? <>{formatCurrency(team.hourly_rate)}<span className="text-xs font-normal text-gray-500 ml-0.5">/hr</span></>
+                      : <span className="text-gray-500 text-xs font-normal">Fixed</span>
+                    }
                   </TableCell>
 
                   <TableCell className="px-4 py-4 text-sm text-gray-700">

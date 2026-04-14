@@ -34,6 +34,7 @@ class MaterialAllocationService
                 'inventoryItem',
                 'directSupply',
                 'allocatedBy',
+                'boqItem.section',
                 'receivingReports' => function ($query) {
                     $query->with('receivedBy')->orderBy('received_at', 'desc');
                 },

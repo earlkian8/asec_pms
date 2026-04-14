@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import { ProjectWizardProvider, useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import Step1ProjectInfo from "./wizard-steps/Step1ProjectInfo";
 import Step2TeamMembers from "./wizard-steps/Step2TeamMembers";
+import Step3BOQ from "./wizard-steps/Step3BOQ";
 import Step3Milestones from "./wizard-steps/Step3Milestones";
 import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
@@ -21,6 +22,7 @@ import { usePermission } from "@/utils/permissions";
 const WIZARD_STEP_PERMISSIONS = [
   "projects.create",
   "project-teams.create",
+  "project-boq.create",
   "project-milestones.create",
   "material-allocations.create",
 ];
@@ -37,6 +39,12 @@ const buildWizardSteps = ({ clients, users, inventoryItems, directSupplyItems, p
     title: "Team Members",
     permission: "project-teams.create",
     render: () => <Step2TeamMembers users={users} errors={errors} />,
+  },
+  {
+    key: "boq",
+    title: "BOQ / Scope",
+    permission: "project-boq.create",
+    render: () => <Step3BOQ errors={errors} />,
   },
   {
     key: "milestones",
@@ -133,6 +141,7 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
       milestones: allData.milestones,
       material_allocations: allData.materialAllocations,
       labor_costs: allData.laborCosts || [],
+      boq_sections: allData.boqSections || [],
     }, {
       preserveScroll: true,
       onSuccess: (page) => {

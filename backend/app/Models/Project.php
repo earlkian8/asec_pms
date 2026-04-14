@@ -108,4 +108,14 @@ class Project extends Model
     {
         return $this->hasMany(ProjectIssue::class);
     }
+
+    public function boqSections()
+    {
+        return $this->hasMany(ProjectBoqSection::class)->orderBy('sort_order');
+    }
+
+    public function boqItems()
+    {
+        return $this->hasMany(ProjectBoqItem::class);
+    }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
 use App\Http\Controllers\Admin\MilestoneMaterialUsagesController;
+use App\Http\Controllers\Admin\ProjectBoqController;
 use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
@@ -93,6 +94,17 @@ Route::middleware('auth')->group(function () {
             Route::put('/update/{project}/files/{file}', [ProjectFilesController::class, 'update'])->middleware('permission:project-files.update')->name('update');
             Route::delete('/destroy/{project}/files/{file?}', [ProjectFilesController::class, 'destroy'])->middleware('permission:project-files.delete')->name('destroy');
             Route::get('/download/{project}/files/{file}', [ProjectFilesController::class, 'download'])->middleware('permission:project-files.download')->name('download');
+        });
+
+        // Project BOQ
+        Route::prefix('project-boq')->name('project-boq.')->group(function(){
+            Route::post('/store/{project}', [ProjectBoqController::class, 'storeBulk'])->middleware('permission:project-boq.create')->name('store');
+            Route::post('/sections/{project}', [ProjectBoqController::class, 'storeSection'])->middleware('permission:project-boq.create')->name('sections.store');
+            Route::put('/sections/{project}/section/{section}', [ProjectBoqController::class, 'updateSection'])->middleware('permission:project-boq.update')->name('sections.update');
+            Route::delete('/sections/{project}/section/{section}', [ProjectBoqController::class, 'destroySection'])->middleware('permission:project-boq.delete')->name('sections.destroy');
+            Route::post('/items/{project}/section/{section}', [ProjectBoqController::class, 'storeItem'])->middleware('permission:project-boq.create')->name('items.store');
+            Route::put('/items/{project}/item/{item}', [ProjectBoqController::class, 'updateItem'])->middleware('permission:project-boq.update')->name('items.update');
+            Route::delete('/items/{project}/item/{item}', [ProjectBoqController::class, 'destroyItem'])->middleware('permission:project-boq.delete')->name('items.destroy');
         });
 
         // Project Milestones

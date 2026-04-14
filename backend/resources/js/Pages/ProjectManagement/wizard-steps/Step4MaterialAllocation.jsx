@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { Input } from "@/Components/ui/input";
 import { Checkbox } from "@/Components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Search, Package, Truck } from "lucide-react";
 import InputError from "@/Components/InputError";
 import {
@@ -14,7 +15,14 @@ import {
 } from "@/Components/ui/table";
 
 export default function Step4MaterialAllocation({ inventoryItems, directSupplyItems = [] }) {
-  const { materialAllocations, addMaterialAllocation, removeMaterialAllocation } = useProjectWizard();
+  const { materialAllocations, addMaterialAllocation, removeMaterialAllocation, boqSections } = useProjectWizard();
+
+  const boqItemOptions = (boqSections || []).flatMap((section, sIdx) =>
+    (section.items || []).map((item, iIdx) => ({
+      value: `${sIdx}:${iIdx}`,
+      label: `${section.code || ''}${item.item_code ? `.${item.item_code}` : `.${iIdx + 1}`} — ${item.description || 'Untitled item'}`.trim(),
+    }))
+  );
   const [activeTab, setActiveTab] = useState("inventory");
   const [search, setSearch] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState([]);
@@ -118,6 +126,7 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
 
       const qty = parseFloat(draftFormData[key]?.quantity) || 0;
       const notes = draftFormData[key]?.notes || null;
+      const boqItemRef = draftFormData[key]?.boq_item_ref || null;
 
       if (isInv) {
         const existingIndex = materialAllocations.findIndex(a => a.inventory_item_id === id);
@@ -131,6 +140,7 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
             unit_of_measure: item.unit_of_measure,
             quantity_allocated: qty,
             notes: notes || existing.notes || null,
+            boq_item_ref: boqItemRef || existing.boq_item_ref || null,
           });
         } else {
           addMaterialAllocation({
@@ -140,6 +150,7 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
             unit_of_measure: item.unit_of_measure,
             quantity_allocated: qty,
             notes,
+            boq_item_ref: boqItemRef,
           });
         }
       } else {
@@ -155,6 +166,7 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
           unit_price: item.unit_price || null,
           quantity_allocated: qty,
           notes,
+          boq_item_ref: boqItemRef,
         });
       }
     });
@@ -301,6 +313,9 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
                 <TableHead className="font-bold text-xs text-gray-700 uppercase tracking-wider min-w-[130px]">
                   Quantity <span className="text-red-500">*</span>
                 </TableHead>
+                {boqItemOptions.length > 0 && (
+                  <TableHead className="font-bold text-xs text-gray-700 uppercase tracking-wider min-w-[200px]">BOQ Item</TableHead>
+                )}
                 <TableHead className="font-bold text-xs text-gray-700 uppercase tracking-wider min-w-[180px]">Notes</TableHead>
               </TableRow>
             </TableHeader>
@@ -382,6 +397,24 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
                       )}
                     </TableCell>
 
+                    {boqItemOptions.length > 0 && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={formData[key]?.boq_item_ref || ""}
+                          onValueChange={(value) => handleChange(key, "boq_item_ref", value === "__none__" ? "" : value)}
+                        >
+                          <SelectTrigger className="w-full text-sm">
+                            <SelectValue placeholder="Link to BOQ..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— Unlinked —</SelectItem>
+                            {boqItemOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Input
                         type="text"
@@ -398,7 +431,7 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
 
               {activeItems.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={activeTab === "inventory" ? 7 : 8} className="text-center py-12">
+                  <TableCell colSpan={(activeTab === "inventory" ? 7 : 8) + (boqItemOptions.length > 0 ? 1 : 0)} className="text-center py-12">
                     <div className="flex flex-col items-center justify-center">
                       <div className="bg-gray-100 rounded-full p-4 mb-3">
                         <Search className="h-8 w-8 text-gray-400" />

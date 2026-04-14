@@ -12,6 +12,7 @@ class ProgressUpdate extends Model
 
     protected $fillable = [
         'project_task_id',
+        'boq_item_id',
         'description',
         'file_path',
         'original_name',
@@ -28,5 +29,10 @@ class ProgressUpdate extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function boqItem()
+    {
+        return $this->belongsTo(ProjectBoqItem::class, 'boq_item_id');
     }
 }

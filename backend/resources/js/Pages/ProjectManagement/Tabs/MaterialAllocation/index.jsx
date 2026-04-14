@@ -349,7 +349,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                     </Select>
                   </div>
                   <div className="mb-4">
-                    <Label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-2">
+                    <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <Calendar className="h-3 w-3" /> Date Range
                     </Label>
                     <div className="space-y-2">
@@ -461,6 +461,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                 { label: 'Remaining', w: '9%' },
                 { label: 'Used',      w: '9%' },
                 { label: 'Available', w: '9%' },
+                { label: 'BOQ Link',  w: '14%' },
                 { label: 'Status',    w: '9%' },
                 { label: 'Progress',  w: '9%' },
                 { label: 'Actions',   w: '8%' },
@@ -482,6 +483,11 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                 const displayName = isDs ? (ds?.supply_name || 'Direct Supply') : (item.item_name || 'Unknown');
                 const displayCode = isDs ? (ds?.supply_code || '---') : (item.item_code || '---');
                 const displayUnit = isDs ? (ds?.unit_of_measure || 'units') : (item.unit_of_measure || 'units');
+                const boqItem = allocation.boq_item || allocation.boqItem || null;
+                const boqSection = boqItem?.section || null;
+                const boqCode = boqItem
+                  ? [boqSection?.code, boqItem?.item_code].filter(Boolean).join('.') || boqItem?.item_code || 'BOQ Item'
+                  : null;
                 const remaining = (allocation.quantity_allocated || 0) - (allocation.quantity_received || 0);
                 const progress  = calculateProgress(allocation);
                 const isSelected = selectedIds.includes(allocation.id);
@@ -555,6 +561,18 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                       })()}
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm">
+                      {boqItem ? (
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-semibold text-zinc-700">{boqCode}</div>
+                          <div className="text-xs text-zinc-500 truncate max-w-[220px]" title={boqItem.description || ''}>
+                            {boqItem.description || 'Linked BOQ item'}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-zinc-400">Unlinked</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-sm">
                       {getStatusBadge(allocation.status)}
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm">
@@ -607,7 +625,7 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-12">
+                <TableCell colSpan={12} className="text-center py-12">
                   <div className="flex flex-col items-center justify-center">
                     <div className="bg-gray-100 rounded-full p-4 mb-3">
                       <Search className="h-8 w-8 text-gray-400" />

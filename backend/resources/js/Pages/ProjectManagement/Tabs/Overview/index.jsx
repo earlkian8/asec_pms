@@ -16,7 +16,7 @@ const DOCUMENT_FIELDS = [
   { key: 'notice_to_proceed',        label: 'Notice to Proceed'        },
 ];
 
-export default function OverviewTab({ project, overviewData }) {
+export default function OverviewTab({ project, overviewData, boqData }) {
   const { has } = usePermission();
 
   if (!has('projects.view')) {
@@ -90,6 +90,10 @@ export default function OverviewTab({ project, overviewData }) {
   }
 
   const { budget, billing, team, milestones, tasks, timeline } = overviewData;
+  const boqPlannedTotal = boqData?.grand_total ?? 0;
+  const boqActualTotal = boqData?.actual_total ?? 0;
+  const boqContractVariance = boqData?.contract_variance ?? 0;
+  const boqIsOverContract = boqData?.is_over_contract ?? false;
 
   const uploadedDocCount = DOCUMENT_FIELDS.filter(({ key }) => project[key]).length;
 
@@ -230,6 +234,48 @@ export default function OverviewTab({ project, overviewData }) {
           </div>
           <p className="text-xl font-bold text-gray-900">{team.total_members}</p>
           <p className="text-xs text-gray-600 mt-1 font-medium">Team Members</p>
+        </div>
+      </div>
+
+      {/* BOQ System Impact */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl border border-cyan-200 p-4 shadow-sm hover:shadow-md transition-all group">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-cyan-500 rounded-lg group-hover:scale-110 transition-transform">
+              <Target className="text-white" size={18} />
+            </div>
+            <span className="text-xs font-semibold text-cyan-700 bg-cyan-200 px-2 py-0.5 rounded">BOQ Planned</span>
+          </div>
+          <p className="text-xl font-bold text-gray-900">{formatCurrency(boqPlannedTotal)}</p>
+          <p className="text-xs text-gray-600 mt-1 font-medium">Total scoped cost</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 p-4 shadow-sm hover:shadow-md transition-all group">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-indigo-500 rounded-lg group-hover:scale-110 transition-transform">
+              <Activity className="text-white" size={18} />
+            </div>
+            <span className="text-xs font-semibold text-indigo-700 bg-indigo-200 px-2 py-0.5 rounded">BOQ Actual</span>
+          </div>
+          <p className="text-xl font-bold text-gray-900">{formatCurrency(boqActualTotal)}</p>
+          <p className="text-xs text-gray-600 mt-1 font-medium">Linked material + labor actuals</p>
+        </div>
+
+        <div className={`rounded-xl border p-4 shadow-sm hover:shadow-md transition-all group ${boqIsOverContract ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' : 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className={`p-2 rounded-lg group-hover:scale-110 transition-transform ${boqIsOverContract ? 'bg-red-500' : 'bg-emerald-500'}`}>
+              {boqIsOverContract ? <TrendingUp className="text-white" size={18} /> : <TrendingDown className="text-white" size={18} />}
+            </div>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${boqIsOverContract ? 'text-red-700 bg-red-200' : 'text-emerald-700 bg-emerald-200'}`}>
+              {boqIsOverContract ? 'Over Contract' : 'Within Contract'}
+            </span>
+          </div>
+          <p className={`text-xl font-bold ${boqIsOverContract ? 'text-red-700' : 'text-emerald-700'}`}>
+            {formatCurrency(Math.abs(boqContractVariance))}
+          </p>
+          <p className="text-xs text-gray-600 mt-1 font-medium">
+            {boqIsOverContract ? 'Amount over contract' : 'Remaining contract room'}
+          </p>
         </div>
       </div>
 

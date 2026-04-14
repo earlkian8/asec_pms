@@ -13,6 +13,7 @@ class ProjectLaborCost extends Model
 
     protected $fillable = [
         'project_id',
+        'boq_item_id',
         'user_id',
         'employee_id',
         'assignable_type',
@@ -67,6 +68,11 @@ class ProjectLaborCost extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function boqItem()
+    {
+        return $this->belongsTo(ProjectBoqItem::class, 'boq_item_id');
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

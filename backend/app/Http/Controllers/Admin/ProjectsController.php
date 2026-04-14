@@ -13,6 +13,8 @@ use App\Models\ProjectTeam;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
+use App\Models\ProjectBoqSection;
+use App\Models\ProjectBoqItem;
 use App\Models\User;
 use App\Models\Employee;
 use App\Models\InventoryItem;
@@ -34,6 +36,7 @@ use App\Services\MiscellaneousExpenseService;
 use App\Services\ProjectOverviewService;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
+use Illuminate\Validation\ValidationException;
 
 class ProjectsController extends Controller
 {
@@ -353,6 +356,7 @@ class ProjectsController extends Controller
             'material_allocations.*.unit_price'        => ['nullable', 'numeric', 'min:0'],
             'material_allocations.*.quantity_allocated' => ['required', 'numeric', 'min:0.01'],
             'material_allocations.*.notes'             => ['nullable', 'string'],
+            'material_allocations.*.boq_item_ref'      => ['nullable', 'string'],
             'labor_costs'                              => ['nullable', 'array'],
             'labor_costs.*.assignable_id'              => ['required', 'integer'],
             'labor_costs.*.assignable_type'            => ['required', 'in:user,employee'],
@@ -363,6 +367,19 @@ class ProjectsController extends Controller
             'labor_costs.*.attendance.*' => ['required', 'in:P,A,HD'],
             'labor_costs.*.description'                => ['nullable', 'string', 'max:500'],
             'labor_costs.*.notes'                      => ['nullable', 'string'],
+            'boq_sections'                                   => ['nullable', 'array'],
+            'boq_sections.*.code'                            => ['nullable', 'string', 'max:50'],
+            'boq_sections.*.name'                            => ['required', 'string', 'max:255'],
+            'boq_sections.*.description'                     => ['nullable', 'string'],
+            'boq_sections.*.sort_order'                      => ['nullable', 'integer', 'min:0'],
+            'boq_sections.*.items'                           => ['nullable', 'array'],
+            'boq_sections.*.items.*.item_code'               => ['nullable', 'string', 'max:50'],
+            'boq_sections.*.items.*.description'             => ['required', 'string', 'max:500'],
+            'boq_sections.*.items.*.unit'                    => ['nullable', 'string', 'max:30'],
+            'boq_sections.*.items.*.quantity'                => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.unit_cost'               => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.remarks'                 => ['nullable', 'string'],
+            'boq_sections.*.items.*.sort_order'              => ['nullable', 'integer', 'min:0'],
         ]);
 
         DB::beginTransaction();
@@ -372,6 +389,21 @@ class ProjectsController extends Controller
             $canCreateMilestones = $user?->can('project-milestones.create') ?? false;
             $canCreateMaterialAllocations = $user?->can('material-allocations.create') ?? false;
             $canCreateLaborCosts = $user?->can('labor-costs.create') ?? false;
+            $canCreateBoq = $user?->can('project-boq.create') ?? false;
+            $boqSections = $canCreateBoq ? ($validated['boq_sections'] ?? []) : [];
+
+            if (!empty($boqSections)) {
+                $boqPlannedTotal = $this->calculateBoqTotalFromSections($boqSections);
+                $contractAmount = (float) ($validated['contract_amount'] ?? 0);
+
+                if ($contractAmount > 0 && $boqPlannedTotal > $contractAmount) {
+                    throw ValidationException::withMessages([
+                        'boq_sections' => [
+                            'BOQ total (' . number_format($boqPlannedTotal, 2) . ') exceeds contract amount (' . number_format($contractAmount, 2) . ').',
+                        ],
+                    ]);
+                }
+            }
 
             do {
                 $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
@@ -434,6 +466,39 @@ class ProjectsController extends Controller
                 }
             }
 
+            $boqItemRefMap = [];
+            if (!empty($boqSections)) {
+                foreach ($boqSections as $sectionIndex => $section) {
+                    $createdSection = ProjectBoqSection::create([
+                        'project_id'  => $project->id,
+                        'code'        => $section['code'] ?? null,
+                        'name'        => $section['name'],
+                        'description' => $section['description'] ?? null,
+                        'sort_order'  => $section['sort_order'] ?? $sectionIndex,
+                    ]);
+
+                    foreach (($section['items'] ?? []) as $itemIndex => $item) {
+                        $quantity = (float) ($item['quantity'] ?? 0);
+                        $unitCost = (float) ($item['unit_cost'] ?? 0);
+
+                        $createdItem = ProjectBoqItem::create([
+                            'project_id'             => $project->id,
+                            'project_boq_section_id' => $createdSection->id,
+                            'item_code'              => $item['item_code'] ?? null,
+                            'description'            => $item['description'],
+                            'unit'                   => $item['unit'] ?? null,
+                            'quantity'               => $quantity,
+                            'unit_cost'              => $unitCost,
+                            'total_cost'             => round($quantity * $unitCost, 2),
+                            'remarks'                => $item['remarks'] ?? null,
+                            'sort_order'             => $item['sort_order'] ?? $itemIndex,
+                        ]);
+
+                        $boqItemRefMap["{$sectionIndex}:{$itemIndex}"] = $createdItem->id;
+                    }
+                }
+            }
+
             if (!empty($milestones)) {
                 foreach ($milestones as $milestone) {
                     ProjectMilestone::create([
@@ -450,8 +515,14 @@ class ProjectsController extends Controller
 
             if (!empty($materialAllocations)) {
                 foreach ($materialAllocations as $allocation) {
+                    $boqItemId = null;
+                    if (!empty($allocation['boq_item_ref']) && isset($boqItemRefMap[$allocation['boq_item_ref']])) {
+                        $boqItemId = $boqItemRefMap[$allocation['boq_item_ref']];
+                    }
+
                     ProjectMaterialAllocation::create([
                         'project_id'         => $project->id,
+                        'boq_item_id'        => $boqItemId,
                         'inventory_item_id'  => $allocation['inventory_item_id'] ?? null,
                         'direct_supply_id'   => $allocation['direct_supply_id'] ?? null,
                         'unit_price'         => $allocation['unit_price'] ?? null,
@@ -497,6 +568,9 @@ class ProjectsController extends Controller
             $this->createSystemNotification('general', 'New Project Created', "A new project '{$project->project_name}' has been created.", $project, route('project-management.view', $project->id));
 
             return redirect()->back()->with('success', 'Project created successfully.');
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Failed to create project: ' . $e->getMessage());
@@ -558,7 +632,74 @@ class ProjectsController extends Controller
 
     public function show(Project $project, Request $request)
     {
-        $project->load(['client', 'projectType']);
+        $project->load(['client', 'projectType', 'boqSections.items']);
+
+        $materialActualByItem = ProjectMaterialAllocation::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('boq_item_id')
+            ->selectRaw('boq_item_id, SUM(COALESCE(unit_price, 0) * COALESCE(quantity_received, 0)) as total')
+            ->groupBy('boq_item_id')
+            ->pluck('total', 'boq_item_id');
+
+        $laborActualByItem = ProjectLaborCost::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('boq_item_id')
+            ->selectRaw('boq_item_id, SUM(COALESCE(gross_pay, 0)) as total')
+            ->groupBy('boq_item_id')
+            ->pluck('total', 'boq_item_id');
+
+        $boqPlannedTotal = (float) $project->boqItems()->sum('total_cost');
+        $boqActualMaterialTotal = (float) $materialActualByItem->sum();
+        $boqActualLaborTotal = (float) $laborActualByItem->sum();
+        $boqActualTotal = $boqActualMaterialTotal + $boqActualLaborTotal;
+        $contractAmount = (float) $project->contract_amount;
+
+        $boqData = [
+            'sections' => $project->boqSections->map(function ($section) use ($materialActualByItem, $laborActualByItem) {
+                $items = $section->items->map(function ($item) use ($materialActualByItem, $laborActualByItem) {
+                    $plannedCost = (float) $item->total_cost;
+                    $materialActual = (float) ($materialActualByItem[$item->id] ?? 0);
+                    $laborActual = (float) ($laborActualByItem[$item->id] ?? 0);
+                    $actualTotal = $materialActual + $laborActual;
+
+                    return [
+                        'id'          => $item->id,
+                        'item_code'   => $item->item_code,
+                        'description' => $item->description,
+                        'unit'        => $item->unit,
+                        'quantity'    => (float) $item->quantity,
+                        'unit_cost'   => (float) $item->unit_cost,
+                        'total_cost'  => $plannedCost,
+                        'remarks'     => $item->remarks,
+                        'sort_order'  => $item->sort_order,
+                        'planned_vs_actual' => [
+                            'planned_cost'    => $plannedCost,
+                            'material_actual' => $materialActual,
+                            'labor_actual'    => $laborActual,
+                            'total_actual'    => $actualTotal,
+                            'variance'        => $plannedCost - $actualTotal,
+                        ],
+                    ];
+                })->values();
+
+                return [
+                    'id'          => $section->id,
+                    'code'        => $section->code,
+                    'name'        => $section->name,
+                    'description' => $section->description,
+                    'sort_order'  => $section->sort_order,
+                    'items'       => $items,
+                ];
+            })->values(),
+            'grand_total'     => $boqPlannedTotal,
+            'contract_amount' => $contractAmount,
+            'actual_material_total' => $boqActualMaterialTotal,
+            'actual_labor_total'    => $boqActualLaborTotal,
+            'actual_total'          => $boqActualTotal,
+            'boq_variance'          => $boqPlannedTotal - $boqActualTotal,
+            'contract_variance'     => $contractAmount - $boqPlannedTotal,
+            'is_over_contract'      => $contractAmount > 0 ? $boqPlannedTotal > $contractAmount : false,
+        ];
 
         $teamData                 = $this->projectTeamService->getProjectTeamData($project);
         $fileData                 = $this->projectFilesService->getProjectFilesData($project);
@@ -579,7 +720,23 @@ class ProjectsController extends Controller
             'miscellaneousExpenseData' => $miscellaneousExpenseData,
             'overviewData'             => $overviewData,
             'requestUpdatesData'       => $requestUpdates,
+            'boqData'                  => $boqData,
         ]);
+    }
+
+    private function calculateBoqTotalFromSections(array $sections): float
+    {
+        $total = 0.0;
+
+        foreach ($sections as $section) {
+            foreach (($section['items'] ?? []) as $item) {
+                $quantity = (float) ($item['quantity'] ?? 0);
+                $unitCost = (float) ($item['unit_cost'] ?? 0);
+                $total += ($quantity * $unitCost);
+            }
+        }
+
+        return round($total, 2);
     }
 
     public function destroyRequestUpdate(Project $project, ClientUpdateRequest $clientUpdateRequest)

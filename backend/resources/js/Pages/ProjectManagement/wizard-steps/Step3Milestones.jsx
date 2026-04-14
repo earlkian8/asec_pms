@@ -4,7 +4,6 @@ import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
 import { Trash2, Plus, Info } from "lucide-react";
 import InputError from "@/Components/InputError";
@@ -240,24 +239,6 @@ export default function Step3Milestones() {
               <InputError message={errors.billing_percentage} />
             </div>
           )}
-
-          {/* Status */}
-          <div className={isMilestoneBilling ? '' : 'md:col-span-1'}>
-            <Label>Status</Label>
-            <Select
-              value={newMilestone.status}
-              onValueChange={(value) => handleChange('status', value)}
-            >
-              <SelectTrigger className={inputClass(false)}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {/* Add Button */}
           <div className="md:col-span-2">

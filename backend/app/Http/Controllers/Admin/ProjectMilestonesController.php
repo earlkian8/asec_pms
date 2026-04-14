@@ -27,8 +27,10 @@ class ProjectMilestonesController extends Controller
             'start_date'         => 'nullable|date',
             'due_date'           => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
-            'status'             => ['required', Rule::in(['pending','in_progress','completed'])],
+            'status'             => ['nullable', Rule::in(['pending','in_progress','completed'])],
         ]);
+
+        $data['status'] = $data['status'] ?? 'pending';
 
         // Guard: only enforce billing % cap for milestone billing type
         if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {

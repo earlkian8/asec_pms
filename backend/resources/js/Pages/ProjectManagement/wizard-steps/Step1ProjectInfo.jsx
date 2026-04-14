@@ -168,22 +168,6 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
               <InputError message={mergedErrors.project_type_id} />
             </div>
 
-            {/* Status */}
-            <div>
-              <Label className="text-zinc-800">Status</Label>
-              <Select value={projectData.status} onValueChange={(v) => updateProjectData({ status: v })}>
-                <SelectTrigger className={inputClass(false)}>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="on_hold">On Hold</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Priority */}
             <div>
               <Label className="text-zinc-800">Priority</Label>

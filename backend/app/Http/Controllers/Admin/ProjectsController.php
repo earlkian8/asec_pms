@@ -373,6 +373,7 @@ class ProjectsController extends Controller
             } while (Project::where('project_code', $projectCode)->exists());
 
             $validated['project_code'] = $projectCode;
+            $validated['status'] = $validated['status'] ?? 'active';
 
             foreach (self::DOCUMENT_FIELDS as $fieldName) {
                 if ($request->hasFile($fieldName)) {

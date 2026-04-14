@@ -10,9 +10,9 @@ export const useProjectWizard = () => {
   return context;
 };
 
-export const ProjectWizardProvider = ({ children }) => {
+export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4 }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = totalStepsProp;
 
   // Step 1: Project Basic Info
   const [projectData, setProjectData] = useState({

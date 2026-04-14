@@ -43,6 +43,15 @@ class ProjectBoqItem extends Model
         // Keep total_cost consistent with quantity * unit_cost so callers
         // don't have to remember to recompute when they edit one side.
         static::saving(function (self $item) {
+            if ($item->relationLoaded('resources') && $item->resources->count() > 0) {
+                $resourceTotal = (float) $item->resources->sum('total_cost');
+                $item->quantity = 1;
+                $item->unit = $item->unit ?: 'lot';
+                $item->unit_cost = round($resourceTotal, 2);
+                $item->total_cost = round($resourceTotal, 2);
+                return;
+            }
+
             if ($item->isDirty(['quantity', 'unit_cost']) || !$item->exists) {
                 $item->total_cost = round((float) $item->quantity * (float) $item->unit_cost, 2);
             }
@@ -57,6 +66,11 @@ class ProjectBoqItem extends Model
     public function section()
     {
         return $this->belongsTo(ProjectBoqSection::class, 'project_boq_section_id');
+    }
+
+    public function resources()
+    {
+        return $this->hasMany(ProjectBoqItemResource::class, 'project_boq_item_id')->orderBy('sort_order');
     }
 
     public function plannedInventoryItem()
@@ -106,18 +120,21 @@ class ProjectBoqItem extends Model
 
     /**
      * Roll up planned vs actual for the details page.
-     * Actual material = sum of received qty * unit price.
-     * Actual labor = sum of labor cost totals tagged to this BOQ item.
+     * Actual material = sum of quantity_used * unit_price across milestone usages.
+     * Actual labor = submitted payroll only.
      */
     public function plannedVsActual(): array
     {
         $planned = (float) $this->total_cost;
 
         $materialActual = (float) $this->materialAllocations()
+            ->with('milestoneUsages')
             ->get()
-            ->sum(fn ($a) => (float) ($a->unit_price ?? 0) * (float) ($a->quantity_received ?? 0));
+            ->sum(fn ($a) => $a->milestoneUsages->sum('quantity_used') * (float) ($a->unit_price ?? 0));
 
-        $laborActual = (float) $this->laborCosts()->sum('gross_pay');
+        $laborActual = (float) $this->laborCosts()
+            ->where('status', 'submitted')
+            ->sum('gross_pay');
 
         $totalActual = $materialActual + $laborActual;
 

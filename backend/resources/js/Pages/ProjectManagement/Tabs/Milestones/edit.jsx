@@ -1,6 +1,6 @@
 import { useForm } from "@inertiajs/react";
 import { toast } from "sonner";
-import { Loader2, Save, Info } from "lucide-react";
+import { Loader2, Save, Info, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -223,6 +223,20 @@ const EditMilestone = ({ setShowEditModal, milestone, project, allMilestones = [
               </p>
             )}
           </div>
+
+          {/* Soft-gate: warn if marking complete with no material usage recorded */}
+          {data.status === 'completed' && (milestone.materialUsages || []).length === 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+              <div>
+                <p className="font-semibold">No material usage recorded</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  If materials were consumed for this milestone, please record them first using the{' '}
+                  <strong>Material Usage</strong> button on the milestone card. You can still save without recording — this is a reminder only.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <DialogFooter className="flex justify-end gap-2 mt-4 border-t pt-4">

@@ -5,23 +5,16 @@ import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Textarea } from '@/Components/ui/textarea';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/Components/ui/table';
-import {
     Plus,
     Trash2,
-    Copy,
     Pencil,
     X,
     Save,
     ChevronDown,
     ChevronRight,
     Info,
+    Package,
+    Wrench,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 
@@ -41,6 +34,41 @@ const formatCurrency = (n) =>
         maximumFractionDigits: 2,
     });
 
+const toNumber = (value) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : 0;
+};
+
+const ReadOnlyInput = ({ value, className = '' }) => (
+    <input
+        readOnly
+        value={value ?? ''}
+        className={`w-full rounded border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-700 cursor-default focus:outline-none ${className}`}
+    />
+);
+
+const VarianceBadge = ({ planned, actual }) => {
+    const diff = Number(planned || 0) - Number(actual || 0);
+    if (Number(planned || 0) === 0 && Number(actual || 0) === 0) return null;
+    if (diff > 0)
+        return (
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                ₱{formatCurrency(diff)} under
+            </span>
+        );
+    if (diff < 0)
+        return (
+            <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                ₱{formatCurrency(Math.abs(diff))} over
+            </span>
+        );
+    return (
+        <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+            on budget
+        </span>
+    );
+};
+
 export default function BOQTab({ project, boqData }) {
     const { has } = usePermission();
     const canEdit = has('project-boq.update') || has('project-boq.create');
@@ -55,15 +83,7 @@ export default function BOQTab({ project, boqData }) {
                 items: (s.items || []).map((i) => ({
                     item_code: i.item_code || '',
                     description: i.description || '',
-                    unit: i.unit || '',
-                    quantity: i.quantity ?? 0,
-                    unit_cost: i.unit_cost ?? 0,
-                    resource_type: i.resource_type || '',
-                    planned_inventory_item_id: i.planned_inventory_item_id || '',
-                    planned_direct_supply_id: i.planned_direct_supply_id || '',
-                    planned_user_id: i.planned_user_id || '',
-                    planned_employee_id: i.planned_employee_id || '',
-                    resource_link: i.resource_link || null,
+                    resources: (i.resources || []).map((r) => ({ ...r })),
                     planned_vs_actual: i.planned_vs_actual || null,
                     remarks: i.remarks || '',
                     sort_order: i.sort_order ?? 0,
@@ -75,44 +95,64 @@ export default function BOQTab({ project, boqData }) {
     const resourceOptions = boqData?.resource_options || {};
     const inventoryItems = resourceOptions.inventory_items || [];
     const directSupplies = resourceOptions.direct_supplies || [];
-    const users = resourceOptions.users || [];
-    const employees = resourceOptions.employees || [];
+    const userOptions = resourceOptions.users || [];
+    const employeeOptions = resourceOptions.employees || [];
 
     const [editing, setEditing] = useState(false);
     const [sections, setSections] = useState(initialSections);
-    const [collapsed, setCollapsed] = useState({});
+    const [collapsedSections, setCollapsedSections] = useState({});
+    const [collapsedItems, setCollapsedItems] = useState({});
     const [saving, setSaving] = useState(false);
 
     const contractAmount = boqData?.contract_amount ?? project?.contract_amount ?? 0;
     const actualTotal = boqData?.actual_total ?? 0;
 
+    const projectDays = (() => {
+        const start = project?.start_date;
+        const end   = project?.planned_end_date;
+        if (!start || !end) return null;
+        return Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1;
+    })();
+
+    const getResourceTotal = (resource) =>
+        toNumber(resource?.quantity) * toNumber(resource?.unit_price);
+
+    const getItemTotal = (item) => {
+        if (Array.isArray(item?.resources) && item.resources.length > 0) {
+            return item.resources.reduce((sum, r) => sum + getResourceTotal(r), 0);
+        }
+        return 0;
+    };
+
     const grandTotal = useMemo(
         () =>
             sections.reduce(
                 (sum, s) =>
-                    sum +
-                    (s.items || []).reduce(
-                        (sub, i) =>
-                            sub +
-                            (parseFloat(i.quantity) || 0) *
-                                (parseFloat(i.unit_cost) || 0),
-                        0
-                    ),
+                    sum + (s.items || []).reduce((sub, i) => sub + getItemTotal(i), 0),
                 0
             ),
         [sections]
     );
 
-    const variance = Number(contractAmount) - grandTotal;
-    const plannedVsActualVariance = grandTotal - Number(actualTotal || 0);
-
     const sectionSubtotal = (section) =>
+        (section.items || []).reduce((sub, i) => sub + getItemTotal(i), 0);
+
+    const sectionActual = (section) =>
         (section.items || []).reduce(
-            (sub, i) =>
-                sub +
-                (parseFloat(i.quantity) || 0) * (parseFloat(i.unit_cost) || 0),
+            (sub, i) => sub + Number(i.planned_vs_actual?.total_actual || 0),
             0
         );
+
+    const contractVariance = Number(contractAmount) - grandTotal;
+    const plannedVsActualVariance = grandTotal - Number(actualTotal || 0);
+
+    const toggleSection = (sIndex) =>
+        setCollapsedSections((prev) => ({ ...prev, [sIndex]: !prev[sIndex] }));
+
+    const toggleItem = (sIndex, iIndex) => {
+        const key = `${sIndex}-${iIndex}`;
+        setCollapsedItems((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const startEdit = () => {
         setSections(initialSections);
@@ -145,10 +185,8 @@ export default function BOQTab({ project, boqData }) {
         );
     };
 
-    const toggleCollapse = (index) =>
-        setCollapsed((prev) => ({ ...prev, [index]: !prev[index] }));
-
-    const addSection = () => {
+    // ── Section CRUD ─────────────────────────────────────────────────────────
+    const addSection = () =>
         setSections((prev) => [
             ...prev,
             {
@@ -156,85 +194,407 @@ export default function BOQTab({ project, boqData }) {
                 name: '',
                 description: '',
                 sort_order: prev.length,
+                create_milestone: true,
                 items: [],
             },
         ]);
-    };
 
-    const removeSection = (index) =>
-        setSections((prev) => prev.filter((_, i) => i !== index));
+    const removeSection = (sIndex) =>
+        setSections((prev) => prev.filter((_, i) => i !== sIndex));
 
-    const updateSection = (index, data) =>
+    const updateSection = (sIndex, data) =>
         setSections((prev) =>
-            prev.map((s, i) => (i === index ? { ...s, ...data } : s))
+            prev.map((s, i) => (i === sIndex ? { ...s, ...data } : s))
         );
 
-    const addItem = (sectionIndex, item = {}) => {
+    // ── Item CRUD ─────────────────────────────────────────────────────────────
+    const addItem = (sIndex) =>
         setSections((prev) =>
             prev.map((s, i) => {
-                if (i !== sectionIndex) return s;
-                const nextItems = [
-                    ...(s.items || []),
-                    {
-                        item_code: '',
-                        description: '',
-                        unit: '',
-                        quantity: 0,
-                        unit_cost: 0,
-                        resource_type: '',
-                        planned_inventory_item_id: '',
-                        planned_direct_supply_id: '',
-                        planned_user_id: '',
-                        planned_employee_id: '',
-                        remarks: '',
-                        sort_order: (s.items || []).length,
-                        ...item,
-                    },
-                ];
-                return { ...s, items: nextItems };
+                if (i !== sIndex) return s;
+                return {
+                    ...s,
+                    items: [
+                        ...(s.items || []),
+                        {
+                            item_code: '',
+                            description: '',
+                            resources: [],
+                            remarks: '',
+                            sort_order: (s.items || []).length,
+                        },
+                    ],
+                };
             })
         );
-    };
 
-    const removeItem = (sectionIndex, itemIndex) =>
+    const removeItem = (sIndex, iIndex) =>
         setSections((prev) =>
             prev.map((s, i) =>
-                i === sectionIndex
-                    ? {
-                          ...s,
-                          items: (s.items || []).filter(
-                              (_, j) => j !== itemIndex
-                          ),
-                      }
+                i === sIndex
+                    ? { ...s, items: (s.items || []).filter((_, j) => j !== iIndex) }
                     : s
             )
         );
 
-    const updateItem = (sectionIndex, itemIndex, data) => {
+    const updateItem = (sIndex, iIndex, data) =>
         setSections((prev) =>
             prev.map((s, i) => {
-                if (i !== sectionIndex) return s;
-                const nextItems = (s.items || []).map((item, j) =>
-                    j === itemIndex ? { ...item, ...data } : item
-                );
-                return { ...s, items: nextItems };
+                if (i !== sIndex) return s;
+                return {
+                    ...s,
+                    items: (s.items || []).map((item, j) =>
+                        j === iIndex ? { ...item, ...data } : item
+                    ),
+                };
             })
         );
+
+    // ── Resource CRUD ─────────────────────────────────────────────────────────
+    const applyResourceRollup = (sIndex, iIndex, resources) =>
+        updateItem(sIndex, iIndex, { resources });
+
+    const addResource = (sIndex, iIndex, resourceCategory) => {
+        const item = sections?.[sIndex]?.items?.[iIndex] || {};
+        const current = Array.isArray(item.resources) ? item.resources : [];
+        applyResourceRollup(sIndex, iIndex, [
+            ...current,
+            {
+                resource_category: resourceCategory,
+                source_type: resourceCategory === 'material' ? 'inventory' : 'employee',
+                inventory_item_id: '',
+                direct_supply_id: '',
+                user_id: '',
+                employee_id: '',
+                resource_name: '',
+                unit: '',
+                quantity: 1,
+                unit_price: 0,
+                remarks: '',
+                sort_order: current.length,
+            },
+        ]);
+    };
+
+    const removeResource = (sIndex, iIndex, rIndex) => {
+        const item = sections?.[sIndex]?.items?.[iIndex] || {};
+        const current = Array.isArray(item.resources) ? item.resources : [];
+        applyResourceRollup(
+            sIndex,
+            iIndex,
+            current.filter((_, idx) => idx !== rIndex).map((r, idx) => ({ ...r, sort_order: idx }))
+        );
+    };
+
+    const updateResource = (sIndex, iIndex, rIndex, patch) => {
+        const item = sections?.[sIndex]?.items?.[iIndex] || {};
+        const current = Array.isArray(item.resources) ? item.resources : [];
+
+        const next = current.map((resource, idx) => {
+            if (idx !== rIndex) return resource;
+            const updated = { ...resource, ...patch };
+
+            if (patch.source_type) {
+                updated.inventory_item_id = '';
+                updated.direct_supply_id = '';
+                updated.user_id = '';
+                updated.employee_id = '';
+                updated.resource_name = '';
+                updated.unit = '';
+                updated.unit_price = 0;
+            }
+
+            if (patch.inventory_item_id) {
+                const sel = inventoryItems.find((x) => String(x.id) === String(patch.inventory_item_id));
+                if (sel) {
+                    updated.resource_name = sel.name;
+                    updated.unit = sel.unit || '';
+                    updated.unit_price = toNumber(sel.unit_price);
+                    updated.source_type = 'inventory';
+                    updated.direct_supply_id = '';
+                }
+            }
+
+            if (patch.direct_supply_id) {
+                const sel = directSupplies.find((x) => String(x.id) === String(patch.direct_supply_id));
+                if (sel) {
+                    updated.resource_name = sel.name;
+                    updated.unit = sel.unit || '';
+                    updated.unit_price = toNumber(sel.unit_price);
+                    updated.source_type = 'direct_supply';
+                    updated.inventory_item_id = '';
+                }
+            }
+
+            if (patch.user_id) {
+                const sel = userOptions.find((x) => String(x.id) === String(patch.user_id));
+                if (sel) {
+                    const hr = toNumber(sel?.compensation?.hourly_rate);
+                    const ms = toNumber(sel?.compensation?.monthly_salary);
+                    const raw = hr > 0 ? hr * 8 : ms > 0 ? ms / 26 : 0;
+                    updated.resource_name = sel.name;
+                    updated.unit = 'day';
+                    updated.unit_price = Math.round(raw * 100) / 100;
+                    updated.source_type = 'user';
+                    updated.employee_id = '';
+                }
+            }
+
+            if (patch.employee_id) {
+                const sel = employeeOptions.find((x) => String(x.id) === String(patch.employee_id));
+                if (sel) {
+                    const hr = toNumber(sel?.compensation?.hourly_rate);
+                    const ms = toNumber(sel?.compensation?.monthly_salary);
+                    const raw = hr > 0 ? hr * 8 : ms > 0 ? ms / 26 : 0;
+                    updated.resource_name = sel.name;
+                    updated.unit = 'day';
+                    updated.unit_price = Math.round(raw * 100) / 100;
+                    updated.source_type = 'employee';
+                    updated.user_id = '';
+                }
+            }
+
+            return updated;
+        });
+
+        applyResourceRollup(sIndex, iIndex, next);
+    };
+
+    // ── Resource table (view mode) ────────────────────────────────────────────
+    const renderResourceTable = (resources, category, icon) => {
+        const filtered = (resources || []).filter((r) => r.resource_category === category);
+        if (filtered.length === 0) return null;
+        const subtotal = filtered.reduce((s, r) => s + getResourceTotal(r), 0);
+
+        return (
+            <div className="mt-3">
+                <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    {icon}
+                    {category === 'material' ? 'Materials & Equipment' : 'Labor'}
+                </div>
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b border-gray-200 text-xs text-gray-500">
+                            <th className="pb-1 text-left font-medium">Resource</th>
+                            <th className="pb-1 text-right font-medium w-16">Unit</th>
+                            <th className="pb-1 text-right font-medium w-20">Qty</th>
+                            <th className="pb-1 text-right font-medium w-28">Unit Price</th>
+                            <th className="pb-1 text-right font-medium w-28">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filtered.map((r, idx) => (
+                            <tr key={idx} className="border-b border-gray-100 last:border-0">
+                                <td className="py-1 pr-2">
+                                    <ReadOnlyInput value={r.resource_name || '—'} />
+                                </td>
+                                <td className="py-1 px-1">
+                                    <ReadOnlyInput value={r.unit || '—'} className="text-right" />
+                                </td>
+                                <td className="py-1 px-1">
+                                    <ReadOnlyInput
+                                        value={Number(r.quantity || 0).toLocaleString()}
+                                        className="text-right"
+                                    />
+                                </td>
+                                <td className="py-1 px-1">
+                                    <ReadOnlyInput
+                                        value={`₱${formatCurrency(r.unit_price || 0)}`}
+                                        className="text-right"
+                                    />
+                                </td>
+                                <td className="py-1 pl-1">
+                                    <ReadOnlyInput
+                                        value={`₱${formatCurrency(getResourceTotal(r))}`}
+                                        className="text-right font-medium"
+                                    />
+                                </td>
+                            </tr>
+                        ))}
+                        <tr className="border-t border-gray-300">
+                            <td colSpan={4} className="pt-1 text-right text-xs font-semibold text-gray-600 pr-2">
+                                Subtotal
+                            </td>
+                            <td className="pt-1 pl-1 text-right text-xs font-semibold text-gray-800">
+                                ₱{formatCurrency(subtotal)}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+    // ── Resource rows (edit mode) ─────────────────────────────────────────────
+    const renderEditResourceRows = (resources, category, sIndex, iIndex) => {
+        const filtered = (resources || [])
+            .map((r, origIdx) => ({ ...r, _origIdx: origIdx }))
+            .filter((r) => r.resource_category === category);
+
+        return filtered.map((resource) => {
+            const rIndex = resource._origIdx;
+            return (
+                <div
+                    key={rIndex}
+                    className="grid grid-cols-1 gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-6"
+                >
+                    <select
+                        value={resource.source_type || ''}
+                        onChange={(e) =>
+                            updateResource(sIndex, iIndex, rIndex, { source_type: e.target.value })
+                        }
+                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                    >
+                        {category === 'material' ? (
+                            <>
+                                <option value="inventory">Inventory</option>
+                                <option value="direct_supply">Direct Supply</option>
+                            </>
+                        ) : (
+                            <>
+                                <option value="employee">Employee</option>
+                                <option value="user">User</option>
+                            </>
+                        )}
+                    </select>
+
+                    {category === 'material' && resource.source_type === 'inventory' && (
+                        <select
+                            value={resource.inventory_item_id || ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { inventory_item_id: e.target.value })
+                            }
+                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                        >
+                            <option value="">Select inventory item</option>
+                            {inventoryItems.map((inv) => (
+                                <option key={inv.id} value={inv.id}>
+                                    {inv.code ? `${inv.code} - ` : ''}{inv.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {category === 'material' && resource.source_type === 'direct_supply' && (
+                        <select
+                            value={resource.direct_supply_id || ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { direct_supply_id: e.target.value })
+                            }
+                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                        >
+                            <option value="">Select direct supply</option>
+                            {directSupplies.map((supply) => (
+                                <option key={supply.id} value={supply.id}>
+                                    {supply.code ? `${supply.code} - ` : ''}{supply.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {category === 'labor' && resource.source_type === 'employee' && (
+                        <select
+                            value={resource.employee_id || ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { employee_id: e.target.value })
+                            }
+                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                        >
+                            <option value="">Select employee</option>
+                            {employeeOptions.map((person) => (
+                                <option key={person.id} value={person.id}>
+                                    {person.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {category === 'labor' && resource.source_type === 'user' && (
+                        <select
+                            value={resource.user_id || ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { user_id: e.target.value })
+                            }
+                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                        >
+                            <option value="">Select user</option>
+                            {userOptions.map((person) => (
+                                <option key={person.id} value={person.id}>
+                                    {person.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    <div className={category === 'labor' ? 'sm:col-span-1' : ''}>
+                        <Input
+                            type="number"
+                            min="0"
+                            step="0.0001"
+                            value={resource.quantity ?? ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { quantity: e.target.value })
+                            }
+                            placeholder={category === 'labor' ? 'Days' : 'Qty'}
+                            className="text-right w-full"
+                        />
+                        {category === 'labor' && projectDays !== null && (
+                            <p className={`mt-0.5 text-xs ${parseFloat(resource.quantity || 0) > projectDays ? 'text-amber-600 font-medium' : 'text-zinc-400'}`}>
+                                {parseFloat(resource.quantity || 0) > projectDays
+                                    ? `Exceeds project duration (${projectDays} days)`
+                                    : `Max: ${projectDays} days`}
+                            </p>
+                        )}
+                    </div>
+
+                    <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={resource.unit_price ?? ''}
+                        onChange={(e) =>
+                            updateResource(sIndex, iIndex, rIndex, { unit_price: e.target.value })
+                        }
+                        placeholder="Daily Rate"
+                        className="text-right"
+                    />
+
+                    <div className="flex items-center justify-between rounded-md bg-zinc-50 px-2 text-xs sm:col-span-6">
+                        <span className="text-zinc-600">
+                            {resource.resource_name || 'Select resource'}{' '}
+                            {resource.unit ? `(${resource.unit})` : ''}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="font-semibold text-zinc-800">
+                                ₱{formatCurrency(getResourceTotal(resource))}
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-red-500"
+                                onClick={() => removeResource(sIndex, iIndex, rIndex)}
+                            >
+                                <Trash2 size={12} />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        });
     };
 
     // ── View mode ────────────────────────────────────────────────────────────
     const renderViewMode = () => (
-        <div className="space-y-4">
+        <div className="space-y-3">
             {sections.length === 0 ? (
                 <div className="rounded-md border border-dashed border-zinc-300 p-10 text-center">
-                    <p className="text-sm text-zinc-500">
-                        No BOQ defined for this project yet.
-                    </p>
+                    <p className="text-sm text-zinc-500">No BOQ defined for this project yet.</p>
                     {canEdit && (
                         <Button
                             type="button"
                             onClick={startEdit}
-                            className="mt-4 flex items-center gap-2 bg-zinc-800 text-white hover:bg-zinc-900 mx-auto"
+                            className="mt-4 mx-auto flex items-center gap-2 bg-zinc-800 text-white hover:bg-zinc-900"
                         >
                             <Plus size={16} /> Create BOQ
                         </Button>
@@ -242,144 +602,132 @@ export default function BOQTab({ project, boqData }) {
                 </div>
             ) : (
                 sections.map((section, sIndex) => {
-                    const isCollapsed = collapsed[sIndex];
+                    const sectionOpen = !collapsedSections[sIndex];
                     const subtotal = sectionSubtotal(section);
+                    const actTotal = sectionActual(section);
+
                     return (
-                        <div
-                            key={sIndex}
-                            className="rounded-md border border-zinc-200 bg-white"
-                        >
-                            <div className="flex items-center justify-between border-b bg-zinc-50 px-4 py-2">
-                                <button
-                                    type="button"
-                                    onClick={() => toggleCollapse(sIndex)}
-                                    className="flex items-center gap-2 text-left"
-                                >
-                                    {isCollapsed ? (
-                                        <ChevronRight size={16} />
-                                    ) : (
-                                        <ChevronDown size={16} />
-                                    )}
-                                    <span className="font-semibold text-zinc-800">
-                                        {section.code
-                                            ? `${section.code} — `
-                                            : ''}
-                                        {section.name}
+                        <div key={sIndex} className="overflow-hidden rounded-lg border border-zinc-200 shadow-sm">
+                            {/* Section header */}
+                            <button
+                                type="button"
+                                onClick={() => toggleSection(sIndex)}
+                                className="flex w-full items-center justify-between bg-gradient-to-r from-zinc-700 to-zinc-800 px-4 py-3 text-left text-white"
+                            >
+                                <div className="flex items-center gap-2">
+                                    {sectionOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                    <span className="font-semibold">
+                                        {section.code ? `${section.code} — ` : ''}
+                                        {section.name || 'Unnamed Section'}
                                     </span>
-                                </button>
-                                <span className="text-sm text-zinc-700">
-                                    ₱{formatCurrency(subtotal)}
-                                </span>
-                            </div>
-                            {!isCollapsed && (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-24">
-                                                Code
-                                            </TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead className="w-20">
-                                                Unit
-                                            </TableHead>
-                                            <TableHead className="w-24 text-right">
-                                                Qty
-                                            </TableHead>
-                                            <TableHead className="w-32 text-right">
-                                                Unit Cost
-                                            </TableHead>
-                                            <TableHead className="w-32 text-right">
-                                                Amount
-                                            </TableHead>
-                                            <TableHead className="w-32 text-right">
-                                                Actual
-                                            </TableHead>
-                                            <TableHead className="w-32 text-right">
-                                                Item Variance
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {(section.items || []).length === 0 ? (
-                                            <TableRow>
-                                                <TableCell
-                                                    colSpan={8}
-                                                    className="py-4 text-center text-sm text-zinc-400"
-                                                >
-                                                    No items in this section.
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            section.items.map((item, iIndex) => {
-                                                const amount =
-                                                    (parseFloat(item.quantity) ||
-                                                        0) *
-                                                    (parseFloat(item.unit_cost) ||
-                                                        0);
-                                                return (
-                                                    <TableRow key={iIndex}>
-                                                        {(() => {
-                                                            const plannedVsActual = item.planned_vs_actual || {};
-                                                            const itemActual = Number(plannedVsActual.total_actual || 0);
-                                                            const itemVariance = Number(plannedVsActual.variance ?? amount - itemActual);
-                                                            return (
-                                                                <>
-                                                        <TableCell>
-                                                            {item.item_code || '—'}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div>
-                                                                {item.description}
-                                                            </div>
-                                                            {item.resource_type === 'material' && item.resource_link && (
-                                                                <div className="mt-1 text-xs text-blue-600">
-                                                                    Material link: {item.resource_link.inventory_item?.name || item.resource_link.direct_supply?.name || 'Not selected'}
-                                                                </div>
+                                    {section.description && (
+                                        <span className="hidden text-xs text-zinc-300 sm:inline">
+                                            — {section.description}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 text-sm">
+                                    {(section.create_milestone ?? true) && (
+                                        <span className="rounded-full bg-zinc-600/60 px-2 py-0.5 text-xs text-zinc-200">
+                                            Milestone
+                                        </span>
+                                    )}
+                                    <span>₱{formatCurrency(subtotal)}</span>
+                                    <VarianceBadge planned={subtotal} actual={actTotal} />
+                                </div>
+                            </button>
+
+                            {/* Items */}
+                            {sectionOpen && (
+                                <div className="divide-y divide-gray-100 bg-white">
+                                    {(section.items || []).length === 0 ? (
+                                        <p className="px-6 py-4 text-sm text-zinc-400">No items in this section.</p>
+                                    ) : (
+                                        section.items.map((item, iIndex) => {
+                                            const itemKey = `${sIndex}-${iIndex}`;
+                                            const itemOpen = !collapsedItems[itemKey];
+                                            const itemTotal = getItemTotal(item);
+                                            const pva = item.planned_vs_actual || {};
+                                            const itemActual = Number(pva.total_actual || 0);
+
+                                            return (
+                                                <div key={iIndex}>
+                                                    {/* Item header */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleItem(sIndex, iIndex)}
+                                                        className="flex w-full items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 px-5 py-2.5 text-left hover:from-gray-100 hover:to-gray-200"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            {itemOpen ? (
+                                                                <ChevronDown size={14} className="text-zinc-400" />
+                                                            ) : (
+                                                                <ChevronRight size={14} className="text-zinc-400" />
                                                             )}
-                                                            {item.resource_type === 'labor' && item.resource_link && (
-                                                                <div className="mt-1 text-xs text-emerald-600">
-                                                                    Labor link: {item.resource_link.user?.name || item.resource_link.employee?.name || 'Not selected'}
-                                                                </div>
+                                                            {item.item_code && (
+                                                                <span className="text-xs font-mono text-zinc-500">
+                                                                    {item.item_code}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-sm font-medium text-zinc-800">
+                                                                {item.description || 'Unnamed Item'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-sm">
+                                                            <span className="text-zinc-500 text-xs">
+                                                                Planned:{' '}
+                                                                <span className="font-medium text-zinc-800">
+                                                                    ₱{formatCurrency(itemTotal)}
+                                                                </span>
+                                                            </span>
+                                                            {itemActual > 0 && (
+                                                                <span className="text-zinc-500 text-xs">
+                                                                    Actual:{' '}
+                                                                    <span className="font-medium text-zinc-800">
+                                                                        ₱{formatCurrency(itemActual)}
+                                                                    </span>
+                                                                </span>
+                                                            )}
+                                                            <VarianceBadge planned={itemTotal} actual={itemActual} />
+                                                        </div>
+                                                    </button>
+
+                                                    {/* Item resources */}
+                                                    {itemOpen && (
+                                                        <div className="px-6 py-3 bg-white">
+                                                            {(item.resources || []).length === 0 ? (
+                                                                <p className="text-sm text-zinc-400 italic">No resources defined.</p>
+                                                            ) : (
+                                                                <>
+                                                                    {renderResourceTable(
+                                                                        item.resources,
+                                                                        'material',
+                                                                        <Package size={12} />
+                                                                    )}
+                                                                    {renderResourceTable(
+                                                                        item.resources,
+                                                                        'labor',
+                                                                        <Wrench size={12} />
+                                                                    )}
+                                                                    <div className="mt-3 flex justify-end border-t border-gray-200 pt-2">
+                                                                        <span className="text-sm font-semibold text-zinc-800">
+                                                                            Item Total: ₱{formatCurrency(itemTotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                </>
                                                             )}
                                                             {item.remarks && (
-                                                                <div className="mt-1 text-xs text-zinc-500">
+                                                                <p className="mt-2 text-xs text-zinc-400 italic">
                                                                     {item.remarks}
-                                                                </div>
+                                                                </p>
                                                             )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {item.unit || '—'}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            {Number(
-                                                                item.quantity || 0
-                                                            ).toLocaleString()}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            ₱
-                                                            {formatCurrency(
-                                                                item.unit_cost
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-medium">
-                                                            ₱{formatCurrency(amount)}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            ₱{formatCurrency(itemActual)}
-                                                        </TableCell>
-                                                        <TableCell className={`text-right font-medium ${itemVariance < 0 ? 'text-red-600' : itemVariance > 0 ? 'text-emerald-600' : 'text-zinc-800'}`}>
-                                                            ₱{formatCurrency(Math.abs(itemVariance))}
-                                                            {itemVariance < 0 ? ' over' : itemVariance > 0 ? ' under' : ''}
-                                                        </TableCell>
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </TableRow>
-                                                );
-                                            })
-                                        )}
-                                    </TableBody>
-                                </Table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
                             )}
                         </div>
                     );
@@ -390,339 +738,228 @@ export default function BOQTab({ project, boqData }) {
 
     // ── Edit mode ────────────────────────────────────────────────────────────
     const renderEditMode = () => (
-        <div className="space-y-4">
+        <div className="space-y-3">
             <div className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
                 <Info size={16} className="mt-0.5 flex-shrink-0" />
                 <div>
-                    Editing replaces the entire BOQ for this project on save.
-                    Linked allocations/milestones keep working — their{' '}
-                    <code className="rounded bg-white px-1">boq_item_id</code>{' '}
-                    is cleared only if the referenced item is removed.
+                    Editing replaces the entire BOQ for this project on save. Linked allocations and
+                    milestones are preserved.
                 </div>
             </div>
 
             {sections.map((section, sIndex) => {
-                const isCollapsed = collapsed[sIndex];
+                const sectionOpen = !collapsedSections[sIndex];
                 const subtotal = sectionSubtotal(section);
+
                 return (
-                    <div
-                        key={sIndex}
-                        className="rounded-md border border-zinc-200 bg-white shadow-sm"
-                    >
-                        <div className="flex items-center gap-2 border-b bg-zinc-50 px-3 py-2">
+                    <div key={sIndex} className="overflow-hidden rounded-lg border border-zinc-200 shadow-sm">
+                        {/* Section header (edit) */}
+                        <div className="flex items-center gap-2 bg-gradient-to-r from-zinc-700 to-zinc-800 px-3 py-2">
                             <button
                                 type="button"
-                                onClick={() => toggleCollapse(sIndex)}
-                                className="text-zinc-500 hover:text-zinc-800"
+                                onClick={() => toggleSection(sIndex)}
+                                className="text-zinc-300 hover:text-white"
                             >
-                                {isCollapsed ? (
-                                    <ChevronRight size={18} />
-                                ) : (
-                                    <ChevronDown size={18} />
-                                )}
+                                {sectionOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                             </button>
                             <Input
                                 value={section.code || ''}
-                                onChange={(e) =>
-                                    updateSection(sIndex, {
-                                        code: e.target.value,
-                                    })
-                                }
+                                onChange={(e) => updateSection(sIndex, { code: e.target.value })}
                                 placeholder="Code"
-                                className="w-20"
+                                className="w-20 bg-zinc-600 border-zinc-500 text-white placeholder-zinc-400"
                             />
                             <Input
                                 value={section.name || ''}
-                                onChange={(e) =>
-                                    updateSection(sIndex, {
-                                        name: e.target.value,
-                                    })
-                                }
+                                onChange={(e) => updateSection(sIndex, { name: e.target.value })}
                                 placeholder="Section name"
-                                className="flex-1 font-medium"
+                                className="flex-1 bg-zinc-600 border-zinc-500 text-white placeholder-zinc-400 font-medium"
                             />
-                            <div className="text-sm text-zinc-600 whitespace-nowrap">
+                            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-300 whitespace-nowrap select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={section.create_milestone ?? true}
+                                    onChange={(e) => updateSection(sIndex, { create_milestone: e.target.checked })}
+                                    className="rounded"
+                                />
+                                Milestone
+                            </label>
+                            <span className="text-sm text-zinc-300 whitespace-nowrap">
                                 ₱{formatCurrency(subtotal)}
-                            </div>
+                            </span>
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => removeSection(sIndex)}
-                                className="text-red-500 hover:bg-red-50"
+                                className="text-red-400 hover:bg-red-900/30 hover:text-red-300"
                             >
                                 <Trash2 size={16} />
                             </Button>
                         </div>
 
-                        {!isCollapsed && (
-                            <>
-                                <div className="px-3 pt-2">
+                        {sectionOpen && (
+                            <div className="bg-white">
+                                {/* Section description */}
+                                <div className="px-4 pt-3">
                                     <Textarea
                                         value={section.description || ''}
                                         onChange={(e) =>
-                                            updateSection(sIndex, {
-                                                description: e.target.value,
-                                            })
+                                            updateSection(sIndex, { description: e.target.value })
                                         }
                                         placeholder="Section notes (optional)"
                                         rows={2}
                                         className="text-sm"
                                     />
                                 </div>
-                                <div className="p-3">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-24">
-                                                    Code
-                                                </TableHead>
-                                                <TableHead>Description</TableHead>
-                                                <TableHead className="w-20">
-                                                    Unit
-                                                </TableHead>
-                                                <TableHead className="w-24 text-right">
-                                                    Qty
-                                                </TableHead>
-                                                <TableHead className="w-32 text-right">
-                                                    Unit Cost
-                                                </TableHead>
-                                                <TableHead className="w-32 text-right">
-                                                    Amount
-                                                </TableHead>
-                                                <TableHead className="w-20"></TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {(section.items || []).map(
-                                                (item, iIndex) => {
-                                                    const qty =
-                                                        parseFloat(
-                                                            item.quantity
-                                                        ) || 0;
-                                                    const rate =
-                                                        parseFloat(
-                                                            item.unit_cost
-                                                        ) || 0;
-                                                    return (
-                                                        <Fragment key={iIndex}>
-                                                            <TableRow key={`${iIndex}-main`}>
-                                                                <TableCell>
-                                                                    <Input
-                                                                        value={item.item_code || ''}
-                                                                        onChange={(e) =>
-                                                                            updateItem(sIndex, iIndex, {
-                                                                                item_code: e.target.value,
-                                                                            })
-                                                                        }
-                                                                        placeholder={`${section.code || ''}.${iIndex + 1}`}
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Input
-                                                                        value={item.description || ''}
-                                                                        onChange={(e) =>
-                                                                            updateItem(sIndex, iIndex, {
-                                                                                description: e.target.value,
-                                                                            })
-                                                                        }
-                                                                        placeholder="Describe the scope item"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Input
-                                                                        value={item.unit || ''}
-                                                                        onChange={(e) =>
-                                                                            updateItem(sIndex, iIndex, {
-                                                                                unit: e.target.value,
-                                                                            })
-                                                                        }
-                                                                        placeholder="m³"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="0.0001"
-                                                                        value={item.quantity ?? ''}
-                                                                        onChange={(e) =>
-                                                                            updateItem(sIndex, iIndex, {
-                                                                                quantity: e.target.value,
-                                                                            })
-                                                                        }
-                                                                        className="text-right"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        step="0.01"
-                                                                        value={item.unit_cost ?? ''}
-                                                                        onChange={(e) =>
-                                                                            updateItem(sIndex, iIndex, {
-                                                                                unit_cost: e.target.value,
-                                                                            })
-                                                                        }
-                                                                        className="text-right"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell className="text-right font-medium">
-                                                                    ₱{formatCurrency(qty * rate)}
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex justify-end gap-1">
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            onClick={() => addItem(sIndex, { ...item })}
-                                                                            title="Duplicate row"
-                                                                        >
-                                                                            <Copy size={14} />
-                                                                        </Button>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            onClick={() => removeItem(sIndex, iIndex)}
-                                                                            className="text-red-500 hover:bg-red-50"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </Button>
-                                                                    </div>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                            <TableRow key={`${iIndex}-resource`}>
-                                                                <TableCell colSpan={7} className="bg-zinc-50/60 py-2">
-                                                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                                                        <select
-                                                                            value={item.resource_type || ''}
-                                                                            onChange={(e) =>
-                                                                                updateItem(sIndex, iIndex, {
-                                                                                    resource_type: e.target.value,
-                                                                                    planned_inventory_item_id: '',
-                                                                                    planned_direct_supply_id: '',
-                                                                                    planned_user_id: '',
-                                                                                    planned_employee_id: '',
-                                                                                })
-                                                                            }
-                                                                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                                                        >
-                                                                            <option value="">No resource link</option>
-                                                                            <option value="material">Material</option>
-                                                                            <option value="labor">Labor</option>
-                                                                        </select>
 
-                                                                        {item.resource_type === 'material' && (
-                                                                            <>
-                                                                                <select
-                                                                                    value={item.planned_inventory_item_id || ''}
-                                                                                    onChange={(e) =>
-                                                                                        updateItem(sIndex, iIndex, {
-                                                                                            planned_inventory_item_id: e.target.value,
-                                                                                            planned_direct_supply_id: '',
-                                                                                        })
-                                                                                    }
-                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                                                                >
-                                                                                    <option value="">Inventory item (optional)</option>
-                                                                                    {inventoryItems.map((inv) => (
-                                                                                        <option key={inv.id} value={inv.id}>
-                                                                                            {inv.code ? `${inv.code} - ` : ''}{inv.name}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                                <select
-                                                                                    value={item.planned_direct_supply_id || ''}
-                                                                                    onChange={(e) =>
-                                                                                        updateItem(sIndex, iIndex, {
-                                                                                            planned_direct_supply_id: e.target.value,
-                                                                                            planned_inventory_item_id: '',
-                                                                                        })
-                                                                                    }
-                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                                                                >
-                                                                                    <option value="">Direct supply (optional)</option>
-                                                                                    {directSupplies.map((supply) => (
-                                                                                        <option key={supply.id} value={supply.id}>
-                                                                                            {supply.code ? `${supply.code} - ` : ''}{supply.name}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            </>
-                                                                        )}
+                                {/* Items */}
+                                <div className="mt-3 divide-y divide-gray-100">
+                                    {(section.items || []).length === 0 && (
+                                        <p className="px-4 py-3 text-sm text-zinc-400">No items yet.</p>
+                                    )}
+                                    {(section.items || []).map((item, iIndex) => {
+                                        const itemKey = `${sIndex}-${iIndex}`;
+                                        const itemOpen = !collapsedItems[itemKey];
+                                        const itemTotal = getItemTotal(item);
+                                        const materialResources = (item.resources || []).filter(
+                                            (r) => r.resource_category === 'material'
+                                        );
+                                        const laborResources = (item.resources || []).filter(
+                                            (r) => r.resource_category === 'labor'
+                                        );
 
-                                                                        {item.resource_type === 'labor' && (
-                                                                            <>
-                                                                                <select
-                                                                                    value={item.planned_user_id || ''}
-                                                                                    onChange={(e) =>
-                                                                                        updateItem(sIndex, iIndex, {
-                                                                                            planned_user_id: e.target.value,
-                                                                                            planned_employee_id: '',
-                                                                                        })
-                                                                                    }
-                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                                                                >
-                                                                                    <option value="">User (optional)</option>
-                                                                                    {users.map((person) => (
-                                                                                        <option key={`u-${person.id}`} value={person.id}>
-                                                                                            {person.name}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                                <select
-                                                                                    value={item.planned_employee_id || ''}
-                                                                                    onChange={(e) =>
-                                                                                        updateItem(sIndex, iIndex, {
-                                                                                            planned_employee_id: e.target.value,
-                                                                                            planned_user_id: '',
-                                                                                        })
-                                                                                    }
-                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                                                                >
-                                                                                    <option value="">Employee (optional)</option>
-                                                                                    {employees.map((person) => (
-                                                                                        <option key={`e-${person.id}`} value={person.id}>
-                                                                                            {person.name}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        </Fragment>
-                                                    );
-                                                }
-                                            )}
-                                            {(section.items || []).length === 0 && (
-                                                <TableRow>
-                                                    <TableCell
-                                                        colSpan={7}
-                                                        className="py-4 text-center text-sm text-zinc-400"
+                                        return (
+                                            <div key={iIndex} className="border-l-2 border-transparent hover:border-zinc-300">
+                                                {/* Item header (edit) */}
+                                                <div className="flex items-center gap-2 bg-gray-50 px-4 py-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleItem(sIndex, iIndex)}
+                                                        className="text-zinc-400 hover:text-zinc-600"
                                                     >
-                                                        No items yet.
-                                                    </TableCell>
-                                                </TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                    <div className="mt-3 flex justify-end">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => addItem(sIndex)}
-                                            className="flex items-center gap-2"
-                                        >
-                                            <Plus size={14} /> Add Item
-                                        </Button>
-                                    </div>
+                                                        {itemOpen ? (
+                                                            <ChevronDown size={16} />
+                                                        ) : (
+                                                            <ChevronRight size={16} />
+                                                        )}
+                                                    </button>
+                                                    <Input
+                                                        value={item.item_code || ''}
+                                                        onChange={(e) =>
+                                                            updateItem(sIndex, iIndex, {
+                                                                item_code: e.target.value,
+                                                            })
+                                                        }
+                                                        placeholder={`${section.code || ''}.${iIndex + 1}`}
+                                                        className="w-24"
+                                                    />
+                                                    <Input
+                                                        value={item.description || ''}
+                                                        onChange={(e) =>
+                                                            updateItem(sIndex, iIndex, {
+                                                                description: e.target.value,
+                                                            })
+                                                        }
+                                                        placeholder="Item description (e.g. Excavation)"
+                                                        className="flex-1"
+                                                    />
+                                                    <span className="text-xs text-zinc-500 whitespace-nowrap">
+                                                        ₱{formatCurrency(itemTotal)}
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeItem(sIndex, iIndex)}
+                                                        className="text-red-500 hover:bg-red-50"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </Button>
+                                                </div>
+
+                                                {/* Item resources (edit) */}
+                                                {itemOpen && (
+                                                    <div className="px-6 py-3 space-y-4">
+                                                        {/* Materials */}
+                                                        <div>
+                                                            <div className="mb-2 flex items-center justify-between">
+                                                                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                                                                    <Package size={12} /> Materials &amp; Equipment
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => addResource(sIndex, iIndex, 'material')}
+                                                                >
+                                                                    <Plus size={12} /> Add Material
+                                                                </Button>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {materialResources.length === 0 && (
+                                                                    <p className="text-xs text-zinc-400 italic">No materials added.</p>
+                                                                )}
+                                                                {renderEditResourceRows(item.resources, 'material', sIndex, iIndex)}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Labor */}
+                                                        <div>
+                                                            <div className="mb-2 flex items-center justify-between">
+                                                                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                                                                    <Wrench size={12} /> Labor
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    className="h-7 text-xs"
+                                                                    onClick={() => addResource(sIndex, iIndex, 'labor')}
+                                                                >
+                                                                    <Plus size={12} /> Add Labor
+                                                                </Button>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                {laborResources.length === 0 && (
+                                                                    <p className="text-xs text-zinc-400 italic">No labor added.</p>
+                                                                )}
+                                                                {renderEditResourceRows(item.resources, 'labor', sIndex, iIndex)}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Item remarks */}
+                                                        <Textarea
+                                                            value={item.remarks || ''}
+                                                            onChange={(e) =>
+                                                                updateItem(sIndex, iIndex, { remarks: e.target.value })
+                                                            }
+                                                            placeholder="Item notes (optional)"
+                                                            rows={1}
+                                                            className="text-xs"
+                                                        />
+
+                                                        {(item.resources || []).length > 0 && (
+                                                            <div className="text-right text-xs font-semibold text-zinc-700">
+                                                                Item total: ₱{formatCurrency(itemTotal)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            </>
+
+                                <div className="flex justify-end px-4 py-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => addItem(sIndex)}
+                                        className="flex items-center gap-2 text-sm"
+                                    >
+                                        <Plus size={14} /> Add Item
+                                    </Button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 );
@@ -739,61 +976,50 @@ export default function BOQTab({ project, boqData }) {
         </div>
     );
 
+    // ── Summary bar ──────────────────────────────────────────────────────────
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white p-4">
-                <div className="flex gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap gap-6">
                     <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">
-                            Contract Amount
-                        </div>
-                        <div className="text-lg font-semibold text-zinc-800">
-                            ₱{formatCurrency(contractAmount)}
-                        </div>
+                        <div className="text-xs uppercase tracking-wide text-zinc-500">Contract Amount</div>
+                        <div className="text-lg font-semibold text-zinc-800">₱{formatCurrency(contractAmount)}</div>
                     </div>
                     <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">
-                            BOQ Total
-                        </div>
-                        <div className="text-lg font-semibold text-zinc-800">
-                            ₱{formatCurrency(grandTotal)}
-                        </div>
+                        <div className="text-xs uppercase tracking-wide text-zinc-500">BOQ Total (Planned)</div>
+                        <div className="text-lg font-semibold text-zinc-800">₱{formatCurrency(grandTotal)}</div>
                     </div>
                     <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">
-                            Actual (Linked)
-                        </div>
-                        <div className="text-lg font-semibold text-zinc-800">
-                            ₱{formatCurrency(actualTotal)}
-                        </div>
+                        <div className="text-xs uppercase tracking-wide text-zinc-500">Actual (Used)</div>
+                        <div className="text-lg font-semibold text-zinc-800">₱{formatCurrency(actualTotal)}</div>
                     </div>
                     <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">
-                            Variance
-                        </div>
+                        <div className="text-xs uppercase tracking-wide text-zinc-500">vs Contract</div>
                         <div
                             className={`text-lg font-semibold ${
-                                variance < 0
+                                contractVariance < 0
                                     ? 'text-red-600'
-                                    : variance > 0
+                                    : contractVariance > 0
                                     ? 'text-emerald-600'
                                     : 'text-zinc-800'
                             }`}
                         >
-                            ₱{formatCurrency(Math.abs(variance))}
-                            {variance < 0 && (
-                                <span className="ml-1 text-xs">(over)</span>
-                            )}
-                            {variance > 0 && (
-                                <span className="ml-1 text-xs">(under)</span>
-                            )}
+                            ₱{formatCurrency(Math.abs(contractVariance))}
+                            {contractVariance < 0 && <span className="ml-1 text-xs">(over)</span>}
+                            {contractVariance > 0 && <span className="ml-1 text-xs">(under)</span>}
                         </div>
                     </div>
                     <div>
-                        <div className="text-xs uppercase tracking-wide text-zinc-500">
-                            Planned vs Actual
-                        </div>
-                        <div className={`text-lg font-semibold ${plannedVsActualVariance < 0 ? 'text-red-600' : plannedVsActualVariance > 0 ? 'text-emerald-600' : 'text-zinc-800'}`}>
+                        <div className="text-xs uppercase tracking-wide text-zinc-500">Planned vs Actual</div>
+                        <div
+                            className={`text-lg font-semibold ${
+                                plannedVsActualVariance < 0
+                                    ? 'text-red-600'
+                                    : plannedVsActualVariance > 0
+                                    ? 'text-emerald-600'
+                                    : 'text-zinc-800'
+                            }`}
+                        >
                             ₱{formatCurrency(Math.abs(plannedVsActualVariance))}
                             {plannedVsActualVariance < 0 && (
                                 <span className="ml-1 text-xs">(overrun)</span>
@@ -804,6 +1030,7 @@ export default function BOQTab({ project, boqData }) {
                         </div>
                     </div>
                 </div>
+
                 <div className="flex gap-2">
                     {!editing && canEdit && sections.length > 0 && (
                         <Button
@@ -839,9 +1066,9 @@ export default function BOQTab({ project, boqData }) {
                 </div>
             </div>
 
-            {variance < 0 && (
+            {contractVariance < 0 && (
                 <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    BOQ total currently exceeds contract by ₱{formatCurrency(Math.abs(variance))}. Saving is blocked until BOQ is brought within contract amount.
+                    BOQ total exceeds contract by ₱{formatCurrency(Math.abs(contractVariance))}. Saving is blocked until BOQ is within contract amount.
                 </div>
             )}
 

@@ -40,13 +40,22 @@ const formatCurrency = (n) =>
     maximumFractionDigits: 2,
   });
 
+const toNumber = (value) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export default function Step3BOQ({ errors = {} }) {
   const { props } = usePage();
   const inventoryItems = props.inventoryItems || [];
   const directSupplyItems = props.directSupplyItems || [];
   const assignables = props.users || [];
 
+  const userOptions = assignables.filter((a) => a.type === "user");
+  const employeeOptions = assignables.filter((a) => a.type === "employee");
+
   const {
+    projectData,
     boqSections,
     addBoqSection,
     removeBoqSection,
@@ -55,6 +64,13 @@ export default function Step3BOQ({ errors = {} }) {
     removeBoqItem,
     updateBoqItem,
   } = useProjectWizard();
+
+  const projectDays = (() => {
+    const start = projectData?.start_date;
+    const end   = projectData?.planned_end_date;
+    if (!start || !end) return null;
+    return Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1;
+  })();
 
   const [collapsed, setCollapsed] = useState({});
 
@@ -85,9 +101,7 @@ export default function Step3BOQ({ errors = {} }) {
         (sum, s) =>
           sum +
           (s.items || []).reduce(
-            (sub, i) =>
-              sub +
-              (parseFloat(i.quantity) || 0) * (parseFloat(i.unit_cost) || 0),
+            (sub, i) => sub + getItemTotal(i),
             0
           ),
         0
@@ -97,10 +111,141 @@ export default function Step3BOQ({ errors = {} }) {
 
   const sectionSubtotal = (section) =>
     (section.items || []).reduce(
-      (sub, i) =>
-        sub + (parseFloat(i.quantity) || 0) * (parseFloat(i.unit_cost) || 0),
+      (sub, i) => sub + getItemTotal(i),
       0
     );
+
+  function getResourceTotal(resource) {
+    return toNumber(resource?.quantity) * toNumber(resource?.unit_price);
+  }
+
+  function getItemTotal(item) {
+    if (Array.isArray(item?.resources) && item.resources.length > 0) {
+      return item.resources.reduce((sum, resource) => sum + getResourceTotal(resource), 0);
+    }
+
+    return toNumber(item?.quantity) * toNumber(item?.unit_cost);
+  }
+
+  function applyResourceRollup(sectionIndex, itemIndex, resources) {
+    const total = resources.reduce((sum, resource) => sum + getResourceTotal(resource), 0);
+
+    updateBoqItem(sectionIndex, itemIndex, {
+      resources,
+      quantity: resources.length > 0 ? 1 : 0,
+      unit: resources.length > 0 ? "lot" : "",
+      unit_cost: resources.length > 0 ? total.toFixed(2) : 0,
+    });
+  }
+
+  function addResource(sectionIndex, itemIndex, resourceCategory) {
+    const item = boqSections?.[sectionIndex]?.items?.[itemIndex] || {};
+    const current = Array.isArray(item.resources) ? item.resources : [];
+
+    const next = [
+      ...current,
+      {
+        resource_category: resourceCategory,
+        source_type: resourceCategory === "material" ? "inventory" : "employee",
+        inventory_item_id: "",
+        direct_supply_id: "",
+        user_id: "",
+        employee_id: "",
+        resource_name: "",
+        unit: "",
+        quantity: 1,
+        unit_price: 0,
+        remarks: "",
+        sort_order: current.length,
+      },
+    ];
+
+    applyResourceRollup(sectionIndex, itemIndex, next);
+  }
+
+  function removeResource(sectionIndex, itemIndex, resourceIndex) {
+    const item = boqSections?.[sectionIndex]?.items?.[itemIndex] || {};
+    const current = Array.isArray(item.resources) ? item.resources : [];
+    const next = current
+      .filter((_, idx) => idx !== resourceIndex)
+      .map((resource, idx) => ({ ...resource, sort_order: idx }));
+
+    applyResourceRollup(sectionIndex, itemIndex, next);
+  }
+
+  function updateResource(sectionIndex, itemIndex, resourceIndex, patch) {
+    const item = boqSections?.[sectionIndex]?.items?.[itemIndex] || {};
+    const current = Array.isArray(item.resources) ? item.resources : [];
+    const next = current.map((resource, idx) => {
+      if (idx !== resourceIndex) return resource;
+
+      const updated = { ...resource, ...patch };
+
+      if (patch.source_type) {
+        updated.inventory_item_id = "";
+        updated.direct_supply_id = "";
+        updated.user_id = "";
+        updated.employee_id = "";
+        updated.resource_name = "";
+        updated.unit = "";
+        updated.unit_price = 0;
+      }
+
+      if (patch.inventory_item_id) {
+        const selected = inventoryItems.find((inv) => String(inv.id) === String(patch.inventory_item_id));
+        if (selected) {
+          updated.resource_name = selected.item_name;
+          updated.unit = selected.unit_of_measure || "";
+          updated.unit_price = toNumber(selected.unit_price);
+          updated.source_type = "inventory";
+          updated.direct_supply_id = "";
+        }
+      }
+
+      if (patch.direct_supply_id) {
+        const selected = directSupplyItems.find((supply) => String(supply.id) === String(patch.direct_supply_id));
+        if (selected) {
+          updated.resource_name = selected.supply_name;
+          updated.unit = selected.unit_of_measure || "";
+          updated.unit_price = toNumber(selected.unit_price);
+          updated.source_type = "direct_supply";
+          updated.inventory_item_id = "";
+        }
+      }
+
+      if (patch.user_id) {
+        const selected = userOptions.find((person) => String(person.id) === String(patch.user_id));
+        if (selected) {
+          const hourlyRate = toNumber(selected?.compensation?.hourly_rate);
+          const monthlySalary = toNumber(selected?.compensation?.monthly_salary);
+          const raw = hourlyRate > 0 ? hourlyRate * 8 : monthlySalary > 0 ? monthlySalary / 26 : 0;
+          updated.resource_name = selected.name;
+          updated.unit = "day";
+          updated.unit_price = Math.round(raw * 100) / 100;
+          updated.source_type = "user";
+          updated.employee_id = "";
+        }
+      }
+
+      if (patch.employee_id) {
+        const selected = employeeOptions.find((person) => String(person.id) === String(patch.employee_id));
+        if (selected) {
+          const hourlyRate = toNumber(selected?.compensation?.hourly_rate);
+          const monthlySalary = toNumber(selected?.compensation?.monthly_salary);
+          const raw = hourlyRate > 0 ? hourlyRate * 8 : monthlySalary > 0 ? monthlySalary / 26 : 0;
+          updated.resource_name = selected.name;
+          updated.unit = "day";
+          updated.unit_price = Math.round(raw * 100) / 100;
+          updated.source_type = "employee";
+          updated.user_id = "";
+        }
+      }
+
+      return updated;
+    });
+
+    applyResourceRollup(sectionIndex, itemIndex, next);
+  }
 
   return (
     <div className="space-y-6">
@@ -167,6 +312,17 @@ export default function Step3BOQ({ errors = {} }) {
                 placeholder="Section name (e.g. Earthworks)"
                 className="flex-1 font-medium"
               />
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-600 whitespace-nowrap select-none">
+                <input
+                  type="checkbox"
+                  checked={section.create_milestone ?? true}
+                  onChange={(e) =>
+                    updateBoqSection(sectionIndex, { create_milestone: e.target.checked })
+                  }
+                  className="rounded"
+                />
+                Milestone
+              </label>
               <div className="text-sm text-zinc-600">
                 Subtotal:{" "}
                 <span className="font-semibold text-zinc-800">
@@ -212,11 +368,6 @@ export default function Step3BOQ({ errors = {} }) {
                       <TableRow>
                         <TableHead className="w-20">Code</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead className="w-24">Unit</TableHead>
-                        <TableHead className="w-28 text-right">Qty</TableHead>
-                        <TableHead className="w-32 text-right">
-                          Unit Cost
-                        </TableHead>
                         <TableHead className="w-32 text-right">
                           Amount
                         </TableHead>
@@ -225,9 +376,7 @@ export default function Step3BOQ({ errors = {} }) {
                     </TableHeader>
                     <TableBody>
                       {(section.items || []).map((item, itemIndex) => {
-                        const qty = parseFloat(item.quantity) || 0;
-                        const rate = parseFloat(item.unit_cost) || 0;
-                        const amount = qty * rate;
+                        const amount = getItemTotal(item);
                         const descKey = `boq_sections.${sectionIndex}.items.${itemIndex}.description`;
                         return (
                           <Fragment key={itemIndex}>
@@ -256,45 +405,6 @@ export default function Step3BOQ({ errors = {} }) {
                                 {errors[descKey] && (
                                   <InputError message={errors[descKey]} />
                                 )}
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  value={item.unit || ""}
-                                  onChange={(e) =>
-                                    updateBoqItem(sectionIndex, itemIndex, {
-                                      unit: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g. m³"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.0001"
-                                  value={item.quantity ?? ""}
-                                  onChange={(e) =>
-                                    updateBoqItem(sectionIndex, itemIndex, {
-                                      quantity: e.target.value,
-                                    })
-                                  }
-                                  className="text-right"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.unit_cost ?? ""}
-                                  onChange={(e) =>
-                                    updateBoqItem(sectionIndex, itemIndex, {
-                                      unit_cost: e.target.value,
-                                    })
-                                  }
-                                  className="text-right"
-                                />
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 ₱{formatCurrency(amount)}
@@ -329,106 +439,159 @@ export default function Step3BOQ({ errors = {} }) {
                             </TableRow>
 
                             <TableRow key={`${itemIndex}-resource`}>
-                              <TableCell colSpan={7} className="bg-zinc-50/60 py-2">
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                  <select
-                                    value={item.resource_type || ""}
-                                    onChange={(e) =>
-                                      updateBoqItem(sectionIndex, itemIndex, {
-                                        resource_type: e.target.value,
-                                        planned_inventory_item_id: "",
-                                        planned_direct_supply_id: "",
-                                        planned_user_id: "",
-                                        planned_employee_id: "",
-                                      })
-                                    }
-                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                  >
-                                    <option value="">No resource link</option>
-                                    <option value="material">Material</option>
-                                    <option value="labor">Labor</option>
-                                  </select>
+                              <TableCell colSpan={4} className="bg-zinc-50/60 py-2">
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-8 text-xs"
+                                      onClick={() => addResource(sectionIndex, itemIndex, "material")}
+                                    >
+                                      <Plus size={12} /> Add Material/Equipment
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-8 text-xs"
+                                      onClick={() => addResource(sectionIndex, itemIndex, "labor")}
+                                    >
+                                      <Plus size={12} /> Add Labor
+                                    </Button>
+                                  </div>
 
-                                  {item.resource_type === "material" && (
-                                    <>
+                                  {(item.resources || []).map((resource, resourceIndex) => (
+                                    <div key={resourceIndex} className="grid grid-cols-1 gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-6">
                                       <select
-                                        value={item.planned_inventory_item_id || ""}
-                                        onChange={(e) =>
-                                          updateBoqItem(sectionIndex, itemIndex, {
-                                            planned_inventory_item_id: e.target.value,
-                                            planned_direct_supply_id: "",
-                                          })
-                                        }
+                                        value={resource.source_type || ""}
+                                        onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { source_type: e.target.value })}
                                         className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
                                       >
-                                        <option value="">Inventory item (optional)</option>
-                                        {inventoryItems.map((inv) => (
-                                          <option key={inv.id} value={inv.id}>
-                                            {inv.item_code ? `${inv.item_code} - ` : ""}{inv.item_name}
-                                          </option>
-                                        ))}
+                                        {resource.resource_category === "material" ? (
+                                          <>
+                                            <option value="inventory">Inventory</option>
+                                            <option value="direct_supply">Direct Supply</option>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <option value="employee">Employee</option>
+                                            <option value="user">User</option>
+                                          </>
+                                        )}
                                       </select>
 
-                                      <select
-                                        value={item.planned_direct_supply_id || ""}
-                                        onChange={(e) =>
-                                          updateBoqItem(sectionIndex, itemIndex, {
-                                            planned_direct_supply_id: e.target.value,
-                                            planned_inventory_item_id: "",
-                                          })
-                                        }
-                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                      >
-                                        <option value="">Direct supply (optional)</option>
-                                        {directSupplyItems.map((supply) => (
-                                          <option key={supply.id} value={supply.id}>
-                                            {supply.supply_code ? `${supply.supply_code} - ` : ""}{supply.supply_name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </>
-                                  )}
+                                      {resource.resource_category === "material" && resource.source_type === "inventory" && (
+                                        <select
+                                          value={resource.inventory_item_id || ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { inventory_item_id: e.target.value })}
+                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                                        >
+                                          <option value="">Select inventory item</option>
+                                          {inventoryItems.map((inv) => (
+                                            <option key={inv.id} value={inv.id}>
+                                              {inv.item_code ? `${inv.item_code} - ` : ""}{inv.item_name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
 
-                                  {item.resource_type === "labor" && (
-                                    <>
-                                      <select
-                                        value={item.planned_user_id || ""}
-                                        onChange={(e) =>
-                                          updateBoqItem(sectionIndex, itemIndex, {
-                                            planned_user_id: e.target.value,
-                                            planned_employee_id: "",
-                                          })
-                                        }
-                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                      >
-                                        <option value="">User (optional)</option>
-                                        {assignables.filter((a) => a.type === "user").map((person) => (
-                                          <option key={`u-${person.id}`} value={person.id}>
-                                            {person.name}
-                                          </option>
-                                        ))}
-                                      </select>
+                                      {resource.resource_category === "material" && resource.source_type === "direct_supply" && (
+                                        <select
+                                          value={resource.direct_supply_id || ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { direct_supply_id: e.target.value })}
+                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                                        >
+                                          <option value="">Select direct supply</option>
+                                          {directSupplyItems.map((supply) => (
+                                            <option key={supply.id} value={supply.id}>
+                                              {supply.supply_code ? `${supply.supply_code} - ` : ""}{supply.supply_name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
 
-                                      <select
-                                        value={item.planned_employee_id || ""}
-                                        onChange={(e) =>
-                                          updateBoqItem(sectionIndex, itemIndex, {
-                                            planned_employee_id: e.target.value,
-                                            planned_user_id: "",
-                                          })
-                                        }
-                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                      >
-                                        <option value="">Employee (optional)</option>
-                                        {assignables.filter((a) => a.type === "employee").map((person) => (
-                                          <option key={`e-${person.id}`} value={person.id}>
-                                            {person.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </>
+                                      {resource.resource_category === "labor" && resource.source_type === "employee" && (
+                                        <select
+                                          value={resource.employee_id || ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { employee_id: e.target.value })}
+                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                                        >
+                                          <option value="">Select employee</option>
+                                          {employeeOptions.map((person) => (
+                                            <option key={person.id} value={person.id}>{person.name}</option>
+                                          ))}
+                                        </select>
+                                      )}
+
+                                      {resource.resource_category === "labor" && resource.source_type === "user" && (
+                                        <select
+                                          value={resource.user_id || ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { user_id: e.target.value })}
+                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
+                                        >
+                                          <option value="">Select user</option>
+                                          {userOptions.map((person) => (
+                                            <option key={person.id} value={person.id}>{person.name}</option>
+                                          ))}
+                                        </select>
+                                      )}
+
+                                      <div>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.0001"
+                                          value={resource.quantity ?? ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { quantity: e.target.value })}
+                                          placeholder={resource.resource_category === "labor" ? "Days" : "Qty"}
+                                          className="text-right"
+                                        />
+                                        {resource.resource_category === "labor" && projectDays !== null && (
+                                          <p className={`mt-0.5 text-xs ${parseFloat(resource.quantity || 0) > projectDays ? "text-amber-600 font-medium" : "text-zinc-400"}`}>
+                                            {parseFloat(resource.quantity || 0) > projectDays
+                                              ? `Exceeds project duration (${projectDays} days)`
+                                              : `Max: ${projectDays} days`}
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={resource.unit_price ?? ""}
+                                        onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { unit_price: e.target.value })}
+                                        placeholder={resource.resource_category === "labor" ? "Daily Rate" : "Unit Cost"}
+                                        className="text-right"
+                                      />
+
+                                      <div className="flex items-center justify-between rounded-md bg-zinc-50 px-2 text-xs sm:col-span-6">
+                                        <span className="text-zinc-600">
+                                          {resource.resource_name || "Select resource"} {resource.unit ? `(${resource.unit})` : ""}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold text-zinc-800">₱{formatCurrency(getResourceTotal(resource))}</span>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-red-500"
+                                            onClick={() => removeResource(sectionIndex, itemIndex, resourceIndex)}
+                                          >
+                                            <Trash2 size={12} />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+
+                                  {(item.resources || []).length > 0 && (
+                                    <div className="text-right text-xs font-semibold text-zinc-700">
+                                      Resource subtotal: ₱{formatCurrency((item.resources || []).reduce((sum, resource) => sum + getResourceTotal(resource), 0))}
+                                    </div>
                                   )}
                                 </div>
+
                               </TableCell>
                             </TableRow>
                           </Fragment>
@@ -437,7 +600,7 @@ export default function Step3BOQ({ errors = {} }) {
                       {(section.items || []).length === 0 && (
                         <TableRow>
                           <TableCell
-                            colSpan={7}
+                            colSpan={4}
                             className="py-4 text-center text-sm text-zinc-400"
                           >
                             No items yet. Add a breakdown row below.

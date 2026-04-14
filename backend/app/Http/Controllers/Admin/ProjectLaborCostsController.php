@@ -149,6 +149,19 @@ class ProjectLaborCostsController extends Controller
             'created_by'      => auth()->id(),
         ]);
 
+        // Auto-link to BOQ item if this worker has a matching labor resource on this project.
+        $boqResource = \App\Models\ProjectBoqItemResource::query()
+            ->where('resource_category', 'labor')
+            ->when($employeeId, fn ($q) => $q->where('employee_id', $employeeId))
+            ->when($userId && !$employeeId, fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('boqItem', fn ($q) => $q->where('project_id', $project->id))
+            ->with('boqItem')
+            ->first();
+
+        if ($boqResource?->boqItem) {
+            $entry->update(['boq_item_id' => $boqResource->boqItem->id]);
+        }
+
         $entry->load(['user', 'employee']);
 
         $this->adminActivityLogs(

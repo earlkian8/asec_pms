@@ -101,7 +101,7 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
   const addBoqSection = (section) => {
     setBoqSections(prev => [
       ...prev,
-      { code: '', name: '', description: '', sort_order: prev.length, items: [], ...section },
+      { code: '', name: '', description: '', sort_order: prev.length, create_milestone: true, items: [], ...section },
     ]);
   };
 
@@ -119,14 +119,11 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
       const nextItems = [...(s.items || []), {
         item_code: '',
         description: '',
-        unit: '',
-        quantity: 0,
+        // unit/quantity/unit_cost are computed from resources; not exposed in UI
+        unit: 'lot',
+        quantity: 1,
         unit_cost: 0,
-        resource_type: '',
-        planned_inventory_item_id: '',
-        planned_direct_supply_id: '',
-        planned_user_id: '',
-        planned_employee_id: '',
+        resources: [],
         remarks: '',
         sort_order: (s.items || []).length,
         ...item,

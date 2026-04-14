@@ -43,7 +43,7 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
   const [laborCosts, setLaborCosts] = useState([]);
 
   // Step BOQ: sections with nested items
-  // Shape: [{ code, name, description, sort_order, items: [{ item_code, description, unit, quantity, unit_cost, remarks, sort_order }] }]
+  // Shape: [{ code, name, description, sort_order, items: [{ item_code, description, unit, quantity, unit_cost, resource_type, planned_* refs, remarks, sort_order }] }]
   const [boqSections, setBoqSections] = useState([]);
 
   const updateProjectData = (data) => {
@@ -122,6 +122,11 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
         unit: '',
         quantity: 0,
         unit_cost: 0,
+        resource_type: '',
+        planned_inventory_item_id: '',
+        planned_direct_supply_id: '',
+        planned_user_id: '',
+        planned_employee_id: '',
         remarks: '',
         sort_order: (s.items || []).length,
         ...item,

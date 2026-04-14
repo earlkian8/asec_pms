@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use App\Models\CompensationProfile;
 
 class Employee extends Model
 {
@@ -71,6 +72,7 @@ class Employee extends Model
         'philhealth_id_image_url',
         'pagibig_id_image_url',
         'tin_id_image_url',
+        'resolved_compensation',
     ];
 
     // ── Auto-generate employee_id on create ───────────────────────────────────
@@ -137,5 +139,32 @@ class Employee extends Model
     public function laborCosts()
     {
         return $this->hasMany(ProjectLaborCost::class, 'employee_id');
+    }
+
+    public function compensationProfiles()
+    {
+        return $this->morphMany(CompensationProfile::class, 'profileable');
+    }
+
+    public function currentCompensationProfile()
+    {
+        return $this->morphOne(CompensationProfile::class, 'profileable')
+            ->where('is_active', true)
+            ->latestOfMany('effective_date');
+    }
+
+    public function getResolvedCompensationAttribute(): array
+    {
+        $profile = $this->relationLoaded('currentCompensationProfile')
+            ? $this->currentCompensationProfile
+            : $this->currentCompensationProfile()->first();
+
+        return [
+            'pay_type' => $profile?->pay_type ?? 'hourly',
+            'hourly_rate' => $profile?->hourly_rate !== null ? (float) $profile->hourly_rate : null,
+            'monthly_salary' => $profile?->monthly_salary !== null ? (float) $profile->monthly_salary : null,
+            'effective_date' => $profile?->effective_date?->toDateString(),
+            'is_profile_based' => $profile !== null,
+        ];
     }
 }

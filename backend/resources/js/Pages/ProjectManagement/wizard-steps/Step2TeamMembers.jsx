@@ -151,6 +151,12 @@ const COLOR = {
   green:  "bg-green-50 border-green-300 text-green-700",
 };
 
+const normalizePayType = (payType, fallback = "hourly") => {
+  if (!payType) return fallback;
+  if (payType === "monthly") return "salary";
+  return payType;
+};
+
 const ACTIVE_COLOR = {
   indigo: "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200",
   blue:   "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200",
@@ -169,7 +175,11 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
 
   const activePreset = formData?.date_preset || null;
   const isEmployee = member.type === "employee";
-  const payType = formData?.pay_type || "hourly";
+  const isProfileBasedCompensation = !!member?.compensation?.is_profile_based;
+  const payType = normalizePayType(
+    member?.compensation?.pay_type || formData?.pay_type,
+    "hourly"
+  );
 
   const handleToggle = (id) => {
     const willSelect = !isSelected;
@@ -315,77 +325,93 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
       {isSelected && expanded && (
         <div className="border-t border-indigo-100 bg-indigo-50/30 p-4 space-y-4">
 
-          {/* Pay Type */}
-          <div>
-            <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-              Pay Type <span className="text-red-500">*</span>
-            </label>
-            <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white">
-              {[
-                { id: "hourly",  label: "Hourly"         },
-                { id: "salary", label: "Monthly Salary" },
-                { id: "fixed",  label: "Fixed"          },
-              ].map((pt) => (
-                <button
-                  key={pt.id}
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onFormChange(compositeId, "pay_type", pt.id); }}
-                  className={`flex-1 py-2 font-medium transition-all ${
-                    payType === pt.id
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {pt.label}
-                </button>
-              ))}
+          {isProfileBasedCompensation ? (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Pay Type</label>
+                <Input
+                  type="text"
+                  readOnly
+                  value={payType === "salary" ? "Monthly Salary" : payType === "fixed" ? "Fixed" : "Hourly"}
+                  className="text-sm bg-gray-50 border-gray-200 text-gray-700"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                  {payType === "salary" ? "Monthly Salary" : "Hourly Rate"}
+                </label>
+                <Input
+                  type="text"
+                  readOnly
+                  value={
+                    payType === "salary"
+                      ? `₱${parseFloat(formData?.monthly_salary || 0).toFixed(2)} / month`
+                      : payType === "fixed"
+                      ? "Fixed"
+                      : `₱${parseFloat(formData?.hourly_rate || 0).toFixed(2)} / hour`
+                  }
+                  className="text-sm bg-gray-50 border-gray-200 text-gray-700"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                  Pay Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white">
+                  {[
+                    { id: "hourly",  label: "Hourly" },
+                    { id: "salary",  label: "Monthly Salary" },
+                    { id: "fixed",   label: "Fixed" },
+                  ].map((pt) => (
+                    <button
+                      key={pt.id}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onFormChange(compositeId, "pay_type", pt.id); }}
+                      className={`flex-1 py-2 font-medium transition-all ${
+                        payType === pt.id ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Rate field — conditional on pay_type */}
-          {payType === "hourly" && (
-            <div>
-              <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                Hourly Rate (₱) <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
-                <Input
-                  type="number" step="0.01" min="0" placeholder="0.00"
-                  value={formData?.hourly_rate ?? ""}
-                  onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
-                />
-              </div>
-              {errors?.rate && <InputError message={errors.rate} className="mt-1" />}
-            </div>
-          )}
-          {payType === "salary" && (
-            <div>
-              <label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                Monthly Salary (₱) <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
-                <Input
-                  type="number" step="0.01" min="0" placeholder="0.00"
-                  value={formData?.monthly_salary ?? ""}
-                  onChange={(e) => onFormChange(compositeId, "monthly_salary", e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
-                />
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Daily equivalent: ₱{formData?.monthly_salary ? (parseFloat(formData.monthly_salary) / 26).toFixed(2) : "0.00"}/day (÷26 working days)
-              </p>
-              {errors?.rate && <InputError message={errors.rate} className="mt-1" />}
-            </div>
-          )}
-          {payType === "fixed" && (
-            <p className="text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
-              Fixed pay — gross amount will be entered per payroll period.
-            </p>
+              {payType === "hourly" && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Hourly Rate (₱) <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
+                    <Input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={formData?.hourly_rate ?? ""}
+                      onChange={(e) => onFormChange(compositeId, "hourly_rate", e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {payType === "salary" && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Monthly Salary (₱) <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₱</span>
+                    <Input
+                      type="number" step="0.01" min="0" placeholder="0.00"
+                      value={formData?.monthly_salary ?? ""}
+                      onChange={(e) => onFormChange(compositeId, "monthly_salary", e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`pl-7 text-sm ${errors?.rate ? "border-red-400 ring-1 ring-red-300" : "border-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"}`}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Date Presets */}
@@ -556,6 +582,15 @@ export default function Step2TeamMembers({ users }) {
   const getMemberRole = (member) =>
     member.type === "employee" ? member.position || "No Position" : member.role || "No Role";
 
+  const getMemberCompensation = (member) => {
+    const compensation = member?.compensation || {};
+    return {
+      pay_type: normalizePayType(compensation.pay_type, member.type === "employee" ? "hourly" : "salary"),
+      hourly_rate: compensation.hourly_rate ?? 0,
+      monthly_salary: compensation.monthly_salary ?? 0,
+    };
+  };
+
   const getCompositeId = (member) => {
     const id = typeof member.id === "number" ? member.id : parseInt(member.id, 10);
     return `${member.type || "user"}-${id}`;
@@ -587,6 +622,8 @@ export default function Step2TeamMembers({ users }) {
     const memberIdInt = parseInt(memberIdStr, 10);
     const member = findMemberByCompositeId(compositeId);
     if (!member) return;
+    const compensation = getMemberCompensation(member);
+    const isProfileBasedCompensation = !!member?.compensation?.is_profile_based;
 
     removeTeamMemberByCompositeId(compositeId);
 
@@ -596,9 +633,9 @@ export default function Step2TeamMembers({ users }) {
       name:           member.name || "Unknown",
       email:          member.email || "",
       role:           getMemberRole(member),
-      pay_type:       draftFormData[compositeId]?.pay_type       || "hourly",
-      hourly_rate:    parseFloat(draftFormData[compositeId]?.hourly_rate)    || 0,
-      monthly_salary: parseFloat(draftFormData[compositeId]?.monthly_salary) || 0,
+      pay_type:       isProfileBasedCompensation ? compensation.pay_type : (draftFormData[compositeId]?.pay_type || compensation.pay_type),
+      hourly_rate:    isProfileBasedCompensation ? (parseFloat(compensation.hourly_rate) || 0) : (parseFloat(draftFormData[compositeId]?.hourly_rate) || 0),
+      monthly_salary: isProfileBasedCompensation ? (parseFloat(compensation.monthly_salary) || 0) : (parseFloat(draftFormData[compositeId]?.monthly_salary) || 0),
       start_date:     draftFormData[compositeId]?.start_date || "",
       end_date:       draftFormData[compositeId]?.end_date   || "",
       time_slot:      draftFormData[compositeId]?.time_slot  || null,
@@ -616,24 +653,20 @@ export default function Step2TeamMembers({ users }) {
 
       const name = member.name || "Team Member";
       const fd = draftFormData[compositeId] || {};
-      const payType = fd.pay_type || "hourly";
-
+      const isProfileBasedCompensation = !!member?.compensation?.is_profile_based;
+      const payType = normalizePayType(fd.pay_type || member?.compensation?.pay_type, "hourly");
       const hasHourlyRate = fd.hourly_rate !== undefined && fd.hourly_rate !== "";
       const hasMonthlySalary = fd.monthly_salary !== undefined && fd.monthly_salary !== "";
       const hasStartDate = !!fd.start_date;
       const hasEndDate = !!fd.end_date;
 
-      if (payType === "hourly" && showRequired && !hasHourlyRate) {
-        validationErrors[`${compositeId}_rate`] = `Hourly rate required for ${name}`;
-      }
-      if (payType === "hourly" && hasHourlyRate && parseFloat(fd.hourly_rate) < 0) {
-        validationErrors[`${compositeId}_rate`] = `Hourly rate required for ${name}`;
-      }
-      if (payType === "salary" && showRequired && !hasMonthlySalary) {
-        validationErrors[`${compositeId}_rate`] = `Monthly salary required for ${name}`;
-      }
-      if (payType === "salary" && hasMonthlySalary && parseFloat(fd.monthly_salary) < 0) {
-        validationErrors[`${compositeId}_rate`] = `Monthly salary required for ${name}`;
+      if (!isProfileBasedCompensation) {
+        if (payType === "hourly" && showRequired && !hasHourlyRate) {
+          validationErrors[`${compositeId}_rate`] = `Hourly rate required for ${name}`;
+        }
+        if (payType === "salary" && showRequired && !hasMonthlySalary) {
+          validationErrors[`${compositeId}_rate`] = `Monthly salary required for ${name}`;
+        }
       }
 
       if (showRequired && !hasStartDate) {
@@ -652,10 +685,9 @@ export default function Step2TeamMembers({ users }) {
         validationErrors[`${compositeId}_end_date`] = "End date must be after start date";
       }
 
-      const hasRequiredForPayType =
-        payType === "hourly" ? hasHourlyRate
-        : payType === "salary" ? hasMonthlySalary
-        : true;
+      const hasRequiredForPayType = isProfileBasedCompensation
+        ? true
+        : (payType === "hourly" ? hasHourlyRate : payType === "salary" ? hasMonthlySalary : true);
 
       const hasAllRequired = hasRequiredForPayType && hasStartDate && hasEndDate;
       if (hasAllRequired && !validationErrors[`${compositeId}_rate`] && !validationErrors[`${compositeId}_start_date`] && !validationErrors[`${compositeId}_end_date`]) {
@@ -720,6 +752,21 @@ export default function Step2TeamMembers({ users }) {
     }
 
     const nextSelected = [...selectedMemberIds, compositeId];
+    const member = findMemberByCompositeId(compositeId);
+    if (member && !formData[compositeId]) {
+      const compensation = getMemberCompensation(member);
+      setFormData((prev) => ({
+        ...prev,
+        [compositeId]: {
+          pay_type: compensation.pay_type,
+          hourly_rate: compensation.hourly_rate,
+          monthly_salary: compensation.monthly_salary,
+          start_date: projectData.start_date || "",
+          end_date: projectData.planned_end_date || "",
+          date_preset: projectData.start_date && projectData.planned_end_date ? "full" : "custom",
+        },
+      }));
+    }
     setSelectedMemberIds(nextSelected);
     syncSelectedMembers([compositeId]);
   };

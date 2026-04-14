@@ -33,7 +33,7 @@ class ProjectTeamService
             : 'desc';
 
         // ── Main query ────────────────────────────────────────────────────────
-        $projectTeams = ProjectTeam::with(['user.roles', 'employee'])
+        $projectTeams = ProjectTeam::with(['user.roles', 'user.currentCompensationProfile', 'employee.currentCompensationProfile'])
             ->where('project_id', $project->id)
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -73,7 +73,7 @@ class ProjectTeamService
             ->filter()
             ->toArray();
 
-        $users = User::with('roles')
+        $users = User::with(['roles', 'currentCompensationProfile'])
             ->whereNotIn('id', $existingUserIds)
             ->orderBy('first_name')
             ->orderBy('last_name')
@@ -83,6 +83,7 @@ class ProjectTeamService
                 'name'  => $user->name,
                 'email' => $user->email,
                 'role'  => $user->roles->first()?->name ?? 'No Role',
+                'compensation' => $user->resolved_compensation,
                 'type'  => 'user',
             ]);
 
@@ -91,7 +92,7 @@ class ProjectTeamService
             ->pluck('employee_id')
             ->filter()
             ->toArray();
-        $employees = Employee::where('is_active', true)
+        $employees = Employee::with('currentCompensationProfile')->where('is_active', true)
             ->whereNotIn('id', $existingEmployeeIds)
             // ->whereNotIn('id', $occupiedEmployeeIds)
             ->orderBy('first_name')
@@ -102,6 +103,7 @@ class ProjectTeamService
                 'name'     => $employee->first_name . ' ' . $employee->last_name,
                 'email'    => $employee->email,
                 'position' => $employee->position ?? 'No Position',
+                'compensation' => $employee->resolved_compensation,
                 'type'     => 'employee',
             ]);
 

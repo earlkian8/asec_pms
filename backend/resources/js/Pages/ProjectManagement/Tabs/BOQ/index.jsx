@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { Button } from '@/Components/ui/button';
@@ -58,6 +58,12 @@ export default function BOQTab({ project, boqData }) {
                     unit: i.unit || '',
                     quantity: i.quantity ?? 0,
                     unit_cost: i.unit_cost ?? 0,
+                    resource_type: i.resource_type || '',
+                    planned_inventory_item_id: i.planned_inventory_item_id || '',
+                    planned_direct_supply_id: i.planned_direct_supply_id || '',
+                    planned_user_id: i.planned_user_id || '',
+                    planned_employee_id: i.planned_employee_id || '',
+                    resource_link: i.resource_link || null,
                     planned_vs_actual: i.planned_vs_actual || null,
                     remarks: i.remarks || '',
                     sort_order: i.sort_order ?? 0,
@@ -65,6 +71,12 @@ export default function BOQTab({ project, boqData }) {
             })),
         [boqData]
     );
+
+    const resourceOptions = boqData?.resource_options || {};
+    const inventoryItems = resourceOptions.inventory_items || [];
+    const directSupplies = resourceOptions.direct_supplies || [];
+    const users = resourceOptions.users || [];
+    const employees = resourceOptions.employees || [];
 
     const [editing, setEditing] = useState(false);
     const [sections, setSections] = useState(initialSections);
@@ -169,6 +181,11 @@ export default function BOQTab({ project, boqData }) {
                         unit: '',
                         quantity: 0,
                         unit_cost: 0,
+                        resource_type: '',
+                        planned_inventory_item_id: '',
+                        planned_direct_supply_id: '',
+                        planned_user_id: '',
+                        planned_employee_id: '',
                         remarks: '',
                         sort_order: (s.items || []).length,
                         ...item,
@@ -314,6 +331,16 @@ export default function BOQTab({ project, boqData }) {
                                                             <div>
                                                                 {item.description}
                                                             </div>
+                                                            {item.resource_type === 'material' && item.resource_link && (
+                                                                <div className="mt-1 text-xs text-blue-600">
+                                                                    Material link: {item.resource_link.inventory_item?.name || item.resource_link.direct_supply?.name || 'Not selected'}
+                                                                </div>
+                                                            )}
+                                                            {item.resource_type === 'labor' && item.resource_link && (
+                                                                <div className="mt-1 text-xs text-emerald-600">
+                                                                    Labor link: {item.resource_link.user?.name || item.resource_link.employee?.name || 'Not selected'}
+                                                                </div>
+                                                            )}
                                                             {item.remarks && (
                                                                 <div className="mt-1 text-xs text-zinc-500">
                                                                     {item.remarks}
@@ -478,158 +505,197 @@ export default function BOQTab({ project, boqData }) {
                                                             item.unit_cost
                                                         ) || 0;
                                                     return (
-                                                        <TableRow key={iIndex}>
-                                                            <TableCell>
-                                                                <Input
-                                                                    value={
-                                                                        item.item_code ||
-                                                                        ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateItem(
-                                                                            sIndex,
-                                                                            iIndex,
-                                                                            {
-                                                                                item_code:
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                    placeholder={`${section.code || ''}.${iIndex + 1}`}
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Input
-                                                                    value={
-                                                                        item.description ||
-                                                                        ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateItem(
-                                                                            sIndex,
-                                                                            iIndex,
-                                                                            {
-                                                                                description:
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                    placeholder="Describe the scope item"
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Input
-                                                                    value={
-                                                                        item.unit ||
-                                                                        ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateItem(
-                                                                            sIndex,
-                                                                            iIndex,
-                                                                            {
-                                                                                unit: e
-                                                                                    .target
-                                                                                    .value,
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                    placeholder="m³"
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    step="0.0001"
-                                                                    value={
-                                                                        item.quantity ??
-                                                                        ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateItem(
-                                                                            sIndex,
-                                                                            iIndex,
-                                                                            {
-                                                                                quantity:
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                    className="text-right"
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    step="0.01"
-                                                                    value={
-                                                                        item.unit_cost ??
-                                                                        ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateItem(
-                                                                            sIndex,
-                                                                            iIndex,
-                                                                            {
-                                                                                unit_cost:
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                    className="text-right"
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell className="text-right font-medium">
-                                                                ₱
-                                                                {formatCurrency(
-                                                                    qty * rate
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="flex justify-end gap-1">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() =>
-                                                                            addItem(
-                                                                                sIndex,
-                                                                                {
-                                                                                    ...item,
-                                                                                }
-                                                                            )
+                                                        <Fragment key={iIndex}>
+                                                            <TableRow key={`${iIndex}-main`}>
+                                                                <TableCell>
+                                                                    <Input
+                                                                        value={item.item_code || ''}
+                                                                        onChange={(e) =>
+                                                                            updateItem(sIndex, iIndex, {
+                                                                                item_code: e.target.value,
+                                                                            })
                                                                         }
-                                                                        title="Duplicate row"
-                                                                    >
-                                                                        <Copy size={14} />
-                                                                    </Button>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() =>
-                                                                            removeItem(
-                                                                                sIndex,
-                                                                                iIndex
-                                                                            )
+                                                                        placeholder={`${section.code || ''}.${iIndex + 1}`}
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Input
+                                                                        value={item.description || ''}
+                                                                        onChange={(e) =>
+                                                                            updateItem(sIndex, iIndex, {
+                                                                                description: e.target.value,
+                                                                            })
                                                                         }
-                                                                        className="text-red-500 hover:bg-red-50"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </Button>
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
+                                                                        placeholder="Describe the scope item"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Input
+                                                                        value={item.unit || ''}
+                                                                        onChange={(e) =>
+                                                                            updateItem(sIndex, iIndex, {
+                                                                                unit: e.target.value,
+                                                                            })
+                                                                        }
+                                                                        placeholder="m³"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.0001"
+                                                                        value={item.quantity ?? ''}
+                                                                        onChange={(e) =>
+                                                                            updateItem(sIndex, iIndex, {
+                                                                                quantity: e.target.value,
+                                                                            })
+                                                                        }
+                                                                        className="text-right"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        value={item.unit_cost ?? ''}
+                                                                        onChange={(e) =>
+                                                                            updateItem(sIndex, iIndex, {
+                                                                                unit_cost: e.target.value,
+                                                                            })
+                                                                        }
+                                                                        className="text-right"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell className="text-right font-medium">
+                                                                    ₱{formatCurrency(qty * rate)}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex justify-end gap-1">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => addItem(sIndex, { ...item })}
+                                                                            title="Duplicate row"
+                                                                        >
+                                                                            <Copy size={14} />
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => removeItem(sIndex, iIndex)}
+                                                                            className="text-red-500 hover:bg-red-50"
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </Button>
+                                                                    </div>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                            <TableRow key={`${iIndex}-resource`}>
+                                                                <TableCell colSpan={7} className="bg-zinc-50/60 py-2">
+                                                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                                                        <select
+                                                                            value={item.resource_type || ''}
+                                                                            onChange={(e) =>
+                                                                                updateItem(sIndex, iIndex, {
+                                                                                    resource_type: e.target.value,
+                                                                                    planned_inventory_item_id: '',
+                                                                                    planned_direct_supply_id: '',
+                                                                                    planned_user_id: '',
+                                                                                    planned_employee_id: '',
+                                                                                })
+                                                                            }
+                                                                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                                                        >
+                                                                            <option value="">No resource link</option>
+                                                                            <option value="material">Material</option>
+                                                                            <option value="labor">Labor</option>
+                                                                        </select>
+
+                                                                        {item.resource_type === 'material' && (
+                                                                            <>
+                                                                                <select
+                                                                                    value={item.planned_inventory_item_id || ''}
+                                                                                    onChange={(e) =>
+                                                                                        updateItem(sIndex, iIndex, {
+                                                                                            planned_inventory_item_id: e.target.value,
+                                                                                            planned_direct_supply_id: '',
+                                                                                        })
+                                                                                    }
+                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                                                                >
+                                                                                    <option value="">Inventory item (optional)</option>
+                                                                                    {inventoryItems.map((inv) => (
+                                                                                        <option key={inv.id} value={inv.id}>
+                                                                                            {inv.code ? `${inv.code} - ` : ''}{inv.name}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                                <select
+                                                                                    value={item.planned_direct_supply_id || ''}
+                                                                                    onChange={(e) =>
+                                                                                        updateItem(sIndex, iIndex, {
+                                                                                            planned_direct_supply_id: e.target.value,
+                                                                                            planned_inventory_item_id: '',
+                                                                                        })
+                                                                                    }
+                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                                                                >
+                                                                                    <option value="">Direct supply (optional)</option>
+                                                                                    {directSupplies.map((supply) => (
+                                                                                        <option key={supply.id} value={supply.id}>
+                                                                                            {supply.code ? `${supply.code} - ` : ''}{supply.name}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </>
+                                                                        )}
+
+                                                                        {item.resource_type === 'labor' && (
+                                                                            <>
+                                                                                <select
+                                                                                    value={item.planned_user_id || ''}
+                                                                                    onChange={(e) =>
+                                                                                        updateItem(sIndex, iIndex, {
+                                                                                            planned_user_id: e.target.value,
+                                                                                            planned_employee_id: '',
+                                                                                        })
+                                                                                    }
+                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                                                                >
+                                                                                    <option value="">User (optional)</option>
+                                                                                    {users.map((person) => (
+                                                                                        <option key={`u-${person.id}`} value={person.id}>
+                                                                                            {person.name}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                                <select
+                                                                                    value={item.planned_employee_id || ''}
+                                                                                    onChange={(e) =>
+                                                                                        updateItem(sIndex, iIndex, {
+                                                                                            planned_employee_id: e.target.value,
+                                                                                            planned_user_id: '',
+                                                                                        })
+                                                                                    }
+                                                                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                                                                >
+                                                                                    <option value="">Employee (optional)</option>
+                                                                                    {employees.map((person) => (
+                                                                                        <option key={`e-${person.id}`} value={person.id}>
+                                                                                            {person.name}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        </Fragment>
                                                     );
                                                 }
                                             )}

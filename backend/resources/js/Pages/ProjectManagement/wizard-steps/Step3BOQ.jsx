@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { usePage } from "@inertiajs/react";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
@@ -40,6 +41,11 @@ const formatCurrency = (n) =>
   });
 
 export default function Step3BOQ({ errors = {} }) {
+  const { props } = usePage();
+  const inventoryItems = props.inventoryItems || [];
+  const directSupplyItems = props.directSupplyItems || [];
+  const assignables = props.users || [];
+
   const {
     boqSections,
     addBoqSection,
@@ -224,102 +230,208 @@ export default function Step3BOQ({ errors = {} }) {
                         const amount = qty * rate;
                         const descKey = `boq_sections.${sectionIndex}.items.${itemIndex}.description`;
                         return (
-                          <TableRow key={itemIndex}>
-                            <TableCell>
-                              <Input
-                                value={item.item_code || ""}
-                                onChange={(e) =>
-                                  updateBoqItem(sectionIndex, itemIndex, {
-                                    item_code: e.target.value,
-                                  })
-                                }
-                                placeholder={`${section.code || ""}.${itemIndex + 1}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                value={item.description || ""}
-                                onChange={(e) =>
-                                  updateBoqItem(sectionIndex, itemIndex, {
-                                    description: e.target.value,
-                                  })
-                                }
-                                placeholder="Describe the scope item"
-                              />
-                              {errors[descKey] && (
-                                <InputError message={errors[descKey]} />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                value={item.unit || ""}
-                                onChange={(e) =>
-                                  updateBoqItem(sectionIndex, itemIndex, {
-                                    unit: e.target.value,
-                                  })
-                                }
-                                placeholder="e.g. m³"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.0001"
-                                value={item.quantity ?? ""}
-                                onChange={(e) =>
-                                  updateBoqItem(sectionIndex, itemIndex, {
-                                    quantity: e.target.value,
-                                  })
-                                }
-                                className="text-right"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.unit_cost ?? ""}
-                                onChange={(e) =>
-                                  updateBoqItem(sectionIndex, itemIndex, {
-                                    unit_cost: e.target.value,
-                                  })
-                                }
-                                className="text-right"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              ₱{formatCurrency(amount)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    handleDuplicateItem(sectionIndex, itemIndex)
+                          <Fragment key={itemIndex}>
+                            <TableRow key={`${itemIndex}-main`}>
+                              <TableCell>
+                                <Input
+                                  value={item.item_code || ""}
+                                  onChange={(e) =>
+                                    updateBoqItem(sectionIndex, itemIndex, {
+                                      item_code: e.target.value,
+                                    })
                                   }
-                                  title="Duplicate row"
-                                  className="text-zinc-500 hover:text-zinc-800"
-                                >
-                                  <Copy size={14} />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    removeBoqItem(sectionIndex, itemIndex)
+                                  placeholder={`${section.code || ""}.${itemIndex + 1}`}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={item.description || ""}
+                                  onChange={(e) =>
+                                    updateBoqItem(sectionIndex, itemIndex, {
+                                      description: e.target.value,
+                                    })
                                   }
-                                  className="text-red-500 hover:bg-red-50 hover:text-red-700"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                                  placeholder="Describe the scope item"
+                                />
+                                {errors[descKey] && (
+                                  <InputError message={errors[descKey]} />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={item.unit || ""}
+                                  onChange={(e) =>
+                                    updateBoqItem(sectionIndex, itemIndex, {
+                                      unit: e.target.value,
+                                    })
+                                  }
+                                  placeholder="e.g. m³"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.0001"
+                                  value={item.quantity ?? ""}
+                                  onChange={(e) =>
+                                    updateBoqItem(sectionIndex, itemIndex, {
+                                      quantity: e.target.value,
+                                    })
+                                  }
+                                  className="text-right"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.unit_cost ?? ""}
+                                  onChange={(e) =>
+                                    updateBoqItem(sectionIndex, itemIndex, {
+                                      unit_cost: e.target.value,
+                                    })
+                                  }
+                                  className="text-right"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                ₱{formatCurrency(amount)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      handleDuplicateItem(sectionIndex, itemIndex)
+                                    }
+                                    title="Duplicate row"
+                                    className="text-zinc-500 hover:text-zinc-800"
+                                  >
+                                    <Copy size={14} />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      removeBoqItem(sectionIndex, itemIndex)
+                                    }
+                                    className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+
+                            <TableRow key={`${itemIndex}-resource`}>
+                              <TableCell colSpan={7} className="bg-zinc-50/60 py-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                  <select
+                                    value={item.resource_type || ""}
+                                    onChange={(e) =>
+                                      updateBoqItem(sectionIndex, itemIndex, {
+                                        resource_type: e.target.value,
+                                        planned_inventory_item_id: "",
+                                        planned_direct_supply_id: "",
+                                        planned_user_id: "",
+                                        planned_employee_id: "",
+                                      })
+                                    }
+                                    className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                  >
+                                    <option value="">No resource link</option>
+                                    <option value="material">Material</option>
+                                    <option value="labor">Labor</option>
+                                  </select>
+
+                                  {item.resource_type === "material" && (
+                                    <>
+                                      <select
+                                        value={item.planned_inventory_item_id || ""}
+                                        onChange={(e) =>
+                                          updateBoqItem(sectionIndex, itemIndex, {
+                                            planned_inventory_item_id: e.target.value,
+                                            planned_direct_supply_id: "",
+                                          })
+                                        }
+                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                      >
+                                        <option value="">Inventory item (optional)</option>
+                                        {inventoryItems.map((inv) => (
+                                          <option key={inv.id} value={inv.id}>
+                                            {inv.item_code ? `${inv.item_code} - ` : ""}{inv.item_name}
+                                          </option>
+                                        ))}
+                                      </select>
+
+                                      <select
+                                        value={item.planned_direct_supply_id || ""}
+                                        onChange={(e) =>
+                                          updateBoqItem(sectionIndex, itemIndex, {
+                                            planned_direct_supply_id: e.target.value,
+                                            planned_inventory_item_id: "",
+                                          })
+                                        }
+                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                      >
+                                        <option value="">Direct supply (optional)</option>
+                                        {directSupplyItems.map((supply) => (
+                                          <option key={supply.id} value={supply.id}>
+                                            {supply.supply_code ? `${supply.supply_code} - ` : ""}{supply.supply_name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </>
+                                  )}
+
+                                  {item.resource_type === "labor" && (
+                                    <>
+                                      <select
+                                        value={item.planned_user_id || ""}
+                                        onChange={(e) =>
+                                          updateBoqItem(sectionIndex, itemIndex, {
+                                            planned_user_id: e.target.value,
+                                            planned_employee_id: "",
+                                          })
+                                        }
+                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                      >
+                                        <option value="">User (optional)</option>
+                                        {assignables.filter((a) => a.type === "user").map((person) => (
+                                          <option key={`u-${person.id}`} value={person.id}>
+                                            {person.name}
+                                          </option>
+                                        ))}
+                                      </select>
+
+                                      <select
+                                        value={item.planned_employee_id || ""}
+                                        onChange={(e) =>
+                                          updateBoqItem(sectionIndex, itemIndex, {
+                                            planned_employee_id: e.target.value,
+                                            planned_user_id: "",
+                                          })
+                                        }
+                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
+                                      >
+                                        <option value="">Employee (optional)</option>
+                                        {assignables.filter((a) => a.type === "employee").map((person) => (
+                                          <option key={`e-${person.id}`} value={person.id}>
+                                            {person.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          </Fragment>
                         );
                       })}
                       {(section.items || []).length === 0 && (

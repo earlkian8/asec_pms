@@ -66,6 +66,26 @@ class UsersController extends Controller
         }
     }
 
+    private function syncCompensationProfile(User $user, array $validated): void
+    {
+        $payType = $validated['compensation_pay_type'] ?? null;
+
+        if (!$payType) {
+            $user->compensationProfiles()->where('is_active', true)->update(['is_active' => false]);
+            return;
+        }
+
+        $user->compensationProfiles()->where('is_active', true)->update(['is_active' => false]);
+
+        $user->compensationProfiles()->create([
+            'pay_type' => $payType,
+            'hourly_rate' => $payType === 'hourly' ? ($validated['compensation_hourly_rate'] ?? null) : null,
+            'monthly_salary' => $payType === 'monthly' ? ($validated['compensation_monthly_salary'] ?? null) : null,
+            'effective_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+    }
+
     // ── Shared rules ──────────────────────────────────────────────────────────
 
     private function baseRules(bool $isCreate = true, ?User $user = null): array
@@ -120,6 +140,10 @@ class UsersController extends Controller
             'tin_number'        => 'nullable|string|max:30',
 
             'notes' => 'nullable|string',
+
+            'compensation_pay_type' => 'nullable|in:hourly,monthly',
+            'compensation_hourly_rate' => 'nullable|numeric|min:0|required_if:compensation_pay_type,hourly',
+            'compensation_monthly_salary' => 'nullable|numeric|min:0|required_if:compensation_pay_type,monthly',
         ], $this->imageRules());
     }
 
@@ -252,6 +276,7 @@ class UsersController extends Controller
         ]);
 
         $user->assignRole($v['role']);
+        $this->syncCompensationProfile($user, $v);
         Cache::forget("user_permissions_{$user->id}");
 
         $sendCredentials = $request->boolean('send_credentials', true);
@@ -328,6 +353,7 @@ class UsersController extends Controller
 
         $user->update($data);
         $user->syncRoles([$v['role']]);
+        $this->syncCompensationProfile($user, $v);
         Cache::forget("user_permissions_{$user->id}");
 
         $this->adminActivityLogs('User', 'Update', "Updated User {$user->name} ({$user->email}) with role: {$v['role']}");

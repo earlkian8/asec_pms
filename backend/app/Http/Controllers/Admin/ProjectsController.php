@@ -163,7 +163,7 @@ class ProjectsController extends Controller
         $projectTypes = ProjectType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $clientTypes  = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        $users = User::with('roles')
+        $users = User::with(['roles', 'currentCompensationProfile'])
             ->orderBy('first_name')->orderBy('last_name')
             ->get(['id', 'first_name', 'middle_name', 'last_name', 'email'])
             ->map(fn ($u) => [
@@ -171,6 +171,7 @@ class ProjectsController extends Controller
             'name'  => $u->name,
             'email' => $u->email,
             'role'  => $u->roles->first()?->name ?? 'No Role',
+            'compensation' => $u->resolved_compensation,
             'type'  => 'user',
         ]);
 
@@ -181,7 +182,7 @@ class ProjectsController extends Controller
         //     ->pluck('employee_id')
         //     ->unique()->filter()->toArray();
 
-        $employees = Employee::where('is_active', true)
+        $employees = Employee::with('currentCompensationProfile')->where('is_active', true)
             // ->whereNotIn('id', $occupiedEmployeeIds)
             ->orderBy('first_name')->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'email', 'position'])
@@ -190,6 +191,7 @@ class ProjectsController extends Controller
                 'name'     => $e->first_name . ' ' . $e->last_name,
                 'email'    => $e->email,
                 'position' => $e->position ?? 'No Position',
+                'compensation' => $e->resolved_compensation,
                 'type'     => 'employee',
             ]);
 
@@ -338,7 +340,7 @@ class ProjectsController extends Controller
             'team_members.*.id'                        => ['required', 'integer'],
             'team_members.*.type'                      => ['required', 'in:user,employee'],
             'team_members.*.role'                      => ['required', 'string', 'max:50'],
-            'team_members.*.pay_type'                  => ['required', 'in:hourly,salary,fixed'],
+            'team_members.*.pay_type'                  => ['nullable', 'in:hourly,salary,fixed'],
             'team_members.*.hourly_rate'               => ['nullable', 'numeric', 'min:0'],
             'team_members.*.monthly_salary'            => ['nullable', 'numeric', 'min:0'],
             'team_members.*.start_date'                => ['required', 'date'],
@@ -378,6 +380,11 @@ class ProjectsController extends Controller
             'boq_sections.*.items.*.unit'                    => ['nullable', 'string', 'max:30'],
             'boq_sections.*.items.*.quantity'                => ['nullable', 'numeric', 'min:0'],
             'boq_sections.*.items.*.unit_cost'               => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.resource_type'           => ['nullable', 'in:material,labor'],
+            'boq_sections.*.items.*.planned_inventory_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'boq_sections.*.items.*.planned_direct_supply_id' => ['nullable', 'exists:direct_supplies,id'],
+            'boq_sections.*.items.*.planned_user_id'         => ['nullable', 'exists:users,id'],
+            'boq_sections.*.items.*.planned_employee_id'     => ['nullable', 'exists:employees,id'],
             'boq_sections.*.items.*.remarks'                 => ['nullable', 'string'],
             'boq_sections.*.items.*.sort_order'              => ['nullable', 'integer', 'min:0'],
         ]);
@@ -429,6 +436,7 @@ class ProjectsController extends Controller
             $laborCosts = $canCreateLaborCosts ? ($validated['labor_costs'] ?? []) : [];
 
             if (!empty($teamMembers)) {
+                $teamCompensations = [];
                 foreach ($teamMembers as $index => $member) {
                     if ($member['type'] === 'user' && !\App\Models\User::where('id', $member['id'])->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid user.']]);
@@ -436,6 +444,7 @@ class ProjectsController extends Controller
                     if ($member['type'] === 'employee' && !\App\Models\Employee::where('id', $member['id'])->where('is_active', true)->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid employee.']]);
                     }
+                    $teamCompensations[$index] = $this->resolveAssignableCompensation($member['type'], (int) $member['id']);
                     // Rotation guard: employees cannot be on two projects at once
                     // if ($member['type'] === 'employee') {
                     //     $occupied = ProjectTeam::occupied()
@@ -448,16 +457,17 @@ class ProjectsController extends Controller
                     //     }
                     // }
                 }
-                foreach ($validated['team_members'] as $member) {
+                foreach ($validated['team_members'] as $index => $member) {
+                    $compensation = $teamCompensations[$index];
                     ProjectTeam::create([
                         'project_id'        => $project->id,
                         'user_id'           => $member['type'] === 'user' ? $member['id'] : null,
                         'employee_id'       => $member['type'] === 'employee' ? $member['id'] : null,
                         'assignable_type'   => $member['type'],
                         'role'              => $member['role'],
-                        'pay_type'          => $member['pay_type']       ?? 'hourly',
-                        'hourly_rate'       => $member['hourly_rate']    ?? null,
-                        'monthly_salary'    => $member['monthly_salary'] ?? null,
+                        'pay_type'          => $compensation['pay_type'],
+                        'hourly_rate'       => $compensation['hourly_rate'],
+                        'monthly_salary'    => $compensation['monthly_salary'],
                         'start_date'        => $member['start_date'],
                         'end_date'          => $member['end_date'] ?? null,
                         'is_active'         => true,
@@ -490,6 +500,11 @@ class ProjectsController extends Controller
                             'quantity'               => $quantity,
                             'unit_cost'              => $unitCost,
                             'total_cost'             => round($quantity * $unitCost, 2),
+                            'resource_type'          => $item['resource_type'] ?? null,
+                            'planned_inventory_item_id' => $item['planned_inventory_item_id'] ?? null,
+                            'planned_direct_supply_id' => $item['planned_direct_supply_id'] ?? null,
+                            'planned_user_id'        => $item['planned_user_id'] ?? null,
+                            'planned_employee_id'    => $item['planned_employee_id'] ?? null,
                             'remarks'                => $item['remarks'] ?? null,
                             'sort_order'             => $item['sort_order'] ?? $itemIndex,
                         ]);
@@ -632,7 +647,33 @@ class ProjectsController extends Controller
 
     public function show(Project $project, Request $request)
     {
-        $project->load(['client', 'projectType', 'boqSections.items']);
+        $project->load([
+            'client',
+            'projectType',
+            'boqSections.items.plannedInventoryItem:id,item_name,item_code',
+            'boqSections.items.plannedDirectSupply:id,supply_name,supply_code',
+            'boqSections.items.plannedUser:id,first_name,last_name',
+            'boqSections.items.plannedEmployee:id,first_name,last_name',
+        ]);
+
+        $resourceUsers = User::orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''))]);
+
+        $resourceEmployees = Employee::where('is_active', true)
+            ->orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($e) => ['id' => $e->id, 'name' => trim(($e->first_name ?? '') . ' ' . ($e->last_name ?? ''))]);
+
+        $resourceInventoryItems = InventoryItem::where('is_active', true)
+            ->orderBy('item_name')
+            ->get(['id', 'item_code', 'item_name'])
+            ->map(fn ($i) => ['id' => $i->id, 'name' => $i->item_name, 'code' => $i->item_code]);
+
+        $resourceDirectSupplies = DirectSupply::where('is_active', true)
+            ->orderBy('supply_name')
+            ->get(['id', 'supply_code', 'supply_name'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->supply_name, 'code' => $s->supply_code]);
 
         $materialActualByItem = ProjectMaterialAllocation::query()
             ->where('project_id', $project->id)
@@ -670,6 +711,31 @@ class ProjectsController extends Controller
                         'quantity'    => (float) $item->quantity,
                         'unit_cost'   => (float) $item->unit_cost,
                         'total_cost'  => $plannedCost,
+                        'resource_type' => $item->resource_type,
+                        'planned_inventory_item_id' => $item->planned_inventory_item_id,
+                        'planned_direct_supply_id' => $item->planned_direct_supply_id,
+                        'planned_user_id' => $item->planned_user_id,
+                        'planned_employee_id' => $item->planned_employee_id,
+                        'resource_link' => [
+                            'inventory_item' => $item->plannedInventoryItem ? [
+                                'id' => $item->plannedInventoryItem->id,
+                                'code' => $item->plannedInventoryItem->item_code,
+                                'name' => $item->plannedInventoryItem->item_name,
+                            ] : null,
+                            'direct_supply' => $item->plannedDirectSupply ? [
+                                'id' => $item->plannedDirectSupply->id,
+                                'code' => $item->plannedDirectSupply->supply_code,
+                                'name' => $item->plannedDirectSupply->supply_name,
+                            ] : null,
+                            'user' => $item->plannedUser ? [
+                                'id' => $item->plannedUser->id,
+                                'name' => trim(($item->plannedUser->first_name ?? '') . ' ' . ($item->plannedUser->last_name ?? '')),
+                            ] : null,
+                            'employee' => $item->plannedEmployee ? [
+                                'id' => $item->plannedEmployee->id,
+                                'name' => trim(($item->plannedEmployee->first_name ?? '') . ' ' . ($item->plannedEmployee->last_name ?? '')),
+                            ] : null,
+                        ],
                         'remarks'     => $item->remarks,
                         'sort_order'  => $item->sort_order,
                         'planned_vs_actual' => [
@@ -699,6 +765,12 @@ class ProjectsController extends Controller
             'boq_variance'          => $boqPlannedTotal - $boqActualTotal,
             'contract_variance'     => $contractAmount - $boqPlannedTotal,
             'is_over_contract'      => $contractAmount > 0 ? $boqPlannedTotal > $contractAmount : false,
+            'resource_options' => [
+                'inventory_items' => $resourceInventoryItems,
+                'direct_supplies' => $resourceDirectSupplies,
+                'users' => $resourceUsers,
+                'employees' => $resourceEmployees,
+            ],
         ];
 
         $teamData                 = $this->projectTeamService->getProjectTeamData($project);
@@ -737,6 +809,29 @@ class ProjectsController extends Controller
         }
 
         return round($total, 2);
+    }
+
+    private function resolveAssignableCompensation(string $assignableType, int $assignableId): array
+    {
+        if ($assignableType === 'user') {
+            $profile = User::with('currentCompensationProfile')->find($assignableId)?->currentCompensationProfile;
+        } else {
+            $profile = Employee::with('currentCompensationProfile')->find($assignableId)?->currentCompensationProfile;
+        }
+
+        if (!$profile) {
+            throw ValidationException::withMessages([
+                'team_members' => ['Selected member has no active compensation profile. Please configure salary profile first.'],
+            ]);
+        }
+
+        $resolvedPayType = $profile->pay_type === 'monthly' ? 'salary' : $profile->pay_type;
+
+        return [
+            'pay_type' => $resolvedPayType,
+            'hourly_rate' => $profile->hourly_rate,
+            'monthly_salary' => $profile->monthly_salary,
+        ];
     }
 
     public function destroyRequestUpdate(Project $project, ClientUpdateRequest $clientUpdateRequest)

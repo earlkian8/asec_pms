@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use App\Models\CompensationProfile;
 
 class User extends Authenticatable
 {
@@ -73,6 +74,7 @@ class User extends Authenticatable
         'philhealth_id_image_url',
         'pagibig_id_image_url',
         'tin_id_image_url',
+        'resolved_compensation',
     ];
 
     protected function casts(): array
@@ -140,5 +142,32 @@ class User extends Authenticatable
     public function chats()
     {
         return $this->hasMany(Chat::class);
+    }
+
+    public function compensationProfiles()
+    {
+        return $this->morphMany(CompensationProfile::class, 'profileable');
+    }
+
+    public function currentCompensationProfile()
+    {
+        return $this->morphOne(CompensationProfile::class, 'profileable')
+            ->where('is_active', true)
+            ->latestOfMany('effective_date');
+    }
+
+    public function getResolvedCompensationAttribute(): array
+    {
+        $profile = $this->relationLoaded('currentCompensationProfile')
+            ? $this->currentCompensationProfile
+            : $this->currentCompensationProfile()->first();
+
+        return [
+            'pay_type' => $profile?->pay_type ?? 'salary',
+            'hourly_rate' => $profile?->hourly_rate !== null ? (float) $profile->hourly_rate : null,
+            'monthly_salary' => $profile?->monthly_salary !== null ? (float) $profile->monthly_salary : null,
+            'effective_date' => $profile?->effective_date?->toDateString(),
+            'is_profile_based' => $profile !== null,
+        ];
     }
 }

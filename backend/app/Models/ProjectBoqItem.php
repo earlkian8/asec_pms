@@ -18,6 +18,11 @@ class ProjectBoqItem extends Model
         'quantity',
         'unit_cost',
         'total_cost',
+        'resource_type',
+        'planned_inventory_item_id',
+        'planned_direct_supply_id',
+        'planned_user_id',
+        'planned_employee_id',
         'remarks',
         'sort_order',
     ];
@@ -26,6 +31,10 @@ class ProjectBoqItem extends Model
         'quantity'   => 'decimal:4',
         'unit_cost'  => 'decimal:2',
         'total_cost' => 'decimal:2',
+        'planned_inventory_item_id' => 'integer',
+        'planned_direct_supply_id' => 'integer',
+        'planned_user_id' => 'integer',
+        'planned_employee_id' => 'integer',
         'sort_order' => 'integer',
     ];
 
@@ -48,6 +57,26 @@ class ProjectBoqItem extends Model
     public function section()
     {
         return $this->belongsTo(ProjectBoqSection::class, 'project_boq_section_id');
+    }
+
+    public function plannedInventoryItem()
+    {
+        return $this->belongsTo(InventoryItem::class, 'planned_inventory_item_id');
+    }
+
+    public function plannedDirectSupply()
+    {
+        return $this->belongsTo(DirectSupply::class, 'planned_direct_supply_id');
+    }
+
+    public function plannedUser()
+    {
+        return $this->belongsTo(User::class, 'planned_user_id');
+    }
+
+    public function plannedEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'planned_employee_id');
     }
 
     public function materialAllocations()

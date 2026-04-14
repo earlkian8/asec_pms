@@ -53,6 +53,26 @@ class EmployeesController extends Controller
         return $existing;
     }
 
+    private function syncCompensationProfile(Employee $employee, array $validated): void
+    {
+        $payType = $validated['compensation_pay_type'] ?? null;
+
+        if (!$payType) {
+            $employee->compensationProfiles()->where('is_active', true)->update(['is_active' => false]);
+            return;
+        }
+
+        $employee->compensationProfiles()->where('is_active', true)->update(['is_active' => false]);
+
+        $employee->compensationProfiles()->create([
+            'pay_type' => $payType,
+            'hourly_rate' => $payType === 'hourly' ? ($validated['compensation_hourly_rate'] ?? null) : null,
+            'monthly_salary' => $payType === 'monthly' ? ($validated['compensation_monthly_salary'] ?? null) : null,
+            'effective_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+    }
+
     // ── Shared validation rules ───────────────────────────────────────────────
 
     private function baseRules(bool $isCreate = true, ?Employee $employee = null): array
@@ -98,6 +118,10 @@ class EmployeesController extends Controller
             'tin_number'        => ['nullable', 'string', 'max:30'],
 
             'notes' => ['nullable', 'string'],
+
+            'compensation_pay_type' => ['nullable', 'in:hourly,monthly'],
+            'compensation_hourly_rate' => ['nullable', 'numeric', 'min:0', 'required_if:compensation_pay_type,hourly'],
+            'compensation_monthly_salary' => ['nullable', 'numeric', 'min:0', 'required_if:compensation_pay_type,monthly'],
         ], $this->imageRules());
     }
 
@@ -206,6 +230,8 @@ class EmployeesController extends Controller
             'notes' => $v['notes'] ?? null,
         ]);
 
+        $this->syncCompensationProfile($employee, $v);
+
         $this->adminActivityLogs('Employee', 'Add', "Added Employee {$employee->full_name} ({$employee->employee_id})");
         $this->createSystemNotification(
             'general', 'New Employee Added',
@@ -263,6 +289,8 @@ class EmployeesController extends Controller
 
             'notes' => $v['notes'] ?? null,
         ]);
+
+        $this->syncCompensationProfile($employee, $v);
 
         $this->adminActivityLogs('Employee', 'Update', "Updated Employee {$oldName} to {$employee->full_name}");
         $this->createSystemNotification(

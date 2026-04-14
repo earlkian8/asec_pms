@@ -30,7 +30,7 @@ const TABS = [
 ];
 
 const TAB_FIELDS = {
-  account:   ['first_name', 'middle_name', 'last_name', 'email', 'role'],
+  account:   ['first_name', 'middle_name', 'last_name', 'email', 'role', 'compensation_pay_type', 'compensation_hourly_rate', 'compensation_monthly_salary'],
   personal:  ['profile_image', 'phone', 'secondary_phone', 'gender', 'date_of_birth',
                'civil_status', 'nationality', 'region', 'province', 'city_municipality',
                'barangay', 'address', 'zip_code', 'notes'],
@@ -116,6 +116,9 @@ const AddUser = ({ setShowAddModal, roles }) => {
     last_name: '',
     email: '',
     role: '',
+    compensation_pay_type: '',
+    compensation_hourly_rate: '',
+    compensation_monthly_salary: '',
 
     // Personal
     profile_image: null,
@@ -324,6 +327,66 @@ const AddUser = ({ setShowAddModal, roles }) => {
                     </Select>
                     <InputError message={errors.role} />
                   </div>
+                </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mt-2">Compensation Profile</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-zinc-800">Pay Type</Label>
+                    <Select
+                      value={data.compensation_pay_type}
+                      onValueChange={(value) => {
+                        setData('compensation_pay_type', value);
+                        if (value === 'hourly') {
+                          setData('compensation_monthly_salary', '');
+                        } else {
+                          setData('compensation_hourly_rate', '');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className={inputClass(errors.compensation_pay_type)}>
+                        <SelectValue placeholder="Select pay type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Hourly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <InputError message={errors.compensation_pay_type} />
+                  </div>
+
+                  {data.compensation_pay_type === 'hourly' && (
+                    <div>
+                      <Label className="text-zinc-800">Hourly Rate</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={data.compensation_hourly_rate}
+                        onChange={e => setData('compensation_hourly_rate', e.target.value)}
+                        placeholder="0.00"
+                        className={inputClass(errors.compensation_hourly_rate)}
+                      />
+                      <InputError message={errors.compensation_hourly_rate} />
+                    </div>
+                  )}
+
+                  {data.compensation_pay_type === 'monthly' && (
+                    <div>
+                      <Label className="text-zinc-800">Monthly Salary</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={data.compensation_monthly_salary}
+                        onChange={e => setData('compensation_monthly_salary', e.target.value)}
+                        placeholder="0.00"
+                        className={inputClass(errors.compensation_monthly_salary)}
+                      />
+                      <InputError message={errors.compensation_monthly_salary} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}

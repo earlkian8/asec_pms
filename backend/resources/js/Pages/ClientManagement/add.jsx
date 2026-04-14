@@ -16,6 +16,7 @@ import { Button } from '@/Components/ui/button';
 import { Switch } from '@/Components/ui/switch';
 import { Textarea } from '@/Components/ui/textarea';
 import { Loader2, Save, Mail, KeyRound } from 'lucide-react';
+import PhilippineAddressSelector from '../UserManagement/Users/PhilippineAddressSelector';
 import {
   Select,
   SelectContent,
@@ -31,15 +32,12 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
     contact_person: '',
     email: '',
     phone_number: '',
+    region: '',
     address: '',
-    city: '',
     province: '',
-    postal_code: '',
-    country: '',
-    tax_id: '',
-    business_permit: '',
-    credit_limit: '',
-    payment_terms: '',
+    city_municipality: '',
+    barangay: '',
+    zip_code: '',
     is_active: true,
     notes: '',
     send_credentials: true,
@@ -243,121 +241,14 @@ const AddClient = ({ setShowAddModal, clientTypes }) => {
             <InputError message={errors.phone_number} />
           </div>
 
-          {/* Address */}
           <div className="md:col-span-2">
             <Label className="text-zinc-800">Address</Label>
-            <Input
-              type="text"
-              value={data.address}
-              onChange={e => setData('address', e.target.value)}
-              placeholder="Address"
-              className={inputClass(errors.address)}
+            <PhilippineAddressSelector
+              value={data}
+              onChange={(field, value) => setData(field, value)}
+              errors={errors}
+              streetKey="address"
             />
-            <InputError message={errors.address} />
-          </div>
-
-          {/* City */}
-          <div>
-            <Label className="text-zinc-800">City</Label>
-            <Input
-              type="text"
-              value={data.city}
-              onChange={e => setData('city', e.target.value)}
-              placeholder="City"
-              className={inputClass(errors.city)}
-            />
-            <InputError message={errors.city} />
-          </div>
-
-          {/* Province */}
-          <div>
-            <Label className="text-zinc-800">Province</Label>
-            <Input
-              type="text"
-              value={data.province}
-              onChange={e => setData('province', e.target.value)}
-              placeholder="Province"
-              className={inputClass(errors.province)}
-            />
-            <InputError message={errors.province} />
-          </div>
-
-          {/* Postal Code */}
-          <div>
-            <Label className="text-zinc-800">Postal Code</Label>
-            <Input
-              type="text"
-              value={data.postal_code}
-              onChange={e => setData('postal_code', e.target.value)}
-              placeholder="Postal Code"
-              className={inputClass(errors.postal_code)}
-            />
-            <InputError message={errors.postal_code} />
-          </div>
-
-          {/* Country */}
-          <div>
-            <Label className="text-zinc-800">Country</Label>
-            <Input
-              type="text"
-              value={data.country}
-              onChange={e => setData('country', e.target.value)}
-              placeholder="Country"
-              className={inputClass(errors.country)}
-            />
-            <InputError message={errors.country} />
-          </div>
-
-          {/* Tax ID */}
-          <div>
-            <Label className="text-zinc-800">Tax ID</Label>
-            <Input
-              type="text"
-              value={data.tax_id}
-              onChange={e => setData('tax_id', e.target.value)}
-              placeholder="Tax ID"
-              className={inputClass(errors.tax_id)}
-            />
-            <InputError message={errors.tax_id} />
-          </div>
-
-          {/* Business Permit */}
-          <div>
-            <Label className="text-zinc-800">Business Permit</Label>
-            <Input
-              type="text"
-              value={data.business_permit}
-              onChange={e => setData('business_permit', e.target.value)}
-              placeholder="Business Permit"
-              className={inputClass(errors.business_permit)}
-            />
-            <InputError message={errors.business_permit} />
-          </div>
-
-          {/* Credit Limit */}
-          <div>
-            <Label className="text-zinc-800">Credit Limit</Label>
-            <Input
-              type="number"
-              value={data.credit_limit}
-              onChange={e => setData('credit_limit', e.target.value)}
-              placeholder="Credit Limit"
-              className={inputClass(errors.credit_limit)}
-            />
-            <InputError message={errors.credit_limit} />
-          </div>
-
-          {/* Payment Terms */}
-          <div>
-            <Label className="text-zinc-800">Payment Terms</Label>
-            <Input
-              type="text"
-              value={data.payment_terms}
-              onChange={e => setData('payment_terms', e.target.value)}
-              placeholder="Payment Terms"
-              className={inputClass(errors.payment_terms)}
-            />
-            <InputError message={errors.payment_terms} />
           </div>
 
           {/* Notes */}

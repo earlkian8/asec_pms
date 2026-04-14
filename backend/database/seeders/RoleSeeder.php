@@ -20,6 +20,61 @@ class RoleSeeder extends Seeder
         // Get all permissions
         $allPermissions = Permission::all()->pluck('name')->toArray();
 
+        $projectManagementPermissions = [
+            'dashboard.view',
+            'projects.view', 'projects.create', 'projects.update', 'projects.view-all',
+            'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
+            'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
+            'project-milestones.view', 'project-milestones.view-detail', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
+            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
+            'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
+            'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
+            'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
+            'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
+            'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete',
+            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', 'miscellaneous-expenses.delete',
+            'clients.view',
+            'employees.view',
+            'inventory.view',
+            'billing.view',
+            'reports.view', 'reports.project-performance',
+        ];
+
+        $financePermissions = [
+            'dashboard.view',
+            'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments',
+            'projects.view',
+            'clients.view',
+            'reports.view', 'reports.financial', 'reports.budget',
+        ];
+
+        $inventoryPermissions = [
+            'dashboard.view',
+            'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate',
+            'projects.view',
+            'project-milestones.view', 'project-milestones.view-detail',
+            'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
+            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
+            'reports.view', 'reports.inventory',
+        ];
+
+        $foremanPermissions = [
+            'dashboard.view',
+            'projects.view', 'projects.view-all',
+            'project-teams.view',
+            'project-milestones.view', 'project-milestones.view-detail',
+            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
+            'project-tasks.view', 'project-tasks.update', 'project-tasks.update-status',
+            'progress-updates.view', 'progress-updates.create', 'progress-updates.update',
+            'project-files.view', 'project-files.upload', 'project-files.download',
+            'project-issues.view', 'project-issues.create', 'project-issues.update',
+            'material-allocations.view', 'material-allocations.receiving-report',
+            'labor-costs.view', 'labor-costs.create', 'labor-costs.update',
+            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update',
+            'employees.view',
+            'reports.view', 'reports.project-performance',
+        ];
+
         // 1. Super Admin - All permissions
         $superAdmin = Role::firstOrCreate(
             ['name' => 'Super Admin', 'guard_name' => 'web'],
@@ -42,8 +97,8 @@ class RoleSeeder extends Seeder
         );
         $admin->syncPermissions([
             'dashboard.view',
-            'projects.view', 'projects.create', 'projects.update', 'projects.delete', 'projects.view-all',
-            'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
+            'projects.view', 'projects.create', 'projects.update', 'projects.delete', 'projects.view-all', 'projects.archive',
+            'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete', 'project-teams.rotate',
             'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
             'project-milestones.view', 'project-milestones.view-detail', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
             'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
@@ -55,8 +110,8 @@ class RoleSeeder extends Seeder
             'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', 'miscellaneous-expenses.delete',
             'clients.view', 'clients.create', 'clients.update', 'clients.delete', 'clients.update-status',
             'employees.view', 'employees.create', 'employees.update', 'employees.delete', 'employees.update-status',
-            'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate',
-            'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments',
+            'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate', 'inventory.archive',
+            'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments', 'billing.archive',
             'reports.view', 'reports.project-performance', 'reports.financial', 'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget',
         ]);
         $this->clearUserPermissionCacheForRole($admin);
@@ -66,25 +121,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Project Manager', 'guard_name' => 'web'],
             ['name' => 'Project Manager', 'guard_name' => 'web']
         );
-        $projectManager->syncPermissions([
-            'dashboard.view',
-            'projects.view', 'projects.create', 'projects.update', 'projects.delete', 'projects.view-all',
-            'project-teams.view', 'project-teams.create', 'project-teams.update', 'project-teams.delete',
-            'project-files.view', 'project-files.upload', 'project-files.update', 'project-files.delete', 'project-files.download',
-            'project-milestones.view', 'project-milestones.view-detail', 'project-milestones.create', 'project-milestones.update', 'project-milestones.delete',
-            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
-            'project-tasks.view', 'project-tasks.create', 'project-tasks.update', 'project-tasks.delete', 'project-tasks.update-status',
-            'progress-updates.view', 'progress-updates.create', 'progress-updates.update', 'progress-updates.delete',
-            'project-issues.view', 'project-issues.create', 'project-issues.update', 'project-issues.delete',
-            'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
-            'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete',
-            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', 'miscellaneous-expenses.delete',
-            'clients.view', // View only
-            'employees.view', // View only
-            'inventory.view', 'inventory.allocate',
-            'billing.view', 'billing.create', 'billing.update',
-            'reports.view', 'reports.project-performance',
-        ]);
+        $projectManager->syncPermissions($projectManagementPermissions);
         $this->clearUserPermissionCacheForRole($projectManager);
 
         // 4. Finance Manager
@@ -92,13 +129,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Finance Manager', 'guard_name' => 'web'],
             ['name' => 'Finance Manager', 'guard_name' => 'web']
         );
-        $financeManager->syncPermissions([
-            'dashboard.view',
-            'billing.view', 'billing.create', 'billing.update', 'billing.delete', 'billing.add-payment', 'billing.view-payments',
-            'projects.view', // View only
-            'clients.view', // View only
-            'reports.view', 'reports.financial', 'reports.budget',
-        ]);
+        $financeManager->syncPermissions($financePermissions);
         $this->clearUserPermissionCacheForRole($financeManager);
 
         // 5. Inventory Manager
@@ -106,15 +137,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Inventory Manager', 'guard_name' => 'web'],
             ['name' => 'Inventory Manager', 'guard_name' => 'web']
         );
-        $inventoryManager->syncPermissions([
-            'dashboard.view',
-            'inventory.view', 'inventory.create', 'inventory.update', 'inventory.delete', 'inventory.stock-in', 'inventory.stock-out', 'inventory.allocate',
-            'projects.view', // View only for context
-            'project-milestones.view', 'project-milestones.view-detail', // View milestone details for material context
-            'material-allocations.view', 'material-allocations.create', 'material-allocations.update', 'material-allocations.delete', 'material-allocations.receiving-report',
-            'milestone-material-usage.view',
-            'reports.view', 'reports.inventory',
-        ]);
+        $inventoryManager->syncPermissions($inventoryPermissions);
         $this->clearUserPermissionCacheForRole($inventoryManager);
 
         // 6. Foreman - Field supervisor with project execution capabilities
@@ -122,22 +145,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Foreman', 'guard_name' => 'web'],
             ['name' => 'Foreman', 'guard_name' => 'web']
         );
-        $foreman->syncPermissions([
-            'dashboard.view',
-            'projects.view', 'projects.view-all', // View assigned projects
-            'project-teams.view', // View team members
-            'project-milestones.view', 'project-milestones.view-detail', // View milestones
-            'milestone-material-usage.view', 'milestone-material-usage.create', 'milestone-material-usage.update', 'milestone-material-usage.delete',
-            'project-tasks.view', 'project-tasks.update', 'project-tasks.update-status', // Manage tasks
-            'progress-updates.view', 'progress-updates.create', 'progress-updates.update', // Create and update progress
-            'project-files.view', 'project-files.upload', 'project-files.download', // View and upload files
-            'project-issues.view', 'project-issues.create', 'project-issues.update', // Report and manage issues
-            'material-allocations.view', 'material-allocations.receiving-report', // View allocations and create receiving reports
-            'labor-costs.view', 'labor-costs.create', 'labor-costs.update', // Track labor costs
-            'miscellaneous-expenses.view', 'miscellaneous-expenses.create', 'miscellaneous-expenses.update', // Track expenses
-            'employees.view', // View employees for team context
-            'reports.view', 'reports.project-performance', // View project reports
-        ]);
+        $foreman->syncPermissions($foremanPermissions);
         $this->clearUserPermissionCacheForRole($foreman);
 
         // 7. Foreman (TM) - Task-management app execution only (permission-driven)

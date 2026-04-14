@@ -148,13 +148,14 @@ class AlphaTestingSeeder extends Seeder
                 'password_changed_at' => now(),
                 'phone_number' => '+639171234567',
                 'address' => '123 Alpha Street',
+                'region' => 'NCR',
                 'city' => 'Manila',
                 'province' => 'Metro Manila',
+                'city_municipality' => 'Manila',
+                'barangay' => 'Barangay 1',
                 'postal_code' => '1000',
+                'zip_code' => '1000',
                 'country' => 'Philippines',
-                'tax_id' => 'TIN-123-456-789',
-                'credit_limit' => 5000000,
-                'payment_terms' => 'Net 30',
                 'is_active' => true,
             ]
         );
@@ -170,6 +171,9 @@ class AlphaTestingSeeder extends Seeder
         ];
 
         foreach ($additionalClients as $data) {
+            $city = fake()->randomElement(['Manila', 'Quezon City', 'Makati', 'Cebu City']);
+            $zipCode = fake()->numerify('####');
+
             $client = Client::firstOrCreate(
                 ['client_code' => $data['client_code']],
                 array_merge($data, [
@@ -177,11 +181,14 @@ class AlphaTestingSeeder extends Seeder
                     'email' => 'client' . substr($data['client_code'], -4) . '@alpha-test.com',
                     'phone_number' => '+63' . rand(9000000000, 9999999999),
                     'address' => fake()->streetAddress(),
-                    'city' => fake()->randomElement(['Manila', 'Quezon City', 'Makati', 'Cebu City']),
+                    'region' => fake()->randomElement(['NCR', 'CALABARZON', 'Central Luzon']),
+                    'city' => $city,
                     'province' => 'Metro Manila',
+                    'city_municipality' => $city,
+                    'barangay' => fake()->citySuffix(),
                     'country' => 'Philippines',
-                    'credit_limit' => rand(500000, 2000000),
-                    'payment_terms' => fake()->randomElement(['Net 30', 'Net 15', 'Net 45']),
+                    'postal_code' => $zipCode,
+                    'zip_code' => $zipCode,
                     'is_active' => true,
                 ])
             );

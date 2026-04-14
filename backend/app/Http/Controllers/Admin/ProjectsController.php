@@ -367,12 +367,19 @@ class ProjectsController extends Controller
 
         DB::beginTransaction();
         try {
+            $user = $request->user();
+            $canCreateTeamMembers = $user?->can('project-teams.create') ?? false;
+            $canCreateMilestones = $user?->can('project-milestones.create') ?? false;
+            $canCreateMaterialAllocations = $user?->can('material-allocations.create') ?? false;
+            $canCreateLaborCosts = $user?->can('labor-costs.create') ?? false;
+
             do {
                 $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
                 $projectCode = 'PRJ-' . $random;
             } while (Project::where('project_code', $projectCode)->exists());
 
             $validated['project_code'] = $projectCode;
+            $validated['status'] = $validated['status'] ?? 'active';
 
             foreach (self::DOCUMENT_FIELDS as $fieldName) {
                 if ($request->hasFile($fieldName)) {
@@ -384,9 +391,13 @@ class ProjectsController extends Controller
             }
 
             $project = Project::create($validated);
+            $teamMembers = $canCreateTeamMembers ? ($validated['team_members'] ?? []) : [];
+            $milestones = $canCreateMilestones ? ($validated['milestones'] ?? []) : [];
+            $materialAllocations = $canCreateMaterialAllocations ? ($validated['material_allocations'] ?? []) : [];
+            $laborCosts = $canCreateLaborCosts ? ($validated['labor_costs'] ?? []) : [];
 
-            if (!empty($validated['team_members'])) {
-                foreach ($validated['team_members'] as $index => $member) {
+            if (!empty($teamMembers)) {
+                foreach ($teamMembers as $index => $member) {
                     if ($member['type'] === 'user' && !\App\Models\User::where('id', $member['id'])->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid user.']]);
                     }
@@ -423,8 +434,8 @@ class ProjectsController extends Controller
                 }
             }
 
-            if (!empty($validated['milestones'])) {
-                foreach ($validated['milestones'] as $milestone) {
+            if (!empty($milestones)) {
+                foreach ($milestones as $milestone) {
                     ProjectMilestone::create([
                         'project_id'         => $project->id,
                         'name'               => $milestone['name'],
@@ -437,8 +448,8 @@ class ProjectsController extends Controller
                 }
             }
 
-            if (!empty($validated['material_allocations'])) {
-                foreach ($validated['material_allocations'] as $allocation) {
+            if (!empty($materialAllocations)) {
+                foreach ($materialAllocations as $allocation) {
                     ProjectMaterialAllocation::create([
                         'project_id'         => $project->id,
                         'inventory_item_id'  => $allocation['inventory_item_id'] ?? null,
@@ -454,8 +465,8 @@ class ProjectsController extends Controller
                 }
             }
 
-            if (!empty($validated['labor_costs'])) {
-                foreach ($validated['labor_costs'] as $index => $laborCost) {
+            if (!empty($laborCosts)) {
+                foreach ($laborCosts as $index => $laborCost) {
                     if ($laborCost['assignable_type'] === 'user' && !\App\Models\User::where('id', $laborCost['assignable_id'])->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["labor_costs.{$index}.assignable_id" => ['Invalid user.']]);
                     }
@@ -463,7 +474,7 @@ class ProjectsController extends Controller
                         throw \Illuminate\Validation\ValidationException::withMessages(["labor_costs.{$index}.assignable_id" => ['Invalid employee.']]);
                     }
                 }
-                foreach ($validated['labor_costs'] as $laborCost) {
+                foreach ($laborCosts as $laborCost) {
                     ProjectLaborCost::create([
                         'project_id'      => $project->id,
                         'user_id'         => $laborCost['assignable_type'] === 'user' ? $laborCost['assignable_id'] : null,

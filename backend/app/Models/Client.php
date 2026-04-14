@@ -22,14 +22,14 @@ class Client extends Authenticatable
         'password_changed_at',
         'phone_number',
         'address',
+        'region',
         'city',
         'province',
+        'city_municipality',
+        'barangay',
         'postal_code',
+        'zip_code',
         'country',
-        'tax_id',
-        'business_permit',
-        'credit_limit',
-        'payment_terms',
         'is_active',
         'notes',
         'push_token',
@@ -37,11 +37,9 @@ class Client extends Authenticatable
 
     protected $hidden = [
         'password',
-        'remember_token',
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'password_changed_at' => 'datetime',
         'is_active' => 'boolean',

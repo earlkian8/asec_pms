@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { router } from "@inertiajs/react";
 import { toast } from "sonner";
 import { Button } from "@/Components/ui/button";
@@ -16,18 +16,55 @@ import Step2TeamMembers from "./wizard-steps/Step2TeamMembers";
 import Step3Milestones from "./wizard-steps/Step3Milestones";
 import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { usePermission } from "@/utils/permissions";
+
+const WIZARD_STEP_PERMISSIONS = [
+  "projects.create",
+  "project-teams.create",
+  "project-milestones.create",
+  "material-allocations.create",
+];
+
+const buildWizardSteps = ({ clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors }) => [
+  {
+    key: "project-information",
+    title: "Project Information",
+    permission: "projects.create",
+    render: () => <Step1ProjectInfo clients={clients} projectTypes={projectTypes} clientTypes={clientTypes} errors={errors} />,
+  },
+  {
+    key: "team-members",
+    title: "Team Members",
+    permission: "project-teams.create",
+    render: () => <Step2TeamMembers users={users} errors={errors} />,
+  },
+  {
+    key: "milestones",
+    title: "Milestones",
+    permission: "project-milestones.create",
+    render: () => <Step3Milestones errors={errors} />,
+  },
+  {
+    key: "material-allocation",
+    title: "Material Allocation",
+    permission: "material-allocations.create",
+    render: () => <Step4MaterialAllocation inventoryItems={inventoryItems} directSupplyItems={directSupplyItems} errors={errors} />,
+  },
+];
 
 const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes }) => {
   const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep, goToStep, projectData } = useProjectWizard();
+  const { has } = usePermission();
   const [processing, setProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  const stepTitles = [
-    "Project Information",
-    "Team Members",
-    "Milestones",
-    "Material Allocation"
-  ];
+  const visibleSteps = useMemo(
+    () => buildWizardSteps({ clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors: formErrors })
+      .filter((step) => has(step.permission)),
+    [has, clients, clientTypes, formErrors, inventoryItems, directSupplyItems, projectTypes, users]
+  );
+
+  const activeStep = visibleSteps[currentStep - 1];
 
   const validateStep1 = () => {
     const errors = {};
@@ -131,20 +168,21 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
   };
 
   const renderStep = () => {
-    const errors = formErrors;
-    switch (currentStep) {
-      case 1:
-        return <Step1ProjectInfo clients={clients} projectTypes={projectTypes} clientTypes={clientTypes} errors={errors} />;
-      case 2:
-        return <Step2TeamMembers users={users} errors={errors} />;
-      case 3:
-        return <Step3Milestones errors={errors} />;
-      case 4:
-        return <Step4MaterialAllocation inventoryItems={inventoryItems} directSupplyItems={directSupplyItems} errors={errors} />;
-      default:
-        return null;
-    }
+    return activeStep?.render() || null;
   };
+
+  if (!has("projects.create")) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="w-[95vw] max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-800">Add New Project</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-500">You don't have permission to create projects.</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -155,37 +193,40 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center mb-6 px-2 gap-4">
-          {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
-            <div key={step} className="flex items-center">
+          {visibleSteps.map((step, index) => {
+            const stepNumber = index + 1;
+            return (
+            <div key={step.key} className="flex items-center">
               <div className="flex flex-col items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                    step < currentStep
+                    stepNumber < currentStep
                       ? "bg-green-500 text-white"
-                      : step === currentStep
+                      : stepNumber === currentStep
                       ? "bg-zinc-700 text-white"
                       : "bg-gray-200 text-gray-600"
                   }`}
                 >
-                  {step < currentStep ? <Check size={20} /> : step}
+                  {stepNumber < currentStep ? <Check size={20} /> : stepNumber}
                 </div>
                 <span
                   className={`text-xs mt-2 text-center whitespace-nowrap ${
-                    step <= currentStep ? "text-zinc-700 font-medium" : "text-gray-400"
+                    stepNumber <= currentStep ? "text-zinc-700 font-medium" : "text-gray-400"
                   }`}
                 >
-                  {stepTitles[step - 1]}
+                  {step.title}
                 </span>
               </div>
-              {step < totalSteps && (
+              {stepNumber < totalSteps && (
                 <div
                   className={`h-1 w-16 mx-4 transition-all ${
-                    step < currentStep ? "bg-green-500" : "bg-gray-200"
+                    stepNumber < currentStep ? "bg-green-500" : "bg-gray-200"
                   }`}
                 />
               )}
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {/* Step Content */}
@@ -260,8 +301,31 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
 };
 
 const AddProject = ({ open, setShowAddModal, clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes }) => {
+  const { has } = usePermission();
+  const visibleStepCount = useMemo(
+    () => WIZARD_STEP_PERMISSIONS.filter((permission) => has(permission)).length,
+    [has]
+  );
+
+  if (!has("projects.create")) {
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setShowAddModal(false);
+        }
+      }}>
+        <DialogContent className="w-[95vw] max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-800">Add New Project</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-500">You don't have permission to create projects.</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
-    <ProjectWizardProvider>
+    <ProjectWizardProvider totalSteps={visibleStepCount || 1}>
       <AddProjectWizard
         open={open}
         setShowAddModal={setShowAddModal}

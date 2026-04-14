@@ -1,11 +1,8 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
-import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { Trash2, Search, Package, Truck } from "lucide-react";
+import { Search, Package, Truck } from "lucide-react";
 import InputError from "@/Components/InputError";
 import {
   Table,
@@ -38,8 +35,9 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
 
   const availableInventory = safeInventory.filter((item) => {
     if (!item?.id) return false;
+    const key = `inv_${item.id}`;
     const remaining = getRemainingStock(item);
-    if (remaining !== null && remaining <= 0) return false;
+    if (remaining !== null && remaining <= 0 && !selectedItemIds.includes(key)) return false;
     const s = search.toLowerCase();
     return `${item.item_code || ""}`.toLowerCase().includes(s) ||
            `${item.item_name || ""}`.toLowerCase().includes(s);
@@ -59,48 +57,11 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
     ? `inv_${item.id}`
     : `ds_${item.id}`;
 
-  const toggleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedItemIds(activeItems.map(getItemKey));
-    } else {
-      setSelectedItemIds([]);
-      setFormData({});
-    }
-  };
-
-  const toggleItem = (item) => {
-    const key = getItemKey(item);
-    if (selectedItemIds.includes(key)) {
-      setSelectedItemIds(selectedItemIds.filter(id => id !== key));
-      setFormData(prev => { const n = { ...prev }; delete n[key]; return n; });
-      setErrors(prev => { const n = { ...prev }; delete n[`${key}_quantity`]; return n; });
-    } else {
-      setSelectedItemIds([...selectedItemIds, key]);
-    }
-  };
-
-  const handleChange = (key, field, value) => {
-    setFormData(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
-    if (errors[`${key}_${field}`]) {
-      setErrors(prev => { const n = { ...prev }; delete n[`${key}_${field}`]; return n; });
-    }
-  };
-
-  const inputClass = (error) =>
-    "w-full border text-sm rounded-md px-3 py-2 focus:outline-none transition-all duration-200 " +
-    (error
-      ? "border-red-500 ring-2 ring-red-400"
-      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
-
-  const handleAddSelected = () => {
-    if (selectedItemIds.length === 0) {
-      toast.error("Please select at least one item");
-      return;
-    }
-
+  const validateItemSelection = (ids, draftFormData = formData, showRequired = false) => {
     const validationErrors = {};
+    const validIds = [];
 
-    for (const key of selectedItemIds) {
+    for (const key of ids) {
       const isInv = key.startsWith("inv_");
       const id = key.replace(/^(inv_|ds_)/, "");
       const item = isInv
@@ -108,51 +69,67 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
         : availableDirectSupply.find(i => i.id.toString() === id);
       if (!item) continue;
 
-      const enteredQty = formData[key]?.quantity;
+      const enteredQty = draftFormData[key]?.quantity;
       const name = isInv ? item.item_name : item.supply_name;
+      const hasQty = enteredQty !== undefined && enteredQty !== "";
 
-      if (!enteredQty || parseFloat(enteredQty) <= 0) {
+      if (showRequired && !hasQty) {
         validationErrors[`${key}_quantity`] = `Please enter a valid quantity for ${name}.`;
-      } else if (isInv) {
+      } else if (hasQty && parseFloat(enteredQty) <= 0) {
+        validationErrors[`${key}_quantity`] = `Please enter a valid quantity for ${name}.`;
+      } else if (hasQty && isInv) {
         const remaining = getRemainingStock(item);
         if (remaining !== null && parseFloat(enteredQty) > remaining) {
           validationErrors[`${key}_quantity`] =
             `Quantity cannot exceed remaining stock (${remaining} ${item.unit_of_measure || ""})`.trim();
         }
       }
+
+      if (hasQty && !validationErrors[`${key}_quantity`]) {
+        validIds.push(key);
+      }
     }
 
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      toast.error("Please fill in all required fields correctly");
-      return;
-    }
+    return { validationErrors, validIds };
+  };
 
-    let addedCount = 0;
+  const autoCommitSelectedItems = (ids, draftFormData = formData, showRequired = false) => {
+    if (!ids.length) return;
 
-    for (const key of selectedItemIds) {
+    const { validationErrors, validIds } = validateItemSelection(ids, draftFormData, showRequired);
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => {
+        delete next[`${id}_quantity`];
+      });
+      return { ...next, ...validationErrors };
+    });
+
+    if (!validIds.length) return;
+
+    validIds.forEach((key) => {
       const isInv = key.startsWith("inv_");
       const id = key.replace(/^(inv_|ds_)/, "");
       const item = isInv
         ? availableInventory.find(i => i.id.toString() === id)
         : availableDirectSupply.find(i => i.id.toString() === id);
-      if (!item) continue;
+      if (!item) return;
 
-      const qty = parseFloat(formData[key]?.quantity) || 0;
-      const notes = formData[key]?.notes || null;
+      const qty = parseFloat(draftFormData[key]?.quantity) || 0;
+      const notes = draftFormData[key]?.notes || null;
 
       if (isInv) {
         const existingIndex = materialAllocations.findIndex(a => a.inventory_item_id === id);
         if (existingIndex !== -1) {
           const existing = materialAllocations[existingIndex];
-          const updatedQty = (parseFloat(existing.quantity_allocated) || 0) + qty;
           removeMaterialAllocation(existingIndex);
           addMaterialAllocation({
             inventory_item_id: id,
             item_code: item.item_code,
             item_name: item.item_name,
             unit_of_measure: item.unit_of_measure,
-            quantity_allocated: updatedQty,
+            quantity_allocated: qty,
             notes: notes || existing.notes || null,
           });
         } else {
@@ -166,6 +143,10 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
           });
         }
       } else {
+        const existingDirectIndex = materialAllocations.findIndex(a => a.direct_supply_id === id);
+        if (existingDirectIndex !== -1) {
+          removeMaterialAllocation(existingDirectIndex);
+        }
         addMaterialAllocation({
           direct_supply_id: id,
           supply_code: item.supply_code,
@@ -176,16 +157,68 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
           notes,
         });
       }
-      addedCount++;
-    }
+    });
+  };
 
-    if (addedCount > 0) {
-      toast.success(`${addedCount} allocation(s) added successfully`);
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      const nextSelected = activeItems.map(getItemKey);
+      setSelectedItemIds(nextSelected);
+      autoCommitSelectedItems(nextSelected);
+    } else {
+      selectedItemIds.forEach((key) => {
+        const isInv = key.startsWith("inv_");
+        const id = key.replace(/^(inv_|ds_)/, "");
+        const indexToRemove = materialAllocations.findIndex((a) =>
+          isInv ? a.inventory_item_id === id : a.direct_supply_id === id
+        );
+        if (indexToRemove !== -1) {
+          removeMaterialAllocation(indexToRemove);
+        }
+      });
       setSelectedItemIds([]);
       setFormData({});
-      setErrors({});
     }
   };
+
+  const toggleItem = (item) => {
+    const key = getItemKey(item);
+    if (selectedItemIds.includes(key)) {
+      const isInv = key.startsWith("inv_");
+      const id = key.replace(/^(inv_|ds_)/, "");
+      const indexToRemove = materialAllocations.findIndex((a) =>
+        isInv ? a.inventory_item_id === id : a.direct_supply_id === id
+      );
+      if (indexToRemove !== -1) {
+        removeMaterialAllocation(indexToRemove);
+      }
+      setSelectedItemIds(selectedItemIds.filter(id => id !== key));
+      setFormData(prev => { const n = { ...prev }; delete n[key]; return n; });
+      setErrors(prev => { const n = { ...prev }; delete n[`${key}_quantity`]; return n; });
+    } else {
+      const nextSelected = [...selectedItemIds, key];
+      setSelectedItemIds(nextSelected);
+      autoCommitSelectedItems([key]);
+    }
+  };
+
+  const handleChange = (key, field, value) => {
+    const nextFormData = { ...formData, [key]: { ...formData[key], [field]: value } };
+    setFormData(nextFormData);
+    if (errors[`${key}_${field}`]) {
+      setErrors(prev => { const n = { ...prev }; delete n[`${key}_${field}`]; return n; });
+    }
+
+    if (selectedItemIds.includes(key)) {
+      autoCommitSelectedItems([key], nextFormData);
+    }
+  };
+
+  const inputClass = (error) =>
+    "w-full border text-sm rounded-md px-3 py-2 focus:outline-none transition-all duration-200 " +
+    (error
+      ? "border-red-500 ring-2 ring-red-400"
+      : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -382,66 +415,6 @@ export default function Step4MaterialAllocation({ inventoryItems, directSupplyIt
         </div>
       </div>
 
-      {selectedItemIds.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            onClick={handleAddSelected}
-            className="bg-gradient-to-r from-zinc-700 to-zinc-800 hover:from-zinc-800 hover:to-zinc-900 text-white shadow-md"
-          >
-            Add Selected ({selectedItemIds.length})
-          </Button>
-        </div>
-      )}
-
-      {/* Allocations List */}
-      {materialAllocations.length > 0 && (
-        <div className="mt-6">
-          <h4 className="text-md font-semibold text-gray-900 mb-3">Added Material Allocations</h4>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {materialAllocations.map((allocation, index) => {
-                  const isDs = !!allocation.direct_supply_id;
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                          isDs ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
-                        }`}>
-                          {isDs ? <Truck size={11} /> : <Package size={11} />}
-                          {isDs ? "Direct" : "Inventory"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="font-medium">{isDs ? allocation.supply_code : allocation.item_code}</TableCell>
-                      <TableCell>{isDs ? allocation.supply_name : allocation.item_name}</TableCell>
-                      <TableCell className="font-semibold text-blue-700">{allocation.quantity_allocated}</TableCell>
-                      <TableCell>{allocation.unit_of_measure}</TableCell>
-                      <TableCell>{allocation.notes || "---"}</TableCell>
-                      <TableCell>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeMaterialAllocation(index)} className="text-red-600 hover:text-red-700">
-                          <Trash2 size={16} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

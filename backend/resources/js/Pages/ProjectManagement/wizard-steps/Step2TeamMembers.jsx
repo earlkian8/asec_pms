@@ -2,30 +2,84 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { Input } from "@/Components/ui/input";
-import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { Trash2, Search, Users, Clock, Calendar, ChevronDown, ChevronUp, Zap, CalendarRange, Sunset, SunMedium, Moon, AlertCircle, X, UserCheck, Building2 } from "lucide-react";
+import { Search, Users, Clock, Calendar, ChevronDown, ChevronUp, Zap, CalendarRange, Sunset, SunMedium, Moon, AlertCircle, Building2 } from "lucide-react";
 import InputError from "@/Components/InputError";
 
 // ─── Date Preset Engine ────────────────────────────────────────────────────────
-const getDatePresets = (projectStartDate, projectEndDate) => {
-  const today = new Date().toISOString().split("T")[0];
-  const pStart = projectStartDate || today;
-  const pEnd = projectEndDate || "";
+const toDateString = (date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
-  const addMonths = (dateStr, months) => {
-    const d = new Date(dateStr);
-    d.setMonth(d.getMonth() + months);
-    if (pEnd && d.toISOString().split("T")[0] > pEnd) return pEnd;
-    return d.toISOString().split("T")[0];
-  };
+const parseDateInput = (dateStr) => {
+  const [year, month, day] = (dateStr || "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
 
-  const addWeeks = (dateStr, weeks) => {
-    const d = new Date(dateStr);
-    d.setDate(d.getDate() + weeks * 7);
-    if (pEnd && d.toISOString().split("T")[0] > pEnd) return pEnd;
-    return d.toISOString().split("T")[0];
-  };
+const clampToProjectEnd = (dateStr, projectEndDate) => {
+  if (!projectEndDate || !dateStr) return dateStr;
+  return dateStr > projectEndDate ? projectEndDate : dateStr;
+};
+
+const addMonthsToDate = (dateStr, months, projectEndDate) => {
+  const date = parseDateInput(dateStr);
+  if (!date) return "";
+  date.setMonth(date.getMonth() + months);
+  return clampToProjectEnd(toDateString(date), projectEndDate);
+};
+
+const addWeeksToDate = (dateStr, weeks, projectEndDate) => {
+  const date = parseDateInput(dateStr);
+  if (!date) return "";
+  date.setDate(date.getDate() + weeks * 7);
+  return clampToProjectEnd(toDateString(date), projectEndDate);
+};
+
+const getPresetDateRange = (presetId, projectStartDate, projectEndDate, currentStartDate) => {
+  const today = toDateString(new Date());
+  const fallbackStart = projectStartDate || today;
+  const anchorStart = currentStartDate || fallbackStart;
+
+  if (presetId === "full") {
+    return {
+      start: projectStartDate || anchorStart,
+      end: projectEndDate || "",
+    };
+  }
+
+  if (presetId === "first_month") {
+    return {
+      start: anchorStart,
+      end: addMonthsToDate(anchorStart, 1, projectEndDate),
+    };
+  }
+
+  if (presetId === "quarter") {
+    return {
+      start: anchorStart,
+      end: addMonthsToDate(anchorStart, 3, projectEndDate),
+    };
+  }
+
+  if (presetId === "two_weeks") {
+    return {
+      start: anchorStart,
+      end: addWeeksToDate(anchorStart, 2, projectEndDate),
+    };
+  }
+
+  return { start: "", end: "" };
+};
+
+const getDatePresets = (projectStartDate, projectEndDate, currentStartDate) => {
+  const fullRange = getPresetDateRange("full", projectStartDate, projectEndDate, currentStartDate);
+  const firstMonthRange = getPresetDateRange("first_month", projectStartDate, projectEndDate, currentStartDate);
+  const quarterRange = getPresetDateRange("quarter", projectStartDate, projectEndDate, currentStartDate);
+  const twoWeeksRange = getPresetDateRange("two_weeks", projectStartDate, projectEndDate, currentStartDate);
 
   return [
     {
@@ -34,9 +88,9 @@ const getDatePresets = (projectStartDate, projectEndDate) => {
       icon: "⚡",
       color: "indigo",
       description: "Entire project duration",
-      start: pStart,
-      end: pEnd,
-      disabled: !pEnd,
+      start: fullRange.start,
+      end: fullRange.end,
+      disabled: !projectEndDate,
     },
     {
       id: "first_month",
@@ -44,8 +98,8 @@ const getDatePresets = (projectStartDate, projectEndDate) => {
       icon: "📅",
       color: "blue",
       description: "First 30 days",
-      start: pStart,
-      end: addMonths(pStart, 1),
+      start: firstMonthRange.start,
+      end: firstMonthRange.end,
     },
     {
       id: "quarter",
@@ -53,8 +107,8 @@ const getDatePresets = (projectStartDate, projectEndDate) => {
       icon: "🗓",
       color: "violet",
       description: "First 3 months",
-      start: pStart,
-      end: addMonths(pStart, 3),
+      start: quarterRange.start,
+      end: quarterRange.end,
     },
     {
       id: "two_weeks",
@@ -62,8 +116,8 @@ const getDatePresets = (projectStartDate, projectEndDate) => {
       icon: "⏱",
       color: "cyan",
       description: "Sprint / short burst",
-      start: pStart,
-      end: addWeeks(pStart, 2),
+      start: twoWeeksRange.start,
+      end: twoWeeksRange.end,
     },
     {
       id: "custom",
@@ -106,11 +160,11 @@ const ACTIVE_COLOR = {
 };
 
 // ─── Member Card Component ─────────────────────────────────────────────────────
-function MemberCard({ member, isSelected, compositeId, onToggle, formData, errors, onFormChange, projectData }) {
+function MemberCard({ member, isSelected, compositeId, onToggle, formData, errors, onFormChange, onFormPatch, projectData }) {
   const [expanded, setExpanded] = useState(false);
   const presets = useMemo(
-    () => getDatePresets(projectData.start_date, projectData.planned_end_date),
-    [projectData.start_date, projectData.planned_end_date]
+    () => getDatePresets(projectData.start_date, projectData.planned_end_date, formData?.start_date),
+    [projectData.start_date, projectData.planned_end_date, formData?.start_date]
   );
 
   const activePreset = formData?.date_preset || null;
@@ -126,12 +180,22 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
 
   const applyPreset = (preset) => {
     if (preset.id === "custom") {
-      onFormChange(compositeId, "date_preset", "custom");
+      onFormPatch(compositeId, { date_preset: "custom" });
       return;
     }
-    onFormChange(compositeId, "date_preset", preset.id);
-    onFormChange(compositeId, "start_date", preset.start);
-    onFormChange(compositeId, "end_date", preset.end);
+
+    const range = getPresetDateRange(
+      preset.id,
+      projectData.start_date,
+      projectData.planned_end_date,
+      formData?.start_date
+    );
+
+    onFormPatch(compositeId, {
+      date_preset: preset.id,
+      start_date: range.start,
+      end_date: range.end,
+    });
   };
 
   const role = isEmployee ? (member.position || "No Position") : (member.role || "No Role");
@@ -326,7 +390,7 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
 
           {/* Date Presets */}
           <div>
-            <label className="text-xs font-semibold text-gray-700 mb-2 block flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
               <Zap size={12} className="text-indigo-500" />
               Assignment Duration <span className="text-red-500">*</span>
             </label>
@@ -424,7 +488,7 @@ function MemberCard({ member, isSelected, compositeId, onToggle, formData, error
 
 // ─── Bulk Action Bar ───────────────────────────────────────────────────────────
 function BulkPresetBar({ selectedIds, onApplyAll, projectData }) {
-  const presets = getDatePresets(projectData.start_date, projectData.planned_end_date);
+  const presets = getDatePresets(projectData.start_date, projectData.planned_end_date, null);
   const [open, setOpen] = useState(false);
 
   if (selectedIds.length < 2) return null;
@@ -477,14 +541,7 @@ export default function Step2TeamMembers({ users }) {
 
   const availableMembers = safeUsers.filter((member) => {
     if (!member?.id) return false;
-    const memberId = typeof member.id === "number" ? member.id : parseInt(member.id, 10);
     const memberType = member.type || "user";
-
-    const isAlreadyAdded = teamMembers.some((tm) => {
-      const tmId = typeof tm.id === "string" ? parseInt(tm.id, 10) : tm.id;
-      return tmId === memberId && (tm.type || "user") === memberType;
-    });
-    if (isAlreadyAdded) return false;
 
     if (typeFilter !== "all" && memberType !== typeFilter) return false;
 
@@ -504,121 +561,226 @@ export default function Step2TeamMembers({ users }) {
     return `${member.type || "user"}-${id}`;
   };
 
-  const toggleSelectAll = (checked) => {
-    if (checked) setSelectedMemberIds(availableMembers.map(getCompositeId));
-    else setSelectedMemberIds([]);
-  };
-
-  const toggleMember = (compositeId) => {
-    setSelectedMemberIds((prev) =>
-      prev.includes(compositeId) ? prev.filter((id) => id !== compositeId) : [...prev, compositeId]
+  const findMemberByCompositeId = (compositeId) => {
+    const [memberType, memberIdStr] = compositeId.split("-");
+    const memberIdInt = parseInt(memberIdStr, 10);
+    return safeUsers.find(
+      (m) => (typeof m.id === "number" ? m.id : parseInt(m.id, 10)) === memberIdInt && (m.type || "user") === memberType
     );
   };
 
-  const handleFormChange = (compositeId, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [compositeId]: { ...prev[compositeId], [field]: value },
-    }));
-    const errorKey = `${compositeId}_${field}`;
-    if (errors[errorKey]) {
-      setErrors((prev) => { const n = { ...prev }; delete n[errorKey]; return n; });
+  const removeTeamMemberByCompositeId = (compositeId) => {
+    const [memberType, memberIdStr] = compositeId.split("-");
+    const memberIdInt = parseInt(memberIdStr, 10);
+
+    for (let i = teamMembers.length - 1; i >= 0; i--) {
+      const tm = teamMembers[i];
+      const tmId = typeof tm.id === "string" ? parseInt(tm.id, 10) : tm.id;
+      if (tmId === memberIdInt && (tm.type || "user") === memberType) {
+        removeTeamMember(i);
+      }
     }
   };
 
-  const applyPresetToAll = (preset, timeSlot) => {
-    selectedMemberIds.forEach((compositeId) => {
-      if (preset) {
-        handleFormChange(compositeId, "date_preset", preset.id);
-        if (preset.id !== "custom") {
-          handleFormChange(compositeId, "start_date", preset.start);
-          handleFormChange(compositeId, "end_date", preset.end);
-        }
-      }
-      if (timeSlot) {
-        handleFormChange(compositeId, "time_slot", timeSlot.id);
-        handleFormChange(compositeId, "work_hours", timeSlot.time);
-      }
+  const upsertTeamMemberFromSelection = (compositeId, draftFormData = formData) => {
+    const [memberType, memberIdStr] = compositeId.split("-");
+    const memberIdInt = parseInt(memberIdStr, 10);
+    const member = findMemberByCompositeId(compositeId);
+    if (!member) return;
+
+    removeTeamMemberByCompositeId(compositeId);
+
+    addTeamMember({
+      id:             memberIdInt,
+      type:           memberType,
+      name:           member.name || "Unknown",
+      email:          member.email || "",
+      role:           getMemberRole(member),
+      pay_type:       draftFormData[compositeId]?.pay_type       || "hourly",
+      hourly_rate:    parseFloat(draftFormData[compositeId]?.hourly_rate)    || 0,
+      monthly_salary: parseFloat(draftFormData[compositeId]?.monthly_salary) || 0,
+      start_date:     draftFormData[compositeId]?.start_date || "",
+      end_date:       draftFormData[compositeId]?.end_date   || "",
+      time_slot:      draftFormData[compositeId]?.time_slot  || null,
+      work_hours:     draftFormData[compositeId]?.work_hours || null,
     });
-    toast.success(`Applied to all ${selectedMemberIds.length} selected members`);
   };
 
-  const handleAddSelected = () => {
-    if (selectedMemberIds.length === 0) {
-      toast.error("Select at least one team member");
-      return;
-    }
-
+  const validateMemberSelection = (ids, draftFormData = formData, showRequired = false) => {
     const validationErrors = {};
+    const validIds = [];
 
-    for (const compositeId of selectedMemberIds) {
+    for (const compositeId of ids) {
       const member = availableMembers.find((m) => getCompositeId(m) === compositeId);
       if (!member) continue;
+
       const name = member.name || "Team Member";
-      const fd = formData[compositeId] || {};
+      const fd = draftFormData[compositeId] || {};
       const payType = fd.pay_type || "hourly";
 
-      if (payType === "hourly" && (fd.hourly_rate === undefined || fd.hourly_rate === "" || parseFloat(fd.hourly_rate) < 0)) {
+      const hasHourlyRate = fd.hourly_rate !== undefined && fd.hourly_rate !== "";
+      const hasMonthlySalary = fd.monthly_salary !== undefined && fd.monthly_salary !== "";
+      const hasStartDate = !!fd.start_date;
+      const hasEndDate = !!fd.end_date;
+
+      if (payType === "hourly" && showRequired && !hasHourlyRate) {
         validationErrors[`${compositeId}_rate`] = `Hourly rate required for ${name}`;
       }
-      if (payType === "salary" && (fd.monthly_salary === undefined || fd.monthly_salary === "" || parseFloat(fd.monthly_salary) < 0)) {
+      if (payType === "hourly" && hasHourlyRate && parseFloat(fd.hourly_rate) < 0) {
+        validationErrors[`${compositeId}_rate`] = `Hourly rate required for ${name}`;
+      }
+      if (payType === "salary" && showRequired && !hasMonthlySalary) {
         validationErrors[`${compositeId}_rate`] = `Monthly salary required for ${name}`;
       }
-      if (!fd.start_date) {
+      if (payType === "salary" && hasMonthlySalary && parseFloat(fd.monthly_salary) < 0) {
+        validationErrors[`${compositeId}_rate`] = `Monthly salary required for ${name}`;
+      }
+
+      if (showRequired && !hasStartDate) {
         validationErrors[`${compositeId}_start_date`] = `Start date required for ${name}`;
-      } else {
+      } else if (hasStartDate) {
         if (projectData.start_date && fd.start_date < projectData.start_date) {
           validationErrors[`${compositeId}_start_date`] = `Cannot be before project start (${projectData.start_date})`;
         } else if (projectData.planned_end_date && fd.start_date > projectData.planned_end_date) {
           validationErrors[`${compositeId}_start_date`] = `Cannot be after project end (${projectData.planned_end_date})`;
         }
       }
-      if (!fd.end_date) {
+
+      if (showRequired && !hasEndDate) {
         validationErrors[`${compositeId}_end_date`] = `End date required for ${name}`;
-      } else if (fd.start_date && fd.end_date < fd.start_date) {
-        validationErrors[`${compositeId}_end_date`] = `End date must be after start date`;
+      } else if (hasStartDate && hasEndDate && fd.end_date < fd.start_date) {
+        validationErrors[`${compositeId}_end_date`] = "End date must be after start date";
+      }
+
+      const hasRequiredForPayType =
+        payType === "hourly" ? hasHourlyRate
+        : payType === "salary" ? hasMonthlySalary
+        : true;
+
+      const hasAllRequired = hasRequiredForPayType && hasStartDate && hasEndDate;
+      if (hasAllRequired && !validationErrors[`${compositeId}_rate`] && !validationErrors[`${compositeId}_start_date`] && !validationErrors[`${compositeId}_end_date`]) {
+        validIds.push(compositeId);
       }
     }
 
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      // Auto-expand members that have errors
-      toast.error("Fill in the required fields (check expanded cards)");
+    return { validationErrors, validIds };
+  };
+
+  const syncSelectedMembers = (ids, draftFormData = formData, showRequired = false) => {
+    if (!ids.length) return;
+
+    const { validationErrors, validIds } = validateMemberSelection(ids, draftFormData, showRequired);
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => {
+        delete next[`${id}_rate`];
+        delete next[`${id}_start_date`];
+        delete next[`${id}_end_date`];
+      });
+      return { ...next, ...validationErrors };
+    });
+
+    ids.forEach((compositeId) => {
+      if (!validIds.includes(compositeId)) {
+        removeTeamMemberByCompositeId(compositeId);
+      }
+    });
+
+    ids.forEach((compositeId) => {
+      if (validIds.includes(compositeId)) {
+        upsertTeamMemberFromSelection(compositeId, draftFormData);
+      }
+    });
+  };
+
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      const nextSelected = availableMembers.map(getCompositeId);
+      setSelectedMemberIds(nextSelected);
+      syncSelectedMembers(nextSelected);
+    } else {
+      selectedMemberIds.forEach((compositeId) => removeTeamMemberByCompositeId(compositeId));
+      setSelectedMemberIds([]);
+    }
+  };
+
+  const toggleMember = (compositeId) => {
+    if (selectedMemberIds.includes(compositeId)) {
+      removeTeamMemberByCompositeId(compositeId);
+      setSelectedMemberIds((prev) => prev.filter((id) => id !== compositeId));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[`${compositeId}_rate`];
+        delete next[`${compositeId}_start_date`];
+        delete next[`${compositeId}_end_date`];
+        return next;
+      });
       return;
     }
 
-    let added = 0;
-    for (const compositeId of selectedMemberIds) {
-      const [memberType, memberIdStr] = compositeId.split("-");
-      const memberIdInt = parseInt(memberIdStr, 10);
-      const member = availableMembers.find(
-        (m) => (typeof m.id === "number" ? m.id : parseInt(m.id, 10)) === memberIdInt && (m.type || "user") === memberType
-      );
-      if (!member) continue;
+    const nextSelected = [...selectedMemberIds, compositeId];
+    setSelectedMemberIds(nextSelected);
+    syncSelectedMembers([compositeId]);
+  };
 
-      addTeamMember({
-        id:             memberIdInt,
-        type:           memberType,
-        name:           member.name || "Unknown",
-        email:          member.email || "",
-        role:           getMemberRole(member),
-        pay_type:       formData[compositeId]?.pay_type       || "hourly",
-        hourly_rate:    parseFloat(formData[compositeId]?.hourly_rate)    || 0,
-        monthly_salary: parseFloat(formData[compositeId]?.monthly_salary) || 0,
-        start_date:     formData[compositeId]?.start_date || "",
-        end_date:       formData[compositeId]?.end_date   || "",
-        time_slot:      formData[compositeId]?.time_slot  || null,
-        work_hours:     formData[compositeId]?.work_hours || null,
+  const handleFormChange = (compositeId, field, value) => {
+    handleFormPatch(compositeId, { [field]: value });
+  };
+
+  const handleFormPatch = (compositeId, patch) => {
+    const nextFormData = {
+      ...formData,
+      [compositeId]: { ...formData[compositeId], ...patch },
+    };
+    setFormData(nextFormData);
+
+    const patchFields = Object.keys(patch);
+    if (patchFields.length) {
+      setErrors((prev) => {
+        const n = { ...prev };
+        patchFields.forEach((field) => {
+          const errorKey = `${compositeId}_${field}`;
+          if (n[errorKey]) delete n[errorKey];
+        });
+        return n;
       });
-      added++;
     }
 
-    if (added > 0) {
-      toast.success(`${added} member${added > 1 ? "s" : ""} added`);
-      setSelectedMemberIds([]);
-      setFormData({});
-      setErrors({});
+    if (selectedMemberIds.includes(compositeId)) {
+      syncSelectedMembers([compositeId], nextFormData);
     }
+  };
+
+  const applyPresetToAll = (preset, timeSlot) => {
+    selectedMemberIds.forEach((compositeId) => {
+      const patch = {};
+
+      if (preset) {
+        const memberStart = formData[compositeId]?.start_date || "";
+        const range = getPresetDateRange(
+          preset.id,
+          projectData.start_date,
+          projectData.planned_end_date,
+          memberStart
+        );
+        patch.date_preset = preset.id;
+        if (preset.id !== "custom") {
+          patch.start_date = range.start;
+          patch.end_date = range.end;
+        }
+      }
+
+      if (timeSlot) {
+        patch.time_slot = timeSlot.id;
+        patch.work_hours = timeSlot.time;
+      }
+
+      if (Object.keys(patch).length) {
+        handleFormPatch(compositeId, patch);
+      }
+    });
+    toast.success(`Applied to all ${selectedMemberIds.length} selected members`);
   };
 
   const employeeCount  = availableMembers.filter((m) => m.type === "employee").length;
@@ -734,6 +896,7 @@ export default function Step2TeamMembers({ users }) {
                 formData={formData[compositeId]}
                 errors={memberErrors}
                 onFormChange={handleFormChange}
+                onFormPatch={handleFormPatch}
                 projectData={projectData}
               />
             );
@@ -745,7 +908,7 @@ export default function Step2TeamMembers({ users }) {
             <Users className="h-7 w-7 text-gray-400" />
           </div>
           <p className="text-gray-500 font-semibold">
-            {search ? "No members match your search" : "All available members have been added"}
+            {search ? "No members match your search" : "All available members have been selected"}
           </p>
           <p className="text-gray-400 text-sm mt-1">
             {search ? "Try a different search term" : "Check the team members list below"}
@@ -753,89 +916,6 @@ export default function Step2TeamMembers({ users }) {
         </div>
       )}
 
-      {/* ── Add Button ── */}
-      {selectedMemberIds.length > 0 && (
-        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-3">
-          <div className="text-sm text-indigo-700">
-            <span className="font-bold">{selectedMemberIds.length}</span> member{selectedMemberIds.length > 1 ? "s" : ""} selected
-          </div>
-          <Button
-            type="button"
-            onClick={handleAddSelected}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 h-9 text-sm font-medium shadow-md shadow-indigo-200 transition-all"
-          >
-            Add Selected ({selectedMemberIds.length}) →
-          </Button>
-        </div>
-      )}
-
-      {/* ── Added Members ── */}
-      {teamMembers.length > 0 && (
-        <div className="mt-2">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <UserCheck size={15} className="text-green-600" />
-              Added Team Members
-              <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">{teamMembers.length}</span>
-            </h4>
-          </div>
-          <div className="space-y-2">
-            {teamMembers.map((member, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 hover:border-gray-300 transition group"
-              >
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                    member.type === "employee" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
-                  }`}
-                >
-                  {(member.name || "?").charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-gray-900 text-sm">{member.name}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      member.type === "employee" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
-                    }`}>{member.type === "employee" ? "Employee" : "User"}</span>
-                    {member.work_hours && (
-                      <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-                        <Clock size={9} /> {member.work_hours}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                    <span className="text-xs text-gray-500">{member.role}</span>
-                    {(!member.pay_type || member.pay_type === "hourly") && (
-                      <span className="text-xs font-semibold text-green-700">
-                        ₱{parseFloat(member.hourly_rate || 0).toFixed(2)}/hr
-                      </span>
-                    )}
-                    {member.pay_type === "salary" && (
-                      <span className="text-xs font-semibold text-purple-700">
-                        ₱{parseFloat(member.monthly_salary || 0).toFixed(2)}/mo
-                      </span>
-                    )}
-                    {member.pay_type === "fixed" && (
-                      <span className="text-xs font-semibold text-amber-700">Fixed</span>
-                    )}
-                    <span className="text-xs text-gray-400">
-                      {member.start_date} → {member.end_date || "—"}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeTeamMember(index)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-red-500 hover:text-red-600 transition-all"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -137,14 +137,14 @@ class ProjectDataSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'phone_number' => '+639123456789',
                 'address' => 'Tugbungan',
+                'region' => 'Region IX',
                 'city' => 'Zamboanga City',
                 'province' => 'Zamboanga del Sur',
+                'city_municipality' => 'Zamboanga City',
+                'barangay' => 'Tugbungan',
                 'postal_code' => '7000',
+                'zip_code' => '7000',
                 'country' => 'Philippines',
-                'tax_id' => 'TIN-123-456-789-000',
-                'business_permit' => 'BP-1234567',
-                'credit_limit' => 10000000,
-                'payment_terms' => 'Net 30',
                 'is_active' => true,
             ]
         );
@@ -165,6 +165,8 @@ class ProjectDataSeeder extends Seeder
 
             $clientType = fake()->randomElement($clientTypes);
             $isCorporation = $clientType === 'corporation';
+            $cityMunicipality = fake()->randomElement($cities);
+            $zipCode = fake()->numerify('####');
 
             $clients->push(Client::create([
                 'client_code' => $clientCode,
@@ -174,14 +176,14 @@ class ProjectDataSeeder extends Seeder
                 'email' => fake()->unique()->safeEmail(),
                 'phone_number' => '+63' . fake()->numerify('9#########'),
                 'address' => fake()->streetAddress(),
-                'city' => fake()->randomElement($cities),
+                'region' => fake()->randomElement(['NCR', 'Region III', 'Region IV-A']),
+                'city' => $cityMunicipality,
                 'province' => fake()->randomElement($provinces),
-                'postal_code' => fake()->numerify('####'),
+                'city_municipality' => $cityMunicipality,
+                'barangay' => fake()->citySuffix(),
+                'postal_code' => $zipCode,
+                'zip_code' => $zipCode,
                 'country' => fake()->randomElement($countries),
-                'tax_id' => $isCorporation ? 'TIN-' . fake()->numerify('###-###-###-###') : null,
-                'business_permit' => $isCorporation ? 'BP-' . fake()->numerify('#######') : null,
-                'credit_limit' => fake()->randomFloat(2, 100000, 5000000),
-                'payment_terms' => fake()->randomElement($paymentTerms),
                 'is_active' => fake()->boolean(85), // 85% chance of being active
                 'notes' => fake()->optional(0.6)->sentence(),
             ]));

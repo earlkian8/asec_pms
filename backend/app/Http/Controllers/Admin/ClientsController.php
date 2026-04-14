@@ -24,13 +24,13 @@ class ClientsController extends Controller
         $search = $request->input('search');
         $clientTypeId = $request->input('client_type_id');
         $isActive = $request->input('is_active');
-        $city = $request->input('city');
+        $cityMunicipality = $request->input('city_municipality');
         $province = $request->input('province');
         $sortBy = $request->input('sort_by', 'created_at');
         $sortOrder = $request->input('sort_order', 'desc');
 
         // Validate sort column
-        $allowedSortColumns = ['created_at', 'client_name', 'client_code', 'is_active', 'city', 'province', 'email'];
+        $allowedSortColumns = ['created_at', 'client_name', 'client_code', 'is_active', 'city_municipality', 'province', 'email'];
         if (!in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'created_at';
         }
@@ -52,8 +52,12 @@ class ClientsController extends Controller
                       ->orWhere('contact_person', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%")
                       ->orWhere('phone_number', 'like', "%{$search}%")
-                      ->orWhere('city', 'like', "%{$search}%")
-                      ->orWhere('province', 'like', "%{$search}%");
+                      ->orWhere('region', 'like', "%{$search}%")
+                      ->orWhere('province', 'like', "%{$search}%")
+                      ->orWhere('city_municipality', 'like', "%{$search}%")
+                      ->orWhere('barangay', 'like', "%{$search}%")
+                      ->orWhere('address', 'like', "%{$search}%")
+                      ->orWhere('zip_code', 'like', "%{$search}%");
                 });
             })
             ->when($clientTypeId, function ($query, $clientTypeId) {
@@ -62,8 +66,11 @@ class ClientsController extends Controller
             ->when($isActive !== null && $isActive !== '', function ($query) use ($isActive) {
                 $query->where('is_active', $isActive === 'true' || $isActive === true || $isActive === '1' || $isActive === 1);
             })
-            ->when($city, function ($query, $city) {
-                $query->where('city', 'like', "%{$city}%");
+            ->when($cityMunicipality, function ($query, $cityMunicipality) {
+                $query->where(function ($q) use ($cityMunicipality) {
+                    $q->where('city_municipality', 'like', "%{$cityMunicipality}%")
+                      ->orWhere('city', 'like', "%{$cityMunicipality}%");
+                });
             })
             ->when($province, function ($query, $province) {
                 $query->where('province', 'like', "%{$province}%");
@@ -84,7 +91,7 @@ class ClientsController extends Controller
 
         // Get unique values for filter options
         $clientTypes = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $cities = Client::distinct()->whereNotNull('city')->pluck('city')->sort()->values();
+        $cities = Client::distinct()->whereNotNull('city_municipality')->pluck('city_municipality')->sort()->values();
         $provinces = Client::distinct()->whereNotNull('province')->pluck('province')->sort()->values();
 
         return Inertia::render('ClientManagement/index', [
@@ -93,7 +100,7 @@ class ClientsController extends Controller
             'filters' => [
                 'client_type_id' => $clientTypeId,
                 'is_active' => $isActive,
-                'city' => $city,
+                'city_municipality' => $cityMunicipality,
                 'province' => $province,
             ],
             'filterOptions' => [
@@ -115,26 +122,20 @@ class ClientsController extends Controller
             'contact_person'  => ['required', 'max:255'],
             'email'           => ['required', 'email', 'max:100'],
             'phone_number'    => ['nullable', 'max:20'],
-            'address'         => ['nullable', 'max:255'],
-            'city'            => ['nullable', 'max:100'],
-            'province'        => ['nullable', 'max:100'],
-            'postal_code'     => ['nullable', 'max:20'],
-            'country'         => ['nullable', 'max:100'],
-            'tax_id'          => ['nullable', 'max:50'],
-            'business_permit' => ['nullable', 'max:50'],
-            'credit_limit'    => ['nullable', 'numeric'],
-            'payment_terms'   => ['nullable', 'max:100'],
-            'is_active'        => ['required', 'boolean'],
-            'notes'            => ['nullable', 'string'],
+            'region'          => ['nullable', 'string', 'max:150'],
+            'province'        => ['nullable', 'string', 'max:150'],
+            'city_municipality' => ['nullable', 'string', 'max:150'],
+            'barangay'        => ['nullable', 'string', 'max:150'],
+            'address'         => ['nullable', 'string'],
+            'zip_code'        => ['nullable', 'string', 'max:20'],
+            'is_active'       => ['required', 'boolean'],
+            'notes'           => ['nullable', 'string'],
             'send_credentials' => ['nullable', 'boolean'],
         ]);
 
-        if (is_null($validated['credit_limit'] ?? null)) {
-            unset($validated['credit_limit']);
-        }
-        if (is_null($validated['payment_terms'] ?? null)) {
-            unset($validated['payment_terms']);
-        }
+        $validated['city'] = $validated['city_municipality'] ?? null;
+        $validated['postal_code'] = $validated['zip_code'] ?? null;
+        $validated['country'] = 'Philippines';
         unset($validated['send_credentials']);
 
         // Auto-generate a secure random password
@@ -191,25 +192,19 @@ class ClientsController extends Controller
             'contact_person'  => ['required', 'max:255'],
             'email'           => ['required', 'email', 'max:100'],
             'phone_number'    => ['nullable', 'max:20'],
-            'address'         => ['nullable', 'max:255'],
-            'city'            => ['nullable', 'max:100'],
-            'province'        => ['nullable', 'max:100'],
-            'postal_code'     => ['nullable', 'max:20'],
-            'country'         => ['nullable', 'max:100'],
-            'tax_id'          => ['nullable', 'max:50'],
-            'business_permit' => ['nullable', 'max:50'],
-            'credit_limit'    => ['nullable', 'numeric'],
-            'payment_terms'   => ['nullable', 'max:100'],
+            'region'          => ['nullable', 'string', 'max:150'],
+            'province'        => ['nullable', 'string', 'max:150'],
+            'city_municipality' => ['nullable', 'string', 'max:150'],
+            'barangay'        => ['nullable', 'string', 'max:150'],
+            'address'         => ['nullable', 'string'],
+            'zip_code'        => ['nullable', 'string', 'max:20'],
             'is_active'       => ['required', 'boolean'],
             'notes'           => ['nullable', 'string'],
         ]);
 
-        if (is_null($validated['credit_limit'] ?? null)) {
-            unset($validated['credit_limit']);
-        }
-        if (is_null($validated['payment_terms'] ?? null)) {
-            unset($validated['payment_terms']);
-        }
+        $validated['city'] = $validated['city_municipality'] ?? null;
+        $validated['postal_code'] = $validated['zip_code'] ?? null;
+        $validated['country'] = 'Philippines';
 
         $oldName = $client->client_name;
         $client->update($validated);

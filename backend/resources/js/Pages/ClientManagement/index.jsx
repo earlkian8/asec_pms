@@ -41,7 +41,7 @@ export default function ClientsIndex() {
     { header: 'Contact Person', width: '12%' },
     { header: 'Email',          width: '13%' },
     { header: 'Phone/Mobile',   width: '9%'  },
-    // { header: 'City / Province',width: '12%' },
+    { header: 'Location',       width: '16%' },
     { header: 'Projects',       width: '7%'  },
     { header: 'Status',         width: '8%'  },
     { header: 'Actions',        width: '7%'  },
@@ -83,7 +83,7 @@ export default function ClientsIndex() {
     return {
       client_type_id: filterProps?.client_type_id || '',
       is_active: filterProps?.is_active !== undefined && filterProps?.is_active !== '' ? filterProps.is_active : '',
-      city: filterProps?.city || '',
+      city_municipality: filterProps?.city_municipality || '',
       province: filterProps?.province || '',
     };
   };
@@ -97,7 +97,7 @@ export default function ClientsIndex() {
   useEffect(() => {
     const newFilters = initializeFilters(filters);
     setLocalFilters(newFilters);
-  }, [filters.client_type_id, filters.is_active, filters.city, filters.province]);
+  }, [filters.client_type_id, filters.is_active, filters.city_municipality, filters.province]);
 
   // Sync sort when props change
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function ClientsIndex() {
     let count = 0;
     if (localFilters.client_type_id && localFilters.client_type_id !== 'all') count++;
     if (localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null) count++;
-    if (localFilters.city && localFilters.city !== 'all') count++;
+    if (localFilters.city_municipality && localFilters.city_municipality !== 'all') count++;
     if (localFilters.province && localFilters.province !== 'all') count++;
     return count;
   };
@@ -140,7 +140,7 @@ export default function ClientsIndex() {
     ...(localFilters.is_active !== '' && localFilters.is_active !== undefined && localFilters.is_active !== null && {
       is_active: localFilters.is_active === true || localFilters.is_active === 'true' || localFilters.is_active === 1 || localFilters.is_active === '1' ? 1 : 0
     }),
-    ...(localFilters.city && { city: localFilters.city }),
+    ...(localFilters.city_municipality && { city_municipality: localFilters.city_municipality }),
     ...(localFilters.province && { province: localFilters.province }),
     ...overrides,
   });
@@ -173,7 +173,7 @@ export default function ClientsIndex() {
 
   // Reset/Clear all filters
   const resetFilters = () => {
-    setLocalFilters({ client_type_id: '', is_active: '', city: '', province: '' });
+    setLocalFilters({ client_type_id: '', is_active: '', city_municipality: '', province: '' });
     setSortBy('created_at');
     setSortOrder('desc');
     router.get(route('client-management.index'), searchInput?.trim() ? { search: searchInput } : {}, {
@@ -440,19 +440,19 @@ export default function ClientsIndex() {
                             </Select>
                           </div>
 
-                          {/* City Filter */}
+                          {/* City / Municipality Filter */}
                           {filterOptions.cities && filterOptions.cities.length > 0 && (
                             <div className="mb-4">
-                              <Label className="text-xs font-semibold text-gray-700 mb-2 block">City</Label>
+                              <Label className="text-xs font-semibold text-gray-700 mb-2 block">City / Municipality</Label>
                               <Select
-                                value={localFilters.city || 'all'}
-                                onValueChange={(value) => handleFilterChange('city', value)}
+                                value={localFilters.city_municipality || 'all'}
+                                onValueChange={(value) => handleFilterChange('city_municipality', value)}
                               >
                                 <SelectTrigger className="w-full h-9">
-                                  <SelectValue placeholder="All Cities" />
+                                  <SelectValue placeholder="All Cities / Municipalities" />
                                 </SelectTrigger>
                                 <SelectContent style={{ zIndex: 50 }}>
-                                  <SelectItem value="all">All Cities</SelectItem>
+                                  <SelectItem value="all">All Cities / Municipalities</SelectItem>
                                   {filterOptions.cities.map((city) => (
                                     <SelectItem key={city} value={city}>
                                       {capitalizeText(city)}
@@ -556,7 +556,7 @@ export default function ClientsIndex() {
                                 <SelectItem value="client_code">Client Code</SelectItem>
                                 <SelectItem value="client_type">Client Type</SelectItem>
                                 <SelectItem value="is_active">Status</SelectItem>
-                                <SelectItem value="city">City</SelectItem>
+                                <SelectItem value="city_municipality">City / Municipality</SelectItem>
                                 <SelectItem value="province">Province</SelectItem>
                                 <SelectItem value="email">Email</SelectItem>
                               </SelectContent>
@@ -652,17 +652,17 @@ export default function ClientsIndex() {
                         <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
                           {client.phone_number || <span className="text-gray-400 italic text-xs">No phone</span>}
                         </TableCell>
-                        {/* <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
-                          {client.city || client.province ? (
+                        <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
+                          {client.region || client.province || client.city_municipality || client.city || client.barangay || client.zip_code || client.postal_code ? (
                             <span>
-                              {client.city ? capitalizeText(client.city) : '---'}
-                              {client.city && client.province ? ' / ' : ''}
+                              {client.city_municipality || client.city ? capitalizeText(client.city_municipality || client.city) : '---'}
+                              {((client.city_municipality || client.city) && client.province) ? ' / ' : ''}
                               {client.province ? capitalizeText(client.province) : ''}
                             </span>
                           ) : (
                             <span className="text-gray-400 italic text-xs">No location</span>
                           )}
-                        </TableCell> */}
+                        </TableCell>
                         <TableCell className="px-3 sm:px-4 py-3 text-sm">
                           {/* Projects count */}
                           <div className="flex items-center gap-1.5">

@@ -29,9 +29,6 @@ class ProjectTeamsController extends Controller
             'assignables.*.id'          => ['required'],
             'assignables.*.type'        => ['required', 'in:user,employee'],
             'assignables.*.role'        => ['required', 'string', 'max:50'],
-            'assignables.*.pay_type'       => ['nullable', 'in:hourly,salary,fixed'],
-            'assignables.*.hourly_rate'    => ['nullable', 'numeric', 'min:0'],
-            'assignables.*.monthly_salary' => ['nullable', 'numeric', 'min:0'],
             'assignables.*.start_date'  => ['required', 'date'],
             'assignables.*.end_date'    => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
@@ -167,9 +164,6 @@ class ProjectTeamsController extends Controller
 
         $validated = $request->validate([
             'role'              => ['required', 'string', 'max:50'],
-            'pay_type'          => ['nullable', 'in:hourly,salary,fixed'],
-            'hourly_rate'       => ['nullable', 'numeric', 'min:0'],
-            'monthly_salary'    => ['nullable', 'numeric', 'min:0'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
             'is_active'         => ['required', 'boolean'],

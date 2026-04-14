@@ -22,6 +22,7 @@ use App\Models\InventoryItem;
 use App\Models\DirectSupply;
 use App\Models\ClientUpdateRequest;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\BoqCostBasisTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -41,7 +42,7 @@ use Illuminate\Validation\ValidationException;
 
 class ProjectsController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
+    use ActivityLogsTrait, BoqCostBasisTrait, ClientNotificationTrait, NotificationTrait;
 
     const DOCUMENT_FIELDS = [
         'building_permit',
@@ -502,7 +503,7 @@ class ProjectsController extends Controller
                     ]);
 
                     foreach (($section['items'] ?? []) as $itemIndex => $item) {
-                        [$quantity, $unitCost] = $this->resolveBoqItemCostBasis($item);
+                        [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
 
                         $createdItem = ProjectBoqItem::create([
                             'project_id'             => $project->id,
@@ -553,6 +554,8 @@ class ProjectsController extends Controller
                         'description' => 'Auto-created from BOQ section.',
                         'status'      => 'pending',
                         'sort_order'  => $milestoneIndex,
+                        'start_date'  => $project->start_date,
+                        'due_date'    => $project->planned_end_date,
                     ]
                 );
                 $milestoneIndex++;
@@ -581,7 +584,9 @@ class ProjectsController extends Controller
                                 ? \App\Models\Employee::with('currentCompensationProfile')->find((int) $entityId)
                                 : \App\Models\User::with('currentCompensationProfile')->find((int) $entityId);
                             $comp          = $person?->getResolvedCompensationAttribute() ?? [];
-                            $payType       = $comp['pay_type']       ?? 'salary';
+                            // Normalize: CompensationProfile stores 'monthly', ProjectTeam uses 'salary'
+                            $rawPayType    = $comp['pay_type'] ?? 'salary';
+                            $payType       = $rawPayType === 'monthly' ? 'salary' : $rawPayType;
                             $hourlyRate    = $comp['hourly_rate']    ?? null;
                             $monthlySalary = $comp['monthly_salary'] ?? null;
 
@@ -610,7 +615,12 @@ class ProjectsController extends Controller
                             $suppId = !empty($resource['direct_supply_id'])   ? (int) $resource['direct_supply_id']   : null;
                             if (!$invId && !$suppId) continue;
 
-                            $allocationAttrs = ['project_id' => $project->id];
+                            // Scope per BOQ item so the same material used in multiple
+                            // BOQ items creates separate allocations instead of collapsing.
+                            $allocationAttrs = [
+                                'project_id'  => $project->id,
+                                'boq_item_id' => $boqItemId,
+                            ];
                             if ($invId)  $allocationAttrs['inventory_item_id'] = $invId;
                             if ($suppId) $allocationAttrs['direct_supply_id']  = $suppId;
 
@@ -945,7 +955,7 @@ class ProjectsController extends Controller
 
         foreach ($sections as $section) {
             foreach (($section['items'] ?? []) as $item) {
-                [$quantity, $unitCost] = $this->resolveBoqItemCostBasis($item);
+                [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
                 $total += ($quantity * $unitCost);
             }
         }
@@ -974,24 +984,6 @@ class ProjectsController extends Controller
             'hourly_rate' => $profile->hourly_rate,
             'monthly_salary' => $profile->monthly_salary,
         ];
-    }
-
-    private function resolveBoqItemCostBasis(array $item): array
-    {
-        $resources = $item['resources'] ?? [];
-
-        if (!empty($resources)) {
-            $resourceTotal = collect($resources)->sum(function ($resource) {
-                return (float) ($resource['quantity'] ?? 0) * (float) ($resource['unit_price'] ?? 0);
-            });
-
-            return [1.0, round((float) $resourceTotal, 2)];
-        }
-
-        $quantity = (float) ($item['quantity'] ?? 0);
-        $unitCost = (float) ($item['unit_cost'] ?? 0);
-
-        return [$quantity, $unitCost];
     }
 
     private function syncBoqItemResources(ProjectBoqItem $item, array $resources): void

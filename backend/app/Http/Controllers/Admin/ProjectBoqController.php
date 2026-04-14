@@ -7,10 +7,8 @@ use App\Models\Project;
 use App\Models\ProjectBoqItem;
 use App\Models\ProjectBoqItemResource;
 use App\Models\ProjectBoqSection;
-use App\Models\ProjectMaterialAllocation;
-use App\Models\ProjectMilestone;
-use App\Models\ProjectTeam;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\BoqCostBasisTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -25,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  */
 class ProjectBoqController extends Controller
 {
-    use ActivityLogsTrait;
+    use ActivityLogsTrait, BoqCostBasisTrait;
 
     public function storeBulk(Request $request, Project $project)
     {
@@ -75,13 +73,10 @@ class ProjectBoqController extends Controller
             ]);
         }
 
-        $milestoneSections    = collect($validated['sections'] ?? [])
-            ->filter(fn($s) => (bool) ($s['create_milestone'] ?? true))
-            ->values();
-        $createdItemResources = []; // collected inside transaction for post-transaction provisioning
-
-        DB::transaction(function () use ($project, $validated, &$createdItemResources) {
-            // Replace-semantics: wipe existing BOQ for this project and rebuild.
+        // Replace-semantics: wipe existing BOQ for this project and rebuild.
+        // Milestones, team members, and material allocations are NOT touched here —
+        // they were seeded at project-creation time and now live independently.
+        DB::transaction(function () use ($project, $validated) {
             $project->boqSections()->delete();
 
             foreach (($validated['sections'] ?? []) as $sectionIndex => $section) {
@@ -94,7 +89,6 @@ class ProjectBoqController extends Controller
                 ]);
 
                 foreach (($section['items'] ?? []) as $itemIndex => $item) {
-                    // Items are always resource-based sub-sections (quantity=1, unit='lot').
                     [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
 
                     $createdItem = ProjectBoqItem::create([
@@ -116,111 +110,9 @@ class ProjectBoqController extends Controller
                     ]);
 
                     $this->syncItemResources($createdItem, $item['resources'] ?? []);
-
-                    // Collect resources with their new BOQ item IDs for post-transaction provisioning.
-                    foreach (($item['resources'] ?? []) as $resource) {
-                        $createdItemResources[] = [
-                            'boq_item_id' => $createdItem->id,
-                            'resource'    => $resource,
-                        ];
-                    }
                 }
             }
         });
-
-        // Auto-create a milestone only for sections with create_milestone = true (idempotent).
-        foreach ($milestoneSections as $sectionIndex => $section) {
-            ProjectMilestone::firstOrCreate(
-                ['project_id' => $project->id, 'name' => $section['name']],
-                [
-                    'description' => 'Auto-created from BOQ section.',
-                    'status'      => 'pending',
-                    'sort_order'  => $sectionIndex,
-                ]
-            );
-        }
-
-        // Auto-assign team members for labor resources (idempotent — skips existing assignments).
-        $seenLaborKeys = [];
-        foreach ($createdItemResources as $entry) {
-            $resource = $entry['resource'];
-            if (($resource['resource_category'] ?? '') !== 'labor') continue;
-
-            $isEmployee = ($resource['source_type'] ?? '') === 'employee';
-            $entityId   = $isEmployee ? ($resource['employee_id'] ?? null) : ($resource['user_id'] ?? null);
-            if (empty($entityId)) continue;
-
-            $key = ($isEmployee ? 'emp' : 'usr') . ':' . $entityId;
-            if (in_array($key, $seenLaborKeys, true)) continue;
-            $seenLaborKeys[] = $key;
-
-            // Use the person's actual compensation profile, not the BOQ unit_price.
-            $person = $isEmployee
-                ? \App\Models\Employee::with('currentCompensationProfile')->find((int) $entityId)
-                : \App\Models\User::with('currentCompensationProfile')->find((int) $entityId);
-            $comp          = $person?->getResolvedCompensationAttribute() ?? [];
-            $payType       = $comp['pay_type']       ?? 'salary';
-            $hourlyRate    = $comp['hourly_rate']    ?? null;
-            $monthlySalary = $comp['monthly_salary'] ?? null;
-
-            $searchAttrs = ['project_id' => $project->id];
-            $searchAttrs[$isEmployee ? 'employee_id' : 'user_id'] = (int) $entityId;
-
-            ProjectTeam::firstOrCreate(
-                $searchAttrs,
-                [
-                    'role'              => 'Labor',
-                    'assignable_type'   => $resource['source_type'],
-                    'pay_type'          => $payType,
-                    'hourly_rate'       => $hourlyRate,
-                    'monthly_salary'    => $monthlySalary,
-                    'start_date'        => $project->start_date,
-                    'end_date'          => $project->planned_end_date,
-                    'is_active'         => true,
-                    'assignment_status' => 'active',
-                    $isEmployee ? 'user_id' : 'employee_id' => null,
-                ]
-            );
-        }
-
-        // Auto-create material allocations for material resources (idempotent).
-        foreach ($createdItemResources as $entry) {
-            $resource = $entry['resource'];
-            if (($resource['resource_category'] ?? '') !== 'material') continue;
-
-            $invId  = !empty($resource['inventory_item_id'])  ? (int) $resource['inventory_item_id']  : null;
-            $suppId = !empty($resource['direct_supply_id'])   ? (int) $resource['direct_supply_id']   : null;
-            if (!$invId && !$suppId) continue;
-
-            $searchAttrs = ['project_id' => $project->id];
-            if ($invId)  $searchAttrs['inventory_item_id'] = $invId;
-            if ($suppId) $searchAttrs['direct_supply_id']  = $suppId;
-
-            $allocation = ProjectMaterialAllocation::firstOrCreate(
-                $searchAttrs,
-                [
-                    'boq_item_id'        => $entry['boq_item_id'],
-                    'unit_price'         => (float) ($resource['unit_price'] ?? 0),
-                    'quantity_allocated' => (float) ($resource['quantity'] ?? 0),
-                    'quantity_received'  => 0,
-                    'status'             => 'pending',
-                    'allocated_by'       => auth()->id(),
-                    'allocated_at'       => now(),
-                ]
-            );
-
-            // Sync boq_item_id and quantity if BOQ was re-saved with different values.
-            $syncFields = [];
-            if ($allocation->boq_item_id !== $entry['boq_item_id']) {
-                $syncFields['boq_item_id'] = $entry['boq_item_id'];
-            }
-            if ((float) $allocation->quantity_allocated !== (float) ($resource['quantity'] ?? 0)) {
-                $syncFields['quantity_allocated'] = (float) ($resource['quantity'] ?? 0);
-            }
-            if ($syncFields) {
-                $allocation->update($syncFields);
-            }
-        }
 
         $this->adminActivityLogs('Project BOQ', 'Update', "Updated BOQ for project {$project->project_name}");
 
@@ -379,24 +271,6 @@ class ProjectBoqController extends Controller
         $item->delete();
 
         return redirect()->back()->with('success', 'BOQ item removed.');
-    }
-
-    private function resolveItemCostBasis(array $item): array
-    {
-        $resources = $item['resources'] ?? [];
-
-        if (!empty($resources)) {
-            $resourceTotal = collect($resources)->sum(function ($resource) {
-                return (float) ($resource['quantity'] ?? 0) * (float) ($resource['unit_price'] ?? 0);
-            });
-
-            return [1.0, round((float) $resourceTotal, 2)];
-        }
-
-        $quantity = (float) ($item['quantity'] ?? 0);
-        $unitCost = (float) ($item['unit_cost'] ?? 0);
-
-        return [$quantity, $unitCost];
     }
 
     private function syncItemResources(ProjectBoqItem $item, array $resources): void

@@ -19,6 +19,7 @@ class ProjectMilestone extends Model
         'due_date',
         'billing_percentage',
         'status',
+        'sort_order',
     ];
 
     // Relationship to Project

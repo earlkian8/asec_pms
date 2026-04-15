@@ -20,7 +20,13 @@ class ProjectOverviewService
         $project->load(['client', 'projectType']);
 
         // ── Labor Costs ───────────────────────────────────────────────────────
-        $laborCosts      = ProjectLaborCost::where('project_id', $project->id)->get();
+        $laborCosts      = ProjectLaborCost::where('project_id', $project->id)
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
+            ->get();
         $totalLaborCost  = (float) $laborCosts->sum('gross_pay');
         $totalLaborDays  = (float) $laborCosts->sum('days_present');
 
@@ -93,6 +99,11 @@ class ProjectOverviewService
 
         // Labor — group by period_start month, sum gross_pay
         $monthlyLaborCosts = ProjectLaborCost::where('project_id', $project->id)
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
             ->where('period_start', '>=', now()->subMonths(6))
             ->get()
             ->groupBy(fn ($c) => $c->period_start->format('Y-m'))

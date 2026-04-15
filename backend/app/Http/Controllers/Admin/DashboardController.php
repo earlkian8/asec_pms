@@ -146,7 +146,13 @@ class DashboardController extends Controller
         $inProgressTasks = ProjectTask::whereHas('milestone.project', fn($q) => $q->whereNull('archived_at'))->where('status', 'in_progress')->count();
 
         // Budget Statistics — only from non-archived projects
-        $totalLaborCost = (float) ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('gross_pay');
+        $totalLaborCost = (float) ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
+            ->sum('gross_pay');
 
         $totalMaterialCost = (float) DB::table('material_receiving_reports as mrr')
             ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
@@ -181,6 +187,11 @@ class DashboardController extends Controller
 
         // Monthly Expenses (last 6 months) — only from non-archived projects
         $monthlyLaborCosts = ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
             ->select(
                 DB::raw("DATE_TRUNC('month', period_start) as month"),
                 DB::raw('SUM(gross_pay) as total')

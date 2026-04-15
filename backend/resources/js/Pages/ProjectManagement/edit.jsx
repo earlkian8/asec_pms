@@ -40,7 +40,6 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
     actual_end_date:  project?.actual_end_date  || "",
     location:         project?.location         || "",
     description:      project?.description      || "",
-    billing_type:     project?.billing_type     || "fixed_price",
     building_permit:          null,
     business_permit:          null,
     environmental_compliance: null,
@@ -319,44 +318,6 @@ const EditProject = ({ open, setShowEditModal, clients, projectTypes, project })
                         className={inputClass(getFieldError('contract_amount'))}
                       />
                       <InputError message={getFieldError('contract_amount')} />
-                    </>
-                  )}
-                </div>
-
-                {/* Billing Type */}
-                <div>
-                  <Label className="text-zinc-800 flex items-center gap-1.5">
-                    Billing Type
-                    {!hasBillings && <span className="text-gray-400 font-normal text-xs">(optional)</span>}
-                    {hasBillings && <Lock className="h-3.5 w-3.5 text-amber-600" />}
-                  </Label>
-                  {hasBillings ? (
-                    <>
-                      <Input
-                        value={data.billing_type === 'fixed_price' ? 'Fixed Price' : data.billing_type === 'milestone' ? 'Milestone' : '—'}
-                        readOnly
-                        className="w-full border text-sm rounded-md px-4 py-2 bg-amber-50 border-amber-300 text-amber-800 cursor-not-allowed"
-                      />
-                      <div className="flex items-start gap-1.5 mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
-                        <p className="text-xs text-amber-700">
-                          Billing type cannot be changed because this project already has billing records.
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <Select value={data.billing_type} onValueChange={(v) => setData("billing_type", v)}>
-                        <SelectTrigger className={inputClass(getFieldError('billing_type'))}>
-                          <SelectValue placeholder="Select billing type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="fixed_price">Fixed Price</SelectItem>
-                          <SelectItem value="milestone">Milestone</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-gray-400 mt-1">For workflow guidance only. Does not restrict billing creation.</p>
-                      <InputError message={getFieldError('billing_type')} />
                     </>
                   )}
                 </div>

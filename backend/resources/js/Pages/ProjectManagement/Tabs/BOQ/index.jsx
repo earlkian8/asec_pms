@@ -91,7 +91,7 @@ export default function BOQTab({ project, boqData }) {
 
     const fetchAvailability = (inventoryItemId) => {
         if (!inventoryItemId || availability[inventoryItemId]) return;
-        const url = route('admin.inventory-management.availability', inventoryItemId)
+        const url = route('inventory-management.availability', inventoryItemId)
             + `?exclude_project_id=${project?.id || ''}`;
         fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
             .then((r) => r.ok ? r.json() : null)

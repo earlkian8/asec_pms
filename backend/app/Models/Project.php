@@ -22,7 +22,6 @@ class Project extends Model
         'actual_end_date',
         'location',
         'description',
-        'billing_type',
         // Documents
         'building_permit',
         'business_permit',

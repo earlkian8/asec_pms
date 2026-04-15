@@ -13,7 +13,6 @@ class Billing extends Model
     protected $fillable = [
         'project_id',
         'billing_code',
-        'billing_type',
         'milestone_id',
         'billing_amount',
         'billing_date',

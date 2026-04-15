@@ -5,7 +5,7 @@ import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
-import { Trash2, Plus, Info } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 import InputError from "@/Components/InputError";
 import {
   Table,
@@ -18,8 +18,6 @@ import {
 
 export default function Step3Milestones() {
   const { milestones, addMilestone, removeMilestone, projectData } = useProjectWizard();
-
-  const isMilestoneBilling = projectData.billing_type === 'milestone';
 
   const [newMilestone, setNewMilestone] = useState({
     name: "",
@@ -71,18 +69,10 @@ export default function Step3Milestones() {
       validationErrors.due_date = `Due date cannot be after project end date (${projectData.planned_end_date}).`;
     }
 
-    // Only validate billing percentage if milestone billing type
-    if (isMilestoneBilling && newMilestone.billing_percentage) {
+    if (newMilestone.billing_percentage) {
       const percentage = parseFloat(newMilestone.billing_percentage);
       if (isNaN(percentage) || percentage < 0 || percentage > 100) {
         validationErrors.billing_percentage = 'Billing percentage must be between 0 and 100.';
-      }
-
-      // Warn if total billing percentage would exceed 100
-      const currentTotal = milestones.reduce((sum, m) => sum + (parseFloat(m.billing_percentage) || 0), 0);
-      const newTotal = currentTotal + (parseFloat(newMilestone.billing_percentage) || 0);
-      if (newTotal > 100) {
-        validationErrors.billing_percentage = `Adding this would bring total billing to ${newTotal.toFixed(2)}%, which exceeds 100%.`;
       }
     }
 
@@ -95,8 +85,7 @@ export default function Step3Milestones() {
     addMilestone({
       ...newMilestone,
       name: newMilestone.name.trim(),
-      // Always null for fixed_price billing type
-      billing_percentage: isMilestoneBilling && newMilestone.billing_percentage
+      billing_percentage: newMilestone.billing_percentage
         ? parseFloat(newMilestone.billing_percentage)
         : null,
     });
@@ -112,37 +101,9 @@ export default function Step3Milestones() {
     setErrors({});
   };
 
-  // Total billing percentage across all added milestones
-  const totalBillingPercentage = milestones.reduce(
-    (sum, m) => sum + (parseFloat(m.billing_percentage) || 0), 0
-  );
-
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Milestones</h3>
-
-      {/* Billing type context banner */}
-      <div className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg border ${
-        isMilestoneBilling
-          ? 'bg-blue-50 border-blue-200 text-blue-700'
-          : 'bg-amber-50 border-amber-200 text-amber-700'
-      }`}>
-        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-        {isMilestoneBilling ? (
-          <span>
-            <span className="font-semibold">Milestone billing</span> is selected. You can assign a billing percentage to each milestone (total should not exceed 100%).
-            {milestones.length > 0 && (
-              <span className={`ml-1 font-semibold ${totalBillingPercentage > 100 ? 'text-red-600' : ''}`}>
-                Current total: {totalBillingPercentage.toFixed(2)}%
-              </span>
-            )}
-          </span>
-        ) : (
-          <span>
-            <span className="font-semibold">Fixed price billing</span> is selected. Billing percentage per milestone is not applicable and has been hidden.
-          </span>
-        )}
-      </div>
 
       {/* Project date context hint */}
       {(projectData.start_date || projectData.planned_end_date) && (
@@ -217,28 +178,22 @@ export default function Step3Milestones() {
             <InputError message={errors.due_date} />
           </div>
 
-          {/* Billing Percentage — only shown for milestone billing */}
-          {isMilestoneBilling && (
-            <div>
-              <Label>
-                Billing Percentage (%)
-                <span className="ml-1 text-xs text-gray-400 font-normal">
-                  — remaining: {Math.max(0, 100 - totalBillingPercentage).toFixed(2)}%
-                </span>
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                placeholder="0.00"
-                value={newMilestone.billing_percentage}
-                onChange={(e) => handleChange('billing_percentage', e.target.value)}
-                className={inputClass(errors.billing_percentage)}
-              />
-              <InputError message={errors.billing_percentage} />
-            </div>
-          )}
+          <div>
+            <Label>
+              Billing Percentage (%)
+            </Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="0.00"
+              value={newMilestone.billing_percentage}
+              onChange={(e) => handleChange('billing_percentage', e.target.value)}
+              className={inputClass(errors.billing_percentage)}
+            />
+            <InputError message={errors.billing_percentage} />
+          </div>
 
           {/* Add Button */}
           <div className="md:col-span-2">
@@ -264,7 +219,7 @@ export default function Step3Milestones() {
                 <TableHead>Description</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>Due Date</TableHead>
-                {isMilestoneBilling && <TableHead>Billing %</TableHead>}
+                <TableHead>Billing %</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
@@ -276,11 +231,9 @@ export default function Step3Milestones() {
                   <TableCell>{milestone.description || "---"}</TableCell>
                   <TableCell>{milestone.start_date || "---"}</TableCell>
                   <TableCell>{milestone.due_date || "---"}</TableCell>
-                  {isMilestoneBilling && (
-                    <TableCell>
-                      {milestone.billing_percentage ? `${milestone.billing_percentage}%` : "---"}
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    {milestone.billing_percentage ? `${milestone.billing_percentage}%` : "---"}
+                  </TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded text-xs capitalize ${
                       milestone.status === 'completed' ? 'bg-green-100 text-green-700' :
@@ -306,20 +259,9 @@ export default function Step3Milestones() {
             </TableBody>
           </Table>
 
-          {/* Total billing percentage footer — only for milestone billing */}
-          {isMilestoneBilling && (
-            <div className={`px-4 py-2 border-t text-xs font-semibold flex justify-end ${
-              totalBillingPercentage > 100
-                ? 'bg-red-50 text-red-600'
-                : totalBillingPercentage === 100
-                ? 'bg-green-50 text-green-600'
-                : 'bg-gray-50 text-gray-600'
-            }`}>
-              Total Billing: {totalBillingPercentage.toFixed(2)}%
-              {totalBillingPercentage > 100 && ' ⚠ Exceeds 100%'}
-              {totalBillingPercentage === 100 && ' ✓'}
-            </div>
-          )}
+          <div className="px-4 py-2 border-t text-xs font-semibold flex justify-end bg-gray-50 text-gray-600">
+            Billing percentages are stored per milestone.
+          </div>
         </div>
       ) : (
         <div className="text-center py-8 text-gray-500 border rounded-lg">

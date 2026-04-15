@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('projects', function (Blueprint $table) {
             // Project documents
-            $table->string('building_permit', 500)->nullable()->after('billing_type');
+            $table->string('building_permit', 500)->nullable()->after('description');
             $table->string('business_permit', 500)->nullable()->after('building_permit');
             $table->string('environmental_compliance', 500)->nullable()->after('business_permit');
             $table->string('contractor_license', 500)->nullable()->after('environmental_compliance');

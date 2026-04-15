@@ -240,7 +240,6 @@ class AlphaTestingSeeder extends Seeder
                     'actual_end_date' => $actualEndDate,
                     'location' => fake()->randomElement(['Manila', 'Makati', 'Quezon City', 'Taguig']) . ', Metro Manila',
                     'description' => 'Alpha testing project - ' . $config['name'],
-                    'billing_type' => fake()->randomElement(['fixed_price', 'milestone']),
                 ]
             );
 
@@ -469,16 +468,20 @@ class AlphaTestingSeeder extends Seeder
         foreach ($projects as $project) {
             $milestones = ProjectMilestone::where('project_id', $project->id)->get();
 
-            if ($project->billing_type === 'milestone' && $milestones->isNotEmpty()) {
-                $selected = $milestones->random(min(2, $milestones->count()));
-                foreach ($selected as $milestone) {
-                    $amount = $project->contract_amount / max($milestones->count(), 1) * (0.8 + (rand(0, 40) / 100));
-                    $billing = $this->createBilling($project, $users, $amount, 'milestone', $milestone->id);
-                    $this->createPayments($billing, $users, $paymentMethods);
-                }
-            } else {
-                $amount = $project->contract_amount * (0.3 + (rand(0, 40) / 100));
-                $billing = $this->createBilling($project, $users, $amount, 'fixed_price', null);
+            $billingCount = rand(1, 3);
+            $remainingContract = $project->contract_amount;
+
+            for ($i = 0; $i < $billingCount && $remainingContract > 0; $i++) {
+                $amount = $i === $billingCount - 1
+                    ? $remainingContract
+                    : $remainingContract * (0.3 + (rand(0, 40) / 100));
+
+                $remainingContract -= $amount;
+                $milestoneId = $milestones->isNotEmpty() && rand(0, 1)
+                    ? $milestones->random()->id
+                    : null;
+
+                $billing = $this->createBilling($project, $users, $amount, $milestoneId);
                 $this->createPayments($billing, $users, $paymentMethods);
             }
         }
@@ -490,7 +493,6 @@ class AlphaTestingSeeder extends Seeder
         Project $project,
         \Illuminate\Support\Collection $users,
         float $amount,
-        string $type,
         ?int $milestoneId
     ): Billing {
         do {
@@ -500,7 +502,6 @@ class AlphaTestingSeeder extends Seeder
         return Billing::create([
             'project_id' => $project->id,
             'billing_code' => $code,
-            'billing_type' => $type,
             'milestone_id' => $milestoneId,
             'billing_amount' => round($amount, 2),
             'billing_date' => $project->start_date,

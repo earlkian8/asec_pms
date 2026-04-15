@@ -1,6 +1,6 @@
 import { useForm } from "@inertiajs/react";
 import { toast } from "sonner";
-import { Loader2, Plus, Info } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,9 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/Components/ui/textarea";
 
 const AddMilestone = ({ setShowAddModal, project, existingBillingTotal = 0 }) => {
-  const isMilestoneBilling = project?.billing_type === 'milestone';
-  const remaining = Math.max(0, 100 - existingBillingTotal);
-
   const { data, setData, post, errors, processing } = useForm({
     name:               "",
     description:        "",
@@ -31,17 +28,6 @@ const AddMilestone = ({ setShowAddModal, project, existingBillingTotal = 0 }) =>
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    // Frontend billing % guard
-    if (isMilestoneBilling && data.billing_percentage) {
-      const newTotal = existingBillingTotal + parseFloat(data.billing_percentage);
-      if (newTotal > 100) {
-        toast.error(
-          `Total billing would reach ${newTotal.toFixed(2)}%. Only ${remaining.toFixed(2)}% remaining.`
-        );
-        return;
-      }
-    }
 
     post(route("project-management.project-milestones.store", project.id), {
       preserveScroll: true,
@@ -73,39 +59,6 @@ const AddMilestone = ({ setShowAddModal, project, existingBillingTotal = 0 }) =>
             Fill in the milestone details below.
           </DialogDescription>
         </DialogHeader>
-
-        {/* Billing type context banner */}
-        <div className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg border ${
-          isMilestoneBilling
-            ? 'bg-blue-50 border-blue-200 text-blue-700'
-            : 'bg-amber-50 border-amber-200 text-amber-700'
-        }`}>
-          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          {isMilestoneBilling ? (
-            <span>
-              <span className="font-semibold">Milestone billing</span> — assign a billing percentage to this milestone.
-              {existingBillingTotal > 0 && (
-                <span className={`ml-1 ${remaining === 0 ? 'text-red-600 font-semibold' : 'text-blue-600'}`}>
-                  {remaining.toFixed(2)}% remaining of 100%.
-                </span>
-              )}
-            </span>
-          ) : (
-            <span>
-              <span className="font-semibold">Fixed price billing</span> — billing percentage per milestone is not applicable.
-            </span>
-          )}
-        </div>
-
-        {/* Warn if billing is already at 100% */}
-        {isMilestoneBilling && remaining === 0 && (
-          <div className="flex items-start gap-2 text-xs px-3 py-2 rounded-lg border bg-red-50 border-red-200 text-red-700">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              <span className="font-semibold">Billing is already at 100%.</span> You cannot assign any more billing percentage to new milestones.
-            </span>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Name */}
@@ -161,29 +114,20 @@ const AddMilestone = ({ setShowAddModal, project, existingBillingTotal = 0 }) =>
             <InputError message={errors.due_date} />
           </div>
 
-          {/* Billing Percentage — only shown for milestone billing */}
-          {isMilestoneBilling && (
-            <div>
-              <Label className="text-zinc-800">
-                Billing Percentage (%)
-                <span className={`ml-1 text-xs font-normal ${remaining === 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                  — {remaining.toFixed(2)}% remaining
-                </span>
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max={remaining}
-                value={data.billing_percentage}
-                onChange={(e) => setData("billing_percentage", e.target.value)}
-                placeholder="0.00"
-                disabled={remaining === 0}
-                className={inputClass(errors.billing_percentage) + (remaining === 0 ? ' opacity-50 cursor-not-allowed' : '')}
-              />
-              <InputError message={errors.billing_percentage} />
-            </div>
-          )}
+          <div>
+            <Label className="text-zinc-800">Billing Percentage (%)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={data.billing_percentage}
+              onChange={(e) => setData("billing_percentage", e.target.value)}
+              placeholder="0.00"
+              className={inputClass(errors.billing_percentage)}
+            />
+            <InputError message={errors.billing_percentage} />
+          </div>
 
           {/* Status */}
           <div>

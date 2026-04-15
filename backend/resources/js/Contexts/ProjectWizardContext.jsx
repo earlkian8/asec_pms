@@ -27,7 +27,6 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
     actual_end_date: '',
     location: '',
     description: '',
-    billing_type: 'fixed_price',
   });
 
   // Step 2: Team Members
@@ -179,7 +178,6 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
       actual_end_date: '',
       location: '',
       description: '',
-      billing_type: 'fixed_price',
     });
     setTeamMembers([]);
     setMilestones([]);

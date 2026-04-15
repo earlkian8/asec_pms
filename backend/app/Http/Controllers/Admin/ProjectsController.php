@@ -331,7 +331,6 @@ class ProjectsController extends Controller
             'actual_end_date'  => ['nullable', 'date'],
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
-            'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
             'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
@@ -727,7 +726,6 @@ class ProjectsController extends Controller
             'actual_end_date'  => ['nullable', 'date'],
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
-            'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
             'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
@@ -753,7 +751,6 @@ class ProjectsController extends Controller
 
         if ($hasBillings) {
             $validated['contract_amount'] = $project->contract_amount;
-            $validated['billing_type']    = $project->billing_type;
         }
 
         $project->update($validated);

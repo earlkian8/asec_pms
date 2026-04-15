@@ -55,7 +55,7 @@ class BillingsController extends Controller
             }], 'billing_amount')
             ->whereNull('archived_at')
             ->orderBy('project_name', 'asc')
-            ->get(['id', 'project_code', 'project_name', 'billing_type', 'contract_amount'])
+            ->get(['id', 'project_code', 'project_name', 'contract_amount'])
             ->map(function ($project) {
                 $contract    = (float) $project->contract_amount;
                 $totalBilled = (float) ($project->total_billed ?? 0);
@@ -127,8 +127,7 @@ class BillingsController extends Controller
     {
         $validated = $request->validate([
             'project_id'     => ['required', 'exists:projects,id'],
-            'billing_type'   => ['required', 'in:fixed_price,milestone'],
-            'milestone_id'   => ['nullable', 'exists:project_milestones,id', 'required_if:billing_type,milestone'],
+            'milestone_id'   => ['nullable', 'exists:project_milestones,id'],
             'billing_amount' => ['required', 'numeric', 'min:0.01'],
             'billing_date'   => ['required', 'date'],
             'due_date'       => ['nullable', 'date', 'after_or_equal:billing_date'],
@@ -137,11 +136,7 @@ class BillingsController extends Controller
 
         $project = Project::findOrFail($validated['project_id']);
 
-        if ($project->billing_type !== $validated['billing_type']) {
-            return back()->with('error', 'Billing type does not match project billing type.');
-        }
-
-        if ($validated['billing_type'] === 'milestone' && $validated['milestone_id']) {
+        if ($validated['milestone_id']) {
             $milestone = ProjectMilestone::where('id', $validated['milestone_id'])
                 ->where('project_id', $validated['project_id'])
                 ->first();

@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
             Route::put('/items/{project}/item/{item}', [ProjectBoqController::class, 'updateItem'])->middleware('permission:project-boq.update')->name('items.update');
             Route::delete('/items/{project}/item/{item}', [ProjectBoqController::class, 'destroyItem'])->middleware('permission:project-boq.delete')->name('items.destroy');
             Route::get('/export/{project}', [ProjectBoqController::class, 'export'])->middleware('permission:project-boq.view')->name('export');
+            Route::get('/export-excel/{project}', [ProjectBoqController::class, 'exportExcel'])->middleware('permission:project-boq.view')->name('export-excel');
         });
 
         // Project Milestones

@@ -326,6 +326,17 @@ class ProjectBoqController extends Controller
         return redirect()->back()->with('success', 'BOQ item removed.');
     }
 
+    public function exportExcel(Project $project)
+    {
+        $fileName = 'BOQ_' . $project->project_code . '_' . now()->format('Ymd') . '.xlsx';
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\ProjectBoqExcelExport($project),
+            $fileName,
+            \Maatwebsite\Excel\Excel::XLSX
+        );
+    }
+
     public function export(Project $project)
     {
         $export   = new ProjectBoqExport($project);

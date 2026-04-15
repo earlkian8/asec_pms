@@ -16,6 +16,7 @@ import {
     Package,
     Wrench,
     Download,
+    FileSpreadsheet,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 
@@ -1119,6 +1120,16 @@ export default function BOQTab({ project, boqData }) {
                             className="flex items-center gap-2 px-3 py-2 rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 text-sm font-medium"
                         >
                             <Download size={14} /> Export PDF
+                        </a>
+                    )}
+                    {!editing && sections.length > 0 && (
+                        <a
+                            href={route('project-management.project-boq.export-excel', project.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium"
+                        >
+                            <FileSpreadsheet size={14} /> Export Excel
                         </a>
                     )}
                     {!editing && canEdit && sections.length > 0 && (

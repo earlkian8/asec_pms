@@ -32,8 +32,29 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
   const payType    = laborCost.pay_type || 'hourly';
   const dailyRate  = parseFloat(laborCost.daily_rate) || 0;
   const monthlySalary = parseFloat(laborCost.monthly_salary) || 0;
+  const basePay    = parseFloat(laborCost.base_pay) || 0;
+  const overpayAmount = parseFloat(laborCost.overpay_amount) || 0;
+  const overpayReason = laborCost.overpay_reason || '';
+  const doublePayAmount = parseFloat(laborCost.double_pay_amount) || 0;
+  const doublePayReason = laborCost.double_pay_reason || '';
+  const damagesDeduction = parseFloat(laborCost.damages_deduction) || 0;
+  const damagesReason = laborCost.damages_reason || '';
+  const otherDeduction = parseFloat(laborCost.other_deduction) || 0;
+  const otherDeductionReason = laborCost.other_deduction_reason || '';
+  const cashAdvance = parseFloat(laborCost.cash_advance) || 0;
+  const cashAdvanceReason = laborCost.cash_advance_reason || '';
+  const deductionItems = Array.isArray(laborCost.deduction_items) ? laborCost.deduction_items : [];
+  const totalAdditions = overpayAmount + doublePayAmount;
+  const totalDeductions = damagesDeduction + otherDeduction + cashAdvance;
+  const payrollEvents = Array.isArray(laborCost.payroll_events) ? laborCost.payroll_events : [];
   const isFixed    = payType === 'fixed';
   const isSalary   = payType === 'salary';
+  const workflowStatus = laborCost.status || 'submitted';
+  const statusLabel = workflowStatus === 'paid'
+    ? 'Paid'
+    : workflowStatus === 'approved'
+      ? 'Approved'
+      : 'Submitted';
 
   // Use breakdown if available (submitted), else compute display from attendance
   const dates = Object.keys(breakdown).length > 0
@@ -68,7 +89,7 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
         <DialogHeader>
           <DialogTitle className="text-zinc-800 flex items-center gap-2">
             <Lock size={16} className="text-green-600" />
-            Payroll Slip — Submitted
+            Payroll Slip — {statusLabel}
           </DialogTitle>
           <DialogDescription className="text-zinc-500">
             {project?.project_name} · {fmtDate(laborCost.period_start)} – {fmtDate(laborCost.period_end)}
@@ -128,7 +149,7 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
               { label: 'Days Present', value: totals.present,                  color: 'text-green-700', bg: 'bg-green-50 border-green-200' },
               { label: 'Days Absent',  value: totals.absent,                   color: 'text-red-600',   bg: 'bg-red-50 border-red-200'     },
               { label: 'Total Deducted', value: fmtHours(totals.deductionHours), color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
-              { label: 'Gross Pay',    value: fmt(displayGrossPay),            color: 'text-zinc-900',  bg: 'bg-zinc-50 border-zinc-200'   },
+              { label: 'Final Pay',    value: fmt(displayGrossPay),            color: 'text-zinc-900',  bg: 'bg-zinc-50 border-zinc-200'   },
             ].map(({ label, value, color, bg }) => (
               <div key={label} className={`rounded-lg border p-3 ${bg}`}>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
@@ -136,6 +157,72 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
               </div>
             ))}
           </div>
+
+          {(basePay > 0 || totalAdditions > 0 || totalDeductions > 0) && (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-2">Payroll Adjustments</p>
+              <div className="grid grid-cols-4 gap-2 text-sm">
+                <div>
+                  <p className="text-xs text-indigo-500">Base Pay</p>
+                  <p className="font-semibold text-indigo-900">{fmt(basePay)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-green-600">Additions</p>
+                  <p className="font-semibold text-green-700">{fmt(totalAdditions)}</p>
+                  <p className="text-xs text-green-600">Overpay {fmt(overpayAmount)} · Double {fmt(doublePayAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-red-600">Deductions</p>
+                  <p className="font-semibold text-red-700">{fmt(totalDeductions)}</p>
+                  <p className="text-xs text-red-600">Damages {fmt(damagesDeduction)} · Other {fmt(otherDeduction)} · CA {fmt(cashAdvance)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500">Final Pay</p>
+                  <p className="font-bold text-zinc-900">{fmt(displayGrossPay)}</p>
+                </div>
+              </div>
+              {(overpayReason || doublePayReason || damagesReason || otherDeductionReason || cashAdvanceReason) && (
+                <div className="mt-3 border-t border-indigo-200 pt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  {overpayReason && <p className="text-indigo-700"><span className="font-semibold">Overpay Reason:</span> {overpayReason}</p>}
+                  {doublePayReason && <p className="text-indigo-700"><span className="font-semibold">Double Pay Reason:</span> {doublePayReason}</p>}
+                  {damagesReason && <p className="text-indigo-700"><span className="font-semibold">Damages Reason:</span> {damagesReason}</p>}
+                  {otherDeductionReason && <p className="text-indigo-700"><span className="font-semibold">Other Deduction Reason:</span> {otherDeductionReason}</p>}
+                  {cashAdvanceReason && <p className="text-indigo-700"><span className="font-semibold">Cash Advance Reference:</span> {cashAdvanceReason}</p>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {deductionItems.length > 0 && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-2">Deduction Lines</p>
+              <div className="space-y-1.5">
+                {deductionItems.map((item, idx) => (
+                  <div key={`${item.type || 'damage'}-${idx}`} className="flex items-center justify-between text-xs">
+                    <span className="text-red-700">{item.label || 'Deduction'} ({item.type || 'damage'})</span>
+                    <span className="font-semibold text-red-700">-{fmt(parseFloat(item.amount) || 0)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {payrollEvents.length > 0 && (
+            <div className="rounded-lg border border-zinc-200 bg-white p-3">
+              <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wide mb-2">Payroll Events</p>
+              <div className="space-y-2">
+                {payrollEvents.map((event, idx) => (
+                  <div key={`${event.type || 'event'}-${idx}`} className="rounded border border-zinc-200 bg-zinc-50 px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-zinc-700">{(event.type || 'event').replace('_', ' ')}</p>
+                      <p className="text-xs text-zinc-500">{event.date || '—'}</p>
+                    </div>
+                    {event.notes && <p className="text-xs text-zinc-600 mt-1">{event.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Per-day breakdown table — hidden for fixed pay type */}
           {!isFixed && (
@@ -261,7 +348,7 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
           {/* Submitted badge */}
           <div className="flex items-center justify-between pt-2 border-t border-gray-200">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
-              <Lock size={11} /> Submitted & Locked
+              <Lock size={11} /> {statusLabel}
             </span>
             <p className="text-xs text-gray-400">
               {laborCost.created_at && `Created ${fmtDate(laborCost.created_at)}`}

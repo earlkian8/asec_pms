@@ -11,6 +11,7 @@ import { Label } from "@/Components/ui/label";
 import { Button } from "@/Components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Textarea } from "@/Components/ui/textarea";
+import DeductionItemsEditor from "./components/DeductionItemsEditor";
 
 const STANDARD_HOURS = 8;
 const DEFAULT_TIME_IN  = '08:00';
@@ -25,9 +26,12 @@ const PRESETS = {
   NW: { label: 'No Work',   time_in: '',              time_out: '',               break_minutes: 0             },
 };
 
-// status derived from times: no time_in = absent/no-work, else P
 function deriveStatus(day) {
-  if (!day.time_in) return day._preset === 'NW' ? 'A' : 'A'; // both map to A for backend
+  const preset = (day?._preset || '').toUpperCase();
+  if (preset === 'NW') return 'NW';
+  if (preset === 'HD') return 'HD';
+  if (preset === 'A') return 'A';
+  if (!day?.time_in) return 'A';
   return 'P';
 }
 
@@ -44,7 +48,7 @@ function getWorkingDates(start, end) {
 }
 
 function makeDefaultDay() {
-  return { _preset: 'P', time_in: DEFAULT_TIME_IN, time_out: DEFAULT_TIME_OUT, break_minutes: DEFAULT_BREAK };
+  return { _preset: 'P', time_in: DEFAULT_TIME_IN, time_out: DEFAULT_TIME_OUT, break_minutes: DEFAULT_BREAK, is_holiday: false };
 }
 
 function computeDayHours(day) {
@@ -65,9 +69,155 @@ function fmtHours(h) {
 const fmt = (v) =>
   new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(v || 0);
 
+const toNum = (v) => parseFloat(v || 0) || 0;
+
+function resolveEffectiveDailyRate(data) {
+  if ((data?.pay_type || 'hourly') === 'salary') {
+    return (parseFloat(data?.monthly_salary || 0) || 0) / 26;
+  }
+  if ((data?.pay_type || 'hourly') === 'fixed') {
+    return 0;
+  }
+  return parseFloat(data?.daily_rate || 0) || 0;
+}
+
+function computeAdjustedPay(basePay, data) {
+  const effectiveDailyRate = resolveEffectiveDailyRate(data);
+  const additions = computeAutomaticOvertimePay(data.attendance, effectiveDailyRate, data.pay_type);
+  const doublePay = computeHolidayDoublePay(data.attendance, effectiveDailyRate, data.pay_type);
+  const itemTotal = (data.deduction_items || []).reduce((sum, x) => sum + (parseFloat(x?.amount || 0) || 0), 0);
+  const deductions = itemTotal + (parseFloat(data.cash_advance || 0) || 0);
+  return {
+    additions: additions + doublePay,
+    overtimePay: additions,
+    doublePay,
+    deductions,
+    netPay: Math.max(0, basePay + additions + doublePay - deductions),
+  };
+}
+
+function computeHolidayDoublePay(attendance, dailyRate, payType) {
+  if (payType === 'fixed') return 0;
+  const map = attendance || {};
+  const hourlyRate = (parseFloat(dailyRate) || 0) / STANDARD_HOURS;
+  let extraPay = 0;
+
+  Object.values(map).forEach((day) => {
+    if (!day?.is_holiday) return;
+    if (!day?.time_in || !day?.time_out) return;
+
+    if (payType === 'salary') {
+      extraPay += parseFloat(dailyRate) || 0;
+      return;
+    }
+
+    const regularHours = computeDayHours(day);
+    extraPay += regularHours * hourlyRate;
+  });
+
+  return extraPay;
+}
+
+function computeAutomaticOvertimePay(attendance, dailyRate, payType) {
+  if (payType === 'fixed') return 0;
+  const map = attendance || {};
+  const hourlyRate = (parseFloat(dailyRate) || 0) / STANDARD_HOURS;
+  let overtimeHours = 0;
+
+  Object.values(map).forEach((day) => {
+    if (!day?.time_in || !day?.time_out) return;
+    const [inH, inM] = day.time_in.split(':').map(Number);
+    const [outH, outM] = day.time_out.split(':').map(Number);
+    const mins = (outH * 60 + outM) - (inH * 60 + inM) - (parseInt(day.break_minutes || 0, 10) || 0);
+    const hours = Math.max(0, mins / 60);
+    overtimeHours += Math.max(0, hours - STANDARD_HOURS);
+  });
+
+  return overtimeHours * hourlyRate * 1.25;
+}
+
 const inputCls = (err) =>
   'w-full border text-sm rounded-md px-3 py-2 focus:outline-none transition-all ' +
   (err ? 'border-red-500 ring-2 ring-red-400' : 'border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800');
+
+function AdjustmentControl({
+  title,
+  amount,
+  reason,
+  amountError,
+  reasonError,
+  reasonPlaceholder,
+  onApply,
+  onRemove,
+  onStep,
+  onQuickPick,
+  onReasonChange,
+}) {
+  const value = toNum(amount);
+  const active = value > 0 || (reason || '').trim() !== '';
+
+  return (
+    <div className="rounded-xl border border-zinc-200 p-3 bg-white">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-zinc-800 text-sm font-semibold">{title}</Label>
+        {!active ? (
+          <Button type="button" variant="outline" size="sm" onClick={onApply}>Apply</Button>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={onRemove}>Remove</Button>
+        )}
+      </div>
+
+      {active && (
+        <div className="mt-3 space-y-3">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Amount</p>
+            <p className="text-base font-bold text-zinc-900">{fmt(value)}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {[-100, -10, 10, 100].map((step) => (
+              <Button
+                key={step}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onStep(step)}
+                className="h-8 px-2"
+              >
+                {step > 0 ? `+${step}` : step}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {[100, 250, 500, 1000, 2000].map((quick) => (
+              <Button
+                key={quick}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onQuickPick(quick)}
+                className="h-8 px-2"
+              >
+                Set {quick}
+              </Button>
+            ))}
+          </div>
+
+          <Textarea
+            value={reason}
+            onChange={e => onReasonChange(e.target.value)}
+            placeholder={reasonPlaceholder}
+            className={inputCls(reasonError)}
+            rows={2}
+          />
+          <InputError message={amountError} />
+          <InputError message={reasonError} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PRESET_STYLE = {
   P:  'bg-green-100 text-green-700 border-green-300',
@@ -84,7 +234,12 @@ function AttendanceSheet({ workingDates, attendance, onChange }) {
 
   const applyPreset = (date, presetKey) => {
     const p = PRESETS[presetKey];
-    onChange({ ...attendance, [date]: { _preset: presetKey, time_in: p.time_in, time_out: p.time_out, break_minutes: p.break_minutes } });
+    onChange({ ...attendance, [date]: { _preset: presetKey, time_in: p.time_in, time_out: p.time_out, break_minutes: p.break_minutes, is_holiday: attendance[date]?.is_holiday || false } });
+  };
+
+  const toggleHoliday = (date) => {
+    const current = attendance[date] || makeDefaultDay();
+    onChange({ ...attendance, [date]: { ...current, is_holiday: !current.is_holiday } });
   };
 
   return (
@@ -132,6 +287,17 @@ function AttendanceSheet({ workingDates, attendance, onChange }) {
                     {p.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => toggleHoliday(date)}
+                  className={`px-2 py-0.5 rounded text-xs font-semibold border transition-all ${
+                    day.is_holiday
+                      ? 'bg-emerald-100 text-emerald-700 border-emerald-300 ring-1 ring-offset-1 ring-emerald-500'
+                      : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  Holiday
+                </button>
               </div>
 
               {/* Time In */}
@@ -195,6 +361,9 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
     daily_rate:      '',
     monthly_salary:  '',
     gross_pay:       '',
+    cash_advance:    '',
+    cash_advance_reason: '',
+    deduction_items: [],
     attendance:      {},
     description:     '',
     notes:           '',
@@ -207,10 +376,11 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
       Object.entries(d.attendance).map(([date, day]) => [
         date,
         {
-          status:        day.time_in ? 'P' : 'A',
+          status:        deriveStatus(day),
           time_in:       day.time_in       || null,
           time_out:      day.time_out      || null,
           break_minutes: day.break_minutes ?? 0,
+          is_holiday:    !!day.is_holiday,
         },
       ])
     ),
@@ -251,19 +421,19 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
 
   const summary = useMemo(() => {
     const payType = data.pay_type || 'hourly';
-    let totalHours = 0, present = 0, absent = 0, deducted = 0, grossPay = 0;
+    let totalHours = 0, present = 0, absent = 0, deducted = 0, basePay = 0;
 
     if (payType === 'fixed') {
       present = workingDates.filter(d => data.attendance[d]?.time_in).length;
       absent  = workingDates.length - present;
-      grossPay = parseFloat(data.gross_pay) || 0;
+      basePay = parseFloat(data.gross_pay) || 0;
     } else if (payType === 'salary') {
       const dailyRate = data.monthly_salary ? (parseFloat(data.monthly_salary) / 26) : 0;
       workingDates.forEach(d => {
         const day = data.attendance[d];
         if (!day?.time_in) { absent++; return; }
         present++;
-        grossPay += dailyRate;
+        basePay += dailyRate;
       });
     } else {
       const rate = parseFloat(data.daily_rate) || 0;
@@ -277,10 +447,33 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
         const s = STANDARD_HOURS - h;
         if (s > 0.01) deducted += s;
       });
-      grossPay = totalHours * hourlyRate;
+      basePay = totalHours * hourlyRate;
     }
-    return { present, absent, totalHours, deducted, grossPay };
-  }, [data.attendance, data.daily_rate, data.monthly_salary, data.gross_pay, data.pay_type, workingDates]);
+
+    const adj = computeAdjustedPay(basePay, data);
+
+    return {
+      present,
+      absent,
+      totalHours,
+      deducted,
+      basePay,
+      additions: adj.additions,
+      overtimePay: adj.overtimePay,
+      doublePay: adj.doublePay,
+      deductions: adj.deductions,
+      netPay: adj.netPay,
+    };
+  }, [
+    data.attendance,
+    data.daily_rate,
+    data.monthly_salary,
+    data.gross_pay,
+    data.cash_advance,
+    data.deduction_items,
+    data.pay_type,
+    workingDates,
+  ]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -339,12 +532,13 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
               <Label className="text-zinc-800 mb-1 block text-sm">Pay Type <span className="text-red-500">*</span></Label>
               <div className="flex rounded-xl border border-gray-200 overflow-hidden text-xs bg-white h-10">
                 {[{id:'hourly',label:'Hourly'},{id:'salary',label:'Salary'},{id:'fixed',label:'Fixed'}].map(pt => (
-                  <button key={pt.id} type="button" onClick={() => setData('pay_type', pt.id)}
+                  <button key={pt.id} type="button" disabled
                     className={`flex-1 font-medium transition-all ${
-                      data.pay_type === pt.id ? 'bg-zinc-700 text-white' : 'text-gray-600 hover:bg-gray-50'
+                      data.pay_type === pt.id ? 'bg-zinc-700 text-white' : 'text-gray-400 bg-zinc-100'
                     }`}>{pt.label}</button>
                 ))}
               </div>
+              <p className="text-xs text-zinc-500 mt-1">Pay type is locked from project assignment.</p>
             </div>
           </div>
 
@@ -361,7 +555,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             <div>
               <Label className="text-zinc-800 mb-1 block text-sm">Monthly Salary <span className="text-red-500">*</span></Label>
               <Input type="number" step="0.01" min="0" value={data.monthly_salary}
-                onChange={e => setData('monthly_salary', e.target.value)}
+                readOnly
                 placeholder="e.g. 25000.00" className={inputCls(errors.monthly_salary)} />
               <InputError message={errors.monthly_salary} />
               {data.monthly_salary && (
@@ -377,7 +571,7 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
                 <span className="text-gray-400 font-normal ml-1 text-xs">(for {STANDARD_HOURS}h)</span>
               </Label>
               <Input type="number" step="0.01" min="0" value={data.daily_rate}
-                onChange={e => setData('daily_rate', e.target.value)}
+                readOnly
                 placeholder="e.g. 600.00" className={inputCls(errors.daily_rate)} />
               <InputError message={errors.daily_rate} />
               {data.daily_rate && <p className="text-xs text-gray-400 mt-0.5">= {fmt((parseFloat(data.daily_rate) || 0) / STANDARD_HOURS)}/hr</p>}
@@ -405,15 +599,52 @@ const AddLaborCost = ({ setShowAddModal, project, teamMembers }) => {
             </div>
           )}
 
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <Label className="text-zinc-800 block text-sm">Automated Overpay</Label>
+            <p className="text-xs text-zinc-500 mt-1">Overpay is computed from attendance overtime only (e.g., 5:30 PM gives +30 minutes overpay basis).</p>
+            <p className="text-xs text-emerald-700 mt-1">Current overtime add: {fmt(summary.overtimePay || 0)}</p>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <Label className="text-zinc-800 block text-sm">Holiday Double Pay</Label>
+            <p className="text-xs text-zinc-500 mt-1">Mark holiday per day in the attendance row. Each marked present day adds one extra day pay.</p>
+            <p className="text-xs text-emerald-700 mt-2">Double pay add: {fmt(summary.doublePay || 0)}</p>
+          </div>
+
+          <DeductionItemsEditor
+            items={data.deduction_items}
+            onChange={(next) => setData('deduction_items', next)}
+            errors={errors}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-zinc-800 mb-1 block text-sm">Cash Advance</Label>
+              <Input type="number" step="0.01" min="0" value={data.cash_advance}
+                onChange={e => setData('cash_advance', e.target.value)}
+                placeholder="0.00" className={inputCls(errors.cash_advance)} />
+              <InputError message={errors.cash_advance} />
+            </div>
+            <div>
+              <Label className="text-zinc-800 mb-1 block text-sm">Cash Advance Notes</Label>
+              <Textarea value={data.cash_advance_reason} onChange={e => setData('cash_advance_reason', e.target.value)}
+                placeholder="Reference or notes" className={inputCls(errors.cash_advance_reason)} rows={2} />
+              <InputError message={errors.cash_advance_reason} />
+            </div>
+          </div>
+
           {workingDates.length > 0 && (data.daily_rate || data.monthly_salary || data.gross_pay) && (
-            <div className="grid grid-cols-4 gap-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
               {[
                 { label: 'Present',     value: summary.present,              color: 'text-green-700' },
                 { label: 'Absent',      value: summary.absent,               color: 'text-red-600'   },
                 { label: 'Total Hours', value: data.pay_type === 'fixed' || data.pay_type === 'salary' ? '—' : fmtHours(summary.totalHours),
                   color: summary.deducted > 0 ? 'text-amber-600' : 'text-blue-700',
                   sub: data.pay_type === 'hourly' && summary.deducted > 0 ? `−${fmtHours(summary.deducted)} late` : null },
-                { label: 'Gross Pay',   value: fmt(summary.grossPay),        color: 'text-zinc-900'  },
+                { label: 'Final Pay',   value: fmt(summary.netPay),           color: 'text-emerald-700',
+                  sub: summary.additions > 0 || summary.deductions > 0
+                    ? `+${fmt(summary.additions)} (OT ${fmt(summary.overtimePay || 0)}, DP ${fmt(summary.doublePay || 0)}) / -${fmt(summary.deductions)}`
+                    : null },
               ].map(({ label, value, color, sub }) => (
                 <div key={label} className="text-center">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>

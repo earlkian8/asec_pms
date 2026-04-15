@@ -155,7 +155,7 @@ export default function LaborCostTab({ project, laborCostData }) {
       <div className="mb-6 pb-6 border-b border-gray-200">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {[
-            { label: 'Total Gross Pay', value: formatCurrency(totalGrossPay), icon: PhilippinePeso, from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
+            { label: 'Total Final Pay', value: formatCurrency(totalGrossPay), icon: PhilippinePeso, from: 'from-green-50',  to: 'to-green-100',  border: 'border-green-200',  text: 'text-green-700',  num: 'text-green-900',  iconBg: 'bg-green-200',  iconColor: 'text-green-700'  },
             { label: 'Total Days',      value: totalDays.toFixed(1) + ' days', icon: Calendar,      from: 'from-blue-50',   to: 'to-blue-100',   border: 'border-blue-200',   text: 'text-blue-700',   num: 'text-blue-900',   iconBg: 'bg-blue-200',   iconColor: 'text-blue-700'   },
             { label: 'Draft Entries',   value: totalDraft,                     icon: Clock,         from: 'from-yellow-50', to: 'to-yellow-100', border: 'border-yellow-200', text: 'text-yellow-700', num: 'text-yellow-900', iconBg: 'bg-yellow-200', iconColor: 'text-yellow-700' },
             { label: 'Submitted',       value: totalSubmitted,                 icon: CheckCircle2,  from: 'from-indigo-50', to: 'to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-700', num: 'text-indigo-900', iconBg: 'bg-indigo-200', iconColor: 'text-indigo-700' },
@@ -295,7 +295,7 @@ export default function LaborCostTab({ project, laborCostData }) {
         <Table className="min-w-[1000px] w-full">
           <TableHeader>
             <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-              {['', 'Worker', 'Period', 'Days Present', 'Daily Rate', 'Gross Pay', 'Status', 'Actions'].map((h, i) => (
+              {['', 'Worker', 'Period', 'Days Present', 'Base Pay', 'Final Pay', 'Status', 'Actions'].map((h, i) => (
                 <TableHead key={i} className="font-bold px-4 py-4 text-xs text-gray-700 uppercase tracking-wider text-left">{h}</TableHead>
               ))}
             </TableRow>
@@ -303,7 +303,10 @@ export default function LaborCostTab({ project, laborCostData }) {
           <TableBody>
             {laborCosts.length > 0 ? laborCosts.map((entry, index) => {
               const isExpanded = expandedRows.has(entry.id);
+              const isDraft = entry.status === 'draft';
               const isSubmitted = entry.status === 'submitted';
+              const isApproved = entry.status === 'approved';
+              const isPaid = entry.status === 'paid';
               const summary = getAttendanceSummary(entry.attendance);
               const attendance = entry.attendance || {};
               const dates = Object.keys(attendance).sort();
@@ -345,25 +348,36 @@ export default function LaborCostTab({ project, laborCostData }) {
                       </div>
                     </TableCell>
 
-                    {/* Daily rate */}
+                    {/* Base pay */}
                     <TableCell className="px-4 py-4 text-sm text-gray-700">
-                      {formatCurrency(entry.daily_rate)}
+                      {formatCurrency(entry.base_pay ?? entry.gross_pay ?? 0)}
                     </TableCell>
 
-                    {/* Gross pay */}
+                    {/* Final pay */}
                     <TableCell className="px-4 py-4 text-sm font-bold text-gray-900">
                       {formatCurrency(entry.gross_pay)}
                     </TableCell>
 
                     {/* Status */}
                     <TableCell className="px-4 py-4 text-sm" onClick={e => e.stopPropagation()}>
-                      {isSubmitted ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-green-100 text-green-700 border border-green-200">
-                          <Lock size={11} />Submitted
-                        </span>
-                      ) : (
+                      {isDraft && (
                         <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
                           <Clock size={11} />Draft
+                        </span>
+                      )}
+                      {isSubmitted && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-green-100 text-green-700 border border-green-200">
+                          <Send size={11} />Submitted
+                        </span>
+                      )}
+                      {isApproved && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                          <CheckCircle2 size={11} />Approved
+                        </span>
+                      )}
+                      {isPaid && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                          <PhilippinePeso size={11} />Paid
                         </span>
                       )}
                     </TableCell>
@@ -371,15 +385,39 @@ export default function LaborCostTab({ project, laborCostData }) {
                     {/* Actions */}
                     <TableCell className="px-4 py-4 text-sm" onClick={e => e.stopPropagation()}>
                       <div className="flex gap-1.5">
-                        {!isSubmitted && has('labor-costs.update') && (
+                        {isDraft && has('labor-costs.update') && (
                           <button
                             onClick={() => handleSubmit(entry)}
                             className="p-2 rounded-lg hover:bg-green-100 text-green-600 hover:text-green-700 transition-all border border-green-200"
-                            title="Submit & Lock">
+                            title="Submit">
                             <Send size={15} />
                           </button>
                         )}
-                        {!isSubmitted && has('labor-costs.update') && (
+                        {isSubmitted && has('labor-costs.update') && (
+                          <button
+                            onClick={() => router.put(route('project-management.labor-costs.approve', [project.id, entry.id]), {}, {
+                              preserveScroll: true,
+                              onSuccess: () => toast.success('Payroll entry approved.'),
+                              onError: () => toast.error('Failed to approve payroll entry.'),
+                            })}
+                            className="p-2 rounded-lg hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all border border-blue-200"
+                            title="Approve">
+                            <CheckCircle2 size={15} />
+                          </button>
+                        )}
+                        {isApproved && has('labor-costs.update') && (
+                          <button
+                            onClick={() => router.put(route('project-management.labor-costs.mark-paid', [project.id, entry.id]), {}, {
+                              preserveScroll: true,
+                              onSuccess: () => toast.success('Payroll entry marked as paid.'),
+                              onError: () => toast.error('Failed to mark payroll as paid.'),
+                            })}
+                            className="p-2 rounded-lg hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 transition-all border border-emerald-200"
+                            title="Mark as Paid">
+                            <PhilippinePeso size={15} />
+                          </button>
+                        )}
+                        {isDraft && has('labor-costs.update') && (
                           <button
                             onClick={() => { setEditLaborCost(entry); setShowEditModal(true); }}
                             className="p-2 rounded-lg hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all border border-blue-200"
@@ -387,7 +425,7 @@ export default function LaborCostTab({ project, laborCostData }) {
                             <SquarePen size={15} />
                           </button>
                         )}
-                        {!isSubmitted && has('labor-costs.delete') && (
+                        {isDraft && has('labor-costs.delete') && (
                           <button
                             onClick={() => { setDeleteLaborCost(entry); setShowDeleteModal(true); }}
                             className="p-2 rounded-lg hover:bg-red-100 text-red-600 hover:text-red-700 transition-all border border-red-200"
@@ -395,7 +433,7 @@ export default function LaborCostTab({ project, laborCostData }) {
                             <Trash2 size={15} />
                           </button>
                         )}
-                        {isSubmitted && (
+                        {!isDraft && (
                           <button
                             onClick={() => { setViewLaborCost(entry); setShowViewModal(true); }}
                             className="p-2 rounded-lg hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-all border border-indigo-200"
@@ -444,6 +482,12 @@ export default function LaborCostTab({ project, laborCostData }) {
                         {entry.description && (
                           <p className="text-xs text-gray-500 mt-3"><span className="font-semibold">Description:</span> {entry.description}</p>
                         )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          <span className="font-semibold">Adjustments:</span>{' '}
+                          +Overpay {formatCurrency(entry.overpay_amount || 0)} · +Double {formatCurrency(entry.double_pay_amount || 0)} ·
+                          {' '}-Damages {formatCurrency(entry.damages_deduction || 0)} · -Other {formatCurrency(entry.other_deduction || 0)} ·
+                          {' '}-Cash Advance {formatCurrency(entry.cash_advance || 0)}
+                        </p>
                         {entry.notes && (
                           <p className="text-xs text-gray-500 mt-1"><span className="font-semibold">Notes:</span> {entry.notes}</p>
                         )}

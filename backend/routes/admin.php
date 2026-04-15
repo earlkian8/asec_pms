@@ -158,6 +158,8 @@ Route::middleware('auth')->group(function () {
             Route::post('/store/{project}', [ProjectLaborCostsController::class, 'store'])->middleware('permission:labor-costs.create')->name('store');
             Route::put('/update/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'update'])->middleware('permission:labor-costs.update')->name('update');
             Route::put('/submit/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'submit'])->middleware('permission:labor-costs.update')->name('submit');
+            Route::put('/approve/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'approve'])->middleware('permission:labor-costs.update')->name('approve');
+            Route::put('/mark-paid/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'markPaid'])->middleware('permission:labor-costs.update')->name('mark-paid');
             Route::delete('/destroy/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'destroy'])->middleware('permission:labor-costs.delete')->name('destroy');
         });
 

@@ -10,6 +10,8 @@ use App\Models\Billing;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTeam;
 use App\Models\ProjectTask;
+use App\Models\ProjectBoqSection;
+use Illuminate\Support\Facades\DB;
 
 class ProjectOverviewService
 {
@@ -18,21 +20,22 @@ class ProjectOverviewService
         $project->load(['client', 'projectType']);
 
         // ── Labor Costs ───────────────────────────────────────────────────────
-        $laborCosts      = ProjectLaborCost::where('project_id', $project->id)->get();
+        $laborCosts      = ProjectLaborCost::where('project_id', $project->id)
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
+            ->get();
         $totalLaborCost  = (float) $laborCosts->sum('gross_pay');
         $totalLaborDays  = (float) $laborCosts->sum('days_present');
 
         // ── Material Costs ────────────────────────────────────────────────────
-        $materialAllocations = ProjectMaterialAllocation::where('project_id', $project->id)
-            ->with('inventoryItem')
-            ->get();
+        $totalMaterialCost = (float) $this->materialReceivingReportsBaseQuery($project->id)
+            ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
 
-        $totalMaterialCost     = $materialAllocations->sum(function ($a) {
-            return $a->inventoryItem
-                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price
-                : 0;
-        });
-        $totalMaterialQuantity = (float) $materialAllocations->sum('quantity_received');
+        $totalMaterialQuantity = (float) $this->materialReceivingReportsBaseQuery($project->id)
+            ->sum('mrr.quantity_received');
 
         // ── Miscellaneous Expenses ────────────────────────────────────────────
         $miscExpenses               = ProjectMiscellaneousExpense::where('project_id', $project->id)->get();
@@ -96,21 +99,25 @@ class ProjectOverviewService
 
         // Labor — group by period_start month, sum gross_pay
         $monthlyLaborCosts = ProjectLaborCost::where('project_id', $project->id)
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
             ->where('period_start', '>=', now()->subMonths(6))
             ->get()
             ->groupBy(fn ($c) => $c->period_start->format('Y-m'))
             ->map(fn ($costs) => (float) $costs->sum('gross_pay'));
 
         // Materials
-        $monthlyMaterialCosts = ProjectMaterialAllocation::where('project_id', $project->id)
-            ->where('allocated_at', '>=', now()->subMonths(6))
-            ->with('inventoryItem')
-            ->get()
-            ->groupBy(fn ($a) => $a->allocated_at->format('Y-m'))
-            ->map(fn ($allocations) => $allocations->sum(fn ($a) => $a->inventoryItem
-                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price
-                : 0
-            ));
+        $monthlyMaterialCosts = $this->materialReceivingReportsBaseQuery($project->id)
+            ->where('mrr.received_at', '>=', now()->subMonths(6))
+            ->select(
+                DB::raw("TO_CHAR(DATE_TRUNC('month', mrr.received_at), 'YYYY-MM') as month_key"),
+                DB::raw('SUM(mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)) as total')
+            )
+            ->groupBy('month_key')
+            ->pluck('total', 'month_key');
 
         // Misc
         $monthlyMiscExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)
@@ -217,6 +224,7 @@ class ProjectOverviewService
                     ? round(($completedTasks / $totalTasks) * 100, 2)
                     : 0,
             ],
+            'cost_performance' => $this->buildCostPerformance($project),
             'timeline' => [
                 'days_elapsed'     => $daysElapsed,
                 'days_remaining'   => $daysRemaining,
@@ -226,5 +234,121 @@ class ProjectOverviewService
                 'actual_end_date'  => $project->actual_end_date,
             ],
         ];
+    }
+
+    private function buildCostPerformance(Project $project): array
+{
+    $sections = ProjectBoqSection::with(['items.materialAllocations.milestoneUsages', 'items.laborCosts'])
+        ->where('project_id', $project->id)
+        ->orderBy('sort_order')
+        ->get();
+
+    $totalPlannedMat = 0.0; $totalPlannedLab = 0.0;
+    $totalActualMat  = 0.0; $totalActualLab  = 0.0;
+
+    $sectionsOut = $sections->map(function ($section) use (&$totalPlannedMat, &$totalPlannedLab, &$totalActualMat, &$totalActualLab) {
+        $secPlannedMat = 0.0; $secPlannedLab = 0.0;
+        $secActualMat  = 0.0; $secActualLab  = 0.0;
+
+        $items = $section->items->map(function ($item) use (&$secPlannedMat, &$secPlannedLab, &$secActualMat, &$secActualLab) {
+            $r = $item->plannedVsActual();
+            $secPlannedMat += $r['planned_material'];
+            $secPlannedLab += $r['planned_labor'];
+            $secActualMat  += $r['material_actual'];
+            $secActualLab  += $r['labor_actual'];
+
+            return [
+                'id'              => $item->id,
+                'item_code'       => $item->item_code,
+                'description'     => $item->description,
+                'unit'            => $item->unit,
+                'quantity'        => (float) $item->quantity,
+                'planned_material'=> $r['planned_material'],
+                'planned_labor'   => $r['planned_labor'],
+                'planned_total'   => $r['planned_cost'],
+                'actual_material' => $r['material_actual'],
+                'actual_labor'    => $r['labor_actual'],
+                'actual_total'    => $r['total_actual'],
+                'variance'        => $r['variance'],
+                'variance_pct'    => $r['variance_pct'],
+            ];
+        })->toArray();
+
+        $secPlannedTotal = $secPlannedMat + $secPlannedLab;
+        $secActualTotal  = $secActualMat  + $secActualLab;
+        $secVariance     = $secPlannedTotal - $secActualTotal;
+
+        $totalPlannedMat += $secPlannedMat;
+        $totalPlannedLab += $secPlannedLab;
+        // ❌ REMOVED: do NOT accumulate $totalActualMat / $totalActualLab here
+        // The section-level actuals come from plannedVsActual() which may not
+        // match the raw expense totals. The grand total is set below directly.
+
+        return [
+            'code'             => $section->code,
+            'name'             => $section->name,
+            'planned_material' => round($secPlannedMat, 2),
+            'planned_labor'    => round($secPlannedLab, 2),
+            'planned_total'    => round($secPlannedTotal, 2),
+            'actual_material'  => round($secActualMat, 2),
+            'actual_labor'     => round($secActualLab, 2),
+            'actual_total'     => round($secActualTotal, 2),
+            'variance'         => round($secVariance, 2),
+            'variance_pct'     => $secPlannedTotal > 0 ? round(($secVariance / $secPlannedTotal) * 100, 2) : null,
+            'items'            => $items,
+        ];
+    })->toArray();
+
+    // ── Use the SAME raw queries as getProjectOverviewData() ─────────────────
+    // This guarantees "Actual to Date" in Cost Performance matches
+    // "All Recorded Expenses" (minus miscellaneous, which is excluded here).
+
+    $rawMaterialActual = (float) $this->materialReceivingReportsBaseQuery($project->id)
+        ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
+
+    $rawLaborActual = (float) ProjectLaborCost::where('project_id', $project->id)
+        ->whereIn('status', [
+            ProjectLaborCost::STATUS_SUBMITTED,
+            ProjectLaborCost::STATUS_APPROVED,
+            ProjectLaborCost::STATUS_PAID,
+        ])
+        ->sum('gross_pay');
+
+    // Intentionally exclude miscellaneous here (per your requirement)
+    $totalActualMat = $rawMaterialActual;
+    $totalActualLab = $rawLaborActual;
+
+    $plannedTotal = $totalPlannedMat + $totalPlannedLab;
+    $actualTotal  = $totalActualMat  + $totalActualLab;
+    $variance     = $plannedTotal - $actualTotal;
+    $contract     = (float) ($project->contract_amount ?? 0);
+    $projectedMargin = $contract > 0 ? round((($contract - $plannedTotal) / $contract) * 100, 2) : null;
+
+    return [
+        'sections' => $sectionsOut,
+        'totals'   => [
+            'planned_material' => round($totalPlannedMat, 2),
+            'planned_labor'    => round($totalPlannedLab, 2),
+            'planned_total'    => round($plannedTotal, 2),
+            'actual_material'  => round($totalActualMat, 2),
+            'actual_labor'     => round($totalActualLab, 2),
+            'actual_total'     => round($actualTotal, 2),
+            'variance'         => round($variance, 2),
+            'variance_pct'     => $plannedTotal > 0 ? round(($variance / $plannedTotal) * 100, 2) : null,
+            'contract_amount'  => round($contract, 2),
+            'projected_margin' => $projectedMargin,
+        ],
+    ];
+}
+
+    private function materialReceivingReportsBaseQuery(int $projectId)
+    {
+        return DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at')
+            ->where('pma.project_id', $projectId);
     }
 }

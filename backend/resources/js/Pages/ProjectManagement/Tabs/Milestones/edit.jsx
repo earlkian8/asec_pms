@@ -1,6 +1,6 @@
 import { useForm } from "@inertiajs/react";
 import { toast } from "sonner";
-import { Loader2, Save, Info } from "lucide-react";
+import { Loader2, Save, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,15 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/Components/ui/textarea";
 
 const EditMilestone = ({ setShowEditModal, milestone, project, allMilestones = [] }) => {
-  const isMilestoneBilling = project?.billing_type === 'milestone';
-
-  // Total billing excluding THIS milestone so editing doesn't self-block
-  const otherMilestonesTotal = allMilestones
-    .filter(m => m.id !== milestone.id)
-    .reduce((sum, m) => sum + (parseFloat(m.billing_percentage) || 0), 0);
-
-  const remaining = Math.max(0, 100 - otherMilestonesTotal);
-
   const { data, setData, put, errors, processing } = useForm({
     name:               milestone.name               || "",
     description:        milestone.description        || "",
@@ -43,17 +34,6 @@ const EditMilestone = ({ setShowEditModal, milestone, project, allMilestones = [
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    // Frontend billing % guard
-    if (isMilestoneBilling && data.billing_percentage) {
-      const newTotal = otherMilestonesTotal + parseFloat(data.billing_percentage);
-      if (newTotal > 100) {
-        toast.error(
-          `Total billing would reach ${newTotal.toFixed(2)}%. Only ${remaining.toFixed(2)}% available for this milestone.`
-        );
-        return;
-      }
-    }
 
     if (data.status === 'completed' && !areAllTasksCompleted()) {
       const incompleteTasks = (milestone.tasks || []).filter(t => t.status !== 'completed').length;
@@ -99,26 +79,6 @@ const EditMilestone = ({ setShowEditModal, milestone, project, allMilestones = [
             Update the milestone details below.
           </DialogDescription>
         </DialogHeader>
-
-        {/* Billing type context banner */}
-        <div className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg border ${
-          isMilestoneBilling
-            ? 'bg-blue-50 border-blue-200 text-blue-700'
-            : 'bg-amber-50 border-amber-200 text-amber-700'
-        }`}>
-          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          {isMilestoneBilling ? (
-            <span>
-              <span className="font-semibold">Milestone billing</span> — other milestones use{' '}
-              <span className="font-semibold">{otherMilestonesTotal.toFixed(2)}%</span>.{' '}
-              Up to <span className={`font-semibold ${remaining === 0 ? 'text-red-600' : ''}`}>{remaining.toFixed(2)}%</span> available for this milestone.
-            </span>
-          ) : (
-            <span>
-              <span className="font-semibold">Fixed price billing</span> — billing percentage per milestone is not applicable.
-            </span>
-          )}
-        </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
           {/* Name */}
@@ -174,28 +134,20 @@ const EditMilestone = ({ setShowEditModal, milestone, project, allMilestones = [
             <InputError message={errors.due_date} />
           </div>
 
-          {/* Billing Percentage — only shown for milestone billing */}
-          {isMilestoneBilling && (
-            <div>
-              <Label className="text-zinc-800">
-                Billing Percentage (%)
-                <span className={`ml-1 text-xs font-normal ${remaining === 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                  — {remaining.toFixed(2)}% available
-                </span>
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max={remaining}
-                value={data.billing_percentage}
-                onChange={(e) => setData("billing_percentage", e.target.value)}
-                placeholder="0.00"
-                className={inputClass(errors.billing_percentage)}
-              />
-              <InputError message={errors.billing_percentage} />
-            </div>
-          )}
+          <div>
+            <Label className="text-zinc-800">Billing Percentage (%)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={data.billing_percentage}
+              onChange={(e) => setData("billing_percentage", e.target.value)}
+              placeholder="0.00"
+              className={inputClass(errors.billing_percentage)}
+            />
+            <InputError message={errors.billing_percentage} />
+          </div>
 
           {/* Status */}
           <div>
@@ -223,6 +175,20 @@ const EditMilestone = ({ setShowEditModal, milestone, project, allMilestones = [
               </p>
             )}
           </div>
+
+          {/* Soft-gate: warn if marking complete with no material usage recorded */}
+          {data.status === 'completed' && (milestone.materialUsages || []).length === 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+              <div>
+                <p className="font-semibold">No material usage recorded</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  If materials were consumed for this milestone, please record them first using the{' '}
+                  <strong>Material Usage</strong> button on the milestone card. You can still save without recording — this is a reminder only.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <DialogFooter className="flex justify-end gap-2 mt-4 border-t pt-4">

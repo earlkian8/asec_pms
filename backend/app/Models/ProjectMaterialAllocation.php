@@ -11,6 +11,7 @@ class ProjectMaterialAllocation extends Model
 
     protected $fillable = [
         'project_id',
+        'boq_item_id',
         'inventory_item_id',
         'direct_supply_id',
         'unit_price',
@@ -68,6 +69,11 @@ class ProjectMaterialAllocation extends Model
     public function milestoneUsages()
     {
         return $this->hasMany(MilestoneMaterialUsage::class, 'project_material_allocation_id');
+    }
+
+    public function boqItem()
+    {
+        return $this->belongsTo(ProjectBoqItem::class, 'boq_item_id');
     }
 
     // Auto-calculate quantity_remaining before saving

@@ -43,7 +43,6 @@ export default function BillingManagement() {
   const columns = [
     { header: 'Billing Code',   width: '10%' },
     { header: 'Project',        width: '15%' },
-    { header: 'Billing Type',   width: '10%' },
     { header: 'Milestone',      width: '12%' },
     { header: 'Billing Amount', width: '10%' },
     { header: 'Billing Date',   width: '9%'  },
@@ -83,7 +82,6 @@ export default function BillingManagement() {
   const initFilters = (fp) => ({
     status:       fp?.status       || '',
     project_id:   fp?.project_id   || '',
-    billing_type: fp?.billing_type || '',
     start_date:   fp?.start_date   || '',
     end_date:     fp?.end_date     || '',
   });
@@ -96,7 +94,7 @@ export default function BillingManagement() {
 
   useEffect(() => {
     setLocalFilters(initFilters(filters));
-  }, [filters.status, filters.project_id, filters.billing_type, filters.start_date, filters.end_date]);
+  }, [filters.status, filters.project_id, filters.start_date, filters.end_date]);
 
   useEffect(() => {
     if (pageProps.sort_by)    setSortBy(pageProps.sort_by);
@@ -129,17 +127,11 @@ export default function BillingManagement() {
     partial: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
     paid:    'bg-green-100 text-green-800 border border-green-200',
   };
-  const billingTypeColors = {
-    fixed_price: 'bg-blue-100 text-blue-800 border border-blue-200',
-    milestone:   'bg-purple-100 text-purple-800 border border-purple-200',
-  };
-
   const capitalizeText = (t) =>
     t ? t.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : '';
 
   const activeFiltersCount = () =>
-    [localFilters.status, localFilters.project_id, localFilters.billing_type,
-     localFilters.start_date, localFilters.end_date].filter(Boolean).length;
+    [localFilters.status, localFilters.project_id, localFilters.start_date, localFilters.end_date].filter(Boolean).length;
 
   const handleFilterChange = (key, val) =>
     setLocalFilters(prev => ({ ...prev, [key]: val === 'all' ? '' : val }));
@@ -148,7 +140,6 @@ export default function BillingManagement() {
     ...(searchInput?.trim() && { search: searchInput }),
     ...(localFilters.status       && { status:       localFilters.status }),
     ...(localFilters.project_id   && { project_id:   localFilters.project_id }),
-    ...(localFilters.billing_type && { billing_type: localFilters.billing_type }),
     ...(localFilters.start_date   && { start_date:   localFilters.start_date }),
     ...(localFilters.end_date     && { end_date:     localFilters.end_date }),
     sort_by: sortBy, sort_order: sortOrder, tab: activeTab,
@@ -171,7 +162,7 @@ export default function BillingManagement() {
   };
 
   const resetFilters = () => {
-    setLocalFilters({ status: '', project_id: '', billing_type: '', start_date: '', end_date: '' });
+    setLocalFilters({ status: '', project_id: '', start_date: '', end_date: '' });
     setSortBy('created_at'); setSortOrder('desc');
     router.get(route('billing-management.index'), { tab: activeTab, ...(searchInput?.trim() && { search: searchInput }) }, {
       preserveState: true, preserveScroll: true, replace: true,
@@ -382,18 +373,6 @@ export default function BillingManagement() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            {filterOptions.billingTypes?.length > 0 && (
-                              <div>
-                                <Label className="text-xs font-semibold text-gray-700 mb-2 block">Billing Type</Label>
-                                <Select value={localFilters.billing_type || 'all'} onValueChange={(v) => handleFilterChange('billing_type', v)}>
-                                  <SelectTrigger className="w-full h-9"><SelectValue placeholder="All Types" /></SelectTrigger>
-                                  <SelectContent style={{ zIndex: 50 }}>
-                                    <SelectItem value="all">All Types</SelectItem>
-                                    {filterOptions.billingTypes.map(t => <SelectItem key={t} value={t}>{t === 'fixed_price' ? 'Fixed Price' : 'Milestone'}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
                             <div>
                               <Label className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5"><Calendar className="h-3 w-3" />Date Range</Label>
                               <div className="space-y-2">
@@ -439,7 +418,6 @@ export default function BillingManagement() {
                                   <SelectItem value="due_date">Due Date</SelectItem>
                                   <SelectItem value="billing_amount">Billing Amount</SelectItem>
                                   <SelectItem value="status">Status</SelectItem>
-                                  <SelectItem value="billing_type">Billing Type</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -524,11 +502,6 @@ export default function BillingManagement() {
                               <div className="font-medium text-gray-900">{billing.project?.project_code}</div>
                               <div className="text-xs text-gray-500">{billing.project?.project_name}</div>
                               {billing.project?.client && <div className="text-xs text-gray-400">{billing.project.client.client_name}</div>}
-                            </TableCell>
-                            <TableCell className="px-3 sm:px-4 py-3 text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${billingTypeColors[billing.billing_type] || 'bg-gray-100 text-gray-800 border border-gray-200'}`}>
-                                {billing.billing_type === 'fixed_price' ? 'Fixed Price' : 'Milestone'}
-                              </span>
                             </TableCell>
                             <TableCell className="px-3 sm:px-4 py-3 text-sm text-gray-700">
                               {billing.milestone ? <span>{billing.milestone.name}</span> : <span className="text-gray-400 italic">---</span>}

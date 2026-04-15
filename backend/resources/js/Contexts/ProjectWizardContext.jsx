@@ -27,7 +27,6 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
     actual_end_date: '',
     location: '',
     description: '',
-    billing_type: 'fixed_price',
   });
 
   // Step 2: Team Members
@@ -41,6 +40,10 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
 
   // Step 5: Labor Costs
   const [laborCosts, setLaborCosts] = useState([]);
+
+  // Step BOQ: sections with nested items
+  // Shape: [{ code, name, description, sort_order, items: [{ item_code, description, unit, quantity, unit_cost, resource_type, planned_* refs, remarks, sort_order }] }]
+  const [boqSections, setBoqSections] = useState([]);
 
   const updateProjectData = (data) => {
     setProjectData(prev => ({ ...prev, ...data }));
@@ -94,6 +97,55 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
     setLaborCosts(prev => prev.map((laborCost, i) => i === index ? { ...laborCost, ...data } : laborCost));
   };
 
+  const addBoqSection = (section) => {
+    setBoqSections(prev => [
+      ...prev,
+      { code: '', name: '', description: '', sort_order: prev.length, create_milestone: true, items: [], ...section },
+    ]);
+  };
+
+  const removeBoqSection = (index) => {
+    setBoqSections(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateBoqSection = (index, data) => {
+    setBoqSections(prev => prev.map((s, i) => i === index ? { ...s, ...data } : s));
+  };
+
+  const addBoqItem = (sectionIndex, item = {}) => {
+    setBoqSections(prev => prev.map((s, i) => {
+      if (i !== sectionIndex) return s;
+      const nextItems = [...(s.items || []), {
+        item_code: '',
+        description: '',
+        // unit/quantity/unit_cost are computed from resources; not exposed in UI
+        unit: 'lot',
+        quantity: 1,
+        unit_cost: 0,
+        resources: [],
+        remarks: '',
+        sort_order: (s.items || []).length,
+        ...item,
+      }];
+      return { ...s, items: nextItems };
+    }));
+  };
+
+  const removeBoqItem = (sectionIndex, itemIndex) => {
+    setBoqSections(prev => prev.map((s, i) => {
+      if (i !== sectionIndex) return s;
+      return { ...s, items: (s.items || []).filter((_, j) => j !== itemIndex) };
+    }));
+  };
+
+  const updateBoqItem = (sectionIndex, itemIndex, data) => {
+    setBoqSections(prev => prev.map((s, i) => {
+      if (i !== sectionIndex) return s;
+      const nextItems = (s.items || []).map((item, j) => j === itemIndex ? { ...item, ...data } : item);
+      return { ...s, items: nextItems };
+    }));
+  };
+
   const nextStep = () => {
     if (currentStep < totalSteps) {
       setCurrentStep(prev => prev + 1);
@@ -126,12 +178,12 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
       actual_end_date: '',
       location: '',
       description: '',
-      billing_type: 'fixed_price',
     });
     setTeamMembers([]);
     setMilestones([]);
     setMaterialAllocations([]);
     setLaborCosts([]);
+    setBoqSections([]);
   };
 
   const getAllData = () => {
@@ -141,6 +193,7 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
       milestones,
       materialAllocations,
       laborCosts,
+      boqSections,
     };
   };
 
@@ -152,6 +205,7 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
     milestones,
     materialAllocations,
     laborCosts,
+    boqSections,
     updateProjectData,
     addTeamMember,
     removeTeamMember,
@@ -165,6 +219,12 @@ export const ProjectWizardProvider = ({ children, totalSteps: totalStepsProp = 4
     addLaborCost,
     removeLaborCost,
     updateLaborCost,
+    addBoqSection,
+    removeBoqSection,
+    updateBoqSection,
+    addBoqItem,
+    removeBoqItem,
+    updateBoqItem,
     nextStep,
     prevStep,
     goToStep,

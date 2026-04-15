@@ -25,7 +25,7 @@ const TABS = [
 ];
 
 const TAB_FIELDS = {
-  basic:     ['first_name', 'middle_name', 'last_name', 'email', 'phone', 'position', 'is_active'],
+  basic:     ['first_name', 'middle_name', 'last_name', 'email', 'phone', 'position', 'is_active', 'compensation_pay_type', 'compensation_hourly_rate', 'compensation_monthly_salary'],
   personal:  ['profile_image', 'secondary_phone', 'gender', 'date_of_birth', 'civil_status',
                'nationality', 'region', 'province', 'city_municipality', 'barangay',
                'address', 'zip_code', 'notes'],
@@ -103,6 +103,9 @@ const AddEmployee = ({ setShowAddModal }) => {
     phone:       '',
     position:    '',
     is_active:   true,
+    compensation_pay_type: '',
+    compensation_hourly_rate: '',
+    compensation_monthly_salary: '',
 
     // Personal
     profile_image:   null,
@@ -239,6 +242,65 @@ const AddEmployee = ({ setShowAddModal }) => {
                   <Label className="text-zinc-800">Position</Label>
                   <Input value={data.position} onChange={e => setData('position', e.target.value)} placeholder="e.g. Engineer, Foreman" className={inputClass(errors.position)} />
                   <InputError message={errors.position} />
+                </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Compensation Profile</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-zinc-800">Pay Type</Label>
+                    <Select
+                      value={data.compensation_pay_type}
+                      onValueChange={(value) => {
+                        setData('compensation_pay_type', value);
+                        if (value === 'hourly') {
+                          setData('compensation_monthly_salary', '');
+                        } else {
+                          setData('compensation_hourly_rate', '');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className={inputClass(errors.compensation_pay_type)}>
+                        <SelectValue placeholder="Select pay type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Hourly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <InputError message={errors.compensation_pay_type} />
+                  </div>
+
+                  {data.compensation_pay_type === 'hourly' && (
+                    <div>
+                      <Label className="text-zinc-800">Hourly Rate</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={data.compensation_hourly_rate}
+                        onChange={e => setData('compensation_hourly_rate', e.target.value)}
+                        placeholder="0.00"
+                        className={inputClass(errors.compensation_hourly_rate)}
+                      />
+                      <InputError message={errors.compensation_hourly_rate} />
+                    </div>
+                  )}
+
+                  {data.compensation_pay_type === 'monthly' && (
+                    <div>
+                      <Label className="text-zinc-800">Monthly Salary</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={data.compensation_monthly_salary}
+                        onChange={e => setData('compensation_monthly_salary', e.target.value)}
+                        placeholder="0.00"
+                        className={inputClass(errors.compensation_monthly_salary)}
+                      />
+                      <InputError message={errors.compensation_monthly_salary} />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">

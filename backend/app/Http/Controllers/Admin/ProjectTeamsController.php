@@ -10,6 +10,7 @@ use App\Models\ProjectTeam;
 use App\Models\ProjectTeamStatusLog;
 use App\Models\ProjectTask;
 use App\Models\User;
+use App\Models\CompensationProfile;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Http\Request;
@@ -28,9 +29,6 @@ class ProjectTeamsController extends Controller
             'assignables.*.id'          => ['required'],
             'assignables.*.type'        => ['required', 'in:user,employee'],
             'assignables.*.role'        => ['required', 'string', 'max:50'],
-            'assignables.*.pay_type'       => ['required', 'in:hourly,salary,fixed'],
-            'assignables.*.hourly_rate'    => ['nullable', 'numeric', 'min:0'],
-            'assignables.*.monthly_salary' => ['nullable', 'numeric', 'min:0'],
             'assignables.*.start_date'  => ['required', 'date'],
             'assignables.*.end_date'    => ['nullable', 'date', 'after_or_equal:assignables.*.start_date'],
         ]);
@@ -81,6 +79,7 @@ class ProjectTeamsController extends Controller
         $skipped = 0;
 
         foreach ($validated['assignables'] as $index => $assignable) {
+            $compensation = $this->resolveCompensationForAssignable($assignable['type'], (int) $assignable['id']);
             // ── Occupation guard (employees only) ─────────────────────────────
             // if ($assignable['type'] === 'employee') {
             //     $occupiedIds = ProjectTeam::fullyOccupiedEmployeeIds();
@@ -117,9 +116,9 @@ class ProjectTeamsController extends Controller
                     'employee_id'       => $assignable['type'] === 'employee' ? (int) $assignable['id'] : null,
                     'assignable_type'   => $assignable['type'],
                     'role'              => $assignable['role'],
-                    'pay_type'          => $assignable['pay_type']       ?? 'hourly',
-                    'hourly_rate'       => $assignable['hourly_rate']    ?? null,
-                    'monthly_salary'    => $assignable['monthly_salary'] ?? null,
+                    'pay_type'          => $compensation['pay_type'],
+                    'hourly_rate'       => $compensation['hourly_rate'],
+                    'monthly_salary'    => $compensation['monthly_salary'],
                     'start_date'        => $assignable['start_date'],
                     'end_date'          => $assignable['end_date'] ?? null,
                     'is_active'         => true,
@@ -165,14 +164,16 @@ class ProjectTeamsController extends Controller
 
         $validated = $request->validate([
             'role'              => ['required', 'string', 'max:50'],
-            'pay_type'          => ['required', 'in:hourly,salary,fixed'],
-            'hourly_rate'       => ['nullable', 'numeric', 'min:0'],
-            'monthly_salary'    => ['nullable', 'numeric', 'min:0'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
             'is_active'         => ['required', 'boolean'],
             'assignment_status' => ['sometimes', 'string', 'in:' . implode(',', AssignmentStatus::values())],
         ]);
+
+        $assignableId = $projectTeam->assignable_type === 'employee'
+            ? (int) $projectTeam->employee_id
+            : (int) $projectTeam->user_id;
+        $compensation = $this->resolveCompensationForAssignable($projectTeam->assignable_type, $assignableId);
 
         // Date range validation against project
         if ($project->start_date || $project->planned_end_date) {
@@ -225,7 +226,11 @@ class ProjectTeamsController extends Controller
                 : $projectTeam->assignment_status,
         ];
 
-        $projectTeam->update($validated);
+        $projectTeam->update(array_merge($validated, [
+            'pay_type' => $compensation['pay_type'],
+            'hourly_rate' => $compensation['hourly_rate'],
+            'monthly_salary' => $compensation['monthly_salary'],
+        ]));
         $projectTeam->refresh();
 
         $this->adminActivityLogs('Project Team', 'Update',
@@ -243,6 +248,34 @@ class ProjectTeamsController extends Controller
         );
 
         return redirect()->back()->with('success', 'Team member updated successfully.');
+    }
+
+    private function resolveCompensationForAssignable(string $assignableType, int $assignableId): array
+    {
+        if ($assignableId <= 0) {
+            abort(422, 'Invalid assignable id for compensation lookup.');
+        }
+
+        $profileType = $assignableType === 'user' ? User::class : Employee::class;
+
+        $profile = CompensationProfile::query()
+            ->where('profileable_type', $profileType)
+            ->where('profileable_id', $assignableId)
+            ->where('is_active', true)
+            ->orderByDesc('effective_date')
+            ->first();
+
+        if (!$profile) {
+            abort(422, 'Selected member has no active compensation profile.');
+        }
+
+        $resolvedPayType = $profile->pay_type === 'monthly' ? 'salary' : $profile->pay_type;
+
+        return [
+            'pay_type' => $resolvedPayType,
+            'hourly_rate' => $profile->hourly_rate,
+            'monthly_salary' => $profile->monthly_salary,
+        ];
     }
 
     // ─── Bulk Status Update (release / reactivate) ───────────────────────────

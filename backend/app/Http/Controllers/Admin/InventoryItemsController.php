@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\InventoryTransaction;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\InventoryAvailabilityService;
 use App\Services\InventoryService;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\NotificationTrait;
@@ -521,5 +522,17 @@ class InventoryItemsController extends Controller
         $data = $this->inventoryService->getTransactions();
 
         return Inertia::render('InventoryManagement/Transactions', $data);
+    }
+
+    public function availability(Request $request, InventoryItem $inventoryItem, InventoryAvailabilityService $service)
+    {
+        $info = $service->availability(
+            $inventoryItem->id,
+            $request->integer('exclude_boq_item_id') ?: null,
+            $request->integer('exclude_resource_id') ?: null,
+            $request->integer('exclude_project_id') ?: null,
+        );
+
+        return response()->json($info);
     }
 }

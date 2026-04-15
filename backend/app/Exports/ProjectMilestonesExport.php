@@ -96,7 +96,6 @@ class ProjectMilestonesExport implements FromView, WithTitle
             'planned_end_date' => $this->project->planned_end_date,
             'actual_end_date' => $this->project->actual_end_date,
             'location' => $this->project->location,
-            'billing_type' => $this->project->billing_type,
             'client' => $this->project->client ? [
                 'code' => $this->project->client->client_code,
                 'name' => $this->project->client->client_name,

@@ -24,6 +24,11 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
   const itemCode = isDs ? (directSupply.supply_code || '---') : (inventoryItem.item_code || '---');
   const unitOfMeasure = isDs ? (directSupply.unit_of_measure || 'units') : (inventoryItem.unit_of_measure || 'units');
   const receivingReports = allocation.receiving_reports || allocation.receivingReports || [];
+  const boqItem = allocation.boq_item || allocation.boqItem || null;
+  const boqSection = boqItem?.section || null;
+  const boqCode = boqItem
+    ? [boqSection?.code, boqItem?.item_code].filter(Boolean).join('.') || boqItem?.item_code || 'BOQ Item'
+    : null;
   const allocatedBy = allocation.allocated_by || allocation.allocatedBy;
   const remaining = (allocation.quantity_allocated || 0) - (allocation.quantity_received || 0);
   const progress = allocation.quantity_allocated > 0
@@ -134,6 +139,17 @@ const ViewMaterialAllocation = ({ setShowViewModal, project, allocation }) => {
                   </div>
                   <span className="text-sm text-gray-600">{progress}%</span>
                 </div>
+              </div>
+              <div className="md:col-span-2">
+                <span className="text-sm font-medium text-gray-700">Linked BOQ Item:</span>
+                {boqItem ? (
+                  <div className="mt-1 text-sm text-gray-900">
+                    <div className="font-medium">{boqCode}</div>
+                    <div className="text-gray-600">{boqItem.description || 'Linked BOQ item'}</div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-1">Unlinked</p>
+                )}
               </div>
               {allocatedBy && (
                 <div>

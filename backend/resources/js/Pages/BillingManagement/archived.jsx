@@ -37,7 +37,6 @@ export default function ArchivedBillings() {
   const columns = [
     { header: 'Billing Code',   width: '12%' },
     { header: 'Project',        width: '20%' },
-    { header: 'Billing Type',   width: '12%' },
     { header: 'Billing Amount', width: '13%' },
     { header: 'Billing Date',   width: '11%' },
     { header: 'Archived On',    width: '13%' },
@@ -221,15 +220,6 @@ export default function ArchivedBillings() {
                       {billing.project?.client && (
                         <div className="text-xs text-gray-400">{billing.project.client.client_name}</div>
                       )}
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        billing.billing_type === 'fixed_price'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                          : 'bg-purple-100 text-purple-800 border border-purple-200'
-                      }`}>
-                        {billing.billing_type === 'fixed_price' ? 'Fixed Price' : 'Milestone'}
-                      </span>
                     </TableCell>
                     <TableCell className="px-4 py-3 text-sm font-bold text-gray-900">
                       ₱{formatNumber(billing.billing_amount)}

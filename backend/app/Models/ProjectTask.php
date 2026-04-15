@@ -12,6 +12,7 @@ class ProjectTask extends Model
 
     protected $fillable = [
         'project_milestone_id',
+        'boq_item_id',
         'title',
         'description',
         'assigned_to',
@@ -42,5 +43,10 @@ class ProjectTask extends Model
     public function clientUpdateRequests()
     {
         return $this->hasMany(ClientUpdateRequest::class, 'task_id');
+    }
+
+    public function boqItem()
+    {
+        return $this->belongsTo(ProjectBoqItem::class, 'boq_item_id');
     }
 }

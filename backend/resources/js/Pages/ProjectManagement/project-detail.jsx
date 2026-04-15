@@ -7,6 +7,7 @@ import { usePermission } from '@/utils/permissions';
 // Future Tab Imports
 import OverviewTab from './Tabs/Overview';
 import MilestonesTab from './Tabs/Milestones';
+import BOQTab from './Tabs/BOQ';
 import TeamTab from './Tabs/Team/index';
 import MaterialAllocationTab from './Tabs/MaterialAllocation';
 import LaborCostTab from './Tabs/LaborCost';
@@ -16,7 +17,7 @@ import RequestUpdatesTab from './Tabs/RequestUpdates';
 // import IssuesTab from './Tabs/Issues';
 
 export default function ProjectDetail() {
-    const { project, teamData, milestoneData, materialAllocationData, laborCostData, miscellaneousExpenseData, overviewData, requestUpdatesData } = usePage().props;
+    const { project, teamData, milestoneData, materialAllocationData, laborCostData, miscellaneousExpenseData, overviewData, requestUpdatesData, boqData } = usePage().props;
     const { has } = usePermission();
 
     const breadcrumbs = [
@@ -30,7 +31,7 @@ export default function ProjectDetail() {
         { 
             key: "overview", 
             label: "Overview", 
-            component: <OverviewTab project={project} overviewData={overviewData} />,
+            component: <OverviewTab project={project} overviewData={overviewData} boqData={boqData} />,
             permission: 'projects.view'
         },
         { 
@@ -39,8 +40,14 @@ export default function ProjectDetail() {
             component: <TeamTab project={project} teamData={teamData} />,
             permission: 'project-teams.view'
         },
-        { 
-            key: "material-allocation", 
+        {
+            key: "boq",
+            label: "BOQ / Scope",
+            component: <BOQTab project={project} boqData={boqData} />,
+            permission: 'project-boq.view'
+        },
+        {
+            key: "material-allocation",
             label: "Material Allocation", 
             component: <MaterialAllocationTab project={project} materialAllocationData={materialAllocationData} />,
             permission: 'material-allocations.view'

@@ -13,12 +13,16 @@ use App\Models\ProjectTeam;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
+use App\Models\ProjectBoqSection;
+use App\Models\ProjectBoqItem;
+use App\Models\ProjectBoqItemResource;
 use App\Models\User;
 use App\Models\Employee;
 use App\Models\InventoryItem;
 use App\Models\DirectSupply;
 use App\Models\ClientUpdateRequest;
 use App\Traits\ActivityLogsTrait;
+use App\Traits\BoqCostBasisTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -32,12 +36,14 @@ use App\Services\MaterialAllocationService;
 use App\Services\LaborCostService;
 use App\Services\MiscellaneousExpenseService;
 use App\Services\ProjectOverviewService;
+use App\Services\InventoryAvailabilityService;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
+use Illuminate\Validation\ValidationException;
 
 class ProjectsController extends Controller
 {
-    use ActivityLogsTrait, ClientNotificationTrait, NotificationTrait;
+    use ActivityLogsTrait, BoqCostBasisTrait, ClientNotificationTrait, NotificationTrait;
 
     const DOCUMENT_FIELDS = [
         'building_permit',
@@ -160,7 +166,7 @@ class ProjectsController extends Controller
         $projectTypes = ProjectType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $clientTypes  = ClientType::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        $users = User::with('roles')
+        $users = User::with(['roles', 'currentCompensationProfile'])
             ->orderBy('first_name')->orderBy('last_name')
             ->get(['id', 'first_name', 'middle_name', 'last_name', 'email'])
             ->map(fn ($u) => [
@@ -168,6 +174,7 @@ class ProjectsController extends Controller
             'name'  => $u->name,
             'email' => $u->email,
             'role'  => $u->roles->first()?->name ?? 'No Role',
+            'compensation' => $u->resolved_compensation,
             'type'  => 'user',
         ]);
 
@@ -178,7 +185,7 @@ class ProjectsController extends Controller
         //     ->pluck('employee_id')
         //     ->unique()->filter()->toArray();
 
-        $employees = Employee::where('is_active', true)
+        $employees = Employee::with('currentCompensationProfile')->where('is_active', true)
             // ->whereNotIn('id', $occupiedEmployeeIds)
             ->orderBy('first_name')->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'email', 'position'])
@@ -187,13 +194,14 @@ class ProjectsController extends Controller
                 'name'     => $e->first_name . ' ' . $e->last_name,
                 'email'    => $e->email,
                 'position' => $e->position ?? 'No Position',
+                'compensation' => $e->resolved_compensation,
                 'type'     => 'employee',
             ]);
 
         $allAssignables = $users->concat($employees)->sortBy('name')->values();
 
         // AFTER
-        $inventoryItems = InventoryItem::where('is_active', true)->orderBy('item_name')->get(['id', 'item_code', 'item_name', 'current_stock', 'unit_of_measure']);
+        $inventoryItems = InventoryItem::where('is_active', true)->orderBy('item_name')->get(['id', 'item_code', 'item_name', 'current_stock', 'unit_of_measure', 'unit_price']);
         $directSupplyItems = DirectSupply::where('is_active', true)->orderBy('supply_name')->get(['id', 'supply_code', 'supply_name', 'unit_of_measure', 'unit_price', 'supplier_name']);
         $statuses       = Project::whereNull('archived_at')->distinct()->whereNotNull('status')->pluck('status')->sort()->values();
         $priorities     = Project::whereNull('archived_at')->distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
@@ -323,7 +331,6 @@ class ProjectsController extends Controller
             'actual_end_date'  => ['nullable', 'date'],
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
-            'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
             'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
@@ -335,7 +342,7 @@ class ProjectsController extends Controller
             'team_members.*.id'                        => ['required', 'integer'],
             'team_members.*.type'                      => ['required', 'in:user,employee'],
             'team_members.*.role'                      => ['required', 'string', 'max:50'],
-            'team_members.*.pay_type'                  => ['required', 'in:hourly,salary,fixed'],
+            'team_members.*.pay_type'                  => ['nullable', 'in:hourly,salary,fixed'],
             'team_members.*.hourly_rate'               => ['nullable', 'numeric', 'min:0'],
             'team_members.*.monthly_salary'            => ['nullable', 'numeric', 'min:0'],
             'team_members.*.start_date'                => ['required', 'date'],
@@ -353,6 +360,7 @@ class ProjectsController extends Controller
             'material_allocations.*.unit_price'        => ['nullable', 'numeric', 'min:0'],
             'material_allocations.*.quantity_allocated' => ['required', 'numeric', 'min:0.01'],
             'material_allocations.*.notes'             => ['nullable', 'string'],
+            'material_allocations.*.boq_item_ref'      => ['nullable', 'string'],
             'labor_costs'                              => ['nullable', 'array'],
             'labor_costs.*.assignable_id'              => ['required', 'integer'],
             'labor_costs.*.assignable_type'            => ['required', 'in:user,employee'],
@@ -363,6 +371,37 @@ class ProjectsController extends Controller
             'labor_costs.*.attendance.*' => ['required', 'in:P,A,HD'],
             'labor_costs.*.description'                => ['nullable', 'string', 'max:500'],
             'labor_costs.*.notes'                      => ['nullable', 'string'],
+            'boq_sections'                                   => ['nullable', 'array'],
+            'boq_sections.*.code'                            => ['nullable', 'string', 'max:50'],
+            'boq_sections.*.name'                            => ['required', 'string', 'max:255'],
+            'boq_sections.*.description'                     => ['nullable', 'string'],
+            'boq_sections.*.sort_order'                      => ['nullable', 'integer', 'min:0'],
+            'boq_sections.*.items'                           => ['nullable', 'array'],
+            'boq_sections.*.items.*.item_code'               => ['nullable', 'string', 'max:50'],
+            'boq_sections.*.items.*.description'             => ['required', 'string', 'max:500'],
+            'boq_sections.*.items.*.unit'                    => ['nullable', 'string', 'max:30'],
+            'boq_sections.*.items.*.quantity'                => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.unit_cost'               => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.resource_type'           => ['nullable', 'in:material,labor'],
+            'boq_sections.*.items.*.planned_inventory_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'boq_sections.*.items.*.planned_direct_supply_id' => ['nullable', 'exists:direct_supplies,id'],
+            'boq_sections.*.items.*.planned_user_id'         => ['nullable', 'exists:users,id'],
+            'boq_sections.*.items.*.planned_employee_id'     => ['nullable', 'exists:employees,id'],
+            'boq_sections.*.items.*.remarks'                 => ['nullable', 'string'],
+            'boq_sections.*.items.*.sort_order'              => ['nullable', 'integer', 'min:0'],
+            'boq_sections.*.items.*.resources'               => ['nullable', 'array'],
+            'boq_sections.*.items.*.resources.*.resource_category' => ['required_with:boq_sections.*.items.*.resources', 'in:material,labor'],
+            'boq_sections.*.items.*.resources.*.source_type' => ['required_with:boq_sections.*.items.*.resources', 'in:inventory,direct_supply,user,employee'],
+            'boq_sections.*.items.*.resources.*.inventory_item_id' => ['nullable', 'exists:inventory_items,id'],
+            'boq_sections.*.items.*.resources.*.direct_supply_id' => ['nullable', 'exists:direct_supplies,id'],
+            'boq_sections.*.items.*.resources.*.user_id' => ['nullable', 'exists:users,id'],
+            'boq_sections.*.items.*.resources.*.employee_id' => ['nullable', 'exists:employees,id'],
+            'boq_sections.*.items.*.resources.*.resource_name' => ['nullable', 'string', 'max:255'],
+            'boq_sections.*.items.*.resources.*.unit' => ['nullable', 'string', 'max:30'],
+            'boq_sections.*.items.*.resources.*.quantity' => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.resources.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'boq_sections.*.items.*.resources.*.remarks' => ['nullable', 'string'],
+            'boq_sections.*.items.*.resources.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
         DB::beginTransaction();
@@ -372,6 +411,23 @@ class ProjectsController extends Controller
             $canCreateMilestones = $user?->can('project-milestones.create') ?? false;
             $canCreateMaterialAllocations = $user?->can('material-allocations.create') ?? false;
             $canCreateLaborCosts = $user?->can('labor-costs.create') ?? false;
+            $canCreateBoq = $user?->can('project-boq.create') ?? false;
+            $boqSections = $canCreateBoq ? ($validated['boq_sections'] ?? []) : [];
+
+            if (!empty($boqSections)) {
+                $boqPlannedTotal = $this->calculateBoqTotalFromSections($boqSections);
+                $contractAmount = (float) ($validated['contract_amount'] ?? 0);
+
+                if ($contractAmount > 0 && $boqPlannedTotal > $contractAmount) {
+                    throw ValidationException::withMessages([
+                        'boq_sections' => [
+                            'BOQ total (' . number_format($boqPlannedTotal, 2) . ') exceeds contract amount (' . number_format($contractAmount, 2) . ').',
+                        ],
+                    ]);
+                }
+
+                $this->validateBoqInventoryStock($boqSections);
+            }
 
             do {
                 $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
@@ -397,6 +453,7 @@ class ProjectsController extends Controller
             $laborCosts = $canCreateLaborCosts ? ($validated['labor_costs'] ?? []) : [];
 
             if (!empty($teamMembers)) {
+                $teamCompensations = [];
                 foreach ($teamMembers as $index => $member) {
                     if ($member['type'] === 'user' && !\App\Models\User::where('id', $member['id'])->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid user.']]);
@@ -404,6 +461,7 @@ class ProjectsController extends Controller
                     if ($member['type'] === 'employee' && !\App\Models\Employee::where('id', $member['id'])->where('is_active', true)->exists()) {
                         throw \Illuminate\Validation\ValidationException::withMessages(["team_members.{$index}.id" => ['Invalid employee.']]);
                     }
+                    $teamCompensations[$index] = $this->resolveAssignableCompensation($member['type'], (int) $member['id']);
                     // Rotation guard: employees cannot be on two projects at once
                     // if ($member['type'] === 'employee') {
                     //     $occupied = ProjectTeam::occupied()
@@ -416,21 +474,64 @@ class ProjectsController extends Controller
                     //     }
                     // }
                 }
-                foreach ($validated['team_members'] as $member) {
+                foreach ($validated['team_members'] as $index => $member) {
+                    $compensation = $teamCompensations[$index];
                     ProjectTeam::create([
                         'project_id'        => $project->id,
                         'user_id'           => $member['type'] === 'user' ? $member['id'] : null,
                         'employee_id'       => $member['type'] === 'employee' ? $member['id'] : null,
                         'assignable_type'   => $member['type'],
                         'role'              => $member['role'],
-                        'pay_type'          => $member['pay_type']       ?? 'hourly',
-                        'hourly_rate'       => $member['hourly_rate']    ?? null,
-                        'monthly_salary'    => $member['monthly_salary'] ?? null,
+                        'pay_type'          => $compensation['pay_type'],
+                        'hourly_rate'       => $compensation['hourly_rate'],
+                        'monthly_salary'    => $compensation['monthly_salary'],
                         'start_date'        => $member['start_date'],
                         'end_date'          => $member['end_date'] ?? null,
                         'is_active'         => true,
                         'assignment_status' => AssignmentStatus::Active->value,
                     ]);
+                }
+            }
+
+            $boqItemRefMap = [];
+            if (!empty($boqSections)) {
+                foreach ($boqSections as $sectionIndex => $section) {
+                    $createdSection = ProjectBoqSection::create([
+                        'project_id'  => $project->id,
+                        'code'        => $section['code'] ?? null,
+                        'name'        => $section['name'],
+                        'description' => $section['description'] ?? null,
+                        'sort_order'  => $section['sort_order'] ?? $sectionIndex,
+                    ]);
+
+                    foreach (($section['items'] ?? []) as $itemIndex => $item) {
+                        $basis = $this->resolveItemCostBasis($item);
+
+                        $createdItem = ProjectBoqItem::create([
+                            'project_id'             => $project->id,
+                            'project_boq_section_id' => $createdSection->id,
+                            'item_code'              => $item['item_code'] ?? null,
+                            'description'            => $item['description'],
+                            'unit'                   => $item['unit'] ?? null,
+                            'quantity'               => $basis['quantity'],
+                            'unit_cost'              => $basis['unit_cost'],
+                            'material_cost'          => $basis['material_cost'],
+                            'labor_cost'             => $basis['labor_cost'],
+                            'total_cost'             => $basis['total_cost'],
+                            'resource_type'          => $item['resource_type'] ?? null,
+                            'planned_inventory_item_id' => $item['planned_inventory_item_id'] ?? null,
+                            'planned_direct_supply_id' => $item['planned_direct_supply_id'] ?? null,
+                            'planned_user_id'        => $item['planned_user_id'] ?? null,
+                            'planned_employee_id'    => $item['planned_employee_id'] ?? null,
+                            'remarks'                => $item['remarks'] ?? null,
+                            'sort_order'             => $item['sort_order'] ?? $itemIndex,
+                        ]);
+
+                        $this->syncBoqItemResources($createdItem, $item['resources'] ?? []);
+                        $createdItem->recomputeFromResources();
+
+                        $boqItemRefMap["{$sectionIndex}:{$itemIndex}"] = $createdItem->id;
+                    }
                 }
             }
 
@@ -448,10 +549,113 @@ class ProjectsController extends Controller
                 }
             }
 
+            // Auto-create milestones only for sections where create_milestone = true (idempotent).
+            $milestoneIndex = 0;
+            foreach ($boqSections as $section) {
+                if (!(bool) ($section['create_milestone'] ?? true)) continue;
+                ProjectMilestone::firstOrCreate(
+                    ['project_id' => $project->id, 'name' => $section['name']],
+                    [
+                        'description' => 'Auto-created from BOQ section.',
+                        'status'      => 'pending',
+                        'sort_order'  => $milestoneIndex,
+                        'start_date'  => $project->start_date,
+                        'due_date'    => $project->planned_end_date,
+                    ]
+                );
+                $milestoneIndex++;
+            }
+
+            // Auto-assign team members and allocations from BOQ resources.
+            $seenLaborKeys = [];
+            foreach ($boqSections as $sectionIndex => $section) {
+                foreach (($section['items'] ?? []) as $itemIndex => $item) {
+                    $boqItemId = $boqItemRefMap["{$sectionIndex}:{$itemIndex}"] ?? null;
+
+                    foreach (($item['resources'] ?? []) as $resource) {
+                        $category = $resource['resource_category'] ?? '';
+
+                        if ($category === 'labor') {
+                            $isEmployee = ($resource['source_type'] ?? '') === 'employee';
+                            $entityId   = $isEmployee ? ($resource['employee_id'] ?? null) : ($resource['user_id'] ?? null);
+                            if (empty($entityId)) continue;
+
+                            $key = ($isEmployee ? 'emp' : 'usr') . ':' . $entityId;
+                            if (in_array($key, $seenLaborKeys, true)) continue;
+                            $seenLaborKeys[] = $key;
+
+                            // Use the person's actual compensation profile, not the BOQ unit_price.
+                            $person = $isEmployee
+                                ? \App\Models\Employee::with('currentCompensationProfile')->find((int) $entityId)
+                                : \App\Models\User::with('currentCompensationProfile')->find((int) $entityId);
+                            $comp          = $person?->getResolvedCompensationAttribute() ?? [];
+                            // Normalize: CompensationProfile stores 'monthly', ProjectTeam uses 'salary'
+                            $rawPayType    = $comp['pay_type'] ?? 'salary';
+                            $payType       = $rawPayType === 'monthly' ? 'salary' : $rawPayType;
+                            $hourlyRate    = $comp['hourly_rate']    ?? null;
+                            $monthlySalary = $comp['monthly_salary'] ?? null;
+
+                            $searchAttrs = ['project_id' => $project->id];
+                            $searchAttrs[$isEmployee ? 'employee_id' : 'user_id'] = (int) $entityId;
+
+                            ProjectTeam::firstOrCreate(
+                                $searchAttrs,
+                                [
+                                    'role'              => 'Labor',
+                                    'assignable_type'   => $resource['source_type'],
+                                    'pay_type'          => $payType,
+                                    'hourly_rate'       => $hourlyRate,
+                                    'monthly_salary'    => $monthlySalary,
+                                    'start_date'        => $project->start_date,
+                                    'end_date'          => $project->planned_end_date,
+                                    'is_active'         => true,
+                                    'assignment_status' => 'active',
+                                    $isEmployee ? 'user_id' : 'employee_id' => null,
+                                ]
+                            );
+                        }
+
+                        if ($category === 'material' && $boqItemId) {
+                            $invId  = !empty($resource['inventory_item_id'])  ? (int) $resource['inventory_item_id']  : null;
+                            $suppId = !empty($resource['direct_supply_id'])   ? (int) $resource['direct_supply_id']   : null;
+                            if (!$invId && !$suppId) continue;
+
+                            // Scope per BOQ item so the same material used in multiple
+                            // BOQ items creates separate allocations instead of collapsing.
+                            $allocationAttrs = [
+                                'project_id'  => $project->id,
+                                'boq_item_id' => $boqItemId,
+                            ];
+                            if ($invId)  $allocationAttrs['inventory_item_id'] = $invId;
+                            if ($suppId) $allocationAttrs['direct_supply_id']  = $suppId;
+
+                            ProjectMaterialAllocation::firstOrCreate(
+                                $allocationAttrs,
+                                [
+                                    'boq_item_id'        => $boqItemId,
+                                    'unit_price'         => (float) ($resource['unit_price'] ?? 0),
+                                    'quantity_allocated' => (float) ($resource['quantity'] ?? 0),
+                                    'quantity_received'  => 0,
+                                    'status'             => 'pending',
+                                    'allocated_by'       => auth()->id(),
+                                    'allocated_at'       => now(),
+                                ]
+                            );
+                        }
+                    }
+                }
+            }
+
             if (!empty($materialAllocations)) {
                 foreach ($materialAllocations as $allocation) {
+                    $boqItemId = null;
+                    if (!empty($allocation['boq_item_ref']) && isset($boqItemRefMap[$allocation['boq_item_ref']])) {
+                        $boqItemId = $boqItemRefMap[$allocation['boq_item_ref']];
+                    }
+
                     ProjectMaterialAllocation::create([
                         'project_id'         => $project->id,
+                        'boq_item_id'        => $boqItemId,
                         'inventory_item_id'  => $allocation['inventory_item_id'] ?? null,
                         'direct_supply_id'   => $allocation['direct_supply_id'] ?? null,
                         'unit_price'         => $allocation['unit_price'] ?? null,
@@ -497,6 +701,9 @@ class ProjectsController extends Controller
             $this->createSystemNotification('general', 'New Project Created', "A new project '{$project->project_name}' has been created.", $project, route('project-management.view', $project->id));
 
             return redirect()->back()->with('success', 'Project created successfully.');
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Failed to create project: ' . $e->getMessage());
@@ -519,7 +726,6 @@ class ProjectsController extends Controller
             'actual_end_date'  => ['nullable', 'date'],
             'location'         => ['nullable', 'string'],
             'description'      => ['nullable', 'string'],
-            'billing_type'     => ['nullable', 'in:fixed_price,milestone'],
             'building_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'business_permit'          => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
             'environmental_compliance' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:102400'],
@@ -545,7 +751,6 @@ class ProjectsController extends Controller
 
         if ($hasBillings) {
             $validated['contract_amount'] = $project->contract_amount;
-            $validated['billing_type']    = $project->billing_type;
         }
 
         $project->update($validated);
@@ -558,7 +763,171 @@ class ProjectsController extends Controller
 
     public function show(Project $project, Request $request)
     {
-        $project->load(['client', 'projectType']);
+        $project->load([
+            'client',
+            'projectType',
+            'boqSections.items.resources',
+            'boqSections.items.plannedInventoryItem:id,item_name,item_code',
+            'boqSections.items.plannedDirectSupply:id,supply_name,supply_code',
+            'boqSections.items.plannedUser:id,first_name,last_name',
+            'boqSections.items.plannedEmployee:id,first_name,last_name',
+        ]);
+
+        $resourceUsers = User::orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($u) => [
+                'id' => $u->id,
+                'name' => trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? '')),
+                'compensation' => $u->resolved_compensation,
+            ]);
+
+        $resourceEmployees = Employee::where('is_active', true)
+            ->orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($e) => [
+                'id' => $e->id,
+                'name' => trim(($e->first_name ?? '') . ' ' . ($e->last_name ?? '')),
+                'compensation' => $e->resolved_compensation,
+            ]);
+
+        $resourceInventoryItems = InventoryItem::where('is_active', true)
+            ->orderBy('item_name')
+            ->get(['id', 'item_code', 'item_name', 'unit_of_measure', 'unit_price'])
+            ->map(fn ($i) => [
+                'id' => $i->id,
+                'name' => $i->item_name,
+                'code' => $i->item_code,
+                'unit' => $i->unit_of_measure,
+                'unit_price' => (float) ($i->unit_price ?? 0),
+            ]);
+
+        $resourceDirectSupplies = DirectSupply::where('is_active', true)
+            ->orderBy('supply_name')
+            ->get(['id', 'supply_code', 'supply_name', 'unit_of_measure', 'unit_price'])
+            ->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->supply_name,
+                'code' => $s->supply_code,
+                'unit' => $s->unit_of_measure,
+                'unit_price' => (float) ($s->unit_price ?? 0),
+            ]);
+
+        $materialActualByItem = ProjectMaterialAllocation::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('boq_item_id')
+            ->selectRaw('boq_item_id, SUM(COALESCE(unit_price, 0) * COALESCE(quantity_received, 0)) as total')
+            ->groupBy('boq_item_id')
+            ->pluck('total', 'boq_item_id');
+
+        $laborActualByItem = ProjectLaborCost::query()
+            ->where('project_id', $project->id)
+            ->whereNotNull('boq_item_id')
+            ->where('status', 'submitted')
+            ->selectRaw('boq_item_id, SUM(COALESCE(gross_pay, 0)) as total')
+            ->groupBy('boq_item_id')
+            ->pluck('total', 'boq_item_id');
+
+        $boqPlannedTotal = (float) $project->boqItems()->sum('total_cost');
+        $boqActualMaterialTotal = (float) $materialActualByItem->sum();
+        $boqActualLaborTotal = (float) $laborActualByItem->sum();
+        $boqActualTotal = $boqActualMaterialTotal + $boqActualLaborTotal;
+        $contractAmount = (float) $project->contract_amount;
+
+        $boqData = [
+            'sections' => $project->boqSections->map(function ($section) use ($materialActualByItem, $laborActualByItem) {
+                $items = $section->items->map(function ($item) use ($materialActualByItem, $laborActualByItem) {
+                    $plannedCost = (float) $item->total_cost;
+                    $materialActual = (float) ($materialActualByItem[$item->id] ?? 0);
+                    $laborActual = (float) ($laborActualByItem[$item->id] ?? 0);
+                    $actualTotal = $materialActual + $laborActual;
+
+                    return [
+                        'id'          => $item->id,
+                        'item_code'   => $item->item_code,
+                        'description' => $item->description,
+                        'unit'        => $item->unit,
+                        'quantity'    => (float) $item->quantity,
+                        'unit_cost'   => (float) $item->unit_cost,
+                        'total_cost'  => $plannedCost,
+                        'resource_type' => $item->resource_type,
+                        'planned_inventory_item_id' => $item->planned_inventory_item_id,
+                        'planned_direct_supply_id' => $item->planned_direct_supply_id,
+                        'planned_user_id' => $item->planned_user_id,
+                        'planned_employee_id' => $item->planned_employee_id,
+                        'resource_link' => [
+                            'inventory_item' => $item->plannedInventoryItem ? [
+                                'id' => $item->plannedInventoryItem->id,
+                                'code' => $item->plannedInventoryItem->item_code,
+                                'name' => $item->plannedInventoryItem->item_name,
+                            ] : null,
+                            'direct_supply' => $item->plannedDirectSupply ? [
+                                'id' => $item->plannedDirectSupply->id,
+                                'code' => $item->plannedDirectSupply->supply_code,
+                                'name' => $item->plannedDirectSupply->supply_name,
+                            ] : null,
+                            'user' => $item->plannedUser ? [
+                                'id' => $item->plannedUser->id,
+                                'name' => trim(($item->plannedUser->first_name ?? '') . ' ' . ($item->plannedUser->last_name ?? '')),
+                            ] : null,
+                            'employee' => $item->plannedEmployee ? [
+                                'id' => $item->plannedEmployee->id,
+                                'name' => trim(($item->plannedEmployee->first_name ?? '') . ' ' . ($item->plannedEmployee->last_name ?? '')),
+                            ] : null,
+                        ],
+                        'resources' => $item->resources->map(function ($resource) {
+                            return [
+                                'id' => $resource->id,
+                                'resource_category' => $resource->resource_category,
+                                'source_type' => $resource->source_type,
+                                'inventory_item_id' => $resource->inventory_item_id,
+                                'direct_supply_id' => $resource->direct_supply_id,
+                                'user_id' => $resource->user_id,
+                                'employee_id' => $resource->employee_id,
+                                'resource_name' => $resource->resource_name,
+                                'unit' => $resource->unit,
+                                'quantity' => (float) $resource->quantity,
+                                'unit_price' => (float) $resource->unit_price,
+                                'total_cost' => (float) $resource->total_cost,
+                                'remarks' => $resource->remarks,
+                                'sort_order' => $resource->sort_order,
+                            ];
+                        })->values(),
+                        'remarks'     => $item->remarks,
+                        'sort_order'  => $item->sort_order,
+                        'planned_vs_actual' => [
+                            'planned_cost'    => $plannedCost,
+                            'material_actual' => $materialActual,
+                            'labor_actual'    => $laborActual,
+                            'total_actual'    => $actualTotal,
+                            'variance'        => $plannedCost - $actualTotal,
+                        ],
+                    ];
+                })->values();
+
+                return [
+                    'id'          => $section->id,
+                    'code'        => $section->code,
+                    'name'        => $section->name,
+                    'description' => $section->description,
+                    'sort_order'  => $section->sort_order,
+                    'items'       => $items,
+                ];
+            })->values(),
+            'grand_total'     => $boqPlannedTotal,
+            'contract_amount' => $contractAmount,
+            'actual_material_total' => $boqActualMaterialTotal,
+            'actual_labor_total'    => $boqActualLaborTotal,
+            'actual_total'          => $boqActualTotal,
+            'boq_variance'          => $boqPlannedTotal - $boqActualTotal,
+            'contract_variance'     => $contractAmount - $boqPlannedTotal,
+            'is_over_contract'      => $contractAmount > 0 ? $boqPlannedTotal > $contractAmount : false,
+            'resource_options' => [
+                'inventory_items' => $resourceInventoryItems,
+                'direct_supplies' => $resourceDirectSupplies,
+                'users' => $resourceUsers,
+                'employees' => $resourceEmployees,
+            ],
+        ];
 
         $teamData                 = $this->projectTeamService->getProjectTeamData($project);
         $fileData                 = $this->projectFilesService->getProjectFilesData($project);
@@ -579,7 +948,88 @@ class ProjectsController extends Controller
             'miscellaneousExpenseData' => $miscellaneousExpenseData,
             'overviewData'             => $overviewData,
             'requestUpdatesData'       => $requestUpdates,
+            'boqData'                  => $boqData,
         ]);
+    }
+
+    private function validateBoqInventoryStock(array $sections, ?int $excludeProjectId = null): void
+    {
+        $flat = [];
+        $keyMap = [];
+        foreach ($sections as $si => $section) {
+            foreach (($section['items'] ?? []) as $ii => $item) {
+                foreach (($item['resources'] ?? []) as $ri => $r) {
+                    $flat[] = $r;
+                    $keyMap[] = "boq_sections.$si.items.$ii.resources.$ri.quantity";
+                }
+            }
+        }
+        if (empty($flat)) return;
+
+        app(InventoryAvailabilityService::class)->validateResources(
+            $flat,
+            fn ($i) => $keyMap[$i] ?? "resources.$i.quantity",
+            $excludeProjectId
+        );
+    }
+
+    private function calculateBoqTotalFromSections(array $sections): float
+    {
+        $total = 0.0;
+
+        foreach ($sections as $section) {
+            foreach (($section['items'] ?? []) as $item) {
+                $basis = $this->resolveItemCostBasis($item);
+                $total += $basis['total_cost'];
+            }
+        }
+
+        return round($total, 2);
+    }
+
+    private function resolveAssignableCompensation(string $assignableType, int $assignableId): array
+    {
+        if ($assignableType === 'user') {
+            $profile = User::with('currentCompensationProfile')->find($assignableId)?->currentCompensationProfile;
+        } else {
+            $profile = Employee::with('currentCompensationProfile')->find($assignableId)?->currentCompensationProfile;
+        }
+
+        if (!$profile) {
+            throw ValidationException::withMessages([
+                'team_members' => ['Selected member has no active compensation profile. Please configure salary profile first.'],
+            ]);
+        }
+
+        $resolvedPayType = $profile->pay_type === 'monthly' ? 'salary' : $profile->pay_type;
+
+        return [
+            'pay_type' => $resolvedPayType,
+            'hourly_rate' => $profile->hourly_rate,
+            'monthly_salary' => $profile->monthly_salary,
+        ];
+    }
+
+    private function syncBoqItemResources(ProjectBoqItem $item, array $resources): void
+    {
+        foreach ($resources as $index => $resource) {
+            ProjectBoqItemResource::create([
+                'project_boq_item_id' => $item->id,
+                'resource_category' => $resource['resource_category'],
+                'source_type' => $resource['source_type'],
+                'inventory_item_id' => $resource['inventory_item_id'] ?? null,
+                'direct_supply_id' => $resource['direct_supply_id'] ?? null,
+                'user_id' => $resource['user_id'] ?? null,
+                'employee_id' => $resource['employee_id'] ?? null,
+                'resource_name' => $resource['resource_name'] ?? null,
+                'unit' => $resource['unit'] ?? null,
+                'quantity' => (float) ($resource['quantity'] ?? 0),
+                'unit_price' => (float) ($resource['unit_price'] ?? 0),
+                'total_cost' => round((float) ($resource['quantity'] ?? 0) * (float) ($resource['unit_price'] ?? 0), 2),
+                'remarks' => $resource['remarks'] ?? null,
+                'sort_order' => $resource['sort_order'] ?? $index,
+            ]);
+        }
     }
 
     public function destroyRequestUpdate(Project $project, ClientUpdateRequest $clientUpdateRequest)

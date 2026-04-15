@@ -12,20 +12,16 @@ import { Loader2 } from "lucide-react";
 
 import { ProjectWizardProvider, useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import Step1ProjectInfo from "./wizard-steps/Step1ProjectInfo";
-import Step2TeamMembers from "./wizard-steps/Step2TeamMembers";
-import Step3Milestones from "./wizard-steps/Step3Milestones";
-import Step4MaterialAllocation from "./wizard-steps/Step4MaterialAllocation";
+import Step3BOQ from "./wizard-steps/Step3BOQ";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { usePermission } from "@/utils/permissions";
 
 const WIZARD_STEP_PERMISSIONS = [
   "projects.create",
-  "project-teams.create",
-  "project-milestones.create",
-  "material-allocations.create",
+  "project-boq.create",
 ];
 
-const buildWizardSteps = ({ clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors }) => [
+const buildWizardSteps = ({ clients, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors }) => [
   {
     key: "project-information",
     title: "Project Information",
@@ -33,35 +29,23 @@ const buildWizardSteps = ({ clients, users, inventoryItems, directSupplyItems, p
     render: () => <Step1ProjectInfo clients={clients} projectTypes={projectTypes} clientTypes={clientTypes} errors={errors} />,
   },
   {
-    key: "team-members",
-    title: "Team Members",
-    permission: "project-teams.create",
-    render: () => <Step2TeamMembers users={users} errors={errors} />,
-  },
-  {
-    key: "milestones",
-    title: "Milestones",
-    permission: "project-milestones.create",
-    render: () => <Step3Milestones errors={errors} />,
-  },
-  {
-    key: "material-allocation",
-    title: "Material Allocation",
-    permission: "material-allocations.create",
-    render: () => <Step4MaterialAllocation inventoryItems={inventoryItems} directSupplyItems={directSupplyItems} errors={errors} />,
+    key: "boq",
+    title: "BOQ / Scope",
+    permission: "project-boq.create",
+    render: () => <Step3BOQ errors={errors} />,
   },
 ];
 
-const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes }) => {
+const AddProjectWizard = ({ open, setShowAddModal, clients, inventoryItems, directSupplyItems, projectTypes, clientTypes }) => {
   const { currentStep, totalSteps, getAllData, resetWizard, nextStep, prevStep, goToStep, projectData } = useProjectWizard();
   const { has } = usePermission();
   const [processing, setProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
   const visibleSteps = useMemo(
-    () => buildWizardSteps({ clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors: formErrors })
+    () => buildWizardSteps({ clients, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors: formErrors })
       .filter((step) => has(step.permission)),
-    [has, clients, clientTypes, formErrors, inventoryItems, directSupplyItems, projectTypes, users]
+    [has, clients, clientTypes, formErrors, inventoryItems, directSupplyItems, projectTypes]
   );
 
   const activeStep = visibleSteps[currentStep - 1];
@@ -133,6 +117,7 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
       milestones: allData.milestones,
       material_allocations: allData.materialAllocations,
       labor_costs: allData.laborCosts || [],
+      boq_sections: allData.boqSections || [],
     }, {
       preserveScroll: true,
       onSuccess: (page) => {
@@ -300,7 +285,7 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, users, inventoryItem
   );
 };
 
-const AddProject = ({ open, setShowAddModal, clients, users, inventoryItems, directSupplyItems, projectTypes, clientTypes }) => {
+const AddProject = ({ open, setShowAddModal, clients, inventoryItems, directSupplyItems, projectTypes, clientTypes }) => {
   const { has } = usePermission();
   const visibleStepCount = useMemo(
     () => WIZARD_STEP_PERMISSIONS.filter((permission) => has(permission)).length,
@@ -330,7 +315,6 @@ const AddProject = ({ open, setShowAddModal, clients, users, inventoryItems, dir
         open={open}
         setShowAddModal={setShowAddModal}
         clients={clients}
-        users={users}
         inventoryItems={inventoryItems}
         directSupplyItems={directSupplyItems}
         projectTypes={projectTypes}

@@ -436,9 +436,7 @@
                 <th style="width: 70px;">Status</th>
                 <th style="width: 80px;">Progress</th>
                 <th style="width: 50px;">Tasks</th>
-                @if($project['billing_type'] === 'milestone')
                 <th style="width: 60px;">Billing %</th>
-                @endif
             </tr>
         </thead>
         <tbody>
@@ -467,17 +465,15 @@
                         —
                     @endif
                 </td>
-                @if($project['billing_type'] === 'milestone')
                 <td class="text-center">
                     {{ $milestone['billing_percentage'] ? number_format($milestone['billing_percentage'], 1) . '%' : '—' }}
                 </td>
-                @endif
             </tr>
             
             <!-- Task Breakdown for this milestone -->
             @if(count($milestone['tasks']) > 0)
             <tr class="page-break-avoid">
-                <td colspan="{{ $project['billing_type'] === 'milestone' ? 9 : 8 }}" class="task-section">
+                <td colspan="9" class="task-section">
                     <h4>Tasks: {{ $milestone['name'] }}</h4>
                     <table class="task-table">
                         <thead>

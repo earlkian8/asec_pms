@@ -64,6 +64,12 @@ class PermissionSeeder extends Seeder
             'project-files.delete',
             'project-files.download',
 
+            // Project BOQ
+            'project-boq.view',
+            'project-boq.create',
+            'project-boq.update',
+            'project-boq.delete',
+
             // Project Milestones
             'project-milestones.view',
             'project-milestones.view-detail',

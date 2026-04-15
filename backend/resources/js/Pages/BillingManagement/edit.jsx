@@ -62,11 +62,8 @@ const EditBilling = ({ setShowEditModal, billing }) => {
     });
   }
 
-  // Milestone preset
   const milestonePresetAmount =
-    billing.billing_type === 'milestone' &&
-    billing.milestone?.billing_percentage &&
-    contractAmount > 0
+    billing.milestone?.billing_percentage && contractAmount > 0
       ? ((contractAmount * parseFloat(billing.milestone.billing_percentage)) / 100).toFixed(2)
       : null;
 
@@ -117,18 +114,8 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             />
           </div>
 
-          {/* Billing Type */}
-          <div className="col-span-2">
-            <Label className="text-zinc-800">Billing Type</Label>
-            <Input
-              value={billing.billing_type === 'fixed_price' ? 'Fixed Price' : billing.billing_type === 'milestone' ? 'Milestone' : ''}
-              readOnly
-              className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
-            />
-          </div>
-
           {/* Milestone (read-only info) */}
-          {billing.billing_type === 'milestone' && billing.milestone && (
+          {billing.milestone && (
             <div className="col-span-2">
               <Label className="text-zinc-800">Milestone</Label>
               <Input

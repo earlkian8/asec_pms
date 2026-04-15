@@ -80,19 +80,6 @@ class MilestonesController extends Controller
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {
-            $existingTotal = $project->milestones()->sum('billing_percentage');
-            $newTotal      = $existingTotal + floatval($data['billing_percentage']);
-            if ($newTotal > 100) {
-                $remaining = max(0, 100 - $existingTotal);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Billing percentage would exceed 100%',
-                    'errors'  => ['billing_percentage' => ["Total billing percentage would exceed 100%. Current total: {$existingTotal}%. You can only assign up to " . number_format($remaining, 2) . "% more."]],
-                ], 422);
-            }
-        }
-
         $milestone = $project->milestones()->create(array_merge($data, ['status' => 'pending']));
 
         return response()->json([
@@ -118,19 +105,6 @@ class MilestonesController extends Controller
             'due_date'           => 'nullable|date|after_or_equal:start_date',
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
-
-        if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {
-            $existingTotal = $project->milestones()->where('id', '!=', $milestone->id)->sum('billing_percentage');
-            $newTotal      = $existingTotal + floatval($data['billing_percentage']);
-            if ($newTotal > 100) {
-                $remaining = max(0, 100 - $existingTotal);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Billing percentage would exceed 100%',
-                    'errors'  => ['billing_percentage' => ["Total billing percentage would exceed 100%. Other milestones total: {$existingTotal}%. You can only assign up to " . number_format($remaining, 2) . "% to this milestone."]],
-                ], 422);
-            }
-        }
 
         // Auto-compute status from tasks
         $tasks       = $milestone->tasks()->get(['status']);

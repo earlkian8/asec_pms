@@ -52,10 +52,10 @@ class BudgetReportExport implements FromArray, WithHeadings, WithTitle, WithColu
                     $project['project_code'] ?? '',
                     $project['project_name'] ?? '',
                     ucfirst($project['status'] ?? ''),
-                    '₱' . number_format($project['budget'] ?? 0, 2),
+                    '₱' . number_format($project['contract_amount'] ?? 0, 2),
                     '₱' . number_format($project['labor_cost'] ?? 0, 2),
                     '₱' . number_format($project['material_cost'] ?? 0, 2),
-                    '₱' . number_format($project['miscellaneous_expenses'] ?? 0, 2),
+                    '₱' . number_format($project['misc_cost'] ?? 0, 2),
                     '₱' . number_format($project['total_spent'] ?? 0, 2),
                     '₱' . number_format($project['variance'] ?? 0, 2),
                     number_format($project['variance_percentage'] ?? 0, 2) . '%'

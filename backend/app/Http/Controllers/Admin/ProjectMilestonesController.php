@@ -32,21 +32,6 @@ class ProjectMilestonesController extends Controller
 
         $data['status'] = $data['status'] ?? 'pending';
 
-        // Guard: only enforce billing % cap for milestone billing type
-        if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {
-            $existingTotal = $project->milestones()->sum('billing_percentage');
-            $newTotal = $existingTotal + floatval($data['billing_percentage']);
-
-            if ($newTotal > 100) {
-                $remaining = max(0, 100 - $existingTotal);
-                return back()->withErrors([
-                    'billing_percentage' => "Total billing percentage would exceed 100%. "
-                        . "Current total: {$existingTotal}%. "
-                        . "You can only assign up to " . number_format($remaining, 2) . "% more.",
-                ])->withInput();
-            }
-        }
-
         $milestone = $project->milestones()->create($data);
 
         $this->adminActivityLogs(
@@ -77,25 +62,6 @@ class ProjectMilestonesController extends Controller
             'billing_percentage' => 'nullable|numeric|min:0|max:100',
             'status'             => ['required', Rule::in(['pending','in_progress','completed'])],
         ]);
-
-        // Guard: only enforce billing % cap for milestone billing type
-        if ($project->billing_type === 'milestone' && !empty($data['billing_percentage'])) {
-            // Exclude the current milestone from the sum so editing doesn't self-block
-            $existingTotal = $project->milestones()
-                ->where('id', '!=', $milestone->id)
-                ->sum('billing_percentage');
-
-            $newTotal = $existingTotal + floatval($data['billing_percentage']);
-
-            if ($newTotal > 100) {
-                $remaining = max(0, 100 - $existingTotal);
-                return back()->withErrors([
-                    'billing_percentage' => "Total billing percentage would exceed 100%. "
-                        . "Other milestones total: {$existingTotal}%. "
-                        . "You can only assign up to " . number_format($remaining, 2) . "% to this milestone.",
-                ])->withInput();
-            }
-        }
 
         // Cannot mark as completed unless all tasks are completed
         if ($data['status'] === 'completed') {
@@ -233,7 +199,6 @@ class ProjectMilestonesController extends Controller
             'planned_end_date' => $project->planned_end_date,
             'actual_end_date' => $project->actual_end_date,
             'location' => $project->location,
-            'billing_type' => $project->billing_type,
             'client' => $project->client ? [
                 'code' => $project->client->client_code,
                 'name' => $project->client->client_name,

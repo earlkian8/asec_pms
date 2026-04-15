@@ -12,12 +12,14 @@ class ProjectMilestone extends Model
 
     protected $fillable = [
         'project_id',
+        'boq_item_id',
         'name',
         'description',
         'start_date',
         'due_date',
         'billing_percentage',
         'status',
+        'sort_order',
     ];
 
     // Relationship to Project
@@ -45,5 +47,10 @@ class ProjectMilestone extends Model
     public function materialUsages()
     {
         return $this->hasMany(MilestoneMaterialUsage::class, 'project_milestone_id');
+    }
+
+    public function boqItem()
+    {
+        return $this->belongsTo(ProjectBoqItem::class, 'boq_item_id');
     }
 }

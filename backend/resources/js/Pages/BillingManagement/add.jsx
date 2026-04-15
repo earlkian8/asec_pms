@@ -32,7 +32,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
 
   const { data, setData, post, errors, processing } = useForm({
     project_id: "",
-    billing_type: "",
     milestone_id: "",
     billing_amount: "",
     billing_date: new Date().toISOString().split('T')[0],
@@ -40,20 +39,19 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
     description: "",
   });
 
-  // When project changes, reset fields and set billing_type from project
   useEffect(() => {
     if (data.project_id) {
       const project = projects.find(p => p.id.toString() === data.project_id.toString());
       if (project) {
         setSelectedProject(project);
-        setData(prev => ({ ...prev, billing_type: project.billing_type, milestone_id: '', billing_amount: '' }));
+        setData(prev => ({ ...prev, milestone_id: '', billing_amount: '' }));
         setMilestones(project.milestones || []);
         setBillingAmountDisplay('');
       }
     } else {
       setSelectedProject(null);
       setMilestones([]);
-      setData(prev => ({ ...prev, billing_type: '', milestone_id: '', billing_amount: '' }));
+      setData(prev => ({ ...prev, milestone_id: '', billing_amount: '' }));
       setBillingAmountDisplay('');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +90,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
     });
   }
 
-  // Milestone preset (only when milestone selected and has billing_percentage)
   const selectedMilestone = data.milestone_id
     ? milestones.find(m => m.id.toString() === data.milestone_id.toString())
     : null;
@@ -147,22 +144,10 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.project_id} />
           </div>
 
-          {/* Billing Type (read-only, derived from project) */}
-          {selectedProject && (
-            <div className="col-span-2">
-              <Label className="text-zinc-800">Billing Type</Label>
-              <Input
-                value={data.billing_type === 'fixed_price' ? 'Fixed Price' : data.billing_type === 'milestone' ? 'Milestone' : ''}
-                readOnly
-                className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
-              />
-            </div>
-          )}
-
           {/* Milestone selector */}
-          {data.billing_type === 'milestone' && (
+          {selectedProject && milestones.length > 0 && (
             <div className="col-span-2">
-              <Label className="text-zinc-800">Milestone <span className="text-red-500">*</span></Label>
+              <Label className="text-zinc-800">Milestone</Label>
               <Select
                 value={data.milestone_id}
                 onValueChange={(v) => setData("milestone_id", v)}

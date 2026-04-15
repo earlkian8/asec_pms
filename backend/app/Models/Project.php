@@ -22,7 +22,6 @@ class Project extends Model
         'actual_end_date',
         'location',
         'description',
-        'billing_type',
         // Documents
         'building_permit',
         'business_permit',
@@ -107,5 +106,15 @@ class Project extends Model
     public function issues()
     {
         return $this->hasMany(ProjectIssue::class);
+    }
+
+    public function boqSections()
+    {
+        return $this->hasMany(ProjectBoqSection::class)->orderBy('sort_order');
+    }
+
+    public function boqItems()
+    {
+        return $this->hasMany(ProjectBoqItem::class);
     }
 }

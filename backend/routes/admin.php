@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmployeesController;
 use App\Http\Controllers\Admin\ProjectFilesController;
 use App\Http\Controllers\Admin\MilestoneMaterialUsagesController;
+use App\Http\Controllers\Admin\ProjectBoqController;
 use App\Http\Controllers\Admin\ProjectMilestonesController;
 use App\Http\Controllers\Admin\ProjectsController;
 use App\Http\Controllers\Admin\ProjectTasksController;
@@ -95,6 +96,19 @@ Route::middleware('auth')->group(function () {
             Route::get('/download/{project}/files/{file}', [ProjectFilesController::class, 'download'])->middleware('permission:project-files.download')->name('download');
         });
 
+        // Project BOQ
+        Route::prefix('project-boq')->name('project-boq.')->group(function(){
+            Route::post('/store/{project}', [ProjectBoqController::class, 'storeBulk'])->middleware('permission:project-boq.create')->name('store');
+            Route::post('/sections/{project}', [ProjectBoqController::class, 'storeSection'])->middleware('permission:project-boq.create')->name('sections.store');
+            Route::put('/sections/{project}/section/{section}', [ProjectBoqController::class, 'updateSection'])->middleware('permission:project-boq.update')->name('sections.update');
+            Route::delete('/sections/{project}/section/{section}', [ProjectBoqController::class, 'destroySection'])->middleware('permission:project-boq.delete')->name('sections.destroy');
+            Route::post('/items/{project}/section/{section}', [ProjectBoqController::class, 'storeItem'])->middleware('permission:project-boq.create')->name('items.store');
+            Route::put('/items/{project}/item/{item}', [ProjectBoqController::class, 'updateItem'])->middleware('permission:project-boq.update')->name('items.update');
+            Route::delete('/items/{project}/item/{item}', [ProjectBoqController::class, 'destroyItem'])->middleware('permission:project-boq.delete')->name('items.destroy');
+            Route::get('/export/{project}', [ProjectBoqController::class, 'export'])->middleware('permission:project-boq.view')->name('export');
+            Route::get('/export-excel/{project}', [ProjectBoqController::class, 'exportExcel'])->middleware('permission:project-boq.view')->name('export-excel');
+        });
+
         // Project Milestones
         Route::prefix('project-milestones')->name('project-milestones.')->group(function(){
             Route::post('/store/{project}', [ProjectMilestonesController::class, 'store'])->middleware('permission:project-milestones.create')->name('store');
@@ -144,6 +158,8 @@ Route::middleware('auth')->group(function () {
             Route::post('/store/{project}', [ProjectLaborCostsController::class, 'store'])->middleware('permission:labor-costs.create')->name('store');
             Route::put('/update/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'update'])->middleware('permission:labor-costs.update')->name('update');
             Route::put('/submit/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'submit'])->middleware('permission:labor-costs.update')->name('submit');
+            Route::put('/approve/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'approve'])->middleware('permission:labor-costs.update')->name('approve');
+            Route::put('/mark-paid/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'markPaid'])->middleware('permission:labor-costs.update')->name('mark-paid');
             Route::delete('/destroy/{project}/cost/{laborCost}', [ProjectLaborCostsController::class, 'destroy'])->middleware('permission:labor-costs.delete')->name('destroy');
         });
 
@@ -278,6 +294,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/archived', [InventoryItemsController::class, 'archived'])->middleware('permission:inventory.archive')->name('archived');
         Route::put('/{inventoryItem}/archive', [InventoryItemsController::class, 'archive'])->middleware('permission:inventory.archive')->name('archive');
         Route::put('/{inventoryItem}/restore', [InventoryItemsController::class, 'restore'])->middleware('permission:inventory.update')->name('restore');
+        Route::get('/{inventoryItem}/availability', [InventoryItemsController::class, 'availability'])->middleware('permission:inventory.view')->name('availability');
     });
 
     // Billing Management

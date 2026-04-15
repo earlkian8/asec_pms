@@ -222,7 +222,6 @@ class ProjectDataSeeder extends Seeder
         $projectTypes = ['design', 'construction', 'consultancy', 'maintenance', 'structural', 'civil', 'mechanical', 'electrical', 'environmental', 'geotechnical', 'surveying'];
         $statuses = ['active', 'on_hold', 'completed', 'cancelled'];
         $priorities = ['low', 'medium', 'high'];
-        $billingTypes = ['fixed_price', 'milestone'];
         $locations = [
             'Manila, Metro Manila',
             'Makati, Metro Manila',
@@ -250,7 +249,6 @@ class ProjectDataSeeder extends Seeder
             $projectType = fake()->randomElement($projectTypes);
             $status = fake()->randomElement($statuses);
             $priority = fake()->randomElement($priorities);
-            $billingType = fake()->randomElement($billingTypes);
             $client = $clients->random();
             
             $startDateObj = fake()->dateTimeBetween('-2 years', 'now');
@@ -288,7 +286,6 @@ class ProjectDataSeeder extends Seeder
                 'actual_end_date' => $actualEndDate?->toDateString(),
                 'location' => fake()->randomElement($locations),
                 'description' => fake()->optional(0.8)->paragraph(),
-                'billing_type' => $billingType,
             ]);
 
             // Create Team Members (2-5 members per project, reduced)
@@ -626,128 +623,61 @@ class ProjectDataSeeder extends Seeder
     {
         $billings = collect();
         $paymentMethods = ['cash', 'check', 'bank_transfer', 'credit_card', 'other'];
-        
-        // Create billings for all projects
+
         foreach ($projects as $project) {
             $milestones = ProjectMilestone::where('project_id', $project->id)->get();
-            
-            // Determine how many billings to create based on project type
-            if ($project->billing_type === 'milestone' && $milestones->count() > 0) {
-                // Create billings for some milestones (60-80% of milestones)
-                $milestonesToBill = $milestones->random(fake()->numberBetween(
-                    max(1, (int)($milestones->count() * 0.6)),
-                    min($milestones->count(), (int)($milestones->count() * 0.8))
+
+            $billingCount = fake()->numberBetween(1, 3);
+            $remainingContract = $project->contract_amount;
+
+            for ($i = 0; $i < $billingCount && $remainingContract > 0; $i++) {
+                do {
+                    $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
+                    $billingCode = 'BLG-' . $random;
+                } while (Billing::where('billing_code', $billingCode)->exists());
+
+                if ($i === $billingCount - 1) {
+                    $billingAmount = $remainingContract;
+                } else {
+                    $maxAmount = $remainingContract * 0.6;
+                    $billingAmount = fake()->randomFloat(2, $remainingContract * 0.2, $maxAmount);
+                }
+
+                $remainingContract -= $billingAmount;
+
+                $billingDateMin = Carbon::parse($project->start_date);
+                $billingDateMax = Carbon::parse(min($project->planned_end_date, now()));
+                if ($billingDateMax->lte($billingDateMin)) {
+                    $billingDateMax = $billingDateMin->copy()->addDays(30);
+                }
+                $billingDate = Carbon::parse(fake()->dateTimeBetween(
+                    $billingDateMin->toDateTimeString(),
+                    $billingDateMax->toDateTimeString()
                 ));
-                
-                foreach ($milestonesToBill as $milestone) {
-                    // Generate unique billing code
-                    do {
-                        $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-                        $billingCode = 'BLG-' . $random;
-                    } while (Billing::where('billing_code', $billingCode)->exists());
-                    
-                    // Billing amount based on milestone (portion of contract)
-                    // Ensure billing amounts are substantial (revenue should be higher than expenses)
-                    $milestonePortion = $project->contract_amount / $milestones->count();
-                    // Set billing amount to 90-110% of milestone portion to ensure good revenue
-                    $billingAmount = fake()->randomFloat(2, $milestonePortion * 0.9, $milestonePortion * 1.1);
-                    
-                    // Billing date should be around milestone due date
-                    $billingDateMin = Carbon::parse($project->start_date);
-                    $billingDateMax = Carbon::parse($milestone->due_date);
-                    if ($billingDateMax->lte($billingDateMin)) {
-                        $billingDateMax = $billingDateMin->copy()->addDays(30);
-                    }
-                    $billingDate = Carbon::parse(fake()->dateTimeBetween(
-                        $billingDateMin->toDateTimeString(),
-                        $billingDateMax->toDateTimeString()
-                    ));
-                    $dueDate = Carbon::parse(fake()->dateTimeBetween(
-                        $billingDate->copy()->addDay()->toDateTimeString(),
-                        $billingDate->copy()->addDays(30)->toDateTimeString()
-                    ));
-                    
-                    // Random status (weighted: 30% unpaid, 20% partial, 50% paid)
-                    $statusRoll = fake()->numberBetween(1, 100);
-                    $status = $statusRoll <= 30 ? 'unpaid' : ($statusRoll <= 50 ? 'partial' : 'paid');
-                    
-                    $billing = Billing::create([
-                        'project_id' => $project->id,
-                        'billing_code' => $billingCode,
-                        'billing_type' => 'milestone',
-                        'milestone_id' => $milestone->id,
-                        'billing_amount' => $billingAmount,
-                        'billing_date' => $billingDate->toDateString(),
-                        'due_date' => $dueDate->toDateString(),
-                        'status' => $status,
-                        'description' => fake()->optional(0.6)->sentence(),
-                        'created_by' => $users->random()->id,
-                    ]);
-                    
-                    $billings->push($billing);
-                    
-                    // Create payments based on status
-                    $this->createPaymentsForBilling($billing, $status, $users, $paymentMethods);
-                }
-            } else {
-                // Fixed price billing - create 1-3 billings that don't exceed contract amount
-                $billingCount = fake()->numberBetween(1, 3);
-                $remainingContract = $project->contract_amount;
-                
-                for ($i = 0; $i < $billingCount && $remainingContract > 0; $i++) {
-                    // Generate unique billing code
-                    do {
-                        $random = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-                        $billingCode = 'BLG-' . $random;
-                    } while (Billing::where('billing_code', $billingCode)->exists());
-                    
-                    // Calculate billing amount (last billing gets remaining, others get portion)
-                    if ($i === $billingCount - 1) {
-                        $billingAmount = $remainingContract;
-                    } else {
-                        $maxAmount = $remainingContract * 0.6; // Max 60% per billing
-                        $billingAmount = fake()->randomFloat(2, $remainingContract * 0.2, $maxAmount);
-                    }
-                    
-                    $remainingContract -= $billingAmount;
-                    
-                    // Billing date should be within project timeline
-                    $billingDateMin = Carbon::parse($project->start_date);
-                    $billingDateMax = Carbon::parse(min($project->planned_end_date, now()));
-                    if ($billingDateMax->lte($billingDateMin)) {
-                        $billingDateMax = $billingDateMin->copy()->addDays(30);
-                    }
-                    $billingDate = Carbon::parse(fake()->dateTimeBetween(
-                        $billingDateMin->toDateTimeString(),
-                        $billingDateMax->toDateTimeString()
-                    ));
-                    $dueDate = Carbon::parse(fake()->dateTimeBetween(
-                        $billingDate->copy()->addDay()->toDateTimeString(),
-                        $billingDate->copy()->addDays(45)->toDateTimeString()
-                    ));
-                    
-                    // Random status (weighted: 30% unpaid, 20% partial, 50% paid)
-                    $statusRoll = fake()->numberBetween(1, 100);
-                    $status = $statusRoll <= 30 ? 'unpaid' : ($statusRoll <= 50 ? 'partial' : 'paid');
-                    
-                    $billing = Billing::create([
-                        'project_id' => $project->id,
-                        'billing_code' => $billingCode,
-                        'billing_type' => 'fixed_price',
-                        'milestone_id' => null,
-                        'billing_amount' => $billingAmount,
-                        'billing_date' => $billingDate->toDateString(),
-                        'due_date' => $dueDate->toDateString(),
-                        'status' => $status,
-                        'description' => fake()->optional(0.6)->sentence(),
-                        'created_by' => $users->random()->id,
-                    ]);
-                    
-                    $billings->push($billing);
-                    
-                    // Create payments based on status
-                    $this->createPaymentsForBilling($billing, $status, $users, $paymentMethods);
-                }
+                $dueDate = Carbon::parse(fake()->dateTimeBetween(
+                    $billingDate->copy()->addDay()->toDateTimeString(),
+                    $billingDate->copy()->addDays(45)->toDateTimeString()
+                ));
+
+                $statusRoll = fake()->numberBetween(1, 100);
+                $status = $statusRoll <= 30 ? 'unpaid' : ($statusRoll <= 50 ? 'partial' : 'paid');
+
+                $billing = Billing::create([
+                    'project_id' => $project->id,
+                    'billing_code' => $billingCode,
+                    'milestone_id' => $milestones->isNotEmpty() && fake()->boolean(50)
+                        ? $milestones->random()->id
+                        : null,
+                    'billing_amount' => $billingAmount,
+                    'billing_date' => $billingDate->toDateString(),
+                    'due_date' => $dueDate->toDateString(),
+                    'status' => $status,
+                    'description' => fake()->optional(0.6)->sentence(),
+                    'created_by' => $users->random()->id,
+                ]);
+
+                $billings->push($billing);
+                $this->createPaymentsForBilling($billing, $status, $users, $paymentMethods);
             }
         }
         

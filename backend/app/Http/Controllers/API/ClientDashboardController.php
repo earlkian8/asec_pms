@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
-use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectLaborCost;
 use App\Models\ProjectMiscellaneousExpense;
 use App\Models\ProjectMilestone;
@@ -23,6 +22,47 @@ use Illuminate\Support\Facades\Storage;
 class ClientDashboardController extends Controller
 {
     use NotificationTrait;
+
+    private function materialExpensesBaseQuery()
+    {
+        return DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at');
+    }
+
+    private function totalMaterialExpensesForProjects($projectIds): float
+    {
+        if ($projectIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return (float) $this->materialExpensesBaseQuery()
+            ->whereIn('pma.project_id', $projectIds)
+            ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
+    }
+
+    private function materialExpensesByProject($projectIds)
+    {
+        if ($projectIds->isEmpty()) {
+            return collect();
+        }
+
+        return $this->materialExpensesBaseQuery()
+            ->whereIn('pma.project_id', $projectIds)
+            ->select('pma.project_id', DB::raw('SUM(mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)) as total'))
+            ->groupBy('pma.project_id')
+            ->pluck('total', 'project_id');
+    }
+
+    private function totalMaterialExpensesForProject(int $projectId): float
+    {
+        return (float) $this->materialExpensesBaseQuery()
+            ->where('pma.project_id', $projectId)
+            ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
+    }
 
     private function computeProjectPaymentStatus(int $projectId): array
     {
@@ -73,12 +113,8 @@ class ClientDashboardController extends Controller
         $totalBudget = $projects->sum('contract_amount');
         
         // Calculate total spent (material costs + labor costs + miscellaneous expenses) - optimized
-        // Material costs: left join to include direct supply allocations; prefer allocation-level unit_price snapshot
-        $materialCosts = DB::table('project_material_allocations')
-            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
-            ->whereIn('project_material_allocations.project_id', $projectIds)
-            ->where('project_material_allocations.quantity_received', '>', 0)
-            ->sum(DB::raw('project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)'));
+        // Material expenses are recognized from receiving reports.
+        $materialCosts = $this->totalMaterialExpensesForProjects($projectIds);
         
         // Labor costs
         // NOTE: Labor is now period-based with computed gross_pay.
@@ -180,14 +216,8 @@ class ClientDashboardController extends Controller
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
         
-        // Pre-calculate all material costs - left join to include direct supply allocations
-        $materialCostsByProject = DB::table('project_material_allocations')
-            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
-            ->whereIn('project_material_allocations.project_id', $projectIds)
-            ->where('project_material_allocations.quantity_received', '>', 0)
-            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)) as total'))
-            ->groupBy('project_material_allocations.project_id')
-            ->pluck('total', 'project_id');
+        // Pre-calculate all material costs from receiving reports
+        $materialCostsByProject = $this->materialExpensesByProject($projectIds);
 
         // Pre-calculate all labor costs
         $laborCostsByProject = ProjectLaborCost::whereIn('project_id', $projectIds)
@@ -291,14 +321,8 @@ class ClientDashboardController extends Controller
         $projects = $query->get();
         $projectIds = $projects->pluck('id');
         
-        // Pre-calculate costs - left join to include direct supply allocations
-        $materialCostsByProject = DB::table('project_material_allocations')
-            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
-            ->whereIn('project_material_allocations.project_id', $projectIds)
-            ->where('project_material_allocations.quantity_received', '>', 0)
-            ->select('project_material_allocations.project_id', DB::raw('SUM(project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)) as total'))
-            ->groupBy('project_material_allocations.project_id')
-            ->pluck('total', 'project_id');
+        // Pre-calculate costs from receiving reports
+        $materialCostsByProject = $this->materialExpensesByProject($projectIds);
         
         $laborCostsByProject = ProjectLaborCost::whereIn('project_id', $projectIds)
             ->select('project_id', DB::raw('SUM(gross_pay) as total'))
@@ -528,13 +552,9 @@ class ClientDashboardController extends Controller
             $progress = round($totalProgress / $milestones->count());
         }
 
-        // Calculate spent - left join to include direct supply allocations; prefer allocation-level unit_price
+        // Calculate spent using receiving reports for material expenses
         $projectId = $project->id;
-        $materialCosts = DB::table('project_material_allocations')
-            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
-            ->where('project_material_allocations.project_id', $projectId)
-            ->where('project_material_allocations.quantity_received', '>', 0)
-            ->sum(DB::raw('project_material_allocations.quantity_received * COALESCE(project_material_allocations.unit_price, inventory_items.unit_price, 0)'));
+        $materialCosts = $this->totalMaterialExpensesForProject((int) $projectId);
         
         $laborCosts = ProjectLaborCost::where('project_id', $projectId)
             ->sum('gross_pay');

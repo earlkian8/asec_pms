@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class ProjectBoqItem extends Model
 {
@@ -144,8 +145,8 @@ class ProjectBoqItem extends Model
 
     /**
      * Roll up planned vs actual for the details page.
-     * Actual material = sum of quantity_used * unit_price across milestone usages.
-     * Actual labor = submitted payroll only.
+     * Actual material = receiving reports posted for this BOQ item's allocations.
+     * Actual labor = submitted payroll entries up to today.
      */
     public function plannedVsActual(): array
     {
@@ -153,13 +154,21 @@ class ProjectBoqItem extends Model
         $plannedLabor    = (float) $this->labor_cost;
         $planned         = (float) $this->total_cost;
 
-        $materialActual = (float) $this->materialAllocations()
-            ->with('milestoneUsages')
-            ->get()
-            ->sum(fn ($a) => $a->milestoneUsages->sum('quantity_used') * (float) ($a->unit_price ?? 0));
+        $asOfDate = now()->endOfDay();
+
+        $materialActual = (float) DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at')
+            ->where('pma.boq_item_id', $this->id)
+            ->where('mrr.received_at', '<=', $asOfDate)
+            ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
 
         $laborActual = (float) $this->laborCosts()
-            ->where('status', 'submitted')
+            ->whereIn('status', ['draft', 'submitted'])
+            ->whereDate('period_start', '<=', $asOfDate)
             ->sum('gross_pay');
 
         $totalActual = $materialActual + $laborActual;

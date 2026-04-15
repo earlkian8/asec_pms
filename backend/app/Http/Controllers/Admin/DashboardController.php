@@ -13,7 +13,6 @@ use App\Models\ProjectTeam;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTask;
 use App\Models\ProjectLaborCost;
-use App\Models\ProjectMaterialAllocation;
 use App\Models\ProjectMiscellaneousExpense;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -149,9 +148,15 @@ class DashboardController extends Controller
         // Budget Statistics — only from non-archived projects
         $totalLaborCost = (float) ProjectLaborCost::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('gross_pay');
 
-        $totalMaterialCost = (float) ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
-            ->selectRaw('COALESCE(SUM(project_material_allocations.quantity_received * COALESCE(inventory_items.unit_price, 0)), 0) as total')
+        $totalMaterialCost = (float) DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->join('projects as p', 'pma.project_id', '=', 'p.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at')
+            ->whereNull('p.archived_at')
+            ->selectRaw('COALESCE(SUM(mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)), 0) as total')
             ->value('total');
 
         $totalMiscCost = (float) ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'))->sum('amount');
@@ -188,13 +193,19 @@ class DashboardController extends Controller
                 return Carbon::parse($item->month)->format('Y-m');
             });
 
-        $monthlyMaterialCosts = ProjectMaterialAllocation::whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->leftJoin('inventory_items', 'project_material_allocations.inventory_item_id', '=', 'inventory_items.id')
+        $monthlyMaterialCosts = DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->join('projects as p', 'pma.project_id', '=', 'p.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
             ->select(
-                DB::raw("DATE_TRUNC('month', project_material_allocations.allocated_at) as month"),
-                DB::raw('SUM(project_material_allocations.quantity_received * COALESCE(inventory_items.unit_price, 0)) as total')
+                DB::raw("DATE_TRUNC('month', mrr.received_at) as month"),
+                DB::raw('SUM(mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)) as total')
             )
-            ->where('allocated_at', '>=', now()->subMonths(6))
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at')
+            ->whereNull('p.archived_at')
+            ->where('mrr.received_at', '>=', now()->subMonths(6))
             ->groupBy('month')
             ->orderBy('month', 'asc')
             ->get()

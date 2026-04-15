@@ -90,6 +90,35 @@ class ReportsController extends Controller
         };
     }
 
+    private function materialExpensesBaseQuery()
+    {
+        return DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->join('projects as p', 'pma.project_id', '=', 'p.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at')
+            ->whereNull('p.archived_at');
+    }
+
+    private function sumMaterialExpenses($startDate = null, $endDate = null, $projectId = null, $clientId = null): float
+    {
+        $query = $this->materialExpensesBaseQuery();
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('mrr.received_at', [$startDate, $endDate]);
+        }
+
+        if ($projectId) {
+            $query->where('pma.project_id', $projectId);
+        } elseif ($clientId) {
+            $query->where('p.client_id', $clientId);
+        }
+
+        return (float) $query->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
+    }
+
     // -------------------------------------------------------------------------
     // Financial Report
     // -------------------------------------------------------------------------
@@ -132,19 +161,7 @@ class ReportsController extends Controller
         $totalLaborCost = (float) $laborQuery->sum('gross_pay');
 
         // ── Materials ─────────────────────────────────────────────────────────
-        $materialQuery = ProjectMaterialAllocation::whereBetween('allocated_at', [$startDate, $endDate])
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->with('inventoryItem');
-        if ($projectId) {
-            $materialQuery->where('project_id', $projectId);
-        } elseif ($clientId) {
-            $materialQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-        }
-        $totalMaterialCost = $materialQuery->get()->sum(function ($allocation) {
-            return $allocation->inventoryItem
-                ? (float) $allocation->quantity_received * (float) $allocation->inventoryItem->unit_price
-                : 0;
-        });
+        $totalMaterialCost = $this->sumMaterialExpenses($startDate, $endDate, $projectId, $clientId);
 
         // ── Miscellaneous ─────────────────────────────────────────────────────
         $miscQuery = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate])
@@ -217,25 +234,19 @@ class ReportsController extends Controller
 
             $laborQ = ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd])
                 ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
-            $matQ   = ProjectMaterialAllocation::whereBetween('allocated_at', [$current, $monthEnd])
-                ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
-                ->with('inventoryItem');
             $miscQ  = ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
                 ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
 
             if ($projectId) {
                 $laborQ->where('project_id', $projectId);
-                $matQ->where('project_id', $projectId);
                 $miscQ->where('project_id', $projectId);
             } elseif ($clientId) {
                 $laborQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-                $matQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
                 $miscQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
             }
 
             $labor    = (float) $laborQ->sum('gross_pay');
-            $material = $matQ->get()->sum(fn($a) => $a->inventoryItem
-                ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
+            $material = $this->sumMaterialExpenses($current, $monthEnd, $projectId, $clientId);
             $misc     = (float) $miscQ->sum('amount');
 
             $months->push([
@@ -321,11 +332,7 @@ class ReportsController extends Controller
                 $laborCost = (float) ProjectLaborCost::where('project_id', $project->id)
                     ->sum('gross_pay');
 
-                $materialCost = ProjectMaterialAllocation::where('project_id', $project->id)
-                    ->with('inventoryItem')
-                    ->get()
-                    ->sum(fn($a) => $a->inventoryItem
-                        ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
+                $materialCost = $this->sumMaterialExpenses(null, null, (int) $project->id, null);
 
                 $miscCost   = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)->sum('amount');
                 $totalSpent = $laborCost + $materialCost + $miscCost;
@@ -412,12 +419,7 @@ class ReportsController extends Controller
                 ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
                 ->sum('gross_pay');
 
-            $materialCost = ProjectMaterialAllocation::whereBetween('allocated_at', [$current, $monthEnd])
-                ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
-                ->with('inventoryItem')
-                ->get()
-                ->sum(fn($a) => $a->inventoryItem
-                    ? (float) $a->quantity_received * (float) $a->inventoryItem->unit_price : 0);
+            $materialCost = $this->sumMaterialExpenses($current, $monthEnd, null, null);
 
             $miscCost = (float) ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
                 ->whereHas('project', fn($q) => $q->whereNull('archived_at'))

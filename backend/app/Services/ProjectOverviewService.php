@@ -11,6 +11,7 @@ use App\Models\ProjectMilestone;
 use App\Models\ProjectTeam;
 use App\Models\ProjectTask;
 use App\Models\ProjectBoqSection;
+use Illuminate\Support\Facades\DB;
 
 class ProjectOverviewService
 {
@@ -24,12 +25,11 @@ class ProjectOverviewService
         $totalLaborDays  = (float) $laborCosts->sum('days_present');
 
         // ── Material Costs ────────────────────────────────────────────────────
-        $materialAllocations = ProjectMaterialAllocation::where('project_id', $project->id)->get();
+        $totalMaterialCost = (float) $this->materialReceivingReportsBaseQuery($project->id)
+            ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
 
-        $totalMaterialCost     = $materialAllocations->sum(
-            fn ($a) => (float) $a->quantity_received * (float) $a->unit_price
-        );
-        $totalMaterialQuantity = (float) $materialAllocations->sum('quantity_received');
+        $totalMaterialQuantity = (float) $this->materialReceivingReportsBaseQuery($project->id)
+            ->sum('mrr.quantity_received');
 
         // ── Miscellaneous Expenses ────────────────────────────────────────────
         $miscExpenses               = ProjectMiscellaneousExpense::where('project_id', $project->id)->get();
@@ -99,13 +99,14 @@ class ProjectOverviewService
             ->map(fn ($costs) => (float) $costs->sum('gross_pay'));
 
         // Materials
-        $monthlyMaterialCosts = ProjectMaterialAllocation::where('project_id', $project->id)
-            ->where('allocated_at', '>=', now()->subMonths(6))
-            ->get()
-            ->groupBy(fn ($a) => $a->allocated_at->format('Y-m'))
-            ->map(fn ($allocations) => $allocations->sum(
-                fn ($a) => (float) $a->quantity_received * (float) $a->unit_price
-            ));
+        $monthlyMaterialCosts = $this->materialReceivingReportsBaseQuery($project->id)
+            ->where('mrr.received_at', '>=', now()->subMonths(6))
+            ->select(
+                DB::raw("TO_CHAR(DATE_TRUNC('month', mrr.received_at), 'YYYY-MM') as month_key"),
+                DB::raw('SUM(mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)) as total')
+            )
+            ->groupBy('month_key')
+            ->pluck('total', 'month_key');
 
         // Misc
         $monthlyMiscExpenses = ProjectMiscellaneousExpense::where('project_id', $project->id)
@@ -288,10 +289,9 @@ class ProjectOverviewService
 
         // ── Unallocated/Other Expenses (not tied to BOQ items) ───────────────
         // These are included in totals but not shown as separate row
-        $unallocatedMaterialActual = (float) ProjectMaterialAllocation::where('project_id', $project->id)
-            ->whereNull('boq_item_id')
-            ->get()
-            ->sum(fn ($a) => (float) $a->quantity_received * (float) $a->unit_price);
+        $unallocatedMaterialActual = (float) $this->materialReceivingReportsBaseQuery($project->id)
+            ->whereNull('pma.boq_item_id')
+            ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
 
         $unallocatedLaborActual = (float) ProjectLaborCost::where('project_id', $project->id)
             ->whereNull('boq_item_id')
@@ -325,5 +325,16 @@ class ProjectOverviewService
                 'projected_margin' => $projectedMargin,
             ],
         ];
+    }
+
+    private function materialReceivingReportsBaseQuery(int $projectId)
+    {
+        return DB::table('material_receiving_reports as mrr')
+            ->join('project_material_allocations as pma', 'mrr.project_material_allocation_id', '=', 'pma.id')
+            ->leftJoin('inventory_items as ii', 'pma.inventory_item_id', '=', 'ii.id')
+            ->leftJoin('direct_supplies as ds', 'pma.direct_supply_id', '=', 'ds.id')
+            ->whereNull('mrr.deleted_at')
+            ->whereNull('pma.deleted_at')
+            ->where('pma.project_id', $projectId);
     }
 }

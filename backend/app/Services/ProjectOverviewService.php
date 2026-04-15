@@ -286,6 +286,24 @@ class ProjectOverviewService
             ];
         })->toArray();
 
+        // ── Unallocated/Other Expenses (not tied to BOQ items) ───────────────
+        // These are included in totals but not shown as separate row
+        $unallocatedMaterialActual = (float) ProjectMaterialAllocation::where('project_id', $project->id)
+            ->whereNull('boq_item_id')
+            ->get()
+            ->sum(fn ($a) => (float) $a->quantity_received * (float) $a->unit_price);
+
+        $unallocatedLaborActual = (float) ProjectLaborCost::where('project_id', $project->id)
+            ->whereNull('boq_item_id')
+            ->sum('gross_pay');
+
+        $miscellaneousActual = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)
+            ->sum('amount');
+
+        // Accumulate totals for summary
+        $totalActualMat  += $unallocatedMaterialActual;
+        $totalActualLab  += $unallocatedLaborActual + $miscellaneousActual;
+
         $plannedTotal = $totalPlannedMat + $totalPlannedLab;
         $actualTotal  = $totalActualMat + $totalActualLab;
         $variance     = $plannedTotal - $actualTotal;

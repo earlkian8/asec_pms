@@ -136,11 +136,13 @@ export default function BOQTab({ project, boqData }) {
 
     const getItemTotal = (item) => {
         if (Array.isArray(item?.resources) && item.resources.length > 0) {
+            // Resources define the per-unit cost; qty floor of 1 matches applyResourceRollup which enforces qty >= 1 when resources exist.
             return (getMaterialCost(item) + getLaborCost(item)) * Math.max(toNumber(item?.quantity), 1);
         }
         return toNumber(item?.quantity) * toNumber(item?.unit_cost);
     };
 
+    // Returns cost per unit (never multiplied by quantity). Invariant: getItemTotal = getItemUnitCost × qty.
     const getItemUnitCost = (item) => {
         if (Array.isArray(item?.resources) && item.resources.length > 0) {
             return getMaterialCost(item) + getLaborCost(item);
@@ -737,12 +739,14 @@ export default function BOQTab({ project, boqData }) {
                                                                 <p className="text-sm text-zinc-400 italic">No resources defined.</p>
                                                             ) : (
                                                                 <>
-                                                                    {(item.resources || []).length > 0 && toNumber(item.quantity) > 1 && (
+                                                                    {toNumber(item.quantity) > 1 && (
                                                                         <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 mb-2 text-xs text-amber-800">
                                                                             <span className="mt-0.5 flex-shrink-0">⚠</span>
                                                                             <span>
-                                                                                Qty <strong>{toNumber(item.quantity)}</strong> — resources are multiplied. Total:{' '}
-                                                                                <strong>₱{formatCurrency(getItemTotal(item))}</strong>. Set qty to 1 if resources represent the full cost.
+                                                                                Qty <strong>{toNumber(item.quantity)}</strong> — resources are multiplied by{' '}
+                                                                                <strong>{toNumber(item.quantity)}</strong>, making the item total{' '}
+                                                                                <strong>₱{formatCurrency(getItemTotal(item))}</strong>. Set qty to <strong>1</strong> if
+                                                                                resources represent the full cost.
                                                                             </span>
                                                                         </div>
                                                                     )}

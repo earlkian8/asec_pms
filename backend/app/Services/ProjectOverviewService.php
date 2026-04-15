@@ -295,6 +295,11 @@ class ProjectOverviewService
 
         $unallocatedLaborActual = (float) ProjectLaborCost::where('project_id', $project->id)
             ->whereNull('boq_item_id')
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
             ->sum('gross_pay');
 
         $miscellaneousActual = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)

@@ -146,7 +146,7 @@ class ProjectBoqItem extends Model
     /**
      * Roll up planned vs actual for the details page.
      * Actual material = receiving reports posted for this BOQ item's allocations.
-     * Actual labor = submitted payroll entries up to today.
+     * Actual labor = submitted/approved/paid payroll entries up to today.
      */
     public function plannedVsActual(): array
     {
@@ -167,7 +167,11 @@ class ProjectBoqItem extends Model
             ->sum(DB::raw('mrr.quantity_received * COALESCE(pma.unit_price, ii.unit_price, ds.unit_price, 0)'));
 
         $laborActual = (float) $this->laborCosts()
-            ->whereIn('status', ['draft', 'submitted'])
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
             ->whereDate('period_start', '<=', $asOfDate)
             ->sum('gross_pay');
 

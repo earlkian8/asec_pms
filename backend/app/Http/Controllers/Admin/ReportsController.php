@@ -123,146 +123,163 @@ class ReportsController extends Controller
     // Financial Report
     // -------------------------------------------------------------------------
 
-    private function getFinancialReport($startDate, $endDate, $projectId, $clientId)
-    {
-        // ── Revenue ──────────────────────────────────────────────────────────
-        $paymentQuery = BillingPayment::where('payment_status', 'paid')
-            ->whereBetween('payment_date', [$startDate, $endDate])
-            ->whereHas('billing', fn($q) => $q->whereNull('archived_at')
-                ->whereHas('project', fn($q2) => $q2->whereNull('archived_at')));
+   private function getFinancialReport($startDate, $endDate, $projectId, $clientId)
+{
+    // ── Revenue (date-filtered — shows what was collected/billed in period) ──
+    $paymentQuery = BillingPayment::where('payment_status', 'paid')
+        ->whereBetween('payment_date', [$startDate, $endDate])
+        ->whereHas('billing', fn($q) => $q->whereNull('archived_at')
+            ->whereHas('project', fn($q2) => $q2->whereNull('archived_at')));
 
-        if ($projectId) {
-            $paymentQuery->whereHas('billing', fn($q) => $q->where('project_id', $projectId));
-        } elseif ($clientId) {
-            $paymentQuery->whereHas('billing.project', fn($q) => $q->where('client_id', $clientId));
-        }
-
-        $totalRevenue = $paymentQuery->sum('payment_amount');
-
-        $billingQuery = Billing::active()->whereBetween('billing_date', [$startDate, $endDate])
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
-        if ($projectId) {
-            $billingQuery->where('project_id', $projectId);
-        } elseif ($clientId) {
-            $billingQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-        }
-
-        $totalBilled      = $billingQuery->sum('billing_amount');
-        $totalOutstanding = $totalBilled - $totalRevenue;
-
-        // ── Labor ─────────────────────────────────────────────────────────────
-        $laborQuery = ProjectLaborCost::whereBetween('period_start', [$startDate, $endDate])
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
-        if ($projectId) {
-            $laborQuery->where('project_id', $projectId);
-        } elseif ($clientId) {
-            $laborQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-        }
-        $totalLaborCost = (float) $laborQuery->sum('gross_pay');
-
-        // ── Materials ─────────────────────────────────────────────────────────
-        $totalMaterialCost = $this->sumMaterialExpenses($startDate, $endDate, $projectId, $clientId);
-
-        // ── Miscellaneous ─────────────────────────────────────────────────────
-        $miscQuery = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate])
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
-        if ($projectId) {
-            $miscQuery->where('project_id', $projectId);
-        } elseif ($clientId) {
-            $miscQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-        }
-        $totalMiscCost = (float) $miscQuery->sum('amount');
-
-        $miscByType = ProjectMiscellaneousExpense::whereBetween('expense_date', [$startDate, $endDate])
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->when($projectId, fn($q) => $q->where('project_id', $projectId))
-            ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)->whereNull('archived_at')))
-            ->select('expense_type', DB::raw('sum(amount) as total'), DB::raw('count(*) as count'))
-            ->groupBy('expense_type')
-            ->get()
-            ->keyBy('expense_type');
-
-        $totalExpenses = $totalLaborCost + $totalMaterialCost + $totalMiscCost;
-        $netProfit     = $totalRevenue - $totalExpenses;
-        $profitMargin  = $totalRevenue > 0 ? ($netProfit / $totalRevenue) * 100 : 0;
-
-        $billingStatus = Billing::active()
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
-            ->whereBetween('billing_date', [$startDate, $endDate])
-            ->when($projectId, fn($q) => $q->where('project_id', $projectId))
-            ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)->whereNull('archived_at')))
-            ->select('status', DB::raw('count(*) as count'), DB::raw('sum(billing_amount) as total'))
-            ->groupBy('status')
-            ->get()
-            ->keyBy('status');
-
-        $monthlyExpenses = $this->getMonthlyExpenseBreakdown($startDate, $endDate, $projectId, $clientId);
-
-        return [
-            'revenue' => [
-                'total_billed'    => $totalBilled,
-                'total_received'  => $totalRevenue,
-                'outstanding'     => $totalOutstanding,
-                'collection_rate' => $totalBilled > 0 ? round(($totalRevenue / $totalBilled) * 100, 2) : 0,
-            ],
-            'expenses' => [
-                'labor'         => $totalLaborCost,
-                'materials'     => $totalMaterialCost,
-                'miscellaneous' => $totalMiscCost,
-                'total'         => $totalExpenses,
-                'misc_by_type'  => $miscByType,
-            ],
-            'profit' => [
-                'net'    => $netProfit,
-                'margin' => round($profitMargin, 2),
-            ],
-            'billing_status'   => $billingStatus,
-            'monthly_expenses' => $monthlyExpenses,
-        ];
+    if ($projectId) {
+        $paymentQuery->whereHas('billing', fn($q) => $q->where('project_id', $projectId));
+    } elseif ($clientId) {
+        $paymentQuery->whereHas('billing.project', fn($q) => $q->where('client_id', $clientId));
     }
+
+    $totalRevenue = $paymentQuery->sum('payment_amount');
+
+    $billingQuery = Billing::active()
+        ->whereBetween('billing_date', [$startDate, $endDate])
+        ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
+    if ($projectId) {
+        $billingQuery->where('project_id', $projectId);
+    } elseif ($clientId) {
+        $billingQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
+    }
+
+    $totalBilled      = $billingQuery->sum('billing_amount');
+    $totalOutstanding = $totalBilled - $totalRevenue;
+
+    // ── Labor (ALL TIME — matches project overview) ───────────────────────
+    $laborQuery = ProjectLaborCost::whereIn('status', [
+            ProjectLaborCost::STATUS_SUBMITTED,
+            ProjectLaborCost::STATUS_APPROVED,
+            ProjectLaborCost::STATUS_PAID,
+        ])
+        ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
+    if ($projectId) {
+        $laborQuery->where('project_id', $projectId);
+    } elseif ($clientId) {
+        $laborQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
+    }
+    $totalLaborCost = (float) $laborQuery->sum('gross_pay');
+
+    // ── Materials (ALL TIME — matches project overview) ───────────────────
+    $totalMaterialCost = $this->sumMaterialExpenses(null, null, $projectId, $clientId);
+
+    // ── Miscellaneous (ALL TIME — matches project overview) ───────────────
+    $miscQuery = ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'));
+    if ($projectId) {
+        $miscQuery->where('project_id', $projectId);
+    } elseif ($clientId) {
+        $miscQuery->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
+    }
+    $totalMiscCost = (float) $miscQuery->sum('amount');
+
+    // ── Misc breakdown by type (ALL TIME) ────────────────────────────────
+    $miscByTypeQuery = ProjectMiscellaneousExpense::whereHas('project', fn($q) => $q->whereNull('archived_at'));
+    if ($projectId) {
+        $miscByTypeQuery->where('project_id', $projectId);
+    } elseif ($clientId) {
+        $miscByTypeQuery->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)->whereNull('archived_at'));
+    }
+    $miscByType = $miscByTypeQuery
+        ->select('expense_type', DB::raw('sum(amount) as total'), DB::raw('count(*) as count'))
+        ->groupBy('expense_type')
+        ->get()
+        ->keyBy('expense_type');
+
+    $totalExpenses = $totalLaborCost + $totalMaterialCost + $totalMiscCost;
+    $netProfit     = $totalRevenue - $totalExpenses;
+    $profitMargin  = $totalRevenue > 0 ? ($netProfit / $totalRevenue) * 100 : 0;
+
+    // ── Billing status (date-filtered) ────────────────────────────────────
+    $billingStatus = Billing::active()
+        ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
+        ->whereBetween('billing_date', [$startDate, $endDate])
+        ->when($projectId, fn($q) => $q->where('project_id', $projectId))
+        ->when(!$projectId && $clientId, fn($q) => $q->whereHas('project', fn($q2) => $q2->where('client_id', $clientId)->whereNull('archived_at')))
+        ->select('status', DB::raw('count(*) as count'), DB::raw('sum(billing_amount) as total'))
+        ->groupBy('status')
+        ->get()
+        ->keyBy('status');
+
+    // ── Monthly breakdown (date-filtered — for charts/trends only) ────────
+    $monthlyExpenses = $this->getMonthlyExpenseBreakdown($startDate, $endDate, $projectId, $clientId);
+
+    return [
+        'revenue' => [
+            'total_billed'    => $totalBilled,
+            'total_received'  => $totalRevenue,
+            'outstanding'     => $totalOutstanding,
+            'collection_rate' => $totalBilled > 0 ? round(($totalRevenue / $totalBilled) * 100, 2) : 0,
+        ],
+        'expenses' => [
+            'labor'         => $totalLaborCost,
+            'materials'     => $totalMaterialCost,
+            'miscellaneous' => $totalMiscCost,
+            'total'         => $totalExpenses,
+            'misc_by_type'  => $miscByType,
+        ],
+        'profit' => [
+            'net'    => $netProfit,
+            'margin' => round($profitMargin, 2),
+        ],
+        'billing_status'   => $billingStatus,
+        'monthly_expenses' => $monthlyExpenses,
+    ];
+}
 
     private function getMonthlyExpenseBreakdown($startDate, $endDate, $projectId, $clientId)
-    {
-        $months  = collect();
-        $current = $startDate->copy()->startOfMonth();
+{
+    $months  = collect();
+    $current = $startDate->copy()->startOfMonth();
 
-        while ($current->lte($endDate)) {
-            $monthEnd = $current->copy()->endOfMonth();
-            if ($monthEnd->gt($endDate)) {
-                $monthEnd = $endDate->copy();
-            }
-
-            $laborQ = ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd])
-                ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
-            $miscQ  = ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
-                ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
-
-            if ($projectId) {
-                $laborQ->where('project_id', $projectId);
-                $miscQ->where('project_id', $projectId);
-            } elseif ($clientId) {
-                $laborQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-                $miscQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
-            }
-
-            $labor    = (float) $laborQ->sum('gross_pay');
-            $material = $this->sumMaterialExpenses($current, $monthEnd, $projectId, $clientId);
-            $misc     = (float) $miscQ->sum('amount');
-
-            $months->push([
-                'month'     => $current->format('M Y'),
-                'month_key' => $current->format('Y-m'),
-                'labor'     => $labor,
-                'materials' => $material,
-                'misc'      => $misc,
-                'total'     => $labor + $material + $misc,
-            ]);
-
-            $current->addMonth();
+    while ($current->lte($endDate)) {
+        $monthEnd = $current->copy()->endOfMonth();
+        if ($monthEnd->gt($endDate)) {
+            $monthEnd = $endDate->copy();
         }
 
-        return $months;
+        // ✅ Add status filter here
+        $laborQ = ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd])
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
+            ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
+
+        $miscQ = ProjectMiscellaneousExpense::whereBetween('expense_date', [$current, $monthEnd])
+            ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
+
+        if ($projectId) {
+            $laborQ->where('project_id', $projectId);
+            $miscQ->where('project_id', $projectId);
+        } elseif ($clientId) {
+            $laborQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
+            $miscQ->whereHas('project', fn($q) => $q->where('client_id', $clientId)->whereNull('archived_at'));
+        }
+
+        $labor    = (float) $laborQ->sum('gross_pay');
+        $material = $this->sumMaterialExpenses($current, $monthEnd, $projectId, $clientId);
+        $misc     = (float) $miscQ->sum('amount');
+
+        $months->push([
+            'month'     => $current->format('M Y'),
+            'month_key' => $current->format('Y-m'),
+            'labor'     => $labor,
+            'materials' => $material,
+            'misc'      => $misc,
+            'total'     => $labor + $material + $misc,
+        ]);
+
+        $current->addMonth();
     }
+
+    return $months;
+}
 
     // -------------------------------------------------------------------------
     // Inventory Report
@@ -315,27 +332,31 @@ class ReportsController extends Controller
 
     private function getProjectReport($startDate, $endDate, $projectId, $clientId)
     {
-        // Only non-archived projects
         $query = Project::notArchived();
-        if ($projectId) $query->where('id', $projectId);
-        if ($clientId)  $query->where('client_id', $clientId);
+    if ($projectId) $query->where('id', $projectId);
+    if ($clientId)  $query->where('client_id', $clientId);
 
-        $projects = $query
-            ->with(['client:id,client_name', 'milestones', 'projectType:id,name'])
-            ->get()
-            ->map(function ($project) {
-                $milestones    = $project->milestones;
-                $total         = $milestones->count();
-                $completed     = $milestones->where('status', 'completed')->count();
-                $completionPct = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+    $projects = $query
+        ->with(['client:id,client_name', 'milestones', 'projectType:id,name'])
+        ->get()
+        ->map(function ($project) {
+            $milestones    = $project->milestones;
+            $total         = $milestones->count();
+            $completed     = $milestones->where('status', 'completed')->count();
+            $completionPct = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
 
-                $laborCost = (float) ProjectLaborCost::where('project_id', $project->id)
-                    ->sum('gross_pay');
+            // ✅ Added status filter to match ProjectOverviewService
+            $laborCost = (float) ProjectLaborCost::where('project_id', $project->id)
+                ->whereIn('status', [
+                    ProjectLaborCost::STATUS_SUBMITTED,
+                    ProjectLaborCost::STATUS_APPROVED,
+                    ProjectLaborCost::STATUS_PAID,
+                ])
+                ->sum('gross_pay');
 
-                $materialCost = $this->sumMaterialExpenses(null, null, (int) $project->id, null);
-
-                $miscCost   = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)->sum('amount');
-                $totalSpent = $laborCost + $materialCost + $miscCost;
+            $materialCost = $this->sumMaterialExpenses(null, null, (int) $project->id, null);
+            $miscCost     = (float) ProjectMiscellaneousExpense::where('project_id', $project->id)->sum('amount');
+            $totalSpent   = $laborCost + $materialCost + $miscCost;
 
                 $budget      = (float) $project->contract_amount;
                 $variance    = $budget - $totalSpent;
@@ -416,8 +437,13 @@ class ReportsController extends Controller
                 ->sum('payment_amount');
 
             $laborCost = (float) ProjectLaborCost::whereBetween('period_start', [$current, $monthEnd])
-                ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
-                ->sum('gross_pay');
+            ->whereIn('status', [
+                ProjectLaborCost::STATUS_SUBMITTED,
+                ProjectLaborCost::STATUS_APPROVED,
+                ProjectLaborCost::STATUS_PAID,
+            ])
+            ->whereHas('project', fn($q) => $q->whereNull('archived_at'))
+            ->sum('gross_pay');
 
             $materialCost = $this->sumMaterialExpenses($current, $monthEnd, null, null);
 
@@ -620,7 +646,12 @@ class ReportsController extends Controller
     private function getTeamProductivityReport($startDate, $endDate, $projectId)
     {
         $query = ProjectLaborCost::whereBetween('period_start', [$startDate, $endDate])
-            ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
+    ->whereIn('status', [
+        ProjectLaborCost::STATUS_SUBMITTED,
+        ProjectLaborCost::STATUS_APPROVED,
+        ProjectLaborCost::STATUS_PAID,
+    ])
+    ->whereHas('project', fn($q) => $q->whereNull('archived_at'));
         if ($projectId) $query->where('project_id', $projectId);
 
         $entries = $query->with(['user:id,name', 'employee', 'project:id,project_name'])->get();

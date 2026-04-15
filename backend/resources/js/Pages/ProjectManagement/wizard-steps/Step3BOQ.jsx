@@ -120,21 +120,19 @@ export default function Step3BOQ({ errors = {} }) {
   }
 
   function getItemTotal(item) {
-    if (Array.isArray(item?.resources) && item.resources.length > 0) {
-      return item.resources.reduce((sum, resource) => sum + getResourceTotal(resource), 0);
-    }
-
     return toNumber(item?.quantity) * toNumber(item?.unit_cost);
   }
 
   function applyResourceRollup(sectionIndex, itemIndex, resources) {
     const total = resources.reduce((sum, resource) => sum + getResourceTotal(resource), 0);
+    const item = boqSections?.[sectionIndex]?.items?.[itemIndex] || {};
+    const qty = toNumber(item.quantity) > 0 ? toNumber(item.quantity) : 1;
 
     updateBoqItem(sectionIndex, itemIndex, {
       resources,
-      quantity: resources.length > 0 ? 1 : 0,
-      unit: resources.length > 0 ? "lot" : "",
-      unit_cost: resources.length > 0 ? total.toFixed(2) : 0,
+      quantity: qty,
+      unit: item.unit || (resources.length > 0 ? "lot" : ""),
+      unit_cost: +total.toFixed(2),
     });
   }
 
@@ -377,6 +375,11 @@ export default function Step3BOQ({ errors = {} }) {
                     <TableBody>
                       {(section.items || []).map((item, itemIndex) => {
                         const amount = getItemTotal(item);
+                        const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
+                        const derivedUnitCost = (item.resources || []).reduce(
+                          (sum, resource) => sum + getResourceTotal(resource),
+                          0
+                        );
                         const descKey = `boq_sections.${sectionIndex}.items.${itemIndex}.description`;
                         return (
                           <Fragment key={itemIndex}>
@@ -402,6 +405,58 @@ export default function Step3BOQ({ errors = {} }) {
                                   }
                                   placeholder="Describe the scope item"
                                 />
+                                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                  <div>
+                                    <Label className="mb-1 block text-[11px] text-zinc-500">Unit</Label>
+                                    <Input
+                                      value={item.unit || ""}
+                                      onChange={(e) =>
+                                        updateBoqItem(sectionIndex, itemIndex, {
+                                          unit: e.target.value,
+                                        })
+                                      }
+                                      placeholder="lot"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="mb-1 block text-[11px] text-zinc-500">Unit Qty</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.0001"
+                                      value={item.quantity ?? ""}
+                                      onChange={(e) =>
+                                        updateBoqItem(sectionIndex, itemIndex, {
+                                          quantity: e.target.value,
+                                        })
+                                      }
+                                      placeholder="0"
+                                      className="text-right"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="mb-1 block text-[11px] text-zinc-500">Cost</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.unit_cost ?? ""}
+                                      onChange={(e) =>
+                                        updateBoqItem(sectionIndex, itemIndex, {
+                                          unit_cost: e.target.value,
+                                        })
+                                      }
+                                      placeholder="0.00"
+                                      className="text-right"
+                                    />
+                                  </div>
+                                </div>
+                                {hasResources && (
+                                  <p className="mt-1 text-[11px] text-zinc-500">
+                                    Auto-filled from resources. Editable as needed. Resource subtotal used as cost:
+                                    {" "}₱{formatCurrency(derivedUnitCost)}
+                                  </p>
+                                )}
                                 {errors[descKey] && (
                                   <InputError message={errors[descKey]} />
                                 )}
@@ -553,6 +608,20 @@ export default function Step3BOQ({ errors = {} }) {
                                               : `Max: ${projectDays} days`}
                                           </p>
                                         )}
+                                        {resource.resource_category === "material" && resource.source_type === "inventory" && resource.inventory_item_id && (() => {
+                                          const inv = inventoryItems.find((x) => String(x.id) === String(resource.inventory_item_id));
+                                          if (!inv) return null;
+                                          const stock = toNumber(inv.current_stock);
+                                          const qty = parseFloat(resource.quantity || 0);
+                                          const over = qty > stock;
+                                          return (
+                                            <p className={`mt-0.5 text-xs ${over ? "text-red-600 font-medium" : "text-zinc-400"}`}>
+                                              {over
+                                                ? `Only ${stock} ${inv.unit_of_measure || ""} in stock`
+                                                : `Stock: ${stock} ${inv.unit_of_measure || ""}`}
+                                            </p>
+                                          );
+                                        })()}
                                       </div>
 
                                       <Input

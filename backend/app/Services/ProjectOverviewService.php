@@ -10,6 +10,7 @@ use App\Models\Billing;
 use App\Models\ProjectMilestone;
 use App\Models\ProjectTeam;
 use App\Models\ProjectTask;
+use App\Models\ProjectBoqSection;
 
 class ProjectOverviewService
 {
@@ -211,6 +212,7 @@ class ProjectOverviewService
                     ? round(($completedTasks / $totalTasks) * 100, 2)
                     : 0,
             ],
+            'cost_performance' => $this->buildCostPerformance($project),
             'timeline' => [
                 'days_elapsed'     => $daysElapsed,
                 'days_remaining'   => $daysRemaining,
@@ -218,6 +220,91 @@ class ProjectOverviewService
                 'start_date'       => $project->start_date,
                 'planned_end_date' => $project->planned_end_date,
                 'actual_end_date'  => $project->actual_end_date,
+            ],
+        ];
+    }
+
+    private function buildCostPerformance(Project $project): array
+    {
+        $sections = ProjectBoqSection::with(['items.materialAllocations.milestoneUsages', 'items.laborCosts'])
+            ->where('project_id', $project->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $totalPlannedMat = 0.0; $totalPlannedLab = 0.0;
+        $totalActualMat  = 0.0; $totalActualLab  = 0.0;
+
+        $sectionsOut = $sections->map(function ($section) use (&$totalPlannedMat, &$totalPlannedLab, &$totalActualMat, &$totalActualLab) {
+            $secPlannedMat = 0.0; $secPlannedLab = 0.0;
+            $secActualMat  = 0.0; $secActualLab  = 0.0;
+
+            $items = $section->items->map(function ($item) use (&$secPlannedMat, &$secPlannedLab, &$secActualMat, &$secActualLab) {
+                $r = $item->plannedVsActual();
+                $secPlannedMat += $r['planned_material'];
+                $secPlannedLab += $r['planned_labor'];
+                $secActualMat  += $r['material_actual'];
+                $secActualLab  += $r['labor_actual'];
+
+                return [
+                    'id'              => $item->id,
+                    'item_code'       => $item->item_code,
+                    'description'     => $item->description,
+                    'unit'            => $item->unit,
+                    'quantity'        => (float) $item->quantity,
+                    'planned_material'=> $r['planned_material'],
+                    'planned_labor'   => $r['planned_labor'],
+                    'planned_total'   => $r['planned_cost'],
+                    'actual_material' => $r['material_actual'],
+                    'actual_labor'    => $r['labor_actual'],
+                    'actual_total'    => $r['total_actual'],
+                    'variance'        => $r['variance'],
+                    'variance_pct'    => $r['variance_pct'],
+                ];
+            })->toArray();
+
+            $secPlannedTotal = $secPlannedMat + $secPlannedLab;
+            $secActualTotal  = $secActualMat + $secActualLab;
+            $secVariance     = $secPlannedTotal - $secActualTotal;
+
+            $totalPlannedMat += $secPlannedMat;
+            $totalPlannedLab += $secPlannedLab;
+            $totalActualMat  += $secActualMat;
+            $totalActualLab  += $secActualLab;
+
+            return [
+                'code'             => $section->code,
+                'name'             => $section->name,
+                'planned_material' => round($secPlannedMat, 2),
+                'planned_labor'    => round($secPlannedLab, 2),
+                'planned_total'    => round($secPlannedTotal, 2),
+                'actual_material'  => round($secActualMat, 2),
+                'actual_labor'     => round($secActualLab, 2),
+                'actual_total'     => round($secActualTotal, 2),
+                'variance'         => round($secVariance, 2),
+                'variance_pct'     => $secPlannedTotal > 0 ? round(($secVariance / $secPlannedTotal) * 100, 2) : null,
+                'items'            => $items,
+            ];
+        })->toArray();
+
+        $plannedTotal = $totalPlannedMat + $totalPlannedLab;
+        $actualTotal  = $totalActualMat + $totalActualLab;
+        $variance     = $plannedTotal - $actualTotal;
+        $contract     = (float) ($project->contract_amount ?? 0);
+        $projectedMargin = $contract > 0 ? round((($contract - $plannedTotal) / $contract) * 100, 2) : null;
+
+        return [
+            'sections' => $sectionsOut,
+            'totals'   => [
+                'planned_material' => round($totalPlannedMat, 2),
+                'planned_labor'    => round($totalPlannedLab, 2),
+                'planned_total'    => round($plannedTotal, 2),
+                'actual_material'  => round($totalActualMat, 2),
+                'actual_labor'     => round($totalActualLab, 2),
+                'actual_total'     => round($actualTotal, 2),
+                'variance'         => round($variance, 2),
+                'variance_pct'     => $plannedTotal > 0 ? round(($variance / $plannedTotal) * 100, 2) : null,
+                'contract_amount'  => round($contract, 2),
+                'projected_margin' => $projectedMargin,
             ],
         ];
     }

@@ -291,6 +291,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/archived', [InventoryItemsController::class, 'archived'])->middleware('permission:inventory.archive')->name('archived');
         Route::put('/{inventoryItem}/archive', [InventoryItemsController::class, 'archive'])->middleware('permission:inventory.archive')->name('archive');
         Route::put('/{inventoryItem}/restore', [InventoryItemsController::class, 'restore'])->middleware('permission:inventory.update')->name('restore');
+        Route::get('/{inventoryItem}/availability', [InventoryItemsController::class, 'availability'])->middleware('permission:inventory.view')->name('availability');
     });
 
     // Billing Management

@@ -36,6 +36,7 @@ use App\Services\MaterialAllocationService;
 use App\Services\LaborCostService;
 use App\Services\MiscellaneousExpenseService;
 use App\Services\ProjectOverviewService;
+use App\Services\InventoryAvailabilityService;
 use App\Traits\ClientNotificationTrait;
 use App\Traits\NotificationTrait;
 use Illuminate\Validation\ValidationException;
@@ -425,6 +426,8 @@ class ProjectsController extends Controller
                         ],
                     ]);
                 }
+
+                $this->validateBoqInventoryStock($boqSections);
             }
 
             do {
@@ -503,7 +506,7 @@ class ProjectsController extends Controller
                     ]);
 
                     foreach (($section['items'] ?? []) as $itemIndex => $item) {
-                        [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
+                        $basis = $this->resolveItemCostBasis($item);
 
                         $createdItem = ProjectBoqItem::create([
                             'project_id'             => $project->id,
@@ -511,9 +514,11 @@ class ProjectsController extends Controller
                             'item_code'              => $item['item_code'] ?? null,
                             'description'            => $item['description'],
                             'unit'                   => $item['unit'] ?? null,
-                            'quantity'               => $quantity,
-                            'unit_cost'              => $unitCost,
-                            'total_cost'             => round($quantity * $unitCost, 2),
+                            'quantity'               => $basis['quantity'],
+                            'unit_cost'              => $basis['unit_cost'],
+                            'material_cost'          => $basis['material_cost'],
+                            'labor_cost'             => $basis['labor_cost'],
+                            'total_cost'             => $basis['total_cost'],
                             'resource_type'          => $item['resource_type'] ?? null,
                             'planned_inventory_item_id' => $item['planned_inventory_item_id'] ?? null,
                             'planned_direct_supply_id' => $item['planned_direct_supply_id'] ?? null,
@@ -524,6 +529,7 @@ class ProjectsController extends Controller
                         ]);
 
                         $this->syncBoqItemResources($createdItem, $item['resources'] ?? []);
+                        $createdItem->recomputeFromResources();
 
                         $boqItemRefMap["{$sectionIndex}:{$itemIndex}"] = $createdItem->id;
                     }
@@ -949,14 +955,35 @@ class ProjectsController extends Controller
         ]);
     }
 
+    private function validateBoqInventoryStock(array $sections, ?int $excludeProjectId = null): void
+    {
+        $flat = [];
+        $keyMap = [];
+        foreach ($sections as $si => $section) {
+            foreach (($section['items'] ?? []) as $ii => $item) {
+                foreach (($item['resources'] ?? []) as $ri => $r) {
+                    $flat[] = $r;
+                    $keyMap[] = "boq_sections.$si.items.$ii.resources.$ri.quantity";
+                }
+            }
+        }
+        if (empty($flat)) return;
+
+        app(InventoryAvailabilityService::class)->validateResources(
+            $flat,
+            fn ($i) => $keyMap[$i] ?? "resources.$i.quantity",
+            $excludeProjectId
+        );
+    }
+
     private function calculateBoqTotalFromSections(array $sections): float
     {
         $total = 0.0;
 
         foreach ($sections as $section) {
             foreach (($section['items'] ?? []) as $item) {
-                [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
-                $total += ($quantity * $unitCost);
+                $basis = $this->resolveItemCostBasis($item);
+                $total += $basis['total_cost'];
             }
         }
 

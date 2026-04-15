@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\ProjectBoqExport;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectBoqItem;
 use App\Models\ProjectBoqItemResource;
 use App\Models\ProjectBoqSection;
+use App\Services\InventoryAvailabilityService;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\BoqCostBasisTrait;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -62,6 +66,13 @@ class ProjectBoqController extends Controller
             'sections.*.items.*.resources.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        // Inventory stock guard (storeBulk replaces the project's BOQ, so
+        // exclude the whole project from "committed elsewhere").
+        $this->validateInventoryStockForSections(
+            $validated['sections'] ?? [],
+            $project->id
+        );
+
         $plannedTotal = $this->calculatePlannedTotal($validated['sections'] ?? []);
         $contractAmount = (float) ($project->contract_amount ?? 0);
 
@@ -89,17 +100,19 @@ class ProjectBoqController extends Controller
                 ]);
 
                 foreach (($section['items'] ?? []) as $itemIndex => $item) {
-                    [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
+                    $basis = $this->resolveItemCostBasis($item);
 
                     $createdItem = ProjectBoqItem::create([
                         'project_id'             => $project->id,
                         'project_boq_section_id' => $created->id,
                         'item_code'              => $item['item_code'] ?? null,
                         'description'            => $item['description'],
-                        'unit'                   => 'lot',
-                        'quantity'               => 1,
-                        'unit_cost'              => $unitCost,
-                        'total_cost'             => round($unitCost, 2),
+                        'unit'                   => $item['unit'] ?? 'lot',
+                        'quantity'               => $basis['quantity'],
+                        'unit_cost'              => $basis['unit_cost'],
+                        'material_cost'          => $basis['material_cost'],
+                        'labor_cost'             => $basis['labor_cost'],
+                        'total_cost'             => $basis['total_cost'],
                         'resource_type'          => $item['resource_type'] ?? null,
                         'planned_inventory_item_id' => $item['planned_inventory_item_id'] ?? null,
                         'planned_direct_supply_id' => $item['planned_direct_supply_id'] ?? null,
@@ -110,6 +123,7 @@ class ProjectBoqController extends Controller
                     ]);
 
                     $this->syncItemResources($createdItem, $item['resources'] ?? []);
+                    $createdItem->recomputeFromResources();
                 }
             }
         });
@@ -119,14 +133,35 @@ class ProjectBoqController extends Controller
         return redirect()->back()->with('success', 'BOQ saved successfully.');
     }
 
+    private function validateInventoryStockForSections(array $sections, ?int $excludeProjectId = null): void
+    {
+        $flat = [];
+        $keyMap = [];
+        foreach ($sections as $si => $section) {
+            foreach (($section['items'] ?? []) as $ii => $item) {
+                foreach (($item['resources'] ?? []) as $ri => $r) {
+                    $flat[] = $r;
+                    $keyMap[] = "sections.$si.items.$ii.resources.$ri.quantity";
+                }
+            }
+        }
+        if (empty($flat)) return;
+
+        app(InventoryAvailabilityService::class)->validateResources(
+            $flat,
+            fn ($i) => $keyMap[$i] ?? "resources.$i.quantity",
+            $excludeProjectId
+        );
+    }
+
     private function calculatePlannedTotal(array $sections): float
     {
         $total = 0.0;
 
         foreach ($sections as $section) {
             foreach (($section['items'] ?? []) as $item) {
-                [$quantity, $unitCost] = $this->resolveItemCostBasis($item);
-                $total += ($quantity * $unitCost);
+                $basis = $this->resolveItemCostBasis($item);
+                $total += $basis['total_cost'];
             }
         }
 
@@ -206,17 +241,25 @@ class ProjectBoqController extends Controller
             'resources.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        [$quantity, $unitCost] = $this->resolveItemCostBasis($validated);
+        app(InventoryAvailabilityService::class)->validateResources(
+            $validated['resources'] ?? [],
+            fn ($i) => "resources.$i.quantity"
+        );
+
+        $basis = $this->resolveItemCostBasis($validated);
 
         $created = ProjectBoqItem::create(array_merge($validated, [
             'project_id'             => $project->id,
             'project_boq_section_id' => $section->id,
-            'quantity'               => $quantity,
-            'unit_cost'              => $unitCost,
-            'total_cost'             => round($quantity * $unitCost, 2),
+            'quantity'               => $basis['quantity'],
+            'unit_cost'              => $basis['unit_cost'],
+            'material_cost'          => $basis['material_cost'],
+            'labor_cost'             => $basis['labor_cost'],
+            'total_cost'             => $basis['total_cost'],
         ]));
 
         $this->syncItemResources($created, $validated['resources'] ?? []);
+        $created->recomputeFromResources();
 
         return redirect()->back()->with('success', 'BOQ item added.');
     }
@@ -254,13 +297,23 @@ class ProjectBoqController extends Controller
             'resources.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        [$quantity, $unitCost] = $this->resolveItemCostBasis($validated);
-        $validated['quantity'] = $quantity;
-        $validated['unit_cost'] = $unitCost;
-        $validated['total_cost'] = round($quantity * $unitCost, 2);
+        app(InventoryAvailabilityService::class)->validateResources(
+            $validated['resources'] ?? [],
+            fn ($i) => "resources.$i.quantity",
+            null,
+            $item->id
+        );
+
+        $basis = $this->resolveItemCostBasis($validated);
+        $validated['quantity']      = $basis['quantity'];
+        $validated['unit_cost']     = $basis['unit_cost'];
+        $validated['material_cost'] = $basis['material_cost'];
+        $validated['labor_cost']    = $basis['labor_cost'];
+        $validated['total_cost']    = $basis['total_cost'];
 
         $item->update($validated);
         $this->syncItemResources($item, $validated['resources'] ?? []);
+        $item->recomputeFromResources();
 
         return redirect()->back()->with('success', 'BOQ item updated.');
     }
@@ -275,10 +328,25 @@ class ProjectBoqController extends Controller
 
     public function export(Project $project)
     {
-        $export   = new \App\Exports\ProjectBoqExport($project);
+        $export   = new ProjectBoqExport($project);
         $fileName = 'BOQ_' . $project->project_code . '_' . now()->format('Ymd') . '.pdf';
 
-        return \Maatwebsite\Excel\Facades\Excel::download($export, $fileName, \Maatwebsite\Excel\Excel::DOMPDF);
+        $html = $export->view()->render();
+
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $options->setDefaultFont('DejaVu Sans');
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ]);
     }
 
     private function syncItemResources(ProjectBoqItem $item, array $resources): void

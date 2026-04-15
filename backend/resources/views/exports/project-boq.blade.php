@@ -2,353 +2,661 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>BOQ — {{ $project['name'] }}</title>
+    <title>Bill of Quantities</title>
     <style>
         @page {
-            margin: 15mm 12mm;
+            size: A4 landscape;
+            margin: 15mm 14mm 16mm 14mm;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+        }
+
         body {
-            font-family: DejaVu Sans, Arial, sans-serif;
-            font-size: 9pt;
-            color: #1a1a2e;
+            color: #1a2332;
+            font-size: 8.7px;
+            line-height: 1.4;
             background: #fff;
         }
 
-        /* ── Header ──────────────────────────────────────── */
+        .page-break { page-break-after: always; }
+        .no-break { page-break-inside: avoid; }
+
+        /* ── HEADER ── */
         .doc-header {
-            border-bottom: 2.5pt solid #1e293b;
-            padding-bottom: 8pt;
-            margin-bottom: 10pt;
-        }
-        .doc-title {
-            font-size: 16pt;
-            font-weight: bold;
-            color: #1e293b;
-            letter-spacing: 0.5pt;
-        }
-        .doc-subtitle {
-            font-size: 10pt;
-            color: #475569;
-            margin-top: 1pt;
-        }
-        .project-info-grid {
-            display: table;
-            width: 100%;
-            margin-top: 8pt;
-        }
-        .project-info-col {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
-        }
-        .info-row {
-            margin-bottom: 3pt;
-        }
-        .info-label {
-            font-size: 7.5pt;
-            color: #64748b;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.3pt;
-        }
-        .info-value {
-            font-size: 9pt;
-            color: #1e293b;
-            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+            border-bottom: 1.5px solid #273c52;
+            position: relative;
         }
 
-        /* ── Table ───────────────────────────────────────── */
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-wrap img {
+            max-height: 48px;
+            max-width: 48px;
+        }
+
+        .company-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0d2640;
+            letter-spacing: 0.3px;
+            line-height: 1.15;
+        }
+
+        .company-tagline {
+            font-size: 7.8px;
+            color: #5a6f84;
+            margin-top: 1px;
+            font-style: italic;
+        }
+
+        .company-meta {
+            margin-top: 3px;
+            font-size: 7.6px;
+            color: #6b7f93;
+            line-height: 1.45;
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .doc-badge {
+            display: inline-block;
+            background: #fff;
+            color: #1a3a5c;
+            border: 1px solid #1a3a5c;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            margin-bottom: 6px;
+        }
+
+        .doc-meta-row {
+            font-size: 7.8px;
+            color: #5a6f84;
+            margin-top: 2px;
+        }
+
+        .doc-meta-row span {
+            font-weight: 700;
+            color: #1a2332;
+        }
+
+        /* ── PROJECT TITLE BAND ── */
+        .project-band {
+            background: #fff;
+            border: 1px solid #cfd9e3;
+            border-left: 3px solid #1a3a5c;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+        }
+
+        .project-band-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: #0d2640;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .project-band-sub {
+            font-size: 7.8px;
+            color: #6b7f93;
+            margin-top: 2px;
+        }
+
+        /* ── INFO TABLE ── */
+        .info-grid {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 8px;
+        }
+
+        .info-grid td {
+            border: 0.5px solid #d1dbe5;
+            padding: 4px 8px;
+        }
+
+        .info-grid .lbl {
+            color: #7a8fa3;
+            text-transform: uppercase;
+            font-size: 7.2px;
+            letter-spacing: 0.4px;
+            width: 13%;
+            background: #fcfdff;
+        }
+
+        .info-grid .val {
+            color: #0d2640;
+            font-weight: 700;
+            font-size: 8.2px;
+            width: 24%;
+        }
+
+        /* ── KPI STRIP ── */
+        .kpi-strip {
+            display: flex;
+            gap: 0;
+            margin-bottom: 12px;
+            border: 1px solid #cfd9e3;
+        }
+
+        .kpi-cell {
+            flex: 1;
+            padding: 8px 10px;
+            border-right: 1px solid #d6e0e9;
+            background: #fff;
+        }
+
+        .kpi-cell:last-child {
+            border-right: none;
+        }
+
+        .kpi-cell.highlight {
+            background: #f8fbff;
+            border-left: 1.5px solid #1a3a5c;
+            border-right: 1.5px solid #1a3a5c;
+        }
+
+        .kpi-cell.positive {
+            background: #fcfffd;
+        }
+
+        .kpi-cell.negative {
+            background: #fffdfd;
+        }
+
+        .kpi-lbl {
+            font-size: 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #7a8fa3;
+        }
+
+        .kpi-cell.highlight .kpi-lbl {
+            color: #5a6f84;
+        }
+
+        .kpi-val {
+            font-size: 11px;
+            font-weight: 700;
+            color: #0d2640;
+            margin-top: 3px;
+        }
+
+        .kpi-cell.highlight .kpi-val {
+            color: #0d2640;
+        }
+
+        .kpi-cell.positive .kpi-val {
+            color: #0f6e44;
+        }
+
+        .kpi-cell.negative .kpi-val {
+            color: #a32d2d;
+        }
+
+        /* ── SECTION TITLES ── */
+        .section-heading {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #1a3a5c;
+            margin-top: 14px;
+            margin-bottom: 5px;
+            padding-bottom: 3px;
+            border-bottom: 1.5px solid #1a3a5c;
+        }
+
+        /* ── BOQ TABLE ── */
         table.boq {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 4pt;
-            margin-bottom: 8pt;
-        }
-        table.boq thead tr {
-            background-color: #1e293b;
-            color: #fff;
-        }
-        table.boq thead th {
-            padding: 5pt 6pt;
-            text-align: left;
-            font-size: 8pt;
-            font-weight: bold;
-            letter-spacing: 0.3pt;
-        }
-        table.boq thead th.num {
-            text-align: right;
+            font-size: 8px;
+            table-layout: fixed;
         }
 
-        /* Section header row */
-        tr.section-header td {
-            background-color: #334155;
-            color: #e2e8f0;
-            font-weight: bold;
-            font-size: 8.5pt;
-            padding: 5pt 6pt;
+        table.boq thead { display: table-header-group; }
+
+        table.boq th {
+            background: #f7fafe;
+            color: #1a3a5c;
+            border: 1px solid #9fb1c2;
+            padding: 5px 5px;
+            text-transform: uppercase;
+            font-size: 7px;
+            letter-spacing: 0.4px;
+            text-align: center;
+            font-weight: 700;
         }
 
-        /* Item rows */
-        tr.item-odd td  { background-color: #f8fafc; }
-        tr.item-even td { background-color: #ffffff; }
-        table.boq tbody td {
-            padding: 4pt 6pt;
-            font-size: 8.5pt;
-            color: #1e293b;
-            border-bottom: 0.5pt solid #e2e8f0;
+        table.boq td {
+            border: 1px solid #d2dce6;
+            padding: 3.5px 5px;
+            vertical-align: middle;
+            color: #1a2332;
+            word-wrap: break-word;
+        }
+
+        table.boq tr:nth-child(even) td {
+            background: #fff;
+        }
+
+        table.boq .ctr { text-align: center; }
+        table.boq .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+        table.boq tr.sec-row td {
+            background: #f7fafe;
+            border-color: #b8cad9;
+            color: #0d2640;
+            font-weight: 700;
+            font-size: 8.2px;
+            padding: 5px 6px;
+        }
+
+        table.boq tr.sec-sub td {
+            background: #fbfdff;
+            font-weight: 700;
+            color: #1a2332;
+            border-top: 1px solid #aabecf;
+        }
+
+        table.boq tr.grand-total td {
+            background: #fff;
+            color: #0d2640;
+            border-top: 1.5px solid #1a3a5c;
+            border-bottom: 1.5px solid #1a3a5c;
+            border-left: 1px solid #d2dce6;
+            border-right: 1px solid #d2dce6;
+            font-weight: 700;
+            font-size: 8.5px;
+            padding: 5px 5px;
+        }
+
+        table.boq tr.contract-summary td {
+            background: #fbfdff;
+            font-weight: 700;
+            color: #0d2640;
+            border-top: 1px solid #d2dce6;
+            font-size: 8px;
+        }
+
+        .muted-empty {
+            text-align: center;
+            color: #8fa3b5;
+            font-style: italic;
+            padding: 7px;
+            background: #fafbfd;
+        }
+
+        /* ── TERMS ── */
+        .terms-box {
+            border: 1px solid #d1dbe5;
+            padding: 8px 10px;
+            margin-top: 4px;
+            background: #fff;
+        }
+
+        .terms-box ol {
+            padding-left: 14px;
+        }
+
+        .terms-box li {
+            font-size: 8px;
+            color: #2e4258;
+            line-height: 1.55;
+            margin-bottom: 3px;
+        }
+
+        .terms-empty {
+            font-size: 8px;
+            color: #8fa3b5;
+            font-style: italic;
+        }
+
+        /* ── SIGNATORIES ── */
+        .sig-grid {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+
+        .sig-grid td {
+            border: 1px solid #d1dbe5;
+            padding: 8px 10px;
+            vertical-align: top;
+            width: 33.33%;
+        }
+
+        .sig-title {
+            font-size: 7.2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #1a3a5c;
+            font-weight: 700;
+        }
+
+        .sig-line {
+            margin-top: 28px;
+            border-top: 1px solid #2a3f52;
+            padding-top: 4px;
+            font-size: 7.8px;
+            color: #2d4558;
+        }
+
+        .sig-role {
+            margin-top: 2px;
+            font-size: 7.5px;
+            color: #6b7f93;
+        }
+
+        /* ── CLIENT ACCEPTANCE ── */
+        .client-box {
+            border: 1.5px solid #1a3a5c;
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #fff;
+        }
+
+        .client-box-title {
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #1a3a5c;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .client-box-body {
+            font-size: 8.2px;
+            color: #31495d;
+            line-height: 1.55;
+            margin-bottom: 10px;
+        }
+
+        .client-sign {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .client-sign td {
+            width: 50%;
+            padding-right: 8px;
             vertical-align: top;
         }
-        table.boq tbody td.num {
-            text-align: right;
-        }
-        td.item-code {
-            font-family: 'Courier New', monospace;
-            font-size: 7.5pt;
-            color: #64748b;
-            white-space: nowrap;
-        }
-        td.description {
-            max-width: 200pt;
-        }
-        .remarks-text {
-            font-size: 7pt;
-            color: #94a3b8;
-            font-style: italic;
-            margin-top: 1pt;
+
+        .client-sign .line {
+            border-top: 1px solid #2a3f52;
+            padding-top: 3px;
+            margin-top: 22px;
+            font-size: 8px;
+            color: #2d4558;
         }
 
-        /* Section subtotal */
-        tr.section-subtotal td {
-            background-color: #f1f5f9;
-            border-top: 1pt solid #94a3b8;
-            font-weight: bold;
-            font-size: 8.5pt;
-            padding: 4pt 6pt;
-            color: #334155;
-        }
-        tr.section-subtotal td.num {
-            text-align: right;
-        }
-
-        /* Grand total */
-        tr.grand-total td {
-            background-color: #1e293b;
-            color: #fff;
-            font-weight: bold;
-            font-size: 10pt;
-            padding: 6pt 6pt;
-        }
-        tr.grand-total td.num {
-            text-align: right;
-        }
-
-        /* ── Contract Summary ─────────────────────────────── */
-        .contract-summary {
-            margin-top: 8pt;
-            border: 1pt solid #cbd5e1;
-            border-radius: 3pt;
-            overflow: hidden;
-        }
-        .contract-summary-title {
-            background-color: #f1f5f9;
-            padding: 5pt 8pt;
-            font-weight: bold;
-            font-size: 8.5pt;
-            color: #334155;
-            border-bottom: 1pt solid #cbd5e1;
-        }
-        .contract-rows {
-            display: table;
-            width: 100%;
-        }
-        .contract-row {
-            display: table-row;
-        }
-        .contract-label, .contract-value {
-            display: table-cell;
-            padding: 4pt 8pt;
-            font-size: 9pt;
-            border-bottom: 0.5pt solid #e2e8f0;
-        }
-        .contract-label { color: #475569; }
-        .contract-value { text-align: right; font-weight: bold; color: #1e293b; }
-        .contract-variance-positive { color: #15803d; }
-        .contract-variance-negative { color: #dc2626; }
-
-        /* ── Footer ──────────────────────────────────────── */
+        /* ── FOOTER ── */
         .doc-footer {
-            margin-top: 12pt;
-            border-top: 1pt solid #e2e8f0;
-            padding-top: 5pt;
-            font-size: 7.5pt;
-            color: #94a3b8;
-            display: table;
-            width: 100%;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: -14mm;
+            border-top: 1px solid #d1dbe5;
+            padding-top: 4px;
+            color: #8fa3b5;
+            font-size: 7px;
+            display: flex;
+            justify-content: space-between;
+            padding-left: 14mm;
+            padding-right: 14mm;
         }
-        .footer-left  { display: table-cell; text-align: left; }
-        .footer-right { display: table-cell; text-align: right; }
+
+        .status-pill {
+            display: inline-block;
+            padding: 1px 7px;
+            font-size: 7px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        /* column widths for landscape */
+        .col-code   { width: 8%; }
+        .col-desc   { width: 30%; }
+        .col-unit   { width: 6%; }
+        .col-qty    { width: 7%; }
+        .col-mat    { width: 12%; }
+        .col-lab    { width: 12%; }
+        .col-unit-c { width: 11%; }
+        .col-total  { width: 14%; }
     </style>
 </head>
 <body>
 
-    {{-- Document Header --}}
-    <div class="doc-header">
-        <div class="doc-title">BILL OF QUANTITIES</div>
-        <div class="doc-subtitle">{{ $project['name'] }}{{ $project['code'] ? ' &mdash; ' . $project['code'] : '' }}</div>
+<div class="doc-footer">
+    <span>{{ $company['name'] }} &nbsp;|&nbsp; BOQ-{{ $project['code'] }}</span>
+    <span>Generated {{ $generated_at->format('M d, Y \a\t h:i A') }}</span>
+    <span>CONFIDENTIAL — FOR CLIENT USE ONLY</span>
+</div>
 
-        <div class="project-info-grid">
-            <div class="project-info-col">
-                @if($project['client'])
-                <div class="info-row">
-                    <div class="info-label">Client</div>
-                    <div class="info-value">{{ $project['client']['name'] }}</div>
-                </div>
-                @endif
-                @if($project['location'])
-                <div class="info-row">
-                    <div class="info-label">Location</div>
-                    <div class="info-value">{{ $project['location'] }}</div>
-                </div>
-                @endif
-                @if($project['project_type'])
-                <div class="info-row">
-                    <div class="info-label">Project Type</div>
-                    <div class="info-value">{{ $project['project_type'] }}</div>
-                </div>
-                @endif
-            </div>
-            <div class="project-info-col">
-                @if($project['start_date'])
-                <div class="info-row">
-                    <div class="info-label">Start Date</div>
-                    <div class="info-value">{{ \Carbon\Carbon::parse($project['start_date'])->format('d M Y') }}</div>
-                </div>
-                @endif
-                @if($project['planned_end_date'])
-                <div class="info-row">
-                    <div class="info-label">Planned End</div>
-                    <div class="info-value">{{ \Carbon\Carbon::parse($project['planned_end_date'])->format('d M Y') }}</div>
-                </div>
-                @endif
-                @if($project['contract_amount'] > 0)
-                <div class="info-row">
-                    <div class="info-label">Contract Amount</div>
-                    <div class="info-value">₱{{ number_format($project['contract_amount'], 2) }}</div>
-                </div>
-                @endif
+<!-- ══════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════ -->
+<div class="doc-header">
+    <div class="header-left">
+        @if(!empty($company['logo_src']))
+        <div class="logo-wrap"><img src="{{ $company['logo_src'] }}" alt="logo" /></div>
+        @endif
+        <div>
+            <div class="company-name">{{ $company['name'] }}</div>
+            @if($company['tagline'])<div class="company-tagline">{{ $company['tagline'] }}</div>@endif
+            <div class="company-meta">
+                @if($company['address']){{ $company['address'] }}<br>@endif
+                @if($company['phone'])T: {{ $company['phone'] }}@endif
+                @if($company['email']) &nbsp;|&nbsp; E: {{ $company['email'] }}@endif
+                @if($company['website']) &nbsp;|&nbsp; {{ $company['website'] }}@endif
+                @if($company['tin'])<br>TIN: {{ $company['tin'] }}@endif
             </div>
         </div>
     </div>
+    <div class="header-right">
+        <div class="doc-badge">Bill of Quantities</div>
+        <div class="doc-meta-row">Reference No: <span>BOQ-{{ $project['code'] }}</span></div>
+        <div class="doc-meta-row">Date Issued: <span>{{ $generated_at->format('F d, Y') }}</span></div>
+    </div>
+</div>
 
-    {{-- BOQ Table --}}
-    <table class="boq">
-        <thead>
-            <tr>
-                <th style="width:8%">Item No.</th>
-                <th style="width:42%">Description</th>
-                <th style="width:7%" class="num">Unit</th>
-                <th style="width:9%" class="num">Qty</th>
-                <th style="width:14%" class="num">Unit Rate (₱)</th>
-                <th style="width:14%" class="num">Amount (₱)</th>
-                <th style="width:6%" class="num">Remarks</th>
+<!-- PROJECT TITLE BAND -->
+<div class="project-band">
+    <div class="project-band-name">{{ $project['name'] }}</div>
+    <div class="project-band-sub">Detailed Cost Proposal — For Formal Review and Approval</div>
+</div>
+
+<!-- PROJECT INFO -->
+<table class="info-grid">
+    <tr>
+        <td class="lbl">Project Code</td><td class="val">{{ $project['code'] }}</td>
+        <td class="lbl">Project Type</td><td class="val">{{ $project['project_type'] ?? '—' }}</td>
+        <td class="lbl">Start Date</td><td class="val">{{ $project['start_date'] ? \Carbon\Carbon::parse($project['start_date'])->format('M d, Y') : '—' }}</td>
+        <td class="lbl">Planned End</td><td class="val">{{ $project['planned_end_date'] ? \Carbon\Carbon::parse($project['planned_end_date'])->format('M d, Y') : '—' }}</td>
+    </tr>
+    <tr>
+        <td class="lbl">Client</td><td class="val">{{ $project['client']['name'] ?? '—' }}</td>
+        <td class="lbl">Client Code</td><td class="val">{{ $project['client']['code'] ?? '—' }}</td>
+        <td class="lbl">Location</td><td class="val">{{ $project['location'] ?? '—' }}</td>
+        <td class="lbl">Status</td><td class="val">{{ ucfirst($project['status'] ?? '—') }}</td>
+    </tr>
+    <tr>
+        <td class="lbl">Contract Amt.</td><td class="val">PHP {{ number_format($contract_amount, 2) }}</td>
+        <td class="lbl">Date Prepared</td><td class="val">{{ $generated_at->format('M d, Y') }}</td>
+        <td class="lbl" colspan="2"></td>
+        <td class="lbl" colspan="2"></td>
+    </tr>
+</table>
+
+<!-- KPI STRIP -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-lbl">Material Cost</div>
+        <div class="kpi-val">PHP {{ number_format($grand_material, 2) }}</div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-lbl">Labor Cost</div>
+        <div class="kpi-val">PHP {{ number_format($grand_labor, 2) }}</div>
+    </div>
+    <div class="kpi-cell highlight">
+        <div class="kpi-lbl">Grand Total</div>
+        <div class="kpi-val">PHP {{ number_format($grand_total, 2) }}</div>
+    </div>
+    <div class="kpi-cell {{ $contract_variance >= 0 ? 'positive' : 'negative' }}">
+        <div class="kpi-lbl">Contract Variance</div>
+        <div class="kpi-val">PHP {{ number_format($contract_variance, 2) }}</div>
+    </div>
+</div>
+
+<!-- BOQ TABLE -->
+<div class="section-heading">Detailed Bill of Quantities</div>
+
+<table class="boq">
+    <thead>
+        <tr>
+            <th class="col-code">Item Code</th>
+            <th class="col-desc" style="text-align:left;">Description</th>
+            <th class="col-unit">Unit</th>
+            <th class="col-qty">Qty</th>
+            <th class="col-mat">Material Cost</th>
+            <th class="col-lab">Labor Cost</th>
+            <th class="col-unit-c">Unit Cost</th>
+            <th class="col-total">Total Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($sections as $section)
+            <tr class="sec-row">
+                <td colspan="8">{{ $section['code'] ? $section['code'] . ' &nbsp;|&nbsp; ' : '' }}{{ $section['name'] }}</td>
             </tr>
-        </thead>
-        <tbody>
-            @forelse($sections as $section)
-                {{-- Section header --}}
-                <tr class="section-header">
-                    <td colspan="7">
-                        {{ $section['code'] ? $section['code'] . ' &mdash; ' : '' }}{{ $section['name'] }}
-                        @if($section['description'])
-                            &nbsp;<span style="font-size:7.5pt;font-weight:normal;color:#cbd5e1">{{ $section['description'] }}</span>
-                        @endif
-                    </td>
-                </tr>
-
-                {{-- Items --}}
-                @forelse($section['items'] as $itemIndex => $item)
-                    <tr class="{{ $itemIndex % 2 === 0 ? 'item-odd' : 'item-even' }}">
-                        <td class="item-code">{{ $item['item_code'] ?: ($section['code'] ? $section['code'] . '.' . ($itemIndex + 1) : ($itemIndex + 1)) }}</td>
-                        <td class="description">
-                            {{ $item['description'] }}
-                            @if($item['remarks'])
-                                <div class="remarks-text">{{ $item['remarks'] }}</div>
-                            @endif
-                        </td>
-                        <td class="num">{{ $item['unit'] }}</td>
-                        <td class="num">{{ number_format($item['quantity'], 2) }}</td>
-                        <td class="num">{{ number_format($item['unit_cost'], 2) }}</td>
-                        <td class="num" style="font-weight:bold">{{ number_format($item['total_cost'], 2) }}</td>
-                        <td></td>
-                    </tr>
-                @empty
-                    <tr class="item-odd">
-                        <td colspan="7" style="text-align:center;color:#94a3b8;font-style:italic;padding:6pt">
-                            No items in this section.
-                        </td>
-                    </tr>
-                @endforelse
-
-                {{-- Section subtotal --}}
-                <tr class="section-subtotal">
-                    <td colspan="5" style="text-align:right;padding-right:12pt">
-                        Subtotal — {{ $section['name'] }}
-                    </td>
-                    <td class="num">{{ number_format($section['subtotal'], 2) }}</td>
-                    <td></td>
+            @forelse($section['items'] as $item)
+                <tr>
+                    <td class="ctr" style="color:#4a6278;">{{ $item['item_code'] ?? '' }}</td>
+                    <td>{{ $item['description'] }}</td>
+                    <td class="ctr">{{ $item['unit'] }}</td>
+                    <td class="num">{{ rtrim(rtrim(number_format($item['quantity'], 4, '.', ''), '0'), '.') }}</td>
+                    <td class="num">{{ number_format($item['material_cost'], 2) }}</td>
+                    <td class="num">{{ number_format($item['labor_cost'], 2) }}</td>
+                    <td class="num">{{ number_format($item['unit_cost'], 2) }}</td>
+                    <td class="num" style="font-weight:600;">{{ number_format($item['total_cost'], 2) }}</td>
                 </tr>
             @empty
-                <tr>
-                    <td colspan="7" style="text-align:center;color:#94a3b8;font-style:italic;padding:16pt">
-                        No BOQ sections defined.
-                    </td>
-                </tr>
+                <tr><td colspan="8" class="muted-empty">No items available for this section.</td></tr>
             @endforelse
-        </tbody>
-        <tfoot>
-            <tr class="grand-total">
-                <td colspan="5" style="text-align:right;padding-right:12pt">GRAND TOTAL</td>
-                <td class="num">₱{{ number_format($grand_total, 2) }}</td>
+            <tr class="sec-sub">
+                <td colspan="4" style="text-align:right; padding-right:8px; font-size:7.5px; letter-spacing:0.3px; text-transform:uppercase; color:#5a7088;">Section Subtotal</td>
+                <td class="num">{{ number_format($section['subtotal_material'], 2) }}</td>
+                <td class="num">{{ number_format($section['subtotal_labor'], 2) }}</td>
                 <td></td>
+                <td class="num">{{ number_format($section['subtotal'], 2) }}</td>
             </tr>
-        </tfoot>
-    </table>
+        @endforeach
 
-    {{-- Contract Summary --}}
-    @if($contract_amount > 0)
-    <div class="contract-summary">
-        <div class="contract-summary-title">Contract Summary</div>
-        <div class="contract-rows">
-            <div class="contract-row">
-                <div class="contract-label">Contract Amount</div>
-                <div class="contract-value">₱{{ number_format($contract_amount, 2) }}</div>
-            </div>
-            <div class="contract-row">
-                <div class="contract-label">BOQ Grand Total</div>
-                <div class="contract-value">₱{{ number_format($grand_total, 2) }}</div>
-            </div>
-            <div class="contract-row">
-                <div class="contract-label">
-                    {{ $contract_variance >= 0 ? 'Under Contract by' : 'Over Contract by' }}
-                </div>
-                <div class="contract-value {{ $contract_variance >= 0 ? 'contract-variance-positive' : 'contract-variance-negative' }}">
-                    ₱{{ number_format(abs($contract_variance), 2) }}
-                </div>
-            </div>
+        <tr class="grand-total">
+            <td colspan="4" style="text-align:right; padding-right:8px; letter-spacing:0.5px;">GRAND TOTAL</td>
+            <td class="num">{{ number_format($grand_material, 2) }}</td>
+            <td class="num">{{ number_format($grand_labor, 2) }}</td>
+            <td></td>
+            <td class="num">{{ number_format($grand_total, 2) }}</td>
+        </tr>
+        <tr class="contract-summary">
+            <td colspan="7" style="text-align:right; padding-right:8px; font-size:7.5px; text-transform:uppercase; letter-spacing:0.3px; color:#3a5570;">
+                Contract Amount: PHP {{ number_format($contract_amount, 2) }} &nbsp;|&nbsp; Variance:
+            </td>
+            <td class="num" style="font-weight:700; color: {{ $contract_variance >= 0 ? '#0f6e44' : '#a32d2d' }};">
+                PHP {{ number_format($contract_variance, 2) }}
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════
+     PAGE 2 — TERMS & SIGNATURES
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+
+<div class="doc-header">
+    <div class="header-left">
+        @if(!empty($company['logo_src']))
+        <div class="logo-wrap"><img src="{{ $company['logo_src'] }}" alt="logo" /></div>
+        @endif
+        <div>
+            <div class="company-name">{{ $company['name'] }}</div>
+            @if($company['tagline'])<div class="company-tagline">{{ $company['tagline'] }}</div>@endif
         </div>
     </div>
+    <div class="header-right">
+        <div class="doc-badge">BOQ-{{ $project['code'] }}</div>
+        <div class="doc-meta-row">Terms, Conditions &amp; Acceptance</div>
+    </div>
+</div>
+
+<div class="section-heading">Terms and Conditions</div>
+<div class="terms-box">
+    @if(count($terms))
+        <ol>
+            @foreach($terms as $term)
+                <li>{{ $term }}</li>
+            @endforeach
+        </ol>
+    @else
+        <div class="terms-empty">No additional terms provided for this BOQ document.</div>
     @endif
+</div>
 
-    {{-- Footer --}}
-    <div class="doc-footer">
-        <div class="footer-left">
-            ASEC Project Management System &mdash; Confidential
-        </div>
-        <div class="footer-right">
-            Generated: {{ $generated_at->format('d M Y, h:i A') }}
-        </div>
+<div class="section-heading" style="margin-top:18px;">Authorizations</div>
+<table class="sig-grid no-break">
+    <tr>
+        @forelse($signatories as $sig)
+        <td>
+            <div class="sig-title">{{ $sig['title'] }}</div>
+            <div class="sig-line">Printed Name &amp; Signature Over Printed Name</div>
+            <div class="sig-role">{{ $sig['role'] }}</div>
+            <div class="sig-role" style="margin-top:4px;">Date: _______________________________</div>
+        </td>
+        @empty
+        <td colspan="3" class="muted-empty">No signatories configured.</td>
+        @endforelse
+    </tr>
+</table>
+
+<div class="client-box no-break">
+    <div class="client-box-title">Client Acceptance</div>
+    <div class="client-box-body">
+        I/We, the undersigned, hereby acknowledge receipt of this Bill of Quantities and accept the scope, quantities, and
+        pricing herein as the formal basis for the contracted work for
+        <strong>{{ $project['name'] }}</strong> (Ref: {{ $project['code'] }}) in the total amount of
+        <strong>PHP {{ number_format($grand_total, 2) }}</strong>, subject to the terms and conditions stated above.
     </div>
+    <table class="client-sign">
+        <tr>
+            <td><div class="line">Authorized Client Representative — Signature Over Printed Name</div></td>
+            <td><div class="line">Date</div></td>
+        </tr>
+    </table>
+</div>
 
 </body>
 </html>

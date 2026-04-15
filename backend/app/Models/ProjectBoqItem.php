@@ -17,6 +17,8 @@ class ProjectBoqItem extends Model
         'unit',
         'quantity',
         'unit_cost',
+        'material_cost',
+        'labor_cost',
         'total_cost',
         'resource_type',
         'planned_inventory_item_id',
@@ -28,9 +30,11 @@ class ProjectBoqItem extends Model
     ];
 
     protected $casts = [
-        'quantity'   => 'decimal:4',
-        'unit_cost'  => 'decimal:2',
-        'total_cost' => 'decimal:2',
+        'quantity'      => 'decimal:4',
+        'unit_cost'     => 'decimal:2',
+        'material_cost' => 'decimal:2',
+        'labor_cost'    => 'decimal:2',
+        'total_cost'    => 'decimal:2',
         'planned_inventory_item_id' => 'integer',
         'planned_direct_supply_id' => 'integer',
         'planned_user_id' => 'integer',
@@ -40,15 +44,25 @@ class ProjectBoqItem extends Model
 
     protected static function booted(): void
     {
-        // Keep total_cost consistent with quantity * unit_cost so callers
-        // don't have to remember to recompute when they edit one side.
+        // Standard BOQ shape: when resources are loaded, derive
+        // material/labor/unit/total from them. Quantity & unit stay
+        // user-controlled so the BOQ reads like a real cost proposal.
         static::saving(function (self $item) {
             if ($item->relationLoaded('resources') && $item->resources->count() > 0) {
-                $resourceTotal = (float) $item->resources->sum('total_cost');
-                $item->quantity = 1;
-                $item->unit = $item->unit ?: 'lot';
-                $item->unit_cost = round($resourceTotal, 2);
-                $item->total_cost = round($resourceTotal, 2);
+                $material = (float) $item->resources
+                    ->where('resource_category', 'material')->sum('total_cost');
+                $labor    = (float) $item->resources
+                    ->where('resource_category', 'labor')->sum('total_cost');
+                $unitCost = round($material + $labor, 2);
+                $quantity = (float) $item->quantity;
+                $quantity = $quantity > 0 ? $quantity : 1;
+                $total    = round($unitCost * $quantity, 2);
+
+                $item->material_cost = round($material, 2);
+                $item->labor_cost    = round($labor, 2);
+                $item->total_cost    = $total;
+                $item->unit_cost     = $unitCost;
+                $item->quantity      = $quantity;
                 return;
             }
 
@@ -56,6 +70,16 @@ class ProjectBoqItem extends Model
                 $item->total_cost = round((float) $item->quantity * (float) $item->unit_cost, 2);
             }
         });
+    }
+
+    /**
+     * Recompute material/labor/unit/total from current persisted resources.
+     * Use after syncing resources outside the saving hook.
+     */
+    public function recomputeFromResources(): void
+    {
+        $this->load('resources');
+        $this->save();
     }
 
     public function project()
@@ -125,7 +149,9 @@ class ProjectBoqItem extends Model
      */
     public function plannedVsActual(): array
     {
-        $planned = (float) $this->total_cost;
+        $plannedMaterial = (float) $this->material_cost;
+        $plannedLabor    = (float) $this->labor_cost;
+        $planned         = (float) $this->total_cost;
 
         $materialActual = (float) $this->materialAllocations()
             ->with('milestoneUsages')
@@ -137,13 +163,18 @@ class ProjectBoqItem extends Model
             ->sum('gross_pay');
 
         $totalActual = $materialActual + $laborActual;
+        $variance    = $planned - $totalActual;
+        $variancePct = $planned > 0 ? round(($variance / $planned) * 100, 2) : null;
 
         return [
-            'planned_cost'    => $planned,
-            'material_actual' => $materialActual,
-            'labor_actual'    => $laborActual,
-            'total_actual'    => $totalActual,
-            'variance'        => $planned - $totalActual,
+            'planned_material' => round($plannedMaterial, 2),
+            'planned_labor'    => round($plannedLabor, 2),
+            'planned_cost'     => round($planned, 2),
+            'material_actual'  => round($materialActual, 2),
+            'labor_actual'     => round($laborActual, 2),
+            'total_actual'     => round($totalActual, 2),
+            'variance'         => round($variance, 2),
+            'variance_pct'     => $variancePct,
         ];
     }
 }

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { Button } from '@/Components/ui/button';
@@ -61,8 +61,12 @@ export default function BOQTab({ project, boqData }) {
                 description: s.description || '',
                 sort_order: s.sort_order ?? 0,
                 items: (s.items || []).map((i) => ({
+                    id: i.id,
                     item_code: i.item_code || '',
                     description: i.description || '',
+                    unit: i.unit || '',
+                    quantity: i.quantity ?? 1,
+                    unit_cost: i.unit_cost ?? 0,
                     resources: (i.resources || []).map((r) => ({ ...r })),
                     remarks: i.remarks || '',
                     sort_order: i.sort_order ?? 0,
@@ -82,6 +86,31 @@ export default function BOQTab({ project, boqData }) {
     const [collapsedSections, setCollapsedSections] = useState({});
     const [collapsedItems, setCollapsedItems] = useState({});
     const [saving, setSaving] = useState(false);
+    const [availability, setAvailability] = useState({}); // { [inventory_item_id]: { available, unit, current_stock, committed } }
+
+    const fetchAvailability = (inventoryItemId) => {
+        if (!inventoryItemId || availability[inventoryItemId]) return;
+        const url = route('admin.inventory-management.availability', inventoryItemId)
+            + `?exclude_project_id=${project?.id || ''}`;
+        fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+                if (data) setAvailability((prev) => ({ ...prev, [inventoryItemId]: data }));
+            })
+            .catch(() => {});
+    };
+
+    useEffect(() => {
+        if (!editing) return;
+        const ids = new Set();
+        sections.forEach((s) => (s.items || []).forEach((it) =>
+            (it.resources || []).forEach((r) => {
+                if (r.source_type === 'inventory' && r.inventory_item_id) ids.add(r.inventory_item_id);
+            })
+        ));
+        ids.forEach((id) => fetchAvailability(id));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editing, sections]);
 
     const contractAmount = boqData?.contract_amount ?? project?.contract_amount ?? 0;
 
@@ -95,11 +124,28 @@ export default function BOQTab({ project, boqData }) {
     const getResourceTotal = (resource) =>
         toNumber(resource?.quantity) * toNumber(resource?.unit_price);
 
+    const getMaterialCost = (item) =>
+        (item?.resources || [])
+            .filter((r) => r.resource_category === 'material')
+            .reduce((sum, r) => sum + getResourceTotal(r), 0);
+
+    const getLaborCost = (item) =>
+        (item?.resources || [])
+            .filter((r) => r.resource_category === 'labor')
+            .reduce((sum, r) => sum + getResourceTotal(r), 0);
+
     const getItemTotal = (item) => {
         if (Array.isArray(item?.resources) && item.resources.length > 0) {
-            return item.resources.reduce((sum, r) => sum + getResourceTotal(r), 0);
+            return getMaterialCost(item) + getLaborCost(item);
         }
-        return 0;
+        return toNumber(item?.quantity) * toNumber(item?.unit_cost);
+    };
+
+    const getItemUnitCost = (item) => {
+        if (Array.isArray(item?.resources) && item.resources.length > 0) {
+            return getMaterialCost(item) + getLaborCost(item);
+        }
+        return toNumber(item?.unit_cost);
     };
 
     const grandTotal = useMemo(
@@ -190,6 +236,9 @@ export default function BOQTab({ project, boqData }) {
                         {
                             item_code: '',
                             description: '',
+                            unit: 'lot',
+                            quantity: 1,
+                            unit_cost: 0,
                             resources: [],
                             remarks: '',
                             sort_order: (s.items || []).length,
@@ -222,8 +271,18 @@ export default function BOQTab({ project, boqData }) {
         );
 
     // ── Resource CRUD ─────────────────────────────────────────────────────────
-    const applyResourceRollup = (sIndex, iIndex, resources) =>
-        updateItem(sIndex, iIndex, { resources });
+    const applyResourceRollup = (sIndex, iIndex, resources) => {
+        const total = resources.reduce((sum, resource) => sum + getResourceTotal(resource), 0);
+        const item = sections?.[sIndex]?.items?.[iIndex] || {};
+        const qty = toNumber(item.quantity) > 0 ? toNumber(item.quantity) : 1;
+
+        updateItem(sIndex, iIndex, {
+            resources,
+            quantity: qty,
+            unit: item.unit || (resources.length > 0 ? 'lot' : ''),
+            unit_cost: +total.toFixed(2),
+        });
+    };
 
     const addResource = (sIndex, iIndex, resourceCategory) => {
         const item = sections?.[sIndex]?.items?.[iIndex] || {};
@@ -516,6 +575,18 @@ export default function BOQTab({ project, boqData }) {
                                     : `Max: ${projectDays} days`}
                             </p>
                         )}
+                        {category === 'material' && resource.source_type === 'inventory' && resource.inventory_item_id && availability[resource.inventory_item_id] && (() => {
+                            const info = availability[resource.inventory_item_id];
+                            const qty = parseFloat(resource.quantity || 0);
+                            const over = qty > info.available;
+                            return (
+                                <p className={`mt-0.5 text-xs ${over ? 'text-red-600 font-medium' : 'text-zinc-400'}`}>
+                                    {over
+                                        ? `Only ${info.available} ${info.unit || ''} available`
+                                        : `Available: ${info.available} ${info.unit || ''}`}
+                                </p>
+                            );
+                        })()}
                     </div>
 
                     <Input
@@ -616,6 +687,9 @@ export default function BOQTab({ project, boqData }) {
                                             const itemKey = `${sIndex}-${iIndex}`;
                                             const itemOpen = !collapsedItems[itemKey];
                                             const itemTotal = getItemTotal(item);
+                                            const itemMaterial = getMaterialCost(item);
+                                            const itemLabor = getLaborCost(item);
+                                            const itemUnitCost = getItemUnitCost(item);
 
                                             return (
                                                 <div key={iIndex}>
@@ -640,11 +714,18 @@ export default function BOQTab({ project, boqData }) {
                                                                 {item.description || 'Unnamed Item'}
                                                             </span>
                                                         </div>
-                                                        <div className="flex items-center gap-3 text-sm">
-                                                            <span className="text-zinc-500 text-xs">
-                                                                <span className="font-medium text-zinc-800">
-                                                                    ₱{formatCurrency(itemTotal)}
-                                                                </span>
+                                                        <div className="flex items-center gap-4 text-sm">
+                                                            <span className="text-xs text-zinc-500 hidden sm:inline whitespace-nowrap">
+                                                                {Number(item.quantity || 0)} {item.unit || ''}
+                                                            </span>
+                                                            <span className="text-xs text-zinc-500 hidden md:inline whitespace-nowrap">
+                                                                Mat ₱{formatCurrency(itemMaterial)} · Lab ₱{formatCurrency(itemLabor)}
+                                                            </span>
+                                                            <span className="text-xs text-zinc-500 hidden lg:inline whitespace-nowrap">
+                                                                @ ₱{formatCurrency(itemUnitCost)}
+                                                            </span>
+                                                            <span className="font-semibold text-zinc-800 whitespace-nowrap">
+                                                                ₱{formatCurrency(itemTotal)}
                                                             </span>
                                                         </div>
                                                     </button>
@@ -778,6 +859,9 @@ export default function BOQTab({ project, boqData }) {
                                         const itemKey = `${sIndex}-${iIndex}`;
                                         const itemOpen = !collapsedItems[itemKey];
                                         const itemTotal = getItemTotal(item);
+                                        const itemMaterial = getMaterialCost(item);
+                                        const itemLabor = getLaborCost(item);
+                                        const itemUnitCost = getItemUnitCost(item);
                                         const materialResources = (item.resources || []).filter(
                                             (r) => r.resource_category === 'material'
                                         );
@@ -820,7 +904,44 @@ export default function BOQTab({ project, boqData }) {
                                                         placeholder="Item description (e.g. Excavation)"
                                                         className="flex-1"
                                                     />
-                                                    <span className="text-xs text-zinc-500 whitespace-nowrap">
+                                                    <Input
+                                                        value={item.unit || ''}
+                                                        onChange={(e) =>
+                                                            updateItem(sIndex, iIndex, { unit: e.target.value })
+                                                        }
+                                                        placeholder="Unit"
+                                                        className="w-20"
+                                                        title="Unit of measure (e.g. m\u00b2, pcs, lot)"
+                                                    />
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.0001"
+                                                        value={item.quantity ?? ''}
+                                                        onChange={(e) =>
+                                                            updateItem(sIndex, iIndex, { quantity: e.target.value })
+                                                        }
+                                                        placeholder="Unit Qty"
+                                                        className="w-20 text-right"
+                                                        title="BOQ unit quantity"
+                                                    />
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={item.unit_cost ?? ''}
+                                                        onChange={(e) =>
+                                                            updateItem(sIndex, iIndex, { unit_cost: e.target.value })
+                                                        }
+                                                        placeholder="Cost"
+                                                        className="w-24 text-right"
+                                                        title="BOQ unit cost"
+                                                    />
+                                                    <div className="hidden md:flex flex-col items-end text-[11px] leading-tight text-zinc-500 whitespace-nowrap">
+                                                        <span>Mat ₱{formatCurrency(itemMaterial)} · Lab ₱{formatCurrency(itemLabor)}</span>
+                                                        <span>Unit ₱{formatCurrency(itemUnitCost)}</span>
+                                                    </div>
+                                                    <span className="text-xs font-semibold text-zinc-700 whitespace-nowrap">
                                                         ₱{formatCurrency(itemTotal)}
                                                     </span>
                                                     <Button

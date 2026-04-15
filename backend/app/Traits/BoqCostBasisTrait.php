@@ -3,30 +3,56 @@
 namespace App\Traits;
 
 /**
- * Shared BOQ item cost resolution logic.
+ * Standard construction BOQ cost shape.
  *
- * When an item has resources, the cost basis is always 1 lot = sum of resource costs.
- * When an item has no resources, cost basis is quantity × unit_cost from the item itself.
+ * Material/Labor cost are summed from resources tied to the item.
+ * Unit cost is material + labor (resource subtotal per BOQ unit).
+ * Total is unit_cost x quantity.
  *
- * Used by both ProjectsController (wizard creation) and ProjectBoqController (post-creation edits).
+ * If the item has no resources at all, fall back to the user-entered
+ * quantity x unit_cost (legacy lump-sum behavior).
  */
 trait BoqCostBasisTrait
 {
     private function resolveItemCostBasis(array $item): array
     {
         $resources = $item['resources'] ?? [];
+        $quantity  = max((float) ($item['quantity'] ?? 0), 0.0);
 
         if (!empty($resources)) {
-            $resourceTotal = collect($resources)->sum(
-                fn ($r) => (float) ($r['quantity'] ?? 0) * (float) ($r['unit_price'] ?? 0)
-            );
+            $materialCost = 0.0;
+            $laborCost    = 0.0;
+            foreach ($resources as $r) {
+                $line = (float) ($r['quantity'] ?? 0) * (float) ($r['unit_price'] ?? 0);
+                if (($r['resource_category'] ?? null) === 'labor') {
+                    $laborCost += $line;
+                } else {
+                    $materialCost += $line;
+                }
+            }
 
-            return [1.0, round((float) $resourceTotal, 2)];
+            $unitCost  = round($materialCost + $laborCost, 2);
+            $quantity  = $quantity > 0 ? $quantity : 1.0;
+            $totalCost = round($unitCost * $quantity, 2);
+
+            return [
+                'quantity'      => $quantity,
+                'material_cost' => round($materialCost, 2),
+                'labor_cost'    => round($laborCost, 2),
+                'unit_cost'     => $unitCost,
+                'total_cost'    => $totalCost,
+            ];
         }
 
-        $quantity = (float) ($item['quantity'] ?? 0);
-        $unitCost = (float) ($item['unit_cost'] ?? 0);
+        $unitCost  = (float) ($item['unit_cost'] ?? 0);
+        $totalCost = round($quantity * $unitCost, 2);
 
-        return [$quantity, $unitCost];
+        return [
+            'quantity'      => $quantity,
+            'material_cost' => 0.0,
+            'labor_cost'    => 0.0,
+            'unit_cost'     => round($unitCost, 2),
+            'total_cost'    => $totalCost,
+        ];
     }
 }

@@ -5,6 +5,7 @@ import {
   TrendingDown, AlertTriangle, ShieldCheck, Zap
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
+import CostPerformance from './CostPerformance';
 
 const DOCUMENT_FIELDS = [
   { key: 'building_permit',          label: 'Building Permit'          },
@@ -89,7 +90,7 @@ export default function OverviewTab({ project, overviewData, boqData }) {
     );
   }
 
-  const { budget, billing, team, milestones, tasks, timeline } = overviewData;
+  const { budget, billing, team, milestones, tasks, timeline, cost_performance: costPerformance } = overviewData;
   const boqPlannedTotal = boqData?.grand_total ?? 0;
 
   // All actual expenses vs contract (not restricted to BOQ-linked actuals)
@@ -294,6 +295,9 @@ export default function OverviewTab({ project, overviewData, boqData }) {
           </p>
         </div>
       </div>
+
+      {/* Scoped (BOQ) vs Actual Cost */}
+      {costPerformance ? <CostPerformance data={costPerformance} /> : null}
 
       {/* Budget & Billing */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

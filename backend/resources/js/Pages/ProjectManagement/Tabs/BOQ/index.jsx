@@ -136,7 +136,7 @@ export default function BOQTab({ project, boqData }) {
 
     const getItemTotal = (item) => {
         if (Array.isArray(item?.resources) && item.resources.length > 0) {
-            return getMaterialCost(item) + getLaborCost(item);
+            return (getMaterialCost(item) + getLaborCost(item)) * Math.max(toNumber(item?.quantity), 1);
         }
         return toNumber(item?.quantity) * toNumber(item?.unit_cost);
     };
@@ -737,6 +737,15 @@ export default function BOQTab({ project, boqData }) {
                                                                 <p className="text-sm text-zinc-400 italic">No resources defined.</p>
                                                             ) : (
                                                                 <>
+                                                                    {(item.resources || []).length > 0 && toNumber(item.quantity) > 1 && (
+                                                                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 mb-2 text-xs text-amber-800">
+                                                                            <span className="mt-0.5 flex-shrink-0">⚠</span>
+                                                                            <span>
+                                                                                Qty <strong>{toNumber(item.quantity)}</strong> — resources are multiplied. Total:{' '}
+                                                                                <strong>₱{formatCurrency(getItemTotal(item))}</strong>. Set qty to 1 if resources represent the full cost.
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
                                                                     {renderResourceTable(
                                                                         item.resources,
                                                                         'material',
@@ -958,6 +967,18 @@ export default function BOQTab({ project, boqData }) {
                                                 {/* Item resources (edit) */}
                                                 {itemOpen && (
                                                     <div className="px-6 py-3 space-y-4">
+                                                        {/* Quantity multiplier warning */}
+                                                        {(item.resources || []).length > 0 && toNumber(item.quantity) > 1 && (
+                                                            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                                <span className="mt-0.5 flex-shrink-0">⚠</span>
+                                                                <span>
+                                                                    Quantity is <strong>{toNumber(item.quantity)}</strong> — your resources will be multiplied by{' '}
+                                                                    <strong>{toNumber(item.quantity)}</strong>, making the item total{' '}
+                                                                    <strong>₱{formatCurrency(getItemTotal(item))}</strong>. If these resources represent the
+                                                                    full cost of this item, set qty to <strong>1</strong>.
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         {/* Materials */}
                                                         <div>
                                                             <div className="mb-2 flex items-center justify-between">

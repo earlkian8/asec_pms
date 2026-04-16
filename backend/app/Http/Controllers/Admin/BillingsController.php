@@ -127,7 +127,6 @@ class BillingsController extends Controller
     {
         $validated = $request->validate([
             'project_id'     => ['required', 'exists:projects,id'],
-            'milestone_id'   => ['nullable', 'exists:project_milestones,id'],
             'billing_amount' => ['required', 'numeric', 'min:0.01'],
             'billing_date'   => ['required', 'date'],
             'due_date'       => ['nullable', 'date', 'after_or_equal:billing_date'],
@@ -135,16 +134,6 @@ class BillingsController extends Controller
         ]);
 
         $project = Project::findOrFail($validated['project_id']);
-
-        if ($validated['milestone_id']) {
-            $milestone = ProjectMilestone::where('id', $validated['milestone_id'])
-                ->where('project_id', $validated['project_id'])
-                ->first();
-
-            if (!$milestone) {
-                return back()->with('error', 'Milestone does not belong to this project.');
-            }
-        }
 
         // Soft warning: check if billing exceeds contract amount (non-blocking)
         $warning = null;

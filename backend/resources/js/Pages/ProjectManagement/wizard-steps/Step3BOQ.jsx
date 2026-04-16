@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { usePage } from "@inertiajs/react";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { Button } from "@/Components/ui/button";
@@ -44,6 +44,66 @@ const toNumber = (value) => {
   const n = parseFloat(value);
   return Number.isFinite(n) ? n : 0;
 };
+
+// Hybrid searchable combobox for resource selection
+function ResourceCombobox({ options, value, onChange, placeholder, className = "" }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = options.find((o) => String(o.value) === String(value));
+  const filtered = query
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <input
+        type="text"
+        value={open ? query : (selected?.label ?? "")}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => { setQuery(""); setOpen(true); }}
+        placeholder={placeholder}
+        className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-zinc-400">No results</div>
+          ) : (
+            filtered.map((o) => (
+              <div
+                key={o.value}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(String(o.value));
+                  setOpen(false);
+                  setQuery("");
+                }}
+                className={`cursor-pointer px-3 py-1.5 text-sm hover:bg-zinc-100 ${
+                  String(o.value) === String(value) ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-700"
+                }`}
+              >
+                {o.label}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Step3BOQ({ errors = {} }) {
   const { props } = usePage();
@@ -533,7 +593,28 @@ export default function Step3BOQ({ errors = {} }) {
                                     </Button>
                                   </div>
 
-                                  {(item.resources || []).map((resource, resourceIndex) => (
+                                  {(item.resources || []).map((resource, resourceIndex) => {
+                                    // IDs already used by sibling resources in this item (exclude current row)
+                                    const siblings = (item.resources || []).filter((_, ri) => ri !== resourceIndex);
+                                    const usedInventoryIds = new Set(siblings.filter(r => r.inventory_item_id).map(r => String(r.inventory_item_id)));
+                                    const usedDirectSupplyIds = new Set(siblings.filter(r => r.direct_supply_id).map(r => String(r.direct_supply_id)));
+                                    const usedEmployeeIds = new Set(siblings.filter(r => r.employee_id).map(r => String(r.employee_id)));
+                                    const usedUserIds = new Set(siblings.filter(r => r.user_id).map(r => String(r.user_id)));
+
+                                    const inventoryOptions = inventoryItems
+                                      .filter(inv => !usedInventoryIds.has(String(inv.id)))
+                                      .map(inv => ({ value: String(inv.id), label: inv.item_code ? `${inv.item_code} - ${inv.item_name}` : inv.item_name }));
+                                    const directSupplyOptions = directSupplyItems
+                                      .filter(s => !usedDirectSupplyIds.has(String(s.id)))
+                                      .map(s => ({ value: String(s.id), label: s.supply_code ? `${s.supply_code} - ${s.supply_name}` : s.supply_name }));
+                                    const employeeOpts = employeeOptions
+                                      .filter(p => !usedEmployeeIds.has(String(p.id)))
+                                      .map(p => ({ value: String(p.id), label: p.name }));
+                                    const userOpts = userOptions
+                                      .filter(p => !usedUserIds.has(String(p.id)))
+                                      .map(p => ({ value: String(p.id), label: p.name }));
+
+                                    return (
                                     <div key={resourceIndex} className="grid grid-cols-1 gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-6">
                                       <select
                                         value={resource.source_type || ""}
@@ -554,59 +635,43 @@ export default function Step3BOQ({ errors = {} }) {
                                       </select>
 
                                       {resource.resource_category === "material" && resource.source_type === "inventory" && (
-                                        <select
+                                        <ResourceCombobox
+                                          options={inventoryOptions}
                                           value={resource.inventory_item_id || ""}
-                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { inventory_item_id: e.target.value })}
-                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                                        >
-                                          <option value="">Select inventory item</option>
-                                          {inventoryItems.map((inv) => (
-                                            <option key={inv.id} value={inv.id}>
-                                              {inv.item_code ? `${inv.item_code} - ` : ""}{inv.item_name}
-                                            </option>
-                                          ))}
-                                        </select>
+                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { inventory_item_id: val })}
+                                          placeholder="Search inventory…"
+                                          className="sm:col-span-2"
+                                        />
                                       )}
 
                                       {resource.resource_category === "material" && resource.source_type === "direct_supply" && (
-                                        <select
+                                        <ResourceCombobox
+                                          options={directSupplyOptions}
                                           value={resource.direct_supply_id || ""}
-                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { direct_supply_id: e.target.value })}
-                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                                        >
-                                          <option value="">Select direct supply</option>
-                                          {directSupplyItems.map((supply) => (
-                                            <option key={supply.id} value={supply.id}>
-                                              {supply.supply_code ? `${supply.supply_code} - ` : ""}{supply.supply_name}
-                                            </option>
-                                          ))}
-                                        </select>
+                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { direct_supply_id: val })}
+                                          placeholder="Search direct supply…"
+                                          className="sm:col-span-2"
+                                        />
                                       )}
 
                                       {resource.resource_category === "labor" && resource.source_type === "employee" && (
-                                        <select
+                                        <ResourceCombobox
+                                          options={employeeOpts}
                                           value={resource.employee_id || ""}
-                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { employee_id: e.target.value })}
-                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                                        >
-                                          <option value="">Select employee</option>
-                                          {employeeOptions.map((person) => (
-                                            <option key={person.id} value={person.id}>{person.name}</option>
-                                          ))}
-                                        </select>
+                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { employee_id: val })}
+                                          placeholder="Search employee…"
+                                          className="sm:col-span-2"
+                                        />
                                       )}
 
                                       {resource.resource_category === "labor" && resource.source_type === "user" && (
-                                        <select
+                                        <ResourceCombobox
+                                          options={userOpts}
                                           value={resource.user_id || ""}
-                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { user_id: e.target.value })}
-                                          className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                                        >
-                                          <option value="">Select user</option>
-                                          {userOptions.map((person) => (
-                                            <option key={person.id} value={person.id}>{person.name}</option>
-                                          ))}
-                                        </select>
+                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { user_id: val })}
+                                          placeholder="Search user…"
+                                          className="sm:col-span-2"
+                                        />
                                       )}
 
                                       <div>
@@ -683,7 +748,7 @@ export default function Step3BOQ({ errors = {} }) {
                                         </div>
                                       </div>
                                     </div>
-                                  ))}
+                                  ); })}
 
                                   {(item.resources || []).length > 0 && (
                                     <div className="text-right text-xs font-semibold text-zinc-700">

@@ -34,18 +34,19 @@ export default function ProjectDetail() {
             component: <OverviewTab project={project} overviewData={overviewData} boqData={boqData} />,
             permission: 'projects.view'
         },
-        { 
-            key: "team", 
-            label: "Team", 
-            component: <TeamTab project={project} teamData={teamData} />,
-            permission: 'project-teams.view'
-        },
         {
             key: "boq",
             label: "BOQ / Scope",
             component: <BOQTab project={project} boqData={boqData} />,
             permission: 'project-boq.view'
         },
+        { 
+            key: "team", 
+            label: "Team", 
+            component: <TeamTab project={project} teamData={teamData} />,
+            permission: 'project-teams.view'
+        },
+
         {
             key: "material-allocation",
             label: "Material Allocation", 

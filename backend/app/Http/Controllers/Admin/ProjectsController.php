@@ -550,10 +550,11 @@ class ProjectsController extends Controller
             }
 
             // Auto-create milestones only for sections where create_milestone = true (idempotent).
+            // Also create tasks for each BOQ item under those sections (unassigned, no date).
             $milestoneIndex = 0;
-            foreach ($boqSections as $section) {
+            foreach ($boqSections as $sectionIndex => $section) {
                 if (!(bool) ($section['create_milestone'] ?? true)) continue;
-                ProjectMilestone::firstOrCreate(
+                $autoMilestone = ProjectMilestone::firstOrCreate(
                     ['project_id' => $project->id, 'name' => $section['name']],
                     [
                         'description' => 'Auto-created from BOQ section.',
@@ -564,6 +565,18 @@ class ProjectsController extends Controller
                     ]
                 );
                 $milestoneIndex++;
+
+                foreach (($section['items'] ?? []) as $itemIndex => $item) {
+                    $boqItemId = $boqItemRefMap["{$sectionIndex}:{$itemIndex}"] ?? null;
+                    ProjectTask::create([
+                        'project_milestone_id' => $autoMilestone->id,
+                        'boq_item_id'          => $boqItemId,
+                        'title'                => $item['description'],
+                        'assigned_to'          => null,
+                        'due_date'             => null,
+                        'status'               => 'pending',
+                    ]);
+                }
             }
 
             // Auto-assign team members and allocations from BOQ resources.

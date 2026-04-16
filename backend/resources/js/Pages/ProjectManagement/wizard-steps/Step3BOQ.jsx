@@ -109,6 +109,23 @@ export default function Step3BOQ({ errors = {} }) {
     [boqSections]
   );
 
+  // Tracks how much of each inventory item is allocated across all BOQ resources
+  // so that displayed remaining stock reflects what's already been entered in other items.
+  const allocatedByInventoryId = useMemo(() => {
+    const map = {};
+    boqSections.forEach((section) => {
+      (section.items || []).forEach((item) => {
+        (item.resources || []).forEach((resource) => {
+          if (resource.source_type === "inventory" && resource.inventory_item_id) {
+            const id = String(resource.inventory_item_id);
+            map[id] = (map[id] || 0) + toNumber(resource.quantity);
+          }
+        });
+      });
+    });
+    return map;
+  }, [boqSections]);
+
   const sectionSubtotal = (section) =>
     (section.items || []).reduce(
       (sub, i) => sub + getItemTotal(i),
@@ -611,14 +628,17 @@ export default function Step3BOQ({ errors = {} }) {
                                         {resource.resource_category === "material" && resource.source_type === "inventory" && resource.inventory_item_id && (() => {
                                           const inv = inventoryItems.find((x) => String(x.id) === String(resource.inventory_item_id));
                                           if (!inv) return null;
-                                          const stock = toNumber(inv.current_stock);
+                                          const id = String(resource.inventory_item_id);
+                                          const totalAllocated = allocatedByInventoryId[id] || 0;
+                                          const thisQty = toNumber(resource.quantity);
+                                          const effectiveStock = toNumber(inv.current_stock) - (totalAllocated - thisQty);
                                           const qty = parseFloat(resource.quantity || 0);
-                                          const over = qty > stock;
+                                          const over = qty > effectiveStock;
                                           return (
                                             <p className={`mt-0.5 text-xs ${over ? "text-red-600 font-medium" : "text-zinc-400"}`}>
                                               {over
-                                                ? `Only ${stock} ${inv.unit_of_measure || ""} in stock`
-                                                : `Stock: ${stock} ${inv.unit_of_measure || ""}`}
+                                                ? `Only ${effectiveStock} ${inv.unit_of_measure || ""} in stock`
+                                                : `Stock: ${effectiveStock} ${inv.unit_of_measure || ""}`}
                                             </p>
                                           );
                                         })()}

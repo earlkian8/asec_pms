@@ -161,6 +161,24 @@ export default function BOQTab({ project, boqData }) {
         [sections]
     );
 
+    // Tracks how much of each inventory item is allocated across all BOQ resources
+    // so that displayed remaining availability reflects what's already been entered in other items.
+    const allocatedByInventoryId = useMemo(() => {
+        if (!editing) return {};
+        const map = {};
+        sections.forEach((section) => {
+            (section.items || []).forEach((item) => {
+                (item.resources || []).forEach((resource) => {
+                    if (resource.source_type === 'inventory' && resource.inventory_item_id) {
+                        const id = String(resource.inventory_item_id);
+                        map[id] = (map[id] || 0) + toNumber(resource.quantity);
+                    }
+                });
+            });
+        });
+        return map;
+    }, [editing, sections]);
+
     const sectionSubtotal = (section) =>
         (section.items || []).reduce((sub, i) => sub + getItemTotal(i), 0);
 
@@ -580,13 +598,17 @@ export default function BOQTab({ project, boqData }) {
                         )}
                         {category === 'material' && resource.source_type === 'inventory' && resource.inventory_item_id && availability[resource.inventory_item_id] && (() => {
                             const info = availability[resource.inventory_item_id];
+                            const id = String(resource.inventory_item_id);
+                            const totalAllocated = allocatedByInventoryId[id] || 0;
+                            const thisQty = toNumber(resource.quantity);
+                            const effectiveAvailable = info.available - (totalAllocated - thisQty);
                             const qty = parseFloat(resource.quantity || 0);
-                            const over = qty > info.available;
+                            const over = qty > effectiveAvailable;
                             return (
                                 <p className={`mt-0.5 text-xs ${over ? 'text-red-600 font-medium' : 'text-zinc-400'}`}>
                                     {over
-                                        ? `Only ${info.available} ${info.unit || ''} available`
-                                        : `Available: ${info.available} ${info.unit || ''}`}
+                                        ? `Only ${effectiveAvailable} ${info.unit || ''} available`
+                                        : `Available: ${effectiveAvailable} ${info.unit || ''}`}
                                 </p>
                             );
                         })()}

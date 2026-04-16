@@ -24,25 +24,6 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
     status: task.status || "pending",
   });
 
-  // Helper function to get progress updates count from a task
-  const getProgressUpdatesCount = (task) => {
-    const rawProgressUpdates = task.progressUpdates || task.progress_updates;
-    if (!rawProgressUpdates) return 0;
-    
-    if (Array.isArray(rawProgressUpdates)) {
-      return rawProgressUpdates.length;
-    }
-    if (rawProgressUpdates.data && Array.isArray(rawProgressUpdates.data)) {
-      return rawProgressUpdates.data.length;
-    }
-    if (rawProgressUpdates.data && Array.isArray(rawProgressUpdates.data.data)) {
-      return rawProgressUpdates.data.data.length;
-    }
-    return 0;
-  };
-
-  const progressUpdatesCount = getProgressUpdatesCount(task);
-
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none " +
     (error
@@ -59,12 +40,6 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
 
     if (!task || !task.id) {
       toast.error("Task information is missing");
-      return;
-    }
-
-    // Validate: Cannot mark as completed without at least 1 progress update
-    if (data.status === 'completed' && progressUpdatesCount === 0) {
-      toast.error('Cannot mark task as completed. Please add at least one progress update first.');
       return;
     }
 
@@ -204,36 +179,6 @@ const EditTask = ({ setShowEditModal, task, milestone, milestones = [], users = 
               className={inputClass(errors.due_date)}
             />
             <InputError message={errors.due_date} />
-          </div>
-
-          {/* Status */}
-          <div>
-            <Label>Status</Label>
-            <Select
-              value={data.status}
-              onValueChange={(value) => setData("status", value)}
-            >
-              <SelectTrigger className={inputClass(errors.status)}>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem 
-                  value="completed"
-                  disabled={progressUpdatesCount === 0}
-                >
-                  Completed
-                  {progressUpdatesCount === 0 && ' (Requires progress update)'}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.status} />
-            {progressUpdatesCount === 0 && data.status !== 'completed' && (
-              <p className="text-xs text-gray-500 mt-1">
-                Add at least one progress update to mark this task as completed.
-              </p>
-            )}
           </div>
 
           <DialogFooter className="flex justify-end gap-2 mt-4">

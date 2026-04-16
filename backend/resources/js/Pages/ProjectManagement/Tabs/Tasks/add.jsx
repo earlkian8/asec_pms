@@ -180,25 +180,6 @@ const AddTask = ({ setShowAddModal, milestones = [], users = [], preselectedMile
             <InputError message={errors.due_date} />
           </div>
 
-          {/* Status */}
-          <div>
-            <Label>Status</Label>
-            <Select
-              value={data.status}
-              onValueChange={(value) => setData("status", value)}
-            >
-              <SelectTrigger className={inputClass(errors.status)}>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.status} />
-          </div>
-
           <DialogFooter className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setShowAddModal(false)}>
               Cancel

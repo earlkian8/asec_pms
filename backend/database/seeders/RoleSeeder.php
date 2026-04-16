@@ -127,41 +127,9 @@ class RoleSeeder extends Seeder
         $this->clearCacheForRole($admin);
 
         // ─────────────────────────────────────────────────────────────────────
-        // 4. General Manager — executive oversight; view-all + approve billing;
-        //    no create/delete on operational records
-        // ─────────────────────────────────────────────────────────────────────
-        $gm = Role::firstOrCreate(['name' => 'General Manager', 'guard_name' => 'web']);
-        $gm->syncPermissions([
-            'dashboard.view',
-
-            // Projects — read + archive
-            'projects.view', 'projects.view-all', 'projects.archive',
-
-            // Project sub-modules — read only
-            ...$projectReadOnly,
-
-            // Clients — view
-            'clients.view',
-
-            // Employees — view
-            'employees.view',
-
-            // Inventory & Direct Supply — view
-            'inventory.view',
-            'direct-supply.view',
-
-            // Billing — full view + payment approval
-            'billing.view', 'billing.update', 'billing.add-payment', 'billing.view-payments',
-
-            // Reports — all
-            'reports.view', 'reports.project-performance', 'reports.financial',
-            'reports.client', 'reports.inventory', 'reports.team-productivity', 'reports.budget',
-        ]);
-        $this->clearCacheForRole($gm);
-
-        // ─────────────────────────────────────────────────────────────────────
-        // 5. Project Manager — owns full project lifecycle from scoping to
-        //    completion; manages team, BOQ, milestones, costs, and files
+        // 4. Project Manager — owns full project lifecycle from scoping to
+        //    completion; manages team, BOQ, milestones, costs, files, and
+        //    approves labor cost payroll submissions
         // ─────────────────────────────────────────────────────────────────────
         $pm = Role::firstOrCreate(['name' => 'Project Manager', 'guard_name' => 'web']);
         $pm->syncPermissions([
@@ -215,68 +183,10 @@ class RoleSeeder extends Seeder
         $this->clearCacheForRole($pm);
 
         // ─────────────────────────────────────────────────────────────────────
-        // 6. Site Engineer — on-site project execution; manages milestones,
-        //    records daily progress, logs labor and material usage
+        // 5. Finance Manager — handles billing, payments, financial reporting,
+        //    and payroll (labor cost timesheets); manages employee records
         // ─────────────────────────────────────────────────────────────────────
-        $siteEngineer = Role::firstOrCreate(['name' => 'Site Engineer', 'guard_name' => 'web']);
-        $siteEngineer->syncPermissions([
-            ...$projectExecution,
-
-            // Can also delete issues and manage tasks fully
-            'project-tasks.create', 'project-tasks.delete',
-            'project-issues.delete',
-            'project-milestones.delete',
-            'progress-updates.delete',
-
-            // Material allocations — full except delete
-            'material-allocations.create', 'material-allocations.update',
-
-            // Labor — full
-            'labor-costs.delete',
-            'miscellaneous-expenses.delete',
-
-            // Supporting lookups
-            'clients.view',
-            'employees.view',
-            'inventory.view',
-            'direct-supply.view',
-
-            // Reports
-            'reports.view', 'reports.project-performance', 'reports.budget',
-        ]);
-        $this->clearCacheForRole($siteEngineer);
-
-        // ─────────────────────────────────────────────────────────────────────
-        // 7. Estimator — prepares BOQ and cost estimates; read-only on
-        //    everything else
-        // ─────────────────────────────────────────────────────────────────────
-        $estimator = Role::firstOrCreate(['name' => 'Estimator', 'guard_name' => 'web']);
-        $estimator->syncPermissions([
-            'dashboard.view',
-
-            // Projects — read
-            'projects.view', 'projects.view-all',
-
-            // BOQ — full (core responsibility)
-            'project-boq.view', 'project-boq.create', 'project-boq.update', 'project-boq.delete',
-
-            // Supporting lookups for costing
-            'project-milestones.view', 'project-milestones.view-detail',
-            'clients.view',
-            'inventory.view',
-            'direct-supply.view',
-            'employees.view',
-
-            // Reports
-            'reports.view', 'reports.budget',
-        ]);
-        $this->clearCacheForRole($estimator);
-
-        // ─────────────────────────────────────────────────────────────────────
-        // 8. Finance Officer — handles billing, payments, and financial
-        //    reporting; no access to site operations
-        // ─────────────────────────────────────────────────────────────────────
-        $finance = Role::firstOrCreate(['name' => 'Finance Officer', 'guard_name' => 'web']);
+        $finance = Role::firstOrCreate(['name' => 'Finance Manager', 'guard_name' => 'web']);
         $finance->syncPermissions([
             'dashboard.view',
 
@@ -284,8 +194,9 @@ class RoleSeeder extends Seeder
             'billing.view', 'billing.create', 'billing.update', 'billing.delete',
             'billing.add-payment', 'billing.view-payments', 'billing.archive',
 
-            // Projects — view for billing context
+            // Projects & team — view for billing/payroll context
             'projects.view', 'projects.view-all',
+            'project-teams.view',
 
             // BOQ — view for cost reference
             'project-boq.view',
@@ -293,21 +204,28 @@ class RoleSeeder extends Seeder
             // Clients — view
             'clients.view',
 
+            // Employees — full (handles payroll records)
+            'employees.view', 'employees.create', 'employees.update',
+            'employees.delete', 'employees.update-status',
+
+            // Labor costs — full (timekeeping / payroll processing)
+            'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete',
+
             // Supporting expense view
             'material-allocations.view',
-            'labor-costs.view',
             'miscellaneous-expenses.view',
 
             // Reports
-            'reports.view', 'reports.financial', 'reports.client', 'reports.budget',
+            'reports.view', 'reports.financial', 'reports.client',
+            'reports.team-productivity', 'reports.budget',
         ]);
         $this->clearCacheForRole($finance);
 
         // ─────────────────────────────────────────────────────────────────────
-        // 9. Procurement Officer — manages materials, inventory, and direct
+        // 6. Inventory Manager — manages materials, inventory, and direct
         //    supply; fulfils material allocations from the field
         // ─────────────────────────────────────────────────────────────────────
-        $procurement = Role::firstOrCreate(['name' => 'Procurement Officer', 'guard_name' => 'web']);
+        $procurement = Role::firstOrCreate(['name' => 'Inventory Manager', 'guard_name' => 'web']);
         $procurement->syncPermissions([
             'dashboard.view',
 
@@ -339,33 +257,7 @@ class RoleSeeder extends Seeder
         $this->clearCacheForRole($procurement);
 
         // ─────────────────────────────────────────────────────────────────────
-        // 10. HR / Timekeeper — manages employee records and labor cost
-        //     timesheets; no access to financials or system management
-        // ─────────────────────────────────────────────────────────────────────
-        $hr = Role::firstOrCreate(['name' => 'HR / Timekeeper', 'guard_name' => 'web']);
-        $hr->syncPermissions([
-            'dashboard.view',
-
-            // Employees — full
-            'employees.view', 'employees.create', 'employees.update',
-            'employees.delete', 'employees.update-status',
-
-            // Labor costs — full (timekeeping)
-            'labor-costs.view', 'labor-costs.create', 'labor-costs.update', 'labor-costs.delete',
-
-            // Team — view for assignment context
-            'project-teams.view',
-
-            // Projects — view for labor context
-            'projects.view', 'projects.view-all',
-
-            // Reports
-            'reports.view', 'reports.team-productivity',
-        ]);
-        $this->clearCacheForRole($hr);
-
-        // ─────────────────────────────────────────────────────────────────────
-        // 11. Foreman — field supervisor; records daily work progress and
+        // 7. Foreman — field supervisor; records daily work progress and
         //     material consumption, raises issues
         // ─────────────────────────────────────────────────────────────────────
         $foreman = Role::firstOrCreate(['name' => 'Foreman', 'guard_name' => 'web']);
@@ -407,7 +299,7 @@ class RoleSeeder extends Seeder
         $this->clearCacheForRole($foreman);
 
         // ─────────────────────────────────────────────────────────────────────
-        // 12. Foreman (TM) — mobile task-management app; field execution only
+        // 8. Foreman (TM) — mobile task-management app; field execution only
         // ─────────────────────────────────────────────────────────────────────
         $tmForeman = Role::firstOrCreate(['name' => 'Foreman (TM)', 'guard_name' => 'web']);
         $tmForeman->syncPermissions([
@@ -427,7 +319,7 @@ class RoleSeeder extends Seeder
         $this->clearCacheForRole($tmForeman);
 
         // ─────────────────────────────────────────────────────────────────────
-        // 13. Engineer (TM) — mobile app with project-scoped management;
+        // 9. Engineer (TM) — mobile app with project-scoped management;
         //     can delegate TM permissions to workers
         // ─────────────────────────────────────────────────────────────────────
         $tmEngineer = Role::firstOrCreate(['name' => 'Engineer (TM)', 'guard_name' => 'web']);

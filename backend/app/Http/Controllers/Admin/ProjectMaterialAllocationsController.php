@@ -249,6 +249,118 @@ class ProjectMaterialAllocationsController extends Controller
         return back()->with('success', 'Material allocation deleted successfully.');
     }
 
+    /**
+     * Return unused materials back to inventory.
+     *
+     * For inventory items: creates a stock_in transaction on the existing item.
+     * For direct supply items: finds a matching inventory item by name, or creates
+     * one from the direct supply record, then stocks in.
+     */
+    public function returnToInventory(Project $project, Request $request, ProjectMaterialAllocation $allocation)
+    {
+        $totalUsed      = (float) ($allocation->milestoneUsages()->sum('quantity_used') ?? 0);
+        $alreadyReturned = (float) ($allocation->quantity_returned ?? 0);
+        $available      = (float) $allocation->quantity_received - $totalUsed - $alreadyReturned;
+
+        $data = $request->validate([
+            'quantity_return' => [
+                'required',
+                'numeric',
+                'min:0.01',
+                function ($attribute, $value, $fail) use ($available) {
+                    if ($value > $available) {
+                        $fail("Return quantity cannot exceed available quantity (" . round($available, 2) . ").");
+                    }
+                },
+            ],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $qty   = (float) $data['quantity_return'];
+        $notes = $data['notes'] ?? null;
+
+        // ── Resolve the inventory item ──────────────────────────────────────
+        if ($allocation->inventory_item_id) {
+            // Straightforward: return to the original inventory item
+            $inventoryItem = $allocation->inventoryItem;
+            $itemName      = $inventoryItem->item_name;
+            $itemUnit      = $inventoryItem->unit_of_measure;
+            $wasCreated    = false;
+        } else {
+            // Direct supply — find or create an inventory item
+            $directSupply = $allocation->directSupply;
+            $itemName     = $directSupply->supply_name ?? 'Direct Supply';
+            $itemUnit     = $directSupply->unit_of_measure ?? 'units';
+
+            // Try to match by name (case-insensitive) and same unit
+            $inventoryItem = InventoryItem::whereRaw('LOWER(item_name) = ?', [strtolower($itemName)])
+                ->where('unit_of_measure', $directSupply->unit_of_measure)
+                ->first();
+
+            if ($inventoryItem) {
+                $wasCreated = false;
+            } else {
+                // Auto-create a new inventory item from direct supply data
+                $inventoryItem = InventoryItem::create([
+                    'item_name'       => $itemName,
+                    'item_code'       => 'DS-' . strtoupper(uniqid()),
+                    'description'     => ($directSupply->description ?? '') . ' (Created from direct supply return)',
+                    'category'        => $directSupply->category ?? 'Returned Materials',
+                    'unit_of_measure' => $itemUnit,
+                    'current_stock'   => 0,
+                    'min_stock_level' => 0,
+                    'unit_price'      => $directSupply->unit_price ?? 0,
+                    'is_active'       => true,
+                    'is_archived'     => false,
+                    'created_by'      => auth()->id(),
+                ]);
+                $wasCreated = true;
+            }
+        }
+
+        // ── Create the stock_in transaction ─────────────────────────────────
+        InventoryTransaction::create([
+            'inventory_item_id'              => $inventoryItem->id,
+            'transaction_type'               => 'stock_in',
+            'quantity'                       => $qty,
+            'project_id'                     => $project->id,
+            'project_material_allocation_id' => $allocation->id,
+            'notes'                          => '[PROJECT_RETURN] Returned from project "' . $project->project_name . '"'
+                                             . ($notes ? ' — ' . $notes : ''),
+            'created_by'                     => auth()->id(),
+            'transaction_date'               => now(),
+        ]);
+
+        $this->inventoryService->updateItemStock($inventoryItem);
+
+        // ── Update allocation ────────────────────────────────────────────────
+        $allocation->quantity_returned = $alreadyReturned + $qty;
+        $allocation->save();
+
+        $this->adminActivityLogs(
+            'Material Return',
+            'Created',
+            'Returned ' . $qty . ' ' . $itemUnit . ' of "' . $itemName . '" to inventory from project "' . $project->project_name . '"'
+                . ($wasCreated ? ' (new inventory item created)' : '')
+        );
+
+        $this->createSystemNotification(
+            'general',
+            'Material Returned to Inventory',
+            "{$qty} {$itemUnit} of '{$itemName}' returned to inventory from project '{$project->project_name}'."
+                . ($wasCreated ? ' A new inventory item was created.' : ''),
+            $project,
+            route('project-management.view', $project->id)
+        );
+
+        $successMsg = "Successfully returned {$qty} {$itemUnit} of \"{$itemName}\" to inventory.";
+        if ($wasCreated) {
+            $successMsg .= " A new inventory item was created since it didn't exist.";
+        }
+
+        return back()->with('success', $successMsg);
+    }
+
     public function bulkReceivingReport(Project $project, Request $request)
     {
         $request->validate([

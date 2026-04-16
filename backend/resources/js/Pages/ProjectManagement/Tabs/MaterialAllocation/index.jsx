@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { usePage, router } from '@inertiajs/react';
+import { usePage, router, useForm } from '@inertiajs/react';
 import {
   Table,
   TableBody,
@@ -12,11 +12,13 @@ import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
 import { Label } from "@/Components/ui/label";
 import { Checkbox } from "@/Components/ui/checkbox";
+import { Textarea } from "@/Components/ui/textarea";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/Components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/Components/ui/dialog";
 import { toast } from 'sonner';
-import { 
-  Trash2, 
-  SquarePen, 
+import {
+  Trash2,
+  SquarePen,
   Plus,
   Filter,
   Search,
@@ -32,6 +34,7 @@ import {
   PackageX,
   PackageSearch,
   PackagePlus,
+  Undo2,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
 import AddReceivingReport from './add';
@@ -60,6 +63,44 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
   const [deleteAllocation, setDeleteAllocation] = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
   const [viewAllocation, setViewAllocation] = useState(null);
+
+  // ── Return to inventory ───────────────────────────────────────────────────
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnAllocation, setReturnAllocation] = useState(null);
+  const returnForm = useForm({ quantity_return: '', notes: '' });
+
+  const openReturnModal = (allocation) => {
+    setReturnAllocation(allocation);
+    returnForm.reset();
+    setShowReturnModal(true);
+  };
+
+  const submitReturn = (e) => {
+    e.preventDefault();
+    if (!returnAllocation) return;
+    returnForm.post(
+      route('project-management.material-allocations.return-to-inventory', {
+        project: project.id,
+        allocation: returnAllocation.id,
+      }),
+      {
+        onSuccess: (page) => {
+          const flash = page.props.flash;
+          if (flash?.error) {
+            toast.error(flash.error);
+          } else {
+            toast.success(flash?.success || 'Materials returned to inventory successfully!');
+          }
+          setShowReturnModal(false);
+          setReturnAllocation(null);
+          returnForm.reset();
+        },
+        onError: () => {
+          toast.error('Please check the form for errors.');
+        },
+      }
+    );
+  };
 
   // ── Bulk selection ────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState([]);
@@ -492,6 +533,10 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                 const progress  = calculateProgress(allocation);
                 const isSelected = selectedIds.includes(allocation.id);
                 const canReceive = remaining > 0;
+                const totalUsed  = allocation.total_used ?? 0;
+                const alreadyReturned = parseFloat(allocation.quantity_returned ?? 0);
+                const availableToReturn = Math.max(0, (allocation.quantity_received || 0) - totalUsed - alreadyReturned);
+                const canReturn = availableToReturn > 0;
 
                 return (
                   <TableRow key={allocation.id}
@@ -547,8 +592,9 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                     </TableCell>
                     <TableCell className="px-4 py-4 text-sm">
                       {(() => {
-                        const used = allocation.total_used ?? 0;
-                        const available = Math.max(0, (allocation.quantity_received || 0) - used);
+                        const used      = allocation.total_used ?? 0;
+                        const returned  = parseFloat(allocation.quantity_returned ?? 0);
+                        const available = Math.max(0, (allocation.quantity_received || 0) - used - returned);
                         const pct = allocation.quantity_received > 0 ? available / allocation.quantity_received : 1;
                         return (
                           <span className={`font-medium ${
@@ -607,6 +653,14 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
                             className="p-2 rounded-lg hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 transition-all border border-indigo-200 hover:border-indigo-300"
                             title="View Details">
                             <Eye size={16} />
+                          </button>
+                        )}
+                        {canReturn && has('material-allocations.update') && (
+                          <button
+                            onClick={() => openReturnModal(allocation)}
+                            className="p-2 rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-all border border-amber-200 hover:border-amber-300"
+                            title={`Return to inventory (${availableToReturn} ${displayUnit} available)`}>
+                            <Undo2 size={16} />
                           </button>
                         )}
                         {has('material-allocations.delete') &&
@@ -690,6 +744,92 @@ export default function MaterialAllocationTab({ project, materialAllocationData 
           }}
         />
       )}
+
+      {/* ── Return to Inventory Modal ── */}
+      {showReturnModal && returnAllocation && (() => {
+        const ds         = returnAllocation.direct_supply || returnAllocation.directSupply || null;
+        const isDs       = !!returnAllocation.direct_supply_id;
+        const rItem      = returnAllocation.inventory_item || returnAllocation.inventoryItem || {};
+        const rName      = isDs ? (ds?.supply_name || 'Direct Supply') : (rItem.item_name || 'Unknown');
+        const rUnit      = isDs ? (ds?.unit_of_measure || 'units') : (rItem.unit_of_measure || 'units');
+        const rUsed      = returnAllocation.total_used ?? 0;
+        const rReturned  = parseFloat(returnAllocation.quantity_returned ?? 0);
+        const rAvailable = Math.max(0, (returnAllocation.quantity_received || 0) - rUsed - rReturned);
+        return (
+          <Dialog open={showReturnModal} onOpenChange={setShowReturnModal}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Undo2 size={18} className="text-amber-600" />
+                  Return to Inventory
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={submitReturn} className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                  <p className="font-medium text-amber-800">{rName}</p>
+                  <p className="text-amber-700 text-xs mt-0.5">
+                    Available to return: <strong>{rAvailable} {rUnit}</strong>
+                    {rReturned > 0 && <span className="ml-2 text-amber-600">(already returned: {rReturned} {rUnit})</span>}
+                  </p>
+                  {isDs && (
+                    <p className="text-amber-600 text-xs mt-1">
+                      This is a direct supply item. If no matching inventory item exists, one will be created automatically.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="return_qty" className="text-sm font-medium">
+                    Quantity to Return <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      id="return_qty"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={rAvailable}
+                      value={returnForm.data.quantity_return}
+                      onChange={e => returnForm.setData('quantity_return', e.target.value)}
+                      placeholder={`Max ${rAvailable}`}
+                      className="flex-1"
+                      required
+                    />
+                    <span className="text-sm text-gray-500 whitespace-nowrap">{rUnit}</span>
+                  </div>
+                  {returnForm.errors.quantity_return && (
+                    <p className="text-red-500 text-xs mt-1">{returnForm.errors.quantity_return}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="return_notes" className="text-sm font-medium">Notes</Label>
+                  <Textarea
+                    id="return_notes"
+                    value={returnForm.data.notes}
+                    onChange={e => returnForm.setData('notes', e.target.value)}
+                    placeholder="Reason for return or condition of materials..."
+                    rows={3}
+                    className="mt-1"
+                  />
+                  {returnForm.errors.notes && (
+                    <p className="text-red-500 text-xs mt-1">{returnForm.errors.notes}</p>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowReturnModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={returnForm.processing || !returnForm.data.quantity_return}
+                    className="bg-amber-600 hover:bg-amber-700 text-white">
+                    {returnForm.processing ? 'Returning...' : 'Return to Inventory'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

@@ -18,6 +18,7 @@ class ProjectMaterialAllocation extends Model
         'quantity_allocated',
         'quantity_received',
         'quantity_remaining',
+        'quantity_returned',
         'status',
         'allocated_by',
         'allocated_at',
@@ -27,6 +28,7 @@ class ProjectMaterialAllocation extends Model
     protected $casts = [
         'quantity_allocated' => 'decimal:2',
         'quantity_received'  => 'decimal:2',
+        'quantity_returned'  => 'decimal:2',
         'unit_price'         => 'decimal:2',
         'allocated_at'       => 'datetime',
     ];

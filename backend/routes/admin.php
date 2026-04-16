@@ -151,6 +151,7 @@ Route::middleware('auth')->group(function () {
             Route::delete('/receiving-report/{project}/allocation/{allocation}/report/{receivingReport}', [ProjectMaterialAllocationsController::class, 'destroyReceivingReport'])->middleware('permission:material-allocations.delete')->name('destroy-receiving-report');
             Route::delete('/{project}/allocation/{allocation}', [ProjectMaterialAllocationsController::class, 'destroy'])->middleware('permission:material-allocations.delete')->name('destroy');
             Route::post('/bulk-receiving-report/{project}', [ProjectMaterialAllocationsController::class, 'bulkReceivingReport'])->middleware('permission:material-allocations.receiving-report')->name('bulk-receiving-report');
+            Route::post('/return/{project}/allocation/{allocation}', [ProjectMaterialAllocationsController::class, 'returnToInventory'])->middleware('permission:material-allocations.update')->name('return-to-inventory');
         });
 
         // Labor Costs

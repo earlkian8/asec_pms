@@ -59,10 +59,14 @@ const BulkReceivingReport = ({ setShowBulkModal, project, allocations, onSuccess
       if (!row.enabled) return;
       const remaining = (a.quantity_allocated || 0) - (a.quantity_received || 0);
       const qty = parseFloat(row.quantity_received);
+      const isDs = !!a.direct_supply_id;
+      const uom = isDs
+        ? ((a.direct_supply || a.directSupply || {}).unit_of_measure || 'units')
+        : ((a.inventory_item || a.inventoryItem || {}).unit_of_measure || 'units');
       if (!row.quantity_received || isNaN(qty) || qty <= 0) {
         errs[`${a.id}_quantity_received`] = 'Required and must be > 0.';
       } else if (qty > remaining) {
-        errs[`${a.id}_quantity_received`] = `Max ${remaining} ${(a.inventory_item || a.inventoryItem || {}).unit_of_measure || 'units'}.`;
+        errs[`${a.id}_quantity_received`] = `Max ${remaining} ${uom}.`;
       }
     });
     return errs;
@@ -187,7 +191,12 @@ const BulkReceivingReport = ({ setShowBulkModal, project, allocations, onSuccess
           {/* Per-allocation rows */}
           <div className="space-y-3">
             {allocations.map((a) => {
-              const item      = a.inventory_item || a.inventoryItem || {};
+              const isDs      = !!a.direct_supply_id;
+              const invItem   = a.inventory_item || a.inventoryItem || {};
+              const dsItem    = a.direct_supply || a.directSupply || {};
+              const itemName  = isDs ? (dsItem.supply_name || 'Direct Supply') : (invItem.item_name || 'Unknown Item');
+              const itemCode  = isDs ? (dsItem.supply_code || '—') : (invItem.item_code || '—');
+              const unitOfMeasure = isDs ? (dsItem.unit_of_measure || 'units') : (invItem.unit_of_measure || 'units');
               const remaining = (a.quantity_allocated || 0) - (a.quantity_received || 0);
               const row       = rows[a.id];
               const enabled   = row?.enabled ?? true;
@@ -205,12 +214,12 @@ const BulkReceivingReport = ({ setShowBulkModal, project, allocations, onSuccess
                       className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-800 cursor-pointer"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-800 truncate">{item.item_name || 'Unknown Item'}</p>
+                      <p className="text-sm font-semibold text-zinc-800 truncate">{itemName}</p>
                       <p className="text-xs text-zinc-400">
-                        Code: {item.item_code || '—'} &nbsp;·&nbsp;
-                        Allocated: {a.quantity_allocated} {item.unit_of_measure || 'units'} &nbsp;·&nbsp;
-                        Already received: {a.quantity_received || 0} {item.unit_of_measure || 'units'} &nbsp;·&nbsp;
-                        <span className="font-medium text-zinc-600">Remaining: {remaining} {item.unit_of_measure || 'units'}</span>
+                        Code: {itemCode} &nbsp;·&nbsp;
+                        Allocated: {a.quantity_allocated} {unitOfMeasure} &nbsp;·&nbsp;
+                        Already received: {a.quantity_received || 0} {unitOfMeasure} &nbsp;·&nbsp;
+                        <span className="font-medium text-zinc-600">Remaining: {remaining} {unitOfMeasure}</span>
                       </p>
                     </div>
                   </div>

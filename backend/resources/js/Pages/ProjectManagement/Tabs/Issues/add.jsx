@@ -179,26 +179,6 @@ const AddIssue = ({ setShowAddModal, project, milestones = [], tasks = [], users
             <InputError message={errors.priority} />
           </div>
 
-          {/* Status */}
-          <div>
-            <Label>Status</Label>
-            <Select
-              value={data.status}
-              onValueChange={(value) => setData("status", value)}
-            >
-              <SelectTrigger className={inputClass(errors.status)}>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
-            <InputError message={errors.status} />
-          </div>
-
           {/* Due Date */}
           <div>
             <Label>Due Date</Label>

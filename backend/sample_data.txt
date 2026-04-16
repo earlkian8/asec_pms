@@ -1,0 +1,317 @@
+================================================================================
+  ASEC PMS — SAMPLE DATA ENTRY GUIDE
+  Project: Two-Storey Residential House Construction
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. CLIENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Client Code     : CLT-2024-001
+  Client Name     : Dela Cruz Family Corp.
+  Contact Person  : Eduardo Dela Cruz
+  Email           : eduardo.delacruz@gmail.com
+  Phone           : 09171234567
+  Address         : 123 Mabini Street, Brgy. San Antonio
+  City            : Cagayan de Oro City
+  Province        : Misamis Oriental
+  Region          : Region X
+  Postal Code     : 9000
+  Country         : Philippines
+  Client Type     : Individual / Residential
+  Notes           : Long-term client. Requires weekly progress reports.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. PROJECT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Project Code    : PRJ-2024-001
+  Project Name    : Dela Cruz Residence — Two-Storey Residential House
+  Client          : Dela Cruz Family Corp.
+  Project Type    : Residential Construction
+  Status          : ongoing
+  Priority        : high
+  Contract Amount : 3,500,000.00
+  Start Date      : 2024-07-01
+  Planned End     : 2025-01-31
+  Location        : Lot 7 Block 12, Villa Marigold Subdivision, Cagayan de Oro City
+  Description     : Construction of a two-storey residential house with 4 bedrooms,
+                    3 bathrooms, living area, dining area, kitchen, and a 2-car garage.
+                    Total floor area: approximately 220 sq.m.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. BOQ — BILL OF QUANTITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NOTE: In Step 3 (BOQ Wizard), add sections in order. Under each section,
+add items one by one. Unit Cost = Material + Labor (you fill these in).
+Leave resource selection to your preference.
+
+Estimated project total: ₱3,185,500.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION A — SITE PREPARATION & EARTHWORKS
+Code: A | Sort Order: 1
+Description: Site clearing, excavation, and grading works prior to construction.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  A.1   A.001  Site Clearing & Grubbing           sqm    220    150.00       33,000.00
+  A.2   A.002  Excavation (Foundation)            cu.m   85     350.00       29,750.00
+  A.3   A.003  Backfilling & Compaction           cu.m   45     280.00       12,600.00
+  A.4   A.004  Rough Grading                      sqm    220    80.00        17,600.00
+
+  SECTION TOTAL: ₱92,950.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION B — FOUNDATION WORKS
+Code: B | Sort Order: 2
+Description: Reinforced concrete footing and foundation wall construction.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  B.1   B.001  Column Footing (CF-1) 1.0x1.0x0.4m  pc   16     4,500.00     72,000.00
+  B.2   B.002  Column Footing (CF-2) 0.8x0.8x0.4m  pc    8     3,200.00     25,600.00
+  B.3   B.003  Foundation Wall (200mm CHB)        sqm    180    850.00       153,000.00
+  B.4   B.004  Tie Beam / Grade Beam              l.m.   95     1,200.00     114,000.00
+  B.5   B.005  Concrete Porch Slab (t=150mm)      sqm    18     1,800.00     32,400.00
+
+  SECTION TOTAL: ₱397,000.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION C — CONCRETE STRUCTURAL WORKS
+Code: C | Sort Order: 3
+Description: Reinforced concrete columns, beams, and floor slabs — both floors.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  C.1   C.001  Columns 200x200mm (1F)             l.m.   96     950.00       91,200.00
+  C.2   C.002  Columns 200x200mm (2F)             l.m.   96     950.00       91,200.00
+  C.3   C.003  Beams 200x400mm (1F)               l.m.   140    1,100.00     154,000.00
+  C.4   C.004  Beams 200x400mm (2F)               l.m.   140    1,100.00     154,000.00
+  C.5   C.005  Ground Floor Slab (t=100mm)        sqm    110    1,650.00     181,500.00
+  C.6   C.006  Second Floor Slab (t=100mm)        sqm    110    2,200.00     242,000.00
+  C.7   C.007  Concrete Stairs (2-flight)         set    1      28,000.00    28,000.00
+  C.8   C.008  Concrete Hollow Blocks (CHB) 1F    sqm    260    750.00       195,000.00
+  C.9   C.009  Concrete Hollow Blocks (CHB) 2F    sqm    230    750.00       172,500.00
+
+  SECTION TOTAL: ₱1,309,400.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION D — ROOFING WORKS
+Code: D | Sort Order: 4
+Description: Roof framing, sheathing, and roofing sheet installation.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  D.1   D.001  Steel Roof Framing (Purlins/Rafters) kg   1,850  95.00        175,750.00
+  D.2   D.002  Long-Span Roofing Sheet (0.5mm)    sqm    145    420.00       60,900.00
+  D.3   D.003  Ridge Roll & Flashing              l.m.   24     280.00       6,720.00
+  D.4   D.004  Fascia Board (Fiber Cement)        l.m.   52     320.00       16,640.00
+  D.5   D.005  Roof Insulation (Foil Bubble)      sqm    145    180.00       26,100.00
+  D.6   D.006  Gutter & Downspout (PVC)           set    4      2,800.00     11,200.00
+
+  SECTION TOTAL: ₱297,310.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION E — DOORS & WINDOWS
+Code: E | Sort Order: 5
+Description: Supply and installation of all doors and windows.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  E.1   E.001  Main Door (Solid Wood Panel)       set    1      18,500.00    18,500.00
+  E.2   E.002  Interior Door (Flush)              set    8      5,500.00     44,000.00
+  E.3   E.003  Bathroom Door (PVC)                set    3      3,800.00     11,400.00
+  E.4   E.004  Sliding Window (Aluminum, 1.2x1.2) unit   10     6,500.00     65,000.00
+  E.5   E.005  Casement Window (Aluminum, 0.6x0.9) unit   6     3,800.00     22,800.00
+  E.6   E.006  Jalousie Window (Comfort Room)     unit   4      2,200.00     8,800.00
+  E.7   E.007  Window Grills (Steel)              sqm    32     1,200.00     38,400.00
+
+  SECTION TOTAL: ₱208,900.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION F — FLOOR & WALL FINISHES
+Code: F | Sort Order: 6
+Description: Tile works, plastering, and painting for all areas.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  F.1   F.001  Floor Tiles (Granite, Living/Dining) sqm  60     850.00       51,000.00
+  F.2   F.002  Floor Tiles (Ceramic, Bedrooms)    sqm    88     650.00       57,200.00
+  F.3   F.003  Floor Tiles (Non-Slip, Bathroom)   sqm    24     700.00       16,800.00
+  F.4   F.004  Wall Tiles (Bathroom, 2.1m height) sqm    72     750.00       54,000.00
+  F.5   F.005  Wall Tiles (Kitchen Backsplash)    sqm    12     750.00       9,000.00
+  F.6   F.006  Wall Plaster & Skim Coat (Int.)    sqm    490    280.00       137,200.00
+  F.7   F.007  Exterior Plaster & Paint           sqm    300    380.00       114,000.00
+  F.8   F.008  Interior Emulsion Paint            sqm    490    180.00       88,200.00
+  F.9   F.009  Ceiling Works (Ficem Board 4.5mm)  sqm    175    650.00       113,750.00
+
+  SECTION TOTAL: ₱641,150.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION G — PLUMBING WORKS
+Code: G | Sort Order: 7
+Description: Waterline, drainage, and sanitary fixtures installation.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  G.1   G.001  Water Supply Line (PPR Pipe)       lot    1      28,000.00    28,000.00
+  G.2   G.002  Drainage & Vent Line (PVC)         lot    1      22,000.00    22,000.00
+  G.3   G.003  Septic Tank (2-chamber precast)    unit   1      35,000.00    35,000.00
+  G.4   G.004  Water Closet (One-Piece)           set    3      6,500.00     19,500.00
+  G.5   G.005  Lavatory (Wall-Hung)               set    3      3,800.00     11,400.00
+  G.6   G.006  Kitchen Sink (Stainless 2-basin)   set    1      5,500.00     5,500.00
+  G.7   G.007  Shower Set                         set    3      2,800.00     8,400.00
+  G.8   G.008  Water Meter & Gate Valve           set    1      4,200.00     4,200.00
+  G.9   G.009  Water Tank (500L Elevated)         set    1      12,500.00    12,500.00
+
+  SECTION TOTAL: ₱146,500.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION H — ELECTRICAL WORKS
+Code: H | Sort Order: 8
+Description: Rough-in wiring, panel board, and lighting/convenience outlets.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  H.1   H.001  Main Distribution Panel (60A, 12br) set   1      12,500.00    12,500.00
+  H.2   H.002  Electrical Rough-In (Conduit/Wire) lot    1      45,000.00    45,000.00
+  H.3   H.003  Lighting Outlets                   unit   38     650.00       24,700.00
+  H.4   H.004  Convenience Outlets                unit   28     580.00       16,240.00
+  H.5   H.005  AC Outlet (Dedicated)              unit   5      850.00       4,250.00
+  H.6   H.006  Exhaust Fan Outlet                 unit   4      580.00       2,320.00
+  H.7   H.007  LED Downlights                     unit   38     350.00       13,300.00
+  H.8   H.008  Outdoor Security Light             unit   6      800.00       4,800.00
+  H.9   H.009  Circuit Breakers                   lot    1      8,500.00     8,500.00
+
+  SECTION TOTAL: ₱131,610.00
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION I — MISCELLANEOUS & FINISHING WORKS
+Code: I | Sort Order: 9
+Description: Fabrication, landscaping, and other finishing items.
+────────────────────────────────────────────────────────────────────────────────
+
+  Item  Code   Description                        Unit   Qty    Unit Cost    Total
+  ----  -----  ---------------------------------  ----   ----   ----------   ----------
+  I.1   I.001  Staircase Railing (Steel, Powder Coated) l.m. 12 3,200.00    38,400.00
+  I.2   I.002  Perimeter Fence (CHB, 1.5m high)   l.m.   42     2,800.00     117,600.00
+  I.3   I.003  Driveway Concrete Slab             sqm    36     1,400.00     50,400.00
+  I.4   I.004  Landscaping (Basic)                lot    1      25,000.00    25,000.00
+  I.5   I.005  Overhead Water Tank Platform (Steel) set  1      18,000.00    18,000.00
+  I.6   I.006  Electrical & Plumbing Final Fix-Up  lot   1      15,000.00    15,000.00
+  I.7   I.007  Snagging & Touch-Up Works          lot    1      12,500.00    12,500.00
+
+  SECTION TOTAL: ₱276,900.00
+
+════════════════════════════════════════════════════════════════════════════════
+  GRAND BOQ TOTAL    : ₱3,501,720.00
+  CONTRACT AMOUNT    : ₱3,500,000.00
+  VARIANCE (OVER)    : ₱1,720.00  ← minor overage; acceptable with contingency
+════════════════════════════════════════════════════════════════════════════════
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. INVENTORY ITEMS (sample — add these under Inventory Management)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Code        Name                            Category         Unit    Stock   Unit Price
+  ----------  ------------------------------  ---------------  ------  ------  ----------
+  INV-001     Portland Cement (40kg)          Cement           bag     500     280.00
+  INV-002     Washed Sand                     Aggregates       cu.m    80      1,200.00
+  INV-003     Crushed Gravel (3/4")           Aggregates       cu.m    60      1,400.00
+  INV-004     Deformed Bar 12mm x 6m         Rebar            pc      400     185.00
+  INV-005     Deformed Bar 10mm x 6m         Rebar            pc      300     125.00
+  INV-006     Deformed Bar 16mm x 6m         Rebar            pc      120     320.00
+  INV-007     CHB 4" (standard)              Masonry          pc      2,000   14.00
+  INV-008     CHB 6" (standard)              Masonry          pc      800     18.00
+  INV-009     Plywood 1/2" (ordinary)        Formwork         sheet   80      650.00
+  INV-010     Coco Lumber 2x3x10             Formwork         pc      150     95.00
+  INV-011     GI Wire #16                    Hardware         kg      50      85.00
+  INV-012     CWN 2" (common nail)           Hardware         kg      40      75.00
+  INV-013     CWN 3" (common nail)           Hardware         kg      40      75.00
+  INV-014     Ceramic Floor Tile 60x60cm     Finishes         sqm     100     450.00
+  INV-015     Granite Floor Tile 60x60cm     Finishes         sqm     75      650.00
+  INV-016     Ceramic Wall Tile 30x60cm      Finishes         sqm     90      420.00
+  INV-017     Portland Cement Paint (4L)     Paints           can     60      680.00
+  INV-018     Flat Latex Paint (4L)          Paints           can     40      850.00
+  INV-019     Skim Coat (25kg bag)           Finishes         bag     80      480.00
+  INV-020     Tile Adhesive (25kg)           Finishes         bag     120     380.00
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. DIRECT SUPPLY ITEMS (sample — add under Direct Supply)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Code        Name                            Category         Unit    Unit Price  Supplier
+  ----------  ------------------------------  ---------------  ------  ----------  -------------------
+  DS-001      Long-Span Roofing Sheet 0.5mm   Roofing          sqm     380.00      CDO Roofing Supply
+  DS-002      Steel Roof Framing (Tubular)    Structural Steel kg      88.00       MetalWorks CDO
+  DS-003      PPR Water Supply Pipe (20mm)    Plumbing         l.m.    95.00       Plumb Pro
+  DS-004      PVC Drainage Pipe 4"            Plumbing         l.m.    180.00      Plumb Pro
+  DS-005      Aluminum Sliding Window 1.2x1.2 Windows         unit    5,800.00    Alum-Rite Fabrication
+  DS-006      Ficem Ceiling Board 4.5mm       Ceilings         sqm     320.00      Hardiflex Dealer CDO
+  DS-007      LED Downlight 7W                Electrical       unit    280.00      E-Supply CDO
+  DS-008      Main Panel Board 60A 12-branch  Electrical       unit    10,500.00   E-Supply CDO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. EMPLOYEES (sample — add under Employee Management)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ID          Name                   Position              Pay Type  Daily Rate
+  ----------  ---------------------  --------------------  --------  ----------
+  EMP-001     Ramon Villanueva       Foreman               daily     900.00
+  EMP-002     Dante Quisumbing       Carpenter             daily     700.00
+  EMP-003     Nestor Reyes           Mason / Concrete      daily     700.00
+  EMP-004     Ernesto Tagalog        Electrician           daily     800.00
+  EMP-005     Rolando Santos         Plumber               daily     750.00
+  EMP-006     Marlon Cabral          Steel Worker          daily     750.00
+  EMP-007     Joel Macaraig          Laborer               daily     550.00
+  EMP-008     Arnel Bautista         Laborer               daily     550.00
+  EMP-009     Glen Reodica           Tile Setter           daily     700.00
+  EMP-010     Virgilio Espinosa      Painter               daily     650.00
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. MILESTONES (add under Milestones tab after project is created)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  #  Milestone Name                    Start Date   End Date     BOQ Link
+  -  --------------------------------  -----------  -----------  --------
+  1  Site Preparation & Earthworks     2024-07-01   2024-07-07   A (Site Prep)
+  2  Foundation Works                  2024-07-08   2024-07-28   B (Foundation)
+  3  Ground Floor Structural Works     2024-07-29   2024-08-25   C (Structural)
+  4  Second Floor Structural Works     2024-08-26   2024-09-22   C (Structural)
+  5  Roofing Works                     2024-09-23   2024-10-06   D (Roofing)
+  6  Doors & Windows Installation      2024-10-07   2024-10-20   E (Doors)
+  7  Floor & Wall Finishes             2024-10-21   2024-11-17   F (Finishes)
+  8  Plumbing Works                    2024-10-07   2024-11-03   G (Plumbing)
+  9  Electrical Works                  2024-10-07   2024-11-03   H (Electrical)
+  10 Miscellaneous & Final Works       2024-11-18   2025-01-12   I (Misc)
+  11 Final Inspection & Turnover       2025-01-13   2025-01-31   (no BOQ link)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. INPUT ORDER (recommended sequence)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Step 1  →  Add Client (Section 1)
+  Step 2  →  Add Inventory Items (Section 4)
+  Step 3  →  Add Direct Supply Items (Section 5)
+  Step 4  →  Add Employees (Section 6)
+  Step 5  →  Create Project via Wizard
+               - Step 1: Project Info (Section 2)
+               - Step 2: Assign Team (include employees from Section 6)
+               - Step 3: BOQ (Sections A–I from Section 3)
+               - Step 4: Review & Save
+  Step 6  →  Add Milestones (Section 7) under project
+  Step 7  →  Add Tasks per milestone
+  Step 8  →  Allocate Materials (link to BOQ items)
+  Step 9  →  Add Labor Cost entries as work progresses
+
+================================================================================

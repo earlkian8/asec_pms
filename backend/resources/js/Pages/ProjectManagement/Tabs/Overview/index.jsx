@@ -209,7 +209,7 @@ export default function OverviewTab({ project, overviewData, boqData }) {
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-4 shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-blue-500 rounded-lg group-hover:scale-110 transition-transform">
@@ -220,7 +220,7 @@ export default function OverviewTab({ project, overviewData, boqData }) {
           <p className="text-xl font-bold text-gray-900">{formatCurrency(budget.contract_amount)}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 p-4 shadow-sm hover:shadow-md transition-all group">
+        {/* <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 p-4 shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-center justify-between mb-2">
             <div className="p-2 bg-orange-500 rounded-lg group-hover:scale-110 transition-transform">
               <TrendingUp className="text-white" size={18} />
@@ -229,7 +229,7 @@ export default function OverviewTab({ project, overviewData, boqData }) {
           </div>
           <p className="text-xl font-bold text-gray-900">{formatCurrency(budget.total_budget_used)}</p>
           <p className="text-xs text-gray-600 mt-1 font-medium">Budget Used</p>
-        </div>
+        </div> */}
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 p-4 shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-center justify-between mb-2">

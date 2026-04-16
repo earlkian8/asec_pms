@@ -57,9 +57,10 @@ const ViewLaborCost = ({ setShowViewModal, project, laborCost }) => {
       : 'Submitted';
 
   // Use breakdown if available (submitted), else compute display from attendance
+  const isDateKey = (k) => /^\d{4}-\d{2}-\d{2}$/.test(k);
   const dates = Object.keys(breakdown).length > 0
-    ? Object.keys(breakdown).filter(k => k !== 'fixed').sort()
-    : Object.keys(attendance).sort();
+    ? Object.keys(breakdown).filter(isDateKey).sort()
+    : Object.keys(attendance).filter(isDateKey).sort();
 
   // Aggregate totals from breakdown
   const totals = dates.reduce((acc, date) => {

@@ -459,12 +459,13 @@ export default function Step3BOQ({ errors = {} }) {
                                       step="0.01"
                                       value={item.unit_cost ?? ""}
                                       onChange={(e) =>
-                                        updateBoqItem(sectionIndex, itemIndex, {
+                                        !hasResources && updateBoqItem(sectionIndex, itemIndex, {
                                           unit_cost: e.target.value,
                                         })
                                       }
+                                      readOnly={hasResources}
                                       placeholder="0.00"
-                                      className="text-right"
+                                      className={`text-right ${hasResources ? "cursor-not-allowed bg-zinc-100 text-zinc-500" : ""}`}
                                     />
                                   </div>
                                 </div>
@@ -644,15 +645,25 @@ export default function Step3BOQ({ errors = {} }) {
                                         })()}
                                       </div>
 
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={resource.unit_price ?? ""}
-                                        onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { unit_price: e.target.value })}
-                                        placeholder={resource.resource_category === "labor" ? "Daily Rate" : "Unit Cost"}
-                                        className="text-right"
-                                      />
+                                      {(() => {
+                                        const sourceSelected =
+                                          resource.inventory_item_id ||
+                                          resource.direct_supply_id ||
+                                          resource.employee_id ||
+                                          resource.user_id;
+                                        return (
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={resource.unit_price ?? ""}
+                                            onChange={(e) => !sourceSelected && updateResource(sectionIndex, itemIndex, resourceIndex, { unit_price: e.target.value })}
+                                            readOnly={!!sourceSelected}
+                                            placeholder={resource.resource_category === "labor" ? "Daily Rate" : "Unit Cost"}
+                                            className={`text-right ${sourceSelected ? "cursor-not-allowed bg-zinc-100 text-zinc-500" : ""}`}
+                                          />
+                                        );
+                                      })()}
 
                                       <div className="flex items-center justify-between rounded-md bg-zinc-50 px-2 text-xs sm:col-span-6">
                                         <span className="text-zinc-600">

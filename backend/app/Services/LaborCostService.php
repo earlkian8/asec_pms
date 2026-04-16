@@ -34,7 +34,13 @@ class LaborCostService
             })
             ->when($dateFrom, fn ($q) => $q->where('period_start', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->where('period_end',   '<=', $dateTo))
-            ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
+            ->when($status && $status !== 'all', function ($q) use ($status) {
+                if ($status === 'returned') {
+                    $q->where('status', 'draft')->whereNotNull('rejected_at');
+                } else {
+                    $q->where('status', $status);
+                }
+            })
             ->with(['user', 'employee', 'createdBy'])
             ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
@@ -81,7 +87,13 @@ class LaborCostService
         $baseQuery = ProjectLaborCost::where('project_id', $project->id)
             ->when($dateFrom, fn ($q) => $q->where('period_start', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->where('period_end',   '<=', $dateTo))
-            ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status));
+            ->when($status && $status !== 'all', function ($q) use ($status) {
+                if ($status === 'returned') {
+                    $q->where('status', 'draft')->whereNotNull('rejected_at');
+                } else {
+                    $q->where('status', $status);
+                }
+            });
 
         $totalGrossPay    = (float) (clone $baseQuery)->sum('gross_pay');
         $totalDaysPresent = (float) (clone $baseQuery)->sum('days_present');

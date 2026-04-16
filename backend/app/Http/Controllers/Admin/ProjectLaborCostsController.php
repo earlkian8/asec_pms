@@ -501,6 +501,10 @@ class ProjectLaborCostsController extends Controller
             'submitted_at'      => now(),
             'submitted_by'      => Auth::id(),
             'payroll_breakdown' => $breakdown,
+            // Clear any previous rejection info on re-submit
+            'rejection_reason'  => null,
+            'rejected_at'       => null,
+            'rejected_by'       => null,
         ]);
         $laborCost->load(['user', 'employee']);
 
@@ -520,6 +524,50 @@ class ProjectLaborCostsController extends Controller
         );
 
         return back()->with('success', 'Payroll entry submitted and locked successfully.');
+    }
+
+    // ── Reject (send back to draft) ───────────────────────────────────────────
+
+    public function reject(Request $request, Project $project, ProjectLaborCost $laborCost)
+    {
+        $scopeError = $this->ensureProjectScoped($project, $laborCost);
+        if ($scopeError) {
+            return back()->withErrors($scopeError);
+        }
+
+        if ($laborCost->status !== ProjectLaborCost::STATUS_SUBMITTED) {
+            return back()->with('error', 'Only submitted payroll entries can be rejected.');
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $laborCost->update([
+            'status'           => ProjectLaborCost::STATUS_DRAFT,
+            'rejection_reason' => $validated['rejection_reason'],
+            'rejected_at'      => now(),
+            'rejected_by'      => Auth::id(),
+        ]);
+
+        $laborCost->load(['user', 'employee']);
+
+        $this->adminActivityLogs(
+            'Labor Cost', 'Rejected',
+            'Rejected payroll entry for ' . $laborCost->assignable_name
+            . ' — period ' . $laborCost->period_start->format('M d, Y')
+            . ' to ' . $laborCost->period_end->format('M d, Y')
+            . ' for project "' . $project->project_name . '". Reason: ' . $validated['rejection_reason']
+        );
+
+        $this->createSystemNotification(
+            'general', 'Payroll Entry Rejected',
+            "Payroll entry for {$laborCost->assignable_name} was rejected for project '{$project->project_name}'. Reason: {$validated['rejection_reason']}",
+            $project,
+            route('project-management.view', $project->id)
+        );
+
+        return back()->with('success', 'Payroll entry rejected and returned to draft.');
     }
 
     public function approve(Project $project, ProjectLaborCost $laborCost)

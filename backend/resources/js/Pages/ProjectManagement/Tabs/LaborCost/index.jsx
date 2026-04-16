@@ -13,8 +13,12 @@ import {
   Trash2, SquarePen, Plus, Filter, Search, Calendar,
   X, ArrowUpDown, Users, CheckCircle2,
   Clock, Lock, Send, ChevronDown, ChevronRight,
-  PhilippinePeso, Eye,
+  PhilippinePeso, Eye, XCircle,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/Components/ui/dialog";
+import { Textarea } from "@/Components/ui/textarea";
 import { usePermission } from '@/utils/permissions';
 import AddLaborCost from './add';
 import EditLaborCost from './edit';
@@ -32,6 +36,10 @@ export default function LaborCostTab({ project, laborCostData }) {
   const [deleteLaborCost, setDeleteLaborCost] = useState(null);
   const [viewLaborCost,   setViewLaborCost]   = useState(null);
   const [expandedRows,    setExpandedRows]    = useState(new Set());
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectTarget,    setRejectTarget]    = useState(null);
+  const [rejectReason,    setRejectReason]    = useState('');
+  const [rejecting,       setRejecting]       = useState(false);
 
   const pagination   = laborCostData?.laborCosts;
   const laborCosts   = pagination?.data || [];
@@ -140,6 +148,29 @@ export default function LaborCostTab({ project, laborCostData }) {
     );
   };
 
+  const handleReject = () => {
+    if (!rejectReason.trim() || rejectReason.trim().length < 5) {
+      toast.error('Please provide a rejection reason (at least 5 characters).');
+      return;
+    }
+    setRejecting(true);
+    router.put(
+      route('project-management.labor-costs.reject', [project.id, rejectTarget.id]),
+      { rejection_reason: rejectReason.trim() },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          toast.success('Payroll entry rejected and returned to draft.');
+          setShowRejectModal(false);
+          setRejectTarget(null);
+          setRejectReason('');
+        },
+        onError: () => toast.error('Failed to reject payroll entry.'),
+        onFinish: () => setRejecting(false),
+      }
+    );
+  };
+
   const toggleRow = (id) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
@@ -212,6 +243,7 @@ export default function LaborCostTab({ project, laborCostData }) {
                       <SelectContent>
                         <SelectItem value="all">All</SelectItem>
                         <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="returned">Returned (Rejected)</SelectItem>
                         <SelectItem value="submitted">Submitted</SelectItem>
                       </SelectContent>
                     </Select>
@@ -304,6 +336,7 @@ export default function LaborCostTab({ project, laborCostData }) {
             {laborCosts.length > 0 ? laborCosts.map((entry, index) => {
               const isExpanded = expandedRows.has(entry.id);
               const isDraft = entry.status === 'draft';
+              const isReturned = isDraft && !!entry.rejected_at;
               const isSubmitted = entry.status === 'submitted';
               const isApproved = entry.status === 'approved';
               const isPaid = entry.status === 'paid';
@@ -360,10 +393,20 @@ export default function LaborCostTab({ project, laborCostData }) {
 
                     {/* Status */}
                     <TableCell className="px-4 py-4 text-sm" onClick={e => e.stopPropagation()}>
-                      {isDraft && (
+                      {isDraft && !isReturned && (
                         <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
                           <Clock size={11} />Draft
                         </span>
+                      )}
+                      {isReturned && (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-red-100 text-red-700 border border-red-200">
+                            <XCircle size={11} />Returned
+                          </span>
+                          <p className="text-xs text-red-600 max-w-[160px] truncate" title={entry.rejection_reason}>
+                            {entry.rejection_reason}
+                          </p>
+                        </div>
                       )}
                       {isSubmitted && (
                         <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full font-medium bg-green-100 text-green-700 border border-green-200">
@@ -394,16 +437,24 @@ export default function LaborCostTab({ project, laborCostData }) {
                           </button>
                         )}
                         {isSubmitted && has('labor-costs.update') && (
-                          <button
-                            onClick={() => router.put(route('project-management.labor-costs.approve', [project.id, entry.id]), {}, {
-                              preserveScroll: true,
-                              onSuccess: () => toast.success('Payroll entry approved.'),
-                              onError: () => toast.error('Failed to approve payroll entry.'),
-                            })}
-                            className="p-2 rounded-lg hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all border border-blue-200"
-                            title="Approve">
-                            <CheckCircle2 size={15} />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => router.put(route('project-management.labor-costs.approve', [project.id, entry.id]), {}, {
+                                preserveScroll: true,
+                                onSuccess: () => toast.success('Payroll entry approved.'),
+                                onError: () => toast.error('Failed to approve payroll entry.'),
+                              })}
+                              className="p-2 rounded-lg hover:bg-blue-100 text-blue-600 hover:text-blue-700 transition-all border border-blue-200"
+                              title="Approve">
+                              <CheckCircle2 size={15} />
+                            </button>
+                            <button
+                              onClick={() => { setRejectTarget(entry); setRejectReason(''); setShowRejectModal(true); }}
+                              className="p-2 rounded-lg hover:bg-red-100 text-red-600 hover:text-red-700 transition-all border border-red-200"
+                              title="Reject — return to draft">
+                              <XCircle size={15} />
+                            </button>
+                          </>
                         )}
                         {isApproved && has('labor-costs.update') && (
                           <button
@@ -554,6 +605,45 @@ export default function LaborCostTab({ project, laborCostData }) {
       )}
       {showDeleteModal && deleteLaborCost && (
         <DeleteLaborCost setShowDeleteModal={setShowDeleteModal} project={project} laborCost={deleteLaborCost} />
+      )}
+
+      {/* ── Reject modal ── */}
+      {showRejectModal && rejectTarget && (
+        <Dialog open onOpenChange={(open) => { if (!open) { setShowRejectModal(false); setRejectTarget(null); setRejectReason(''); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-700">
+                <XCircle size={18} /> Reject Payroll Entry
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-gray-600">
+                This will return the entry for <strong>{rejectTarget.assignable_name}</strong> to draft so it can be corrected and re-submitted.
+              </p>
+              <div>
+                <Label className="text-sm font-medium">Reason for rejection <span className="text-red-500">*</span></Label>
+                <Textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  placeholder="Explain what needs to be corrected…"
+                  rows={3}
+                  className="mt-1"
+                />
+                {rejectReason.trim().length > 0 && rejectReason.trim().length < 5 && (
+                  <p className="text-xs text-red-500 mt-1">Must be at least 5 characters.</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setShowRejectModal(false); setRejectTarget(null); setRejectReason(''); }} disabled={rejecting}>
+                Cancel
+              </Button>
+              <Button onClick={handleReject} disabled={rejecting || rejectReason.trim().length < 5} className="bg-red-600 hover:bg-red-700 text-white">
+                {rejecting ? 'Rejecting…' : 'Reject & Return'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

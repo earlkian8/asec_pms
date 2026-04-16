@@ -56,6 +56,9 @@ class ProjectLaborCost extends Model
         'gross_pay',
         'description',
         'notes',
+        'rejection_reason',
+        'rejected_at',
+        'rejected_by',
         'created_by',
     ];
 
@@ -65,6 +68,7 @@ class ProjectLaborCost extends Model
         'submitted_at'   => 'datetime',
         'approved_at'    => 'datetime',
         'paid_at'        => 'datetime',
+        'rejected_at'    => 'datetime',
         'daily_rate'     => 'decimal:2',
         'monthly_salary' => 'decimal:2',
         'days_present'   => 'decimal:2',
@@ -122,6 +126,11 @@ class ProjectLaborCost extends Model
     public function paidBy()
     {
         return $this->belongsTo(User::class, 'paid_by');
+    }
+
+    public function rejectedBy()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
     }
 
     public function boqItem()

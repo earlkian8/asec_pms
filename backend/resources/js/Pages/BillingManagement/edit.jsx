@@ -62,11 +62,6 @@ const EditBilling = ({ setShowEditModal, billing }) => {
     });
   }
 
-  const milestonePresetAmount =
-    billing.milestone?.billing_percentage && contractAmount > 0
-      ? ((contractAmount * parseFloat(billing.milestone.billing_percentage)) / 100).toFixed(2)
-      : null;
-
   const inputClass = (error, readOnly = false) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
     (readOnly
@@ -114,18 +109,6 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             />
           </div>
 
-          {/* Milestone (read-only info) */}
-          {billing.milestone && (
-            <div className="col-span-2">
-              <Label className="text-zinc-800">Milestone</Label>
-              <Input
-                value={billing.milestone.name + (billing.milestone.billing_percentage ? ` (${billing.milestone.billing_percentage}%)` : '')}
-                readOnly
-                className="bg-gray-50 border-gray-300 text-gray-600 cursor-not-allowed"
-              />
-            </div>
-          )}
-
           {/* Contract amount info */}
           {contractAmount > 0 && (
             <div className="col-span-2">
@@ -157,17 +140,8 @@ const EditBilling = ({ setShowEditModal, billing }) => {
             <InputError message={errors.billing_amount} />
 
             {/* Presets */}
-            {(presets.length > 0 || milestonePresetAmount) && (
+            {presets.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {milestonePresetAmount && (
-                  <button
-                    type="button"
-                    onClick={() => setAmount(milestonePresetAmount)}
-                    className="px-2.5 py-1 text-xs rounded-md border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium"
-                  >
-                    Milestone ({billing.milestone?.billing_percentage}%) = ₱{fmt(milestonePresetAmount)}
-                  </button>
-                )}
                 {presets.map(({ label, value }) => (
                   <button
                     key={label}

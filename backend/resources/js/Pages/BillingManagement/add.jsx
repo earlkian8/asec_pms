@@ -27,12 +27,10 @@ const fmt = (n) => parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits
 
 const AddBilling = ({ setShowAddModal, projects = [] }) => {
   const [selectedProject, setSelectedProject] = useState(null);
-  const [milestones, setMilestones] = useState([]);
   const [billingAmountDisplay, setBillingAmountDisplay] = useState('');
 
   const { data, setData, post, errors, processing } = useForm({
     project_id: "",
-    milestone_id: "",
     billing_amount: "",
     billing_date: new Date().toISOString().split('T')[0],
     due_date: "",
@@ -44,14 +42,12 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
       const project = projects.find(p => p.id.toString() === data.project_id.toString());
       if (project) {
         setSelectedProject(project);
-        setData(prev => ({ ...prev, milestone_id: '', billing_amount: '' }));
-        setMilestones(project.milestones || []);
+        setData(prev => ({ ...prev, billing_amount: '' }));
         setBillingAmountDisplay('');
       }
     } else {
       setSelectedProject(null);
-      setMilestones([]);
-      setData(prev => ({ ...prev, milestone_id: '', billing_amount: '' }));
+      setData(prev => ({ ...prev, billing_amount: '' }));
       setBillingAmountDisplay('');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,13 +85,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
       presets.push({ label: `${pct}%`, value: ((contractAmount * pct) / 100).toFixed(2) });
     });
   }
-
-  const selectedMilestone = data.milestone_id
-    ? milestones.find(m => m.id.toString() === data.milestone_id.toString())
-    : null;
-  const milestonePresetAmount = selectedMilestone?.billing_percentage && contractAmount > 0
-    ? ((contractAmount * parseFloat(selectedMilestone.billing_percentage)) / 100).toFixed(2)
-    : null;
 
   const inputClass = (error) =>
     "w-full border text-sm rounded-md px-4 py-2 focus:outline-none transition-all duration-200 " +
@@ -144,29 +133,6 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.project_id} />
           </div>
 
-          {/* Milestone selector */}
-          {selectedProject && milestones.length > 0 && (
-            <div className="col-span-2">
-              <Label className="text-zinc-800">Milestone</Label>
-              <Select
-                value={data.milestone_id}
-                onValueChange={(v) => setData("milestone_id", v)}
-              >
-                <SelectTrigger className={inputClass(errors.milestone_id)}>
-                  <SelectValue placeholder="Select milestone" />
-                </SelectTrigger>
-                <SelectContent>
-                  {milestones.map((m) => (
-                    <SelectItem key={m.id} value={m.id.toString()}>
-                      {m.name}{m.billing_percentage ? ` (${m.billing_percentage}%)` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <InputError message={errors.milestone_id} />
-            </div>
-          )}
-
           {/* Contract amount info bar */}
           {selectedProject && contractAmount > 0 && (
             <div className="col-span-2">
@@ -204,17 +170,8 @@ const AddBilling = ({ setShowAddModal, projects = [] }) => {
             <InputError message={errors.billing_amount} />
 
             {/* Presets */}
-            {(presets.length > 0 || milestonePresetAmount) && (
+            {presets.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {milestonePresetAmount && (
-                  <button
-                    type="button"
-                    onClick={() => setAmount(milestonePresetAmount)}
-                    className="px-2.5 py-1 text-xs rounded-md border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors font-medium"
-                  >
-                    Milestone ({selectedMilestone?.billing_percentage}%) = ₱{fmt(milestonePresetAmount)}
-                  </button>
-                )}
                 {presets.map(({ label, value }) => (
                   <button
                     key={label}

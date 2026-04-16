@@ -727,24 +727,51 @@ export default function Step3BOQ({ errors = {} }) {
         );
       })}
 
-      {boqSections.length > 0 && (
-        <div className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleAddSection}
-            className="flex items-center gap-2 border-zinc-300"
-          >
-            <Plus size={14} /> Add Section
-          </Button>
-          <div className="text-sm text-zinc-700">
-            BOQ Total:{" "}
-            <span className="ml-2 text-base font-semibold text-zinc-900">
-              ₱{formatCurrency(grandTotal)}
-            </span>
-          </div>
-        </div>
-      )}
+      {boqSections.length > 0 && (() => {
+        const contractAmount = toNumber(projectData?.contract_amount);
+        const isOverContract = contractAmount > 0 && grandTotal > contractAmount;
+        return (
+          <>
+            {isOverContract && (
+              <div className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <span className="mt-0.5 flex-shrink-0">⚠</span>
+                <span>
+                  BOQ total (<strong>₱{formatCurrency(grandTotal)}</strong>) exceeds the contract
+                  amount (<strong>₱{formatCurrency(contractAmount)}</strong>) by{" "}
+                  <strong>₱{formatCurrency(grandTotal - contractAmount)}</strong>. Planned costs
+                  will exceed what the client has contracted.
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddSection}
+                className="flex items-center gap-2 border-zinc-300"
+              >
+                <Plus size={14} /> Add Section
+              </Button>
+              <div className="flex items-center gap-6 text-sm text-zinc-700">
+                {contractAmount > 0 && (
+                  <span>
+                    Contract:{" "}
+                    <span className="font-semibold text-zinc-900">
+                      ₱{formatCurrency(contractAmount)}
+                    </span>
+                  </span>
+                )}
+                <span>
+                  BOQ Total:{" "}
+                  <span className={`ml-1 font-semibold ${isOverContract ? "text-red-600" : "text-zinc-900"}`}>
+                    ₱{formatCurrency(grandTotal)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

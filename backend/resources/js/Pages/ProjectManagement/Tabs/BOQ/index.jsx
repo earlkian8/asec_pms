@@ -1189,8 +1189,14 @@ export default function BOQTab({ project, boqData }) {
             </div>
 
             {contractVariance < 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    BOQ total exceeds contract by ₱{formatCurrency(Math.abs(contractVariance))}. Saving is blocked until BOQ is within contract amount.
+                <div className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <span className="mt-0.5 flex-shrink-0">⚠</span>
+                    <span>
+                        BOQ total (<strong>₱{formatCurrency(grandTotal)}</strong>) exceeds the
+                        contract amount (<strong>₱{formatCurrency(Number(contractAmount))}</strong>)
+                        by <strong>₱{formatCurrency(Math.abs(contractVariance))}</strong>. Planned
+                        costs exceed what the client has contracted.
+                    </span>
                 </div>
             )}
 

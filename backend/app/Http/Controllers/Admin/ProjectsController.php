@@ -415,17 +415,6 @@ class ProjectsController extends Controller
             $boqSections = $canCreateBoq ? ($validated['boq_sections'] ?? []) : [];
 
             if (!empty($boqSections)) {
-                $boqPlannedTotal = $this->calculateBoqTotalFromSections($boqSections);
-                $contractAmount = (float) ($validated['contract_amount'] ?? 0);
-
-                if ($contractAmount > 0 && $boqPlannedTotal > $contractAmount) {
-                    throw ValidationException::withMessages([
-                        'boq_sections' => [
-                            'BOQ total (' . number_format($boqPlannedTotal, 2) . ') exceeds contract amount (' . number_format($contractAmount, 2) . ').',
-                        ],
-                    ]);
-                }
-
                 $this->validateBoqInventoryStock($boqSections);
             }
 

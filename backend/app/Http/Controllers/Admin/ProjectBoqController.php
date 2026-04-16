@@ -73,17 +73,6 @@ class ProjectBoqController extends Controller
             $project->id
         );
 
-        $plannedTotal = $this->calculatePlannedTotal($validated['sections'] ?? []);
-        $contractAmount = (float) ($project->contract_amount ?? 0);
-
-        if ($contractAmount > 0 && $plannedTotal > $contractAmount) {
-            throw ValidationException::withMessages([
-                'sections' => [
-                    'BOQ total (' . number_format($plannedTotal, 2) . ') exceeds contract amount (' . number_format($contractAmount, 2) . ').',
-                ],
-            ]);
-        }
-
         // Replace-semantics: wipe existing BOQ for this project and rebuild.
         // Milestones, team members, and material allocations are NOT touched here —
         // they were seeded at project-creation time and now live independently.

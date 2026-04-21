@@ -489,95 +489,113 @@ export default function BOQTab({ project, boqData }) {
                     key={rIndex}
                     className="grid grid-cols-1 gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-6"
                 >
-                    <select
-                        value={resource.source_type || ''}
-                        onChange={(e) =>
-                            updateResource(sIndex, iIndex, rIndex, { source_type: e.target.value })
-                        }
-                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                    >
-                        {category === 'material' ? (
-                            <>
-                                <option value="inventory">Inventory</option>
-                                <option value="direct_supply">Direct Supply</option>
-                            </>
-                        ) : (
-                            <>
-                                <option value="employee">Employee</option>
-                                <option value="user">User</option>
-                            </>
-                        )}
-                    </select>
+                    <div>
+                        <label className="mb-1 block text-[11px] text-zinc-500">Source</label>
+                        <select
+                            value={resource.source_type || ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { source_type: e.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
+                        >
+                            {category === 'material' ? (
+                                <>
+                                    <option value="inventory">Inventory</option>
+                                    <option value="direct_supply">Direct Supply</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="employee">Employee</option>
+                                    <option value="user">User</option>
+                                </>
+                            )}
+                        </select>
+                    </div>
 
                     {category === 'material' && resource.source_type === 'inventory' && (
-                        <select
-                            value={resource.inventory_item_id || ''}
-                            onChange={(e) =>
-                                updateResource(sIndex, iIndex, rIndex, { inventory_item_id: e.target.value })
-                            }
-                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                        >
-                            <option value="">Select inventory item</option>
-                            {inventoryItems.map((inv) => (
-                                <option key={inv.id} value={inv.id}>
-                                    {inv.code ? `${inv.code} - ` : ''}{inv.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="sm:col-span-2">
+                            <label className="mb-1 block text-[11px] text-zinc-500">Inventory Item</label>
+                            <select
+                                value={resource.inventory_item_id || ''}
+                                onChange={(e) =>
+                                    updateResource(sIndex, iIndex, rIndex, { inventory_item_id: e.target.value })
+                                }
+                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
+                            >
+                                <option value="">Select inventory item</option>
+                                {inventoryItems.map((inv) => (
+                                    <option key={inv.id} value={inv.id}>
+                                        {inv.code ? `${inv.code} - ` : ''}{inv.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     )}
 
                     {category === 'material' && resource.source_type === 'direct_supply' && (
-                        <select
-                            value={resource.direct_supply_id || ''}
-                            onChange={(e) =>
-                                updateResource(sIndex, iIndex, rIndex, { direct_supply_id: e.target.value })
-                            }
-                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                        >
-                            <option value="">Select direct supply</option>
-                            {directSupplies.map((supply) => (
-                                <option key={supply.id} value={supply.id}>
-                                    {supply.code ? `${supply.code} - ` : ''}{supply.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="sm:col-span-2">
+                            <label className="mb-1 block text-[11px] text-zinc-500">Direct Supply</label>
+                            <select
+                                value={resource.direct_supply_id || ''}
+                                onChange={(e) =>
+                                    updateResource(sIndex, iIndex, rIndex, { direct_supply_id: e.target.value })
+                                }
+                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
+                            >
+                                <option value="">Select direct supply</option>
+                                {directSupplies.map((supply) => (
+                                    <option key={supply.id} value={supply.id}>
+                                        {supply.code ? `${supply.code} - ` : ''}{supply.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     )}
 
                     {category === 'labor' && resource.source_type === 'employee' && (
-                        <select
-                            value={resource.employee_id || ''}
-                            onChange={(e) =>
-                                updateResource(sIndex, iIndex, rIndex, { employee_id: e.target.value })
-                            }
-                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                        >
-                            <option value="">Select employee</option>
-                            {employeeOptions.map((person) => (
-                                <option key={person.id} value={person.id}>
-                                    {person.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="sm:col-span-2">
+                            <label className="mb-1 block text-[11px] text-zinc-500">Employee</label>
+                            <select
+                                value={resource.employee_id || ''}
+                                onChange={(e) =>
+                                    updateResource(sIndex, iIndex, rIndex, { employee_id: e.target.value })
+                                }
+                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
+                            >
+                                <option value="">Select employee</option>
+                                {employeeOptions.map((person) => (
+                                    <option key={person.id} value={person.id}>
+                                        {person.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     )}
 
                     {category === 'labor' && resource.source_type === 'user' && (
-                        <select
-                            value={resource.user_id || ''}
-                            onChange={(e) =>
-                                updateResource(sIndex, iIndex, rIndex, { user_id: e.target.value })
-                            }
-                            className="h-9 rounded-md border border-zinc-300 px-2 text-sm sm:col-span-2"
-                        >
-                            <option value="">Select user</option>
-                            {userOptions.map((person) => (
-                                <option key={person.id} value={person.id}>
-                                    {person.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="sm:col-span-2">
+                            <label className="mb-1 block text-[11px] text-zinc-500">User</label>
+                            <select
+                                value={resource.user_id || ''}
+                                onChange={(e) =>
+                                    updateResource(sIndex, iIndex, rIndex, { user_id: e.target.value })
+                                }
+                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
+                            >
+                                <option value="">Select user</option>
+                                {userOptions.map((person) => (
+                                    <option key={person.id} value={person.id}>
+                                        {person.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     )}
 
                     <div className={category === 'labor' ? 'sm:col-span-1' : ''}>
+                        <label className="mb-1 block text-[11px] text-zinc-500">
+                            {category === 'labor' ? 'Days' : 'Quantity'}
+                        </label>
                         <Input
                             type="number"
                             min="0"
@@ -614,17 +632,22 @@ export default function BOQTab({ project, boqData }) {
                         })()}
                     </div>
 
-                    <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={resource.unit_price ?? ''}
-                        onChange={(e) =>
-                            updateResource(sIndex, iIndex, rIndex, { unit_price: e.target.value })
-                        }
-                        placeholder="Daily Rate"
-                        className="text-right"
-                    />
+                    <div>
+                        <label className="mb-1 block text-[11px] text-zinc-500">
+                            {category === 'labor' ? 'Daily Rate' : 'Unit Price'}
+                        </label>
+                        <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={resource.unit_price ?? ''}
+                            onChange={(e) =>
+                                updateResource(sIndex, iIndex, rIndex, { unit_price: e.target.value })
+                            }
+                            placeholder={category === 'labor' ? 'Daily Rate' : 'Unit Price'}
+                            className="text-right"
+                        />
+                    </div>
 
                     <div className="flex items-center justify-between rounded-md bg-zinc-50 px-2 text-xs sm:col-span-6">
                         <span className="text-zinc-600">

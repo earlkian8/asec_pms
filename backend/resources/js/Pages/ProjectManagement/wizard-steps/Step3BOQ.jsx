@@ -616,65 +616,79 @@ export default function Step3BOQ({ errors = {} }) {
 
                                     return (
                                     <div key={resourceIndex} className="grid grid-cols-1 gap-2 rounded-md border border-zinc-200 bg-white p-2 sm:grid-cols-6">
-                                      <select
-                                        value={resource.source_type || ""}
-                                        onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { source_type: e.target.value })}
-                                        className="h-9 rounded-md border border-zinc-300 px-2 text-sm"
-                                      >
-                                        {resource.resource_category === "material" ? (
-                                          <>
-                                            <option value="inventory">Inventory</option>
-                                            <option value="direct_supply">Direct Supply</option>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <option value="employee">Employee</option>
-                                            <option value="user">User</option>
-                                          </>
-                                        )}
-                                      </select>
+                                      <div>
+                                        <Label className="mb-1 block text-[11px] text-zinc-500">Source</Label>
+                                        <select
+                                          value={resource.source_type || ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { source_type: e.target.value })}
+                                          className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
+                                        >
+                                          {resource.resource_category === "material" ? (
+                                            <>
+                                              <option value="inventory">Inventory</option>
+                                              <option value="direct_supply">Direct Supply</option>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <option value="employee">Employee</option>
+                                              <option value="user">User</option>
+                                            </>
+                                          )}
+                                        </select>
+                                      </div>
 
                                       {resource.resource_category === "material" && resource.source_type === "inventory" && (
-                                        <ResourceCombobox
-                                          options={inventoryOptions}
-                                          value={resource.inventory_item_id || ""}
-                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { inventory_item_id: val })}
-                                          placeholder="Search inventory…"
-                                          className="sm:col-span-2"
-                                        />
+                                        <div className="sm:col-span-2">
+                                          <Label className="mb-1 block text-[11px] text-zinc-500">Inventory Item</Label>
+                                          <ResourceCombobox
+                                            options={inventoryOptions}
+                                            value={resource.inventory_item_id || ""}
+                                            onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { inventory_item_id: val })}
+                                            placeholder="Search inventory…"
+                                          />
+                                        </div>
                                       )}
 
                                       {resource.resource_category === "material" && resource.source_type === "direct_supply" && (
-                                        <ResourceCombobox
-                                          options={directSupplyOptions}
-                                          value={resource.direct_supply_id || ""}
-                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { direct_supply_id: val })}
-                                          placeholder="Search direct supply…"
-                                          className="sm:col-span-2"
-                                        />
+                                        <div className="sm:col-span-2">
+                                          <Label className="mb-1 block text-[11px] text-zinc-500">Direct Supply</Label>
+                                          <ResourceCombobox
+                                            options={directSupplyOptions}
+                                            value={resource.direct_supply_id || ""}
+                                            onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { direct_supply_id: val })}
+                                            placeholder="Search direct supply…"
+                                          />
+                                        </div>
                                       )}
 
                                       {resource.resource_category === "labor" && resource.source_type === "employee" && (
-                                        <ResourceCombobox
-                                          options={employeeOpts}
-                                          value={resource.employee_id || ""}
-                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { employee_id: val })}
-                                          placeholder="Search employee…"
-                                          className="sm:col-span-2"
-                                        />
+                                        <div className="sm:col-span-2">
+                                          <Label className="mb-1 block text-[11px] text-zinc-500">Employee</Label>
+                                          <ResourceCombobox
+                                            options={employeeOpts}
+                                            value={resource.employee_id || ""}
+                                            onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { employee_id: val })}
+                                            placeholder="Search employee…"
+                                          />
+                                        </div>
                                       )}
 
                                       {resource.resource_category === "labor" && resource.source_type === "user" && (
-                                        <ResourceCombobox
-                                          options={userOpts}
-                                          value={resource.user_id || ""}
-                                          onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { user_id: val })}
-                                          placeholder="Search user…"
-                                          className="sm:col-span-2"
-                                        />
+                                        <div className="sm:col-span-2">
+                                          <Label className="mb-1 block text-[11px] text-zinc-500">User</Label>
+                                          <ResourceCombobox
+                                            options={userOpts}
+                                            value={resource.user_id || ""}
+                                            onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { user_id: val })}
+                                            placeholder="Search user…"
+                                          />
+                                        </div>
                                       )}
 
                                       <div>
+                                        <Label className="mb-1 block text-[11px] text-zinc-500">
+                                          {resource.resource_category === "labor" ? "Days" : "Quantity"}
+                                        </Label>
                                         <Input
                                           type="number"
                                           min="0"
@@ -710,25 +724,20 @@ export default function Step3BOQ({ errors = {} }) {
                                         })()}
                                       </div>
 
-                                      {(() => {
-                                        const sourceSelected =
-                                          resource.inventory_item_id ||
-                                          resource.direct_supply_id ||
-                                          resource.employee_id ||
-                                          resource.user_id;
-                                        return (
-                                          <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={resource.unit_price ?? ""}
-                                            onChange={(e) => !sourceSelected && updateResource(sectionIndex, itemIndex, resourceIndex, { unit_price: e.target.value })}
-                                            readOnly={!!sourceSelected}
-                                            placeholder={resource.resource_category === "labor" ? "Daily Rate" : "Unit Cost"}
-                                            className={`text-right ${sourceSelected ? "cursor-not-allowed bg-zinc-100 text-zinc-500" : ""}`}
-                                          />
-                                        );
-                                      })()}
+                                      <div>
+                                        <Label className="mb-1 block text-[11px] text-zinc-500">
+                                          {resource.resource_category === "labor" ? "Daily Rate" : "Unit Price"}
+                                        </Label>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={resource.unit_price ?? ""}
+                                          onChange={(e) => updateResource(sectionIndex, itemIndex, resourceIndex, { unit_price: e.target.value })}
+                                          placeholder={resource.resource_category === "labor" ? "Daily Rate" : "Unit Cost"}
+                                          className="text-right"
+                                        />
+                                      </div>
 
                                       <div className="flex items-center justify-between rounded-md bg-zinc-50 px-2 text-xs sm:col-span-6">
                                         <span className="text-zinc-600">

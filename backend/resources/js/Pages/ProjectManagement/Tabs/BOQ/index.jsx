@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
 import AddInventoryItem from '@/Pages/InventoryManagement/add';
@@ -8,6 +8,8 @@ import AddUser from '@/Pages/UserManagement/Users/add';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Textarea } from '@/Components/ui/textarea';
+import ResourceCombobox from '@/Pages/ProjectManagement/boq/shared/ResourceCombobox';
+import ConfirmationModal from '@/Pages/ProjectManagement/boq/shared/ConfirmationModal';
 import {
     Plus,
     Trash2,
@@ -23,27 +25,20 @@ import {
     FileSpreadsheet,
 } from 'lucide-react';
 import { usePermission } from '@/utils/permissions';
-
-const toSectionCode = (index) => {
-    let n = index;
-    let out = '';
-    do {
-        out = String.fromCharCode(65 + (n % 26)) + out;
-        n = Math.floor(n / 26) - 1;
-    } while (n >= 0);
-    return out;
-};
-
-const formatCurrency = (n) =>
-    Number(n || 0).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
-
-const toNumber = (value) => {
-    const n = parseFloat(value);
-    return Number.isFinite(n) ? n : 0;
-};
+import {
+    formatCurrency,
+    getAllocatedByInventoryId,
+    getEffectiveInventoryStock,
+    getGrandTotal,
+    getItemTotal,
+    getItemUnitCost,
+    getLaborCost,
+    getMaterialCost,
+    getResourceTotal,
+    getSectionSubtotal,
+    toNumber,
+    toSectionCode,
+} from '@/Pages/ProjectManagement/boq/shared/boqCalculations';
 
 const ReadOnlyInput = ({ value, className = '' }) => (
     <input
@@ -96,6 +91,8 @@ export default function BOQTab({ project, boqData }) {
     const [showAddDirectSupply, setShowAddDirectSupply] = useState(false);
     const [showAddEmployee, setShowAddEmployee] = useState(false);
     const [showAddUser, setShowAddUser] = useState(false); // { [inventory_item_id]: { available, unit, current_stock, committed } }
+    const [pendingOverrunSave, setPendingOverrunSave] = useState(false);
+    const [manualCostTarget, setManualCostTarget] = useState(null);
 
     const fetchAvailability = (inventoryItemId) => {
         if (!inventoryItemId || availability[inventoryItemId]) return;
@@ -130,65 +127,14 @@ export default function BOQTab({ project, boqData }) {
         return Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1;
     })();
 
-    const getResourceTotal = (resource) =>
-        toNumber(resource?.quantity) * toNumber(resource?.unit_price);
-
-    const getMaterialCost = (item) =>
-        (item?.resources || [])
-            .filter((r) => r.resource_category === 'material')
-            .reduce((sum, r) => sum + getResourceTotal(r), 0);
-
-    const getLaborCost = (item) =>
-        (item?.resources || [])
-            .filter((r) => r.resource_category === 'labor')
-            .reduce((sum, r) => sum + getResourceTotal(r), 0);
-
-    const getItemTotal = (item) => {
-        if (Array.isArray(item?.resources) && item.resources.length > 0) {
-            // Resources define the per-unit cost; qty floor of 1 matches applyResourceRollup which enforces qty >= 1 when resources exist.
-            return (getMaterialCost(item) + getLaborCost(item)) * Math.max(toNumber(item?.quantity), 1);
-        }
-        return toNumber(item?.quantity) * toNumber(item?.unit_cost);
-    };
-
-    // Returns cost per unit (never multiplied by quantity). Invariant: getItemTotal = getItemUnitCost × qty.
-    const getItemUnitCost = (item) => {
-        if (Array.isArray(item?.resources) && item.resources.length > 0) {
-            return getMaterialCost(item) + getLaborCost(item);
-        }
-        return toNumber(item?.unit_cost);
-    };
-
-    const grandTotal = useMemo(
-        () =>
-            sections.reduce(
-                (sum, s) =>
-                    sum + (s.items || []).reduce((sub, i) => sub + getItemTotal(i), 0),
-                0
-            ),
-        [sections]
-    );
+    const grandTotal = useMemo(() => getGrandTotal(sections), [sections]);
 
     // Tracks how much of each inventory item is allocated across all BOQ resources
     // so that displayed remaining availability reflects what's already been entered in other items.
-    const allocatedByInventoryId = useMemo(() => {
-        if (!editing) return {};
-        const map = {};
-        sections.forEach((section) => {
-            (section.items || []).forEach((item) => {
-                (item.resources || []).forEach((resource) => {
-                    if (resource.source_type === 'inventory' && resource.inventory_item_id) {
-                        const id = String(resource.inventory_item_id);
-                        map[id] = (map[id] || 0) + toNumber(resource.quantity);
-                    }
-                });
-            });
-        });
-        return map;
-    }, [editing, sections]);
-
-    const sectionSubtotal = (section) =>
-        (section.items || []).reduce((sub, i) => sub + getItemTotal(i), 0);
+    const allocatedByInventoryId = useMemo(
+        () => (editing ? getAllocatedByInventoryId(sections) : {}),
+        [editing, sections]
+    );
 
     const contractVariance = Number(contractAmount) - grandTotal;
 
@@ -211,6 +157,33 @@ export default function BOQTab({ project, boqData }) {
     };
 
     const handleSave = () => {
+        if (contractVariance < 0) {
+            setPendingOverrunSave(true);
+            return;
+        }
+
+        setSaving(true);
+        router.post(
+            route('project-management.project-boq.store', project.id),
+            { sections },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('BOQ saved');
+                    setEditing(false);
+                    setSaving(false);
+                },
+                onError: (errors) => {
+                    setSaving(false);
+                    const firstError = Object.values(errors || {})[0];
+                    toast.error(firstError || 'Failed to save BOQ');
+                },
+            }
+        );
+    };
+
+    const handleConfirmOverrunSave = () => {
+        setPendingOverrunSave(false);
         setSaving(true);
         router.post(
             route('project-management.project-boq.store', project.id),
@@ -419,6 +392,39 @@ export default function BOQTab({ project, boqData }) {
         applyResourceRollup(sIndex, iIndex, next);
     };
 
+    const switchToManualCost = (sIndex, iIndex) => {
+        const item = sections?.[sIndex]?.items?.[iIndex] || {};
+        const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
+        if (!hasResources) return;
+
+        setManualCostTarget({ sIndex, iIndex });
+    };
+
+    const handleConfirmManualCost = () => {
+        if (!manualCostTarget) return;
+
+        const { sIndex, iIndex } = manualCostTarget;
+        const item = sections?.[sIndex]?.items?.[iIndex] || {};
+        const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
+
+        if (!hasResources) {
+            setManualCostTarget(null);
+            return;
+        }
+
+        const derivedUnitCost = getItemUnitCost(item);
+        const qty = toNumber(item.quantity) > 0 ? toNumber(item.quantity) : 1;
+
+        updateItem(sIndex, iIndex, {
+            resources: [],
+            quantity: qty,
+            unit: item.unit || 'lot',
+            unit_cost: +derivedUnitCost.toFixed(2),
+        });
+
+        setManualCostTarget(null);
+    };
+
     // ── Resource table (view mode) ────────────────────────────────────────────
     const renderResourceTable = (resources, category, icon) => {
         const filtered = (resources || []).filter((r) => r.resource_category === category);
@@ -492,6 +498,47 @@ export default function BOQTab({ project, boqData }) {
 
         return filtered.map((resource) => {
             const rIndex = resource._origIdx;
+            const siblings = (resources || []).filter((_, idx) => idx !== rIndex);
+            const usedInventoryIds = new Set(
+                siblings
+                    .filter((r) => r.inventory_item_id)
+                    .map((r) => String(r.inventory_item_id))
+            );
+            const usedDirectSupplyIds = new Set(
+                siblings
+                    .filter((r) => r.direct_supply_id)
+                    .map((r) => String(r.direct_supply_id))
+            );
+            const usedEmployeeIds = new Set(
+                siblings
+                    .filter((r) => r.employee_id)
+                    .map((r) => String(r.employee_id))
+            );
+            const usedUserIds = new Set(
+                siblings
+                    .filter((r) => r.user_id)
+                    .map((r) => String(r.user_id))
+            );
+
+            const inventoryOpts = inventoryItems
+                .filter((inv) => !usedInventoryIds.has(String(inv.id)))
+                .map((inv) => ({
+                    value: String(inv.id),
+                    label: inv.code ? `${inv.code} - ${inv.name}` : inv.name,
+                }));
+            const directSupplyOpts = directSupplies
+                .filter((supply) => !usedDirectSupplyIds.has(String(supply.id)))
+                .map((supply) => ({
+                    value: String(supply.id),
+                    label: supply.code ? `${supply.code} - ${supply.name}` : supply.name,
+                }));
+            const employeeOpts = employeeOptions
+                .filter((person) => !usedEmployeeIds.has(String(person.id)))
+                .map((person) => ({ value: String(person.id), label: person.name }));
+            const userOpts = userOptions
+                .filter((person) => !usedUserIds.has(String(person.id)))
+                .map((person) => ({ value: String(person.id), label: person.name }));
+
             return (
                 <div
                     key={rIndex}
@@ -528,20 +575,17 @@ export default function BOQTab({ project, boqData }) {
                                     <button type="button" onClick={() => setShowAddInventory(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
                                 )}
                             </div>
-                            <select
+                            <ResourceCombobox
+                                options={inventoryOpts}
                                 value={resource.inventory_item_id || ''}
-                                onChange={(e) =>
-                                    updateResource(sIndex, iIndex, rIndex, { inventory_item_id: e.target.value })
-                                }
-                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
-                            >
-                                <option value="">Select inventory item</option>
-                                {inventoryItems.map((inv) => (
-                                    <option key={inv.id} value={inv.id}>
-                                        {inv.code ? `${inv.code} - ` : ''}{inv.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => updateResource(sIndex, iIndex, rIndex, { inventory_item_id: val })}
+                                placeholder="Search inventory..."
+                            />
+                            {inventoryOpts.length === 0 && !resource.inventory_item_id && (
+                                <p className="mt-1 text-[11px] text-zinc-400">
+                                    All inventory items are already used in this BOQ item.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -553,20 +597,17 @@ export default function BOQTab({ project, boqData }) {
                                     <button type="button" onClick={() => setShowAddDirectSupply(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
                                 )}
                             </div>
-                            <select
+                            <ResourceCombobox
+                                options={directSupplyOpts}
                                 value={resource.direct_supply_id || ''}
-                                onChange={(e) =>
-                                    updateResource(sIndex, iIndex, rIndex, { direct_supply_id: e.target.value })
-                                }
-                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
-                            >
-                                <option value="">Select direct supply</option>
-                                {directSupplies.map((supply) => (
-                                    <option key={supply.id} value={supply.id}>
-                                        {supply.code ? `${supply.code} - ` : ''}{supply.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => updateResource(sIndex, iIndex, rIndex, { direct_supply_id: val })}
+                                placeholder="Search direct supply..."
+                            />
+                            {directSupplyOpts.length === 0 && !resource.direct_supply_id && (
+                                <p className="mt-1 text-[11px] text-zinc-400">
+                                    All direct supplies are already used in this BOQ item.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -578,20 +619,17 @@ export default function BOQTab({ project, boqData }) {
                                     <button type="button" onClick={() => setShowAddEmployee(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
                                 )}
                             </div>
-                            <select
+                            <ResourceCombobox
+                                options={employeeOpts}
                                 value={resource.employee_id || ''}
-                                onChange={(e) =>
-                                    updateResource(sIndex, iIndex, rIndex, { employee_id: e.target.value })
-                                }
-                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
-                            >
-                                <option value="">Select employee</option>
-                                {employeeOptions.map((person) => (
-                                    <option key={person.id} value={person.id}>
-                                        {person.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => updateResource(sIndex, iIndex, rIndex, { employee_id: val })}
+                                placeholder="Search employee..."
+                            />
+                            {employeeOpts.length === 0 && !resource.employee_id && (
+                                <p className="mt-1 text-[11px] text-zinc-400">
+                                    All employees are already used in this BOQ item.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -603,20 +641,17 @@ export default function BOQTab({ project, boqData }) {
                                     <button type="button" onClick={() => setShowAddUser(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
                                 )}
                             </div>
-                            <select
+                            <ResourceCombobox
+                                options={userOpts}
                                 value={resource.user_id || ''}
-                                onChange={(e) =>
-                                    updateResource(sIndex, iIndex, rIndex, { user_id: e.target.value })
-                                }
-                                className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm"
-                            >
-                                <option value="">Select user</option>
-                                {userOptions.map((person) => (
-                                    <option key={person.id} value={person.id}>
-                                        {person.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => updateResource(sIndex, iIndex, rIndex, { user_id: val })}
+                                placeholder="Search user..."
+                            />
+                            {userOpts.length === 0 && !resource.user_id && (
+                                <p className="mt-1 text-[11px] text-zinc-400">
+                                    All users are already used in this BOQ item.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -647,7 +682,11 @@ export default function BOQTab({ project, boqData }) {
                             const id = String(resource.inventory_item_id);
                             const totalAllocated = allocatedByInventoryId[id] || 0;
                             const thisQty = toNumber(resource.quantity);
-                            const effectiveAvailable = info.available - (totalAllocated - thisQty);
+                            const effectiveAvailable = getEffectiveInventoryStock({
+                                currentStock: info.available,
+                                totalAllocated,
+                                currentResourceQty: thisQty,
+                            });
                             const qty = parseFloat(resource.quantity || 0);
                             const over = qty > effectiveAvailable;
                             return (
@@ -721,7 +760,7 @@ export default function BOQTab({ project, boqData }) {
             ) : (
                 sections.map((section, sIndex) => {
                     const sectionOpen = !collapsedSections[sIndex];
-                    const subtotal = sectionSubtotal(section);
+                    const subtotal = getSectionSubtotal(section);
 
                     return (
                         <div key={sIndex} className="overflow-hidden rounded-lg border border-zinc-200 shadow-sm">
@@ -874,7 +913,7 @@ export default function BOQTab({ project, boqData }) {
 
             {sections.map((section, sIndex) => {
                 const sectionOpen = !collapsedSections[sIndex];
-                const subtotal = sectionSubtotal(section);
+                const subtotal = getSectionSubtotal(section);
 
                 return (
                     <div key={sIndex} className="overflow-hidden rounded-lg border border-zinc-200 shadow-sm">
@@ -949,6 +988,7 @@ export default function BOQTab({ project, boqData }) {
                                         const itemMaterial = getMaterialCost(item);
                                         const itemLabor = getLaborCost(item);
                                         const itemUnitCost = getItemUnitCost(item);
+                                        const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
                                         const materialResources = (item.resources || []).filter(
                                             (r) => r.resource_category === 'material'
                                         );
@@ -1018,10 +1058,11 @@ export default function BOQTab({ project, boqData }) {
                                                         step="0.01"
                                                         value={item.unit_cost ?? ''}
                                                         onChange={(e) =>
-                                                            updateItem(sIndex, iIndex, { unit_cost: e.target.value })
+                                                            !hasResources && updateItem(sIndex, iIndex, { unit_cost: e.target.value })
                                                         }
+                                                        readOnly={hasResources}
                                                         placeholder="Cost"
-                                                        className="w-24 text-right"
+                                                        className={`w-24 text-right ${hasResources ? 'cursor-not-allowed bg-zinc-100 text-zinc-500' : ''}`}
                                                         title="BOQ unit cost"
                                                     />
                                                     <div className="hidden md:flex flex-col items-end text-[11px] leading-tight text-zinc-500 whitespace-nowrap">
@@ -1045,6 +1086,26 @@ export default function BOQTab({ project, boqData }) {
                                                 {/* Item resources (edit) */}
                                                 {itemOpen && (
                                                     <div className="px-6 py-3 space-y-4">
+                                                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                            <span className={`rounded-full px-2 py-0.5 font-medium ${hasResources ? 'bg-blue-100 text-blue-800' : 'bg-zinc-100 text-zinc-700'}`}>
+                                                                Cost Basis: {hasResources ? 'Resource-derived' : 'Manual'}
+                                                            </span>
+                                                            {hasResources ? (
+                                                                <>
+                                                                    <span className="text-zinc-500">Unit cost from resources: ₱{formatCurrency(itemUnitCost)}</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => switchToManualCost(sIndex, iIndex)}
+                                                                        className="font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                                                                    >
+                                                                        Switch to manual cost
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-zinc-500">Add resources below if you want automatic cost roll-up.</span>
+                                                            )}
+                                                        </div>
+
                                                         {/* Quantity multiplier warning */}
                                                         {(item.resources || []).length > 0 && toNumber(item.quantity) > 1 && (
                                                             <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -1160,6 +1221,29 @@ export default function BOQTab({ project, boqData }) {
         {showAddDirectSupply && <AddDirectSupply setShowAddModal={setShowAddDirectSupply} preserveState />}
         {showAddEmployee && <AddEmployee setShowAddModal={setShowAddEmployee} preserveState />}
         {showAddUser && <AddUser setShowAddModal={setShowAddUser} preserveState />}
+        <ConfirmationModal
+            open={pendingOverrunSave}
+            onOpenChange={(open) => {
+                if (!open) setPendingOverrunSave(false);
+            }}
+            title="BOQ Exceeds Contract"
+            description={`The BOQ total (P${formatCurrency(grandTotal)}) exceeds the contract amount (P${formatCurrency(Number(contractAmount))}) by P${formatCurrency(Math.abs(contractVariance))}. Do you still want to save?`}
+            confirmLabel="Save Anyway"
+            cancelLabel="Review BOQ"
+            onConfirm={handleConfirmOverrunSave}
+        />
+        <ConfirmationModal
+            open={Boolean(manualCostTarget)}
+            onOpenChange={(open) => {
+                if (!open) setManualCostTarget(null);
+            }}
+            title="Switch To Manual Cost"
+            description="This will remove all assigned resources for the selected item and keep the current computed unit cost as manual cost."
+            confirmLabel="Switch To Manual"
+            cancelLabel="Keep Resource-Based"
+            onConfirm={handleConfirmManualCost}
+            destructive
+        />
         <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap gap-6">

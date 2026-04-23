@@ -15,6 +15,8 @@ import Step1ProjectInfo from "./wizard-steps/Step1ProjectInfo";
 import Step3BOQ from "./wizard-steps/Step3BOQ";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { usePermission } from "@/utils/permissions";
+import ConfirmationModal from "@/Pages/ProjectManagement/boq/shared/ConfirmationModal";
+import { formatCurrency, getGrandTotal, toNumber } from "@/Pages/ProjectManagement/boq/shared/boqCalculations";
 
 const WIZARD_STEP_PERMISSIONS = [
   "projects.create",
@@ -41,6 +43,7 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, inventoryItems, dire
   const { has } = usePermission();
   const [processing, setProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [pendingOverContractData, setPendingOverContractData] = useState(null);
 
   const visibleSteps = useMemo(
     () => buildWizardSteps({ clients, inventoryItems, directSupplyItems, projectTypes, clientTypes, errors: formErrors })
@@ -98,16 +101,7 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, inventoryItems, dire
     nextStep();
   };
 
-  const handleSubmit = () => {
-    const stepErrors = validateStep1();
-    if (Object.keys(stepErrors).length > 0) {
-      setFormErrors(stepErrors);
-      goToStep(1);
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    const allData = getAllData();
+  const submitProject = (allData) => {
     setProcessing(true);
     setFormErrors({});
 
@@ -146,6 +140,34 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, inventoryItems, dire
     });
   };
 
+  const handleSubmit = () => {
+    const stepErrors = validateStep1();
+    if (Object.keys(stepErrors).length > 0) {
+      setFormErrors(stepErrors);
+      goToStep(1);
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    const allData = getAllData();
+
+    const boqTotal = getGrandTotal(allData.boqSections || []);
+    const contractAmount = toNumber(allData.project?.contract_amount);
+
+    if (contractAmount > 0 && boqTotal > contractAmount) {
+      setPendingOverContractData({ allData, boqTotal, contractAmount });
+      return;
+    }
+
+    submitProject(allData);
+  };
+
+  const handleConfirmOverContractSubmit = () => {
+    if (!pendingOverContractData) return;
+    submitProject(pendingOverContractData.allData);
+    setPendingOverContractData(null);
+  };
+
   const handleOpenChange = (isOpen) => {
     if (!isOpen) {
       setShowAddModal(false);
@@ -172,6 +194,22 @@ const AddProjectWizard = ({ open, setShowAddModal, clients, inventoryItems, dire
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
+        <ConfirmationModal
+          open={Boolean(pendingOverContractData)}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              setPendingOverContractData(null);
+            }
+          }}
+          title="BOQ Exceeds Contract"
+          description={pendingOverContractData
+            ? `The BOQ total (P${formatCurrency(pendingOverContractData.boqTotal)}) exceeds the contract amount (P${formatCurrency(pendingOverContractData.contractAmount)}) by P${formatCurrency(pendingOverContractData.boqTotal - pendingOverContractData.contractAmount)}. Do you still want to create the project?`
+            : ""}
+          confirmLabel="Create Project Anyway"
+          cancelLabel="Review BOQ"
+          onConfirm={handleConfirmOverContractSubmit}
+          busy={processing}
+        />
         <DialogHeader>
           <DialogTitle className="text-zinc-800">Add New Project</DialogTitle>
         </DialogHeader>

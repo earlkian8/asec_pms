@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { usePage } from "@inertiajs/react";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
 import { usePermission } from "@/utils/permissions";
@@ -27,88 +27,20 @@ import AddInventoryItem from "@/Pages/InventoryManagement/add";
 import AddDirectSupply from "@/Pages/DirectSupplyManagement/add";
 import AddEmployee from "@/Pages/EmployeeManagement/add";
 import AddUser from "@/Pages/UserManagement/Users/add";
-
-// Excel-style column letters for auto section codes (A, B, ..., Z, AA, AB, ...)
-const toSectionCode = (index) => {
-  let n = index;
-  let out = "";
-  do {
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return out;
-};
-
-const formatCurrency = (n) =>
-  Number(n || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const toNumber = (value) => {
-  const n = parseFloat(value);
-  return Number.isFinite(n) ? n : 0;
-};
-
-// Hybrid searchable combobox for resource selection
-function ResourceCombobox({ options, value, onChange, placeholder, className = "" }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setOpen(false);
-        setQuery("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const selected = options.find((o) => String(o.value) === String(value));
-  const filtered = query
-    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
-    : options;
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <input
-        type="text"
-        value={open ? query : (selected?.label ?? "")}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-        onFocus={() => { setQuery(""); setOpen(true); }}
-        placeholder={placeholder}
-        className="h-9 w-full rounded-md border border-zinc-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
-      />
-      {open && (
-        <div className="absolute z-50 mt-1 max-h-52 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg">
-          {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-zinc-400">No results</div>
-          ) : (
-            filtered.map((o) => (
-              <div
-                key={o.value}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(String(o.value));
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className={`cursor-pointer px-3 py-1.5 text-sm hover:bg-zinc-100 ${
-                  String(o.value) === String(value) ? "bg-zinc-50 font-medium text-zinc-900" : "text-zinc-700"
-                }`}
-              >
-                {o.label}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import ResourceCombobox from "@/Pages/ProjectManagement/boq/shared/ResourceCombobox";
+import ConfirmationModal from "@/Pages/ProjectManagement/boq/shared/ConfirmationModal";
+import {
+  formatCurrency,
+  getAllocatedByInventoryId,
+  getEffectiveInventoryStock,
+  getGrandTotal,
+  getItemTotal,
+  getItemUnitCost,
+  getResourceTotal,
+  getSectionSubtotal,
+  toNumber,
+  toSectionCode,
+} from "@/Pages/ProjectManagement/boq/shared/boqCalculations";
 
 export default function Step3BOQ({ errors = {} }) {
   const { props } = usePage();
@@ -124,6 +56,7 @@ export default function Step3BOQ({ errors = {} }) {
   const [showAddDirectSupply, setShowAddDirectSupply] = useState(false);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
+  const [manualCostTarget, setManualCostTarget] = useState(null);
 
   const {
     projectData,
@@ -166,50 +99,14 @@ export default function Step3BOQ({ errors = {} }) {
     addBoqItem(sectionIndex, { ...item });
   };
 
-  const grandTotal = useMemo(
-    () =>
-      boqSections.reduce(
-        (sum, s) =>
-          sum +
-          (s.items || []).reduce(
-            (sub, i) => sub + getItemTotal(i),
-            0
-          ),
-        0
-      ),
-    [boqSections]
-  );
+  const grandTotal = useMemo(() => getGrandTotal(boqSections), [boqSections]);
 
   // Tracks how much of each inventory item is allocated across all BOQ resources
   // so that displayed remaining stock reflects what's already been entered in other items.
-  const allocatedByInventoryId = useMemo(() => {
-    const map = {};
-    boqSections.forEach((section) => {
-      (section.items || []).forEach((item) => {
-        (item.resources || []).forEach((resource) => {
-          if (resource.source_type === "inventory" && resource.inventory_item_id) {
-            const id = String(resource.inventory_item_id);
-            map[id] = (map[id] || 0) + toNumber(resource.quantity);
-          }
-        });
-      });
-    });
-    return map;
-  }, [boqSections]);
-
-  const sectionSubtotal = (section) =>
-    (section.items || []).reduce(
-      (sub, i) => sub + getItemTotal(i),
-      0
-    );
-
-  function getResourceTotal(resource) {
-    return toNumber(resource?.quantity) * toNumber(resource?.unit_price);
-  }
-
-  function getItemTotal(item) {
-    return toNumber(item?.quantity) * toNumber(item?.unit_cost);
-  }
+  const allocatedByInventoryId = useMemo(
+    () => getAllocatedByInventoryId(boqSections),
+    [boqSections]
+  );
 
   function applyResourceRollup(sectionIndex, itemIndex, resources) {
     const total = resources.reduce((sum, resource) => sum + getResourceTotal(resource), 0);
@@ -247,6 +144,37 @@ export default function Step3BOQ({ errors = {} }) {
     ];
 
     applyResourceRollup(sectionIndex, itemIndex, next);
+  }
+
+  function switchToManualCost(sectionIndex, itemIndex) {
+    const item = boqSections?.[sectionIndex]?.items?.[itemIndex] || {};
+    const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
+    if (!hasResources) return;
+
+    setManualCostTarget({ sectionIndex, itemIndex });
+  }
+
+  function handleConfirmManualCost() {
+    if (!manualCostTarget) return;
+    const { sectionIndex, itemIndex } = manualCostTarget;
+    const item = boqSections?.[sectionIndex]?.items?.[itemIndex] || {};
+    const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
+    if (!hasResources) {
+      setManualCostTarget(null);
+      return;
+    }
+
+    const derivedUnitCost = getItemUnitCost(item);
+    const qty = toNumber(item.quantity) > 0 ? toNumber(item.quantity) : 1;
+
+    updateBoqItem(sectionIndex, itemIndex, {
+      resources: [],
+      quantity: qty,
+      unit: item.unit || "lot",
+      unit_cost: +derivedUnitCost.toFixed(2),
+    });
+
+    setManualCostTarget(null);
   }
 
   function removeResource(sectionIndex, itemIndex, resourceIndex) {
@@ -339,6 +267,18 @@ export default function Step3BOQ({ errors = {} }) {
     {showAddDirectSupply && <AddDirectSupply setShowAddModal={setShowAddDirectSupply} preserveState />}
     {showAddEmployee && <AddEmployee setShowAddModal={setShowAddEmployee} preserveState />}
     {showAddUser && <AddUser setShowAddModal={setShowAddUser} preserveState />}
+    <ConfirmationModal
+      open={Boolean(manualCostTarget)}
+      onOpenChange={(open) => {
+        if (!open) setManualCostTarget(null);
+      }}
+      title="Switch To Manual Cost"
+      description="This will remove all assigned resources for the selected item and keep the current computed unit cost as manual cost."
+      confirmLabel="Switch To Manual"
+      cancelLabel="Keep Resource-Based"
+      onConfirm={handleConfirmManualCost}
+      destructive
+    />
     <div className="space-y-6">
       <div className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
         <Info size={16} className="mt-0.5 flex-shrink-0" />
@@ -367,7 +307,7 @@ export default function Step3BOQ({ errors = {} }) {
 
       {boqSections.map((section, sectionIndex) => {
         const isCollapsed = collapsed[sectionIndex];
-        const subtotal = sectionSubtotal(section);
+        const subtotal = getSectionSubtotal(section);
         const sectionErrorKey = `boq_sections.${sectionIndex}.name`;
 
         return (
@@ -469,10 +409,7 @@ export default function Step3BOQ({ errors = {} }) {
                       {(section.items || []).map((item, itemIndex) => {
                         const amount = getItemTotal(item);
                         const hasResources = Array.isArray(item.resources) && item.resources.length > 0;
-                        const derivedUnitCost = (item.resources || []).reduce(
-                          (sum, resource) => sum + getResourceTotal(resource),
-                          0
-                        );
+                        const derivedUnitCost = getItemUnitCost(item);
                         const descKey = `boq_sections.${sectionIndex}.items.${itemIndex}.description`;
                         return (
                           <Fragment key={itemIndex}>
@@ -545,12 +482,25 @@ export default function Step3BOQ({ errors = {} }) {
                                     />
                                   </div>
                                 </div>
-                                {hasResources && (
-                                  <p className="mt-1 text-[11px] text-zinc-500">
-                                    Auto-filled from resources. Editable as needed. Resource subtotal used as cost:
-                                    {" "}₱{formatCurrency(derivedUnitCost)}
-                                  </p>
-                                )}
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                                  <span className={`rounded-full px-2 py-0.5 font-medium ${hasResources ? "bg-blue-100 text-blue-800" : "bg-zinc-100 text-zinc-700"}`}>
+                                    Cost Basis: {hasResources ? "Resource-derived" : "Manual"}
+                                  </span>
+                                  {hasResources ? (
+                                    <>
+                                      <span className="text-zinc-500">Unit cost from resources: ₱{formatCurrency(derivedUnitCost)}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => switchToManualCost(sectionIndex, itemIndex)}
+                                        className="font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                                      >
+                                        Switch to manual cost
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="text-zinc-500">Add resources below if you want automatic cost roll-up.</span>
+                                  )}
+                                </div>
                                 {errors[descKey] && (
                                   <InputError message={errors[descKey]} />
                                 )}
@@ -667,6 +617,11 @@ export default function Step3BOQ({ errors = {} }) {
                                             onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { inventory_item_id: val })}
                                             placeholder="Search inventory…"
                                           />
+                                          {inventoryOptions.length === 0 && !resource.inventory_item_id && (
+                                            <p className="mt-1 text-[11px] text-zinc-400">
+                                              All inventory items are already used in this BOQ item.
+                                            </p>
+                                          )}
                                         </div>
                                       )}
 
@@ -684,6 +639,11 @@ export default function Step3BOQ({ errors = {} }) {
                                             onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { direct_supply_id: val })}
                                             placeholder="Search direct supply…"
                                           />
+                                          {directSupplyOptions.length === 0 && !resource.direct_supply_id && (
+                                            <p className="mt-1 text-[11px] text-zinc-400">
+                                              All direct supplies are already used in this BOQ item.
+                                            </p>
+                                          )}
                                         </div>
                                       )}
 
@@ -701,6 +661,11 @@ export default function Step3BOQ({ errors = {} }) {
                                             onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { employee_id: val })}
                                             placeholder="Search employee…"
                                           />
+                                          {employeeOpts.length === 0 && !resource.employee_id && (
+                                            <p className="mt-1 text-[11px] text-zinc-400">
+                                              All employees are already used in this BOQ item.
+                                            </p>
+                                          )}
                                         </div>
                                       )}
 
@@ -718,6 +683,11 @@ export default function Step3BOQ({ errors = {} }) {
                                             onChange={(val) => updateResource(sectionIndex, itemIndex, resourceIndex, { user_id: val })}
                                             placeholder="Search user…"
                                           />
+                                          {userOpts.length === 0 && !resource.user_id && (
+                                            <p className="mt-1 text-[11px] text-zinc-400">
+                                              All users are already used in this BOQ item.
+                                            </p>
+                                          )}
                                         </div>
                                       )}
 
@@ -747,7 +717,11 @@ export default function Step3BOQ({ errors = {} }) {
                                           const id = String(resource.inventory_item_id);
                                           const totalAllocated = allocatedByInventoryId[id] || 0;
                                           const thisQty = toNumber(resource.quantity);
-                                          const effectiveStock = toNumber(inv.current_stock) - (totalAllocated - thisQty);
+                                          const effectiveStock = getEffectiveInventoryStock({
+                                            currentStock: inv.current_stock,
+                                            totalAllocated,
+                                            currentResourceQty: thisQty,
+                                          });
                                           const qty = parseFloat(resource.quantity || 0);
                                           const over = qty > effectiveStock;
                                           return (

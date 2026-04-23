@@ -1,6 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
+import AddInventoryItem from '@/Pages/InventoryManagement/add';
+import AddDirectSupply from '@/Pages/DirectSupplyManagement/add';
+import AddEmployee from '@/Pages/EmployeeManagement/add';
+import AddUser from '@/Pages/UserManagement/Users/add';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Textarea } from '@/Components/ui/textarea';
@@ -87,7 +91,11 @@ export default function BOQTab({ project, boqData }) {
     const [collapsedSections, setCollapsedSections] = useState({});
     const [collapsedItems, setCollapsedItems] = useState({});
     const [saving, setSaving] = useState(false);
-    const [availability, setAvailability] = useState({}); // { [inventory_item_id]: { available, unit, current_stock, committed } }
+    const [availability, setAvailability] = useState({});
+    const [showAddInventory, setShowAddInventory] = useState(false);
+    const [showAddDirectSupply, setShowAddDirectSupply] = useState(false);
+    const [showAddEmployee, setShowAddEmployee] = useState(false);
+    const [showAddUser, setShowAddUser] = useState(false); // { [inventory_item_id]: { available, unit, current_stock, committed } }
 
     const fetchAvailability = (inventoryItemId) => {
         if (!inventoryItemId || availability[inventoryItemId]) return;
@@ -514,7 +522,12 @@ export default function BOQTab({ project, boqData }) {
 
                     {category === 'material' && resource.source_type === 'inventory' && (
                         <div className="sm:col-span-2">
-                            <label className="mb-1 block text-[11px] text-zinc-500">Inventory Item</label>
+                            <div className="mb-1 flex items-center justify-between">
+                                <label className="text-[11px] text-zinc-500">Inventory Item</label>
+                                {has('inventory.create') && (
+                                    <button type="button" onClick={() => setShowAddInventory(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                )}
+                            </div>
                             <select
                                 value={resource.inventory_item_id || ''}
                                 onChange={(e) =>
@@ -534,7 +547,12 @@ export default function BOQTab({ project, boqData }) {
 
                     {category === 'material' && resource.source_type === 'direct_supply' && (
                         <div className="sm:col-span-2">
-                            <label className="mb-1 block text-[11px] text-zinc-500">Direct Supply</label>
+                            <div className="mb-1 flex items-center justify-between">
+                                <label className="text-[11px] text-zinc-500">Direct Supply</label>
+                                {has('direct-supply.create') && (
+                                    <button type="button" onClick={() => setShowAddDirectSupply(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                )}
+                            </div>
                             <select
                                 value={resource.direct_supply_id || ''}
                                 onChange={(e) =>
@@ -554,7 +572,12 @@ export default function BOQTab({ project, boqData }) {
 
                     {category === 'labor' && resource.source_type === 'employee' && (
                         <div className="sm:col-span-2">
-                            <label className="mb-1 block text-[11px] text-zinc-500">Employee</label>
+                            <div className="mb-1 flex items-center justify-between">
+                                <label className="text-[11px] text-zinc-500">Employee</label>
+                                {has('employees.create') && (
+                                    <button type="button" onClick={() => setShowAddEmployee(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                )}
+                            </div>
                             <select
                                 value={resource.employee_id || ''}
                                 onChange={(e) =>
@@ -574,7 +597,12 @@ export default function BOQTab({ project, boqData }) {
 
                     {category === 'labor' && resource.source_type === 'user' && (
                         <div className="sm:col-span-2">
-                            <label className="mb-1 block text-[11px] text-zinc-500">User</label>
+                            <div className="mb-1 flex items-center justify-between">
+                                <label className="text-[11px] text-zinc-500">User</label>
+                                {has('users.create') && (
+                                    <button type="button" onClick={() => setShowAddUser(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                )}
+                            </div>
                             <select
                                 value={resource.user_id || ''}
                                 onChange={(e) =>
@@ -1127,6 +1155,11 @@ export default function BOQTab({ project, boqData }) {
 
     // ── Summary bar ──────────────────────────────────────────────────────────
     return (
+        <>
+        {showAddInventory && <AddInventoryItem setShowAddModal={setShowAddInventory} preserveState />}
+        {showAddDirectSupply && <AddDirectSupply setShowAddModal={setShowAddDirectSupply} preserveState />}
+        {showAddEmployee && <AddEmployee setShowAddModal={setShowAddEmployee} preserveState />}
+        {showAddUser && <AddUser setShowAddModal={setShowAddUser} preserveState />}
         <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap gap-6">
@@ -1225,5 +1258,6 @@ export default function BOQTab({ project, boqData }) {
 
             {editing ? renderEditMode() : renderViewMode()}
         </div>
+        </>
     );
 }

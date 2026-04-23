@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { usePage } from "@inertiajs/react";
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
+import { usePermission } from "@/utils/permissions";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
@@ -22,6 +23,10 @@ import {
   Info,
 } from "lucide-react";
 import InputError from "@/Components/InputError";
+import AddInventoryItem from "@/Pages/InventoryManagement/add";
+import AddDirectSupply from "@/Pages/DirectSupplyManagement/add";
+import AddEmployee from "@/Pages/EmployeeManagement/add";
+import AddUser from "@/Pages/UserManagement/Users/add";
 
 // Excel-style column letters for auto section codes (A, B, ..., Z, AA, AB, ...)
 const toSectionCode = (index) => {
@@ -113,6 +118,12 @@ export default function Step3BOQ({ errors = {} }) {
 
   const userOptions = assignables.filter((a) => a.type === "user");
   const employeeOptions = assignables.filter((a) => a.type === "employee");
+
+  const { has } = usePermission();
+  const [showAddInventory, setShowAddInventory] = useState(false);
+  const [showAddDirectSupply, setShowAddDirectSupply] = useState(false);
+  const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [showAddUser, setShowAddUser] = useState(false);
 
   const {
     projectData,
@@ -323,6 +334,11 @@ export default function Step3BOQ({ errors = {} }) {
   }
 
   return (
+    <>
+    {showAddInventory && <AddInventoryItem setShowAddModal={setShowAddInventory} preserveState />}
+    {showAddDirectSupply && <AddDirectSupply setShowAddModal={setShowAddDirectSupply} preserveState />}
+    {showAddEmployee && <AddEmployee setShowAddModal={setShowAddEmployee} preserveState />}
+    {showAddUser && <AddUser setShowAddModal={setShowAddUser} preserveState />}
     <div className="space-y-6">
       <div className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
         <Info size={16} className="mt-0.5 flex-shrink-0" />
@@ -639,7 +655,12 @@ export default function Step3BOQ({ errors = {} }) {
 
                                       {resource.resource_category === "material" && resource.source_type === "inventory" && (
                                         <div className="sm:col-span-2">
-                                          <Label className="mb-1 block text-[11px] text-zinc-500">Inventory Item</Label>
+                                          <div className="mb-1 flex items-center justify-between">
+                                            <Label className="text-[11px] text-zinc-500">Inventory Item</Label>
+                                            {has('inventory.create') && (
+                                              <button type="button" onClick={() => setShowAddInventory(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                            )}
+                                          </div>
                                           <ResourceCombobox
                                             options={inventoryOptions}
                                             value={resource.inventory_item_id || ""}
@@ -651,7 +672,12 @@ export default function Step3BOQ({ errors = {} }) {
 
                                       {resource.resource_category === "material" && resource.source_type === "direct_supply" && (
                                         <div className="sm:col-span-2">
-                                          <Label className="mb-1 block text-[11px] text-zinc-500">Direct Supply</Label>
+                                          <div className="mb-1 flex items-center justify-between">
+                                            <Label className="text-[11px] text-zinc-500">Direct Supply</Label>
+                                            {has('direct-supply.create') && (
+                                              <button type="button" onClick={() => setShowAddDirectSupply(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                            )}
+                                          </div>
                                           <ResourceCombobox
                                             options={directSupplyOptions}
                                             value={resource.direct_supply_id || ""}
@@ -663,7 +689,12 @@ export default function Step3BOQ({ errors = {} }) {
 
                                       {resource.resource_category === "labor" && resource.source_type === "employee" && (
                                         <div className="sm:col-span-2">
-                                          <Label className="mb-1 block text-[11px] text-zinc-500">Employee</Label>
+                                          <div className="mb-1 flex items-center justify-between">
+                                            <Label className="text-[11px] text-zinc-500">Employee</Label>
+                                            {has('employees.create') && (
+                                              <button type="button" onClick={() => setShowAddEmployee(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                            )}
+                                          </div>
                                           <ResourceCombobox
                                             options={employeeOpts}
                                             value={resource.employee_id || ""}
@@ -675,7 +706,12 @@ export default function Step3BOQ({ errors = {} }) {
 
                                       {resource.resource_category === "labor" && resource.source_type === "user" && (
                                         <div className="sm:col-span-2">
-                                          <Label className="mb-1 block text-[11px] text-zinc-500">User</Label>
+                                          <div className="mb-1 flex items-center justify-between">
+                                            <Label className="text-[11px] text-zinc-500">User</Label>
+                                            {has('users.create') && (
+                                              <button type="button" onClick={() => setShowAddUser(true)} className="text-[11px] text-blue-600 hover:underline hover:text-blue-800">+ New</button>
+                                            )}
+                                          </div>
                                           <ResourceCombobox
                                             options={userOpts}
                                             value={resource.user_id || ""}
@@ -847,5 +883,6 @@ export default function Step3BOQ({ errors = {} }) {
         );
       })()}
     </div>
+    </>
   );
 }

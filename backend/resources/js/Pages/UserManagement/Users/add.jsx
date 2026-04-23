@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { useState, useRef } from 'react';
 import { toast } from "sonner";
 import {
@@ -104,7 +104,9 @@ const GovIdRow = ({ label, numberKey, imageKey, data, setData, errors }) => {
   );
 };
 
-const AddUser = ({ setShowAddModal, roles }) => {
+const AddUser = ({ setShowAddModal, roles: rolesProp, preserveState = false }) => {
+  const pageRoles = usePage().props.roles || [];
+  const roles = rolesProp ?? pageRoles;
   const [activeTab, setActiveTab] = useState('account');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const avatarRef = useRef(null);
@@ -183,6 +185,7 @@ const AddUser = ({ setShowAddModal, roles }) => {
     post(route('user-management.users.store'), {
       forceFormData: true,
       preserveScroll: true,
+      preserveState,
       onSuccess: (page) => {
         setShowAddModal(false);
         const flash = page.props.flash;

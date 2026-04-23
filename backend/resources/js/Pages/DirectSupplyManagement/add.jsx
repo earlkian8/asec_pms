@@ -28,7 +28,7 @@ const inputClass = (error) =>
         ? "border-red-500 ring-2 ring-red-400 focus:border-red-500 focus:ring-red-500"
         : "border-zinc-300 focus:border-zinc-800 focus:ring-2 focus:ring-zinc-800");
 
-const AddDirectSupply = ({ setShowAddModal }) => {
+const AddDirectSupply = ({ setShowAddModal, preserveState = false }) => {
     const { data, setData, post, errors, processing } = useForm({
         supply_name: "",
         description: "",
@@ -44,6 +44,7 @@ const AddDirectSupply = ({ setShowAddModal }) => {
         e.preventDefault();
         post(route("direct-supply-management.store"), {
             preserveScroll: true,
+            preserveState,
             onSuccess: (page) => {
                 setShowAddModal(false);
                 const flash = page.props.flash;

@@ -21,6 +21,7 @@ use App\Models\Employee;
 use App\Models\InventoryItem;
 use App\Models\DirectSupply;
 use App\Models\ClientUpdateRequest;
+use Spatie\Permission\Models\Role;
 use App\Traits\ActivityLogsTrait;
 use App\Traits\BoqCostBasisTrait;
 use Illuminate\Http\Request;
@@ -205,6 +206,7 @@ class ProjectsController extends Controller
         $directSupplyItems = DirectSupply::where('is_active', true)->orderBy('supply_name')->get(['id', 'supply_code', 'supply_name', 'unit_of_measure', 'unit_price', 'supplier_name']);
         $statuses       = Project::whereNull('archived_at')->distinct()->whereNotNull('status')->pluck('status')->sort()->values();
         $priorities     = Project::whereNull('archived_at')->distinct()->whereNotNull('priority')->pluck('priority')->sort()->values();
+        $roles          = Role::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('ProjectManagement/index', [
             'projects'          => $projects,
@@ -231,6 +233,7 @@ class ProjectsController extends Controller
             ],
             'sort_by'    => $sortBy,
             'sort_order' => $sortOrder,
+            'roles'      => $roles,
         ]);
     }
 
@@ -940,6 +943,8 @@ class ProjectsController extends Controller
         $overviewData             = $this->projectOverviewService->getProjectOverviewData($project);
         $requestUpdates           = ClientUpdateRequest::with(['client'])->where('project_id', $project->id)->orderBy('created_at', 'desc')->get();
 
+        $roles = Role::orderBy('name')->get(['id', 'name']);
+
         return Inertia::render('ProjectManagement/project-detail', [
             'project'                  => $project,
             'teamData'                 => $teamData,
@@ -951,6 +956,7 @@ class ProjectsController extends Controller
             'overviewData'             => $overviewData,
             'requestUpdatesData'       => $requestUpdates,
             'boqData'                  => $boqData,
+            'roles'                    => $roles,
         ]);
     }
 

@@ -89,7 +89,7 @@ const GovIdRow = ({ label, numberKey, imageKey, data, setData, errors }) => {
   );
 };
 
-const AddEmployee = ({ setShowAddModal }) => {
+const AddEmployee = ({ setShowAddModal, preserveState = false }) => {
   const [activeTab, setActiveTab]         = useState('basic');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const avatarRef = useRef(null);
@@ -161,6 +161,7 @@ const AddEmployee = ({ setShowAddModal }) => {
     post(route('employee-management.store'), {
       forceFormData: true,
       preserveScroll: true,
+      preserveState,
       onSuccess: () => {
         setShowAddModal(false);
         toast.success('Employee created successfully!');

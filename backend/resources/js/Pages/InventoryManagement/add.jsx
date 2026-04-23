@@ -23,7 +23,7 @@ import {
 } from "@/Components/ui/select";
 import { Loader2, Package } from "lucide-react";
 
-const AddInventoryItem = ({ setShowAddModal }) => {
+const AddInventoryItem = ({ setShowAddModal, preserveState = false }) => {
   const categories = [
     "Construction Materials",
     "Electrical",
@@ -80,6 +80,7 @@ const AddInventoryItem = ({ setShowAddModal }) => {
 
     post(route("inventory-management.store"), {
       preserveScroll: true,
+      preserveState,
       onSuccess: (page) => {
         setShowAddModal(false);
         const flash = page.props.flash;

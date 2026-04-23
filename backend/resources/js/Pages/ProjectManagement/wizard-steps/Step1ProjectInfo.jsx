@@ -1,4 +1,5 @@
 import { useProjectWizard } from "@/Contexts/ProjectWizardContext";
+import { usePermission } from "@/utils/permissions";
 import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";
 import { Label } from "@/Components/ui/label";
@@ -24,6 +25,7 @@ const DOCUMENT_FIELDS = [
 
 export default function Step1ProjectInfo({ clients, projectTypes = [], clientTypes = [], errors = {} }) {
   const { projectData, updateProjectData } = useProjectWizard();
+  const { has } = usePermission();
   const [showAddClient, setShowAddClient]           = useState(false);
   const [showAddProjectType, setShowAddProjectType] = useState(false);
   const [contractAmountDisplay, setContractAmountDisplay] = useState('');
@@ -144,7 +146,9 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                     {clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.client_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="outline" className="whitespace-nowrap" onClick={() => setShowAddClient(true)}>New</Button>
+                {has('clients.create') && (
+                  <Button type="button" variant="outline" className="whitespace-nowrap" onClick={() => setShowAddClient(true)}>New</Button>
+                )}
               </div>
               <InputError message={mergedErrors.client_id} />
             </div>
@@ -163,7 +167,9 @@ export default function Step1ProjectInfo({ clients, projectTypes = [], clientTyp
                       : <SelectItem value="" disabled>No project types available</SelectItem>}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="outline" className="whitespace-nowrap" onClick={() => setShowAddProjectType(true)}>New</Button>
+                {has('projects.create') && (
+                  <Button type="button" variant="outline" className="whitespace-nowrap" onClick={() => setShowAddProjectType(true)}>New</Button>
+                )}
               </div>
               <InputError message={mergedErrors.project_type_id} />
             </div>
